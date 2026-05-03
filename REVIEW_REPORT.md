@@ -318,6 +318,7 @@ Top 3 P0/P1: F-1 (top_stories RBAC bypass), F-7 (ticket_messages staff-impersona
 ---
 
 ### [P0] `top_stories` table is writable by ANY authenticated user (RLS bypass on front-page hero)
+> CLOSED in Session 3 — migration `2026-05-03_session_3_top_stories_rbac` + new POST/DELETE routes + page rewrite. Old `top_stories_write_authenticated` policy dropped, `admin.top_stories.manage` perm minted.
 - File: `supabase/migrations/2026-04-29_create_top_stories_table.sql:23-26`, exploited from `web/src/app/admin/top-stories/page.tsx:110-128`
 - Issue: The `top_stories_write_authenticated` RLS policy is `USING (auth.role() = 'authenticated')` for ALL operations (insert/update/delete). The migration explicitly says "the admin UI will enforce role checks at the application layer" — but `/admin/top-stories/page.tsx` enforces only client-side via `ADMIN_ROLES.has(r)` (line 81), and the page issues `supabase.from('top_stories').upsert(...)` (line 112) and `.delete()` (line 128) directly through the cookie-scoped browser client. There is NO server-side API route for `top_stories` (`web/src/app/api/admin/top-stories` does not exist). Any logged-in non-admin can `curl -X DELETE` (or use the JS client) to clear or replace the front-page hero pin.
 - Evidence: Live RLS via MCP returns `{polname: 'top_stories_write_authenticated', polcmd: '*', using_expr: "(auth.role() = 'authenticated'::text)"}`. Migration comment line 22: "For now, restrict to authenticated users; the admin UI (Wave 6a) will enforce role checks at the application layer via RBAC."
@@ -326,6 +327,7 @@ Top 3 P0/P1: F-1 (top_stories RBAC bypass), F-7 (ticket_messages staff-impersona
 - Verified by: Read the page (lines 110-128, 81), checked for an API route under `web/src/app/api/admin/top-stories` (none), MCP-queried `pg_policy` on `public.top_stories`.
 
 ### [P0] `webhook_log.update` is RLS-default-denied — admin retry button silently fails forever
+> CLOSED in Session 3 — migration `20260503000015_session3_webhook_ticket_rbac` adds admin UPDATE policy + new POST /api/admin/webhooks/[id]/retry route. Note: route now sets `processing_status='success'` (operator-acknowledged) since no backend retry worker exists; UI copy updated to match honest semantics.
 - File: `web/src/app/admin/webhooks/page.tsx:151-158`
 - Issue: The page's "Retry" action runs `supabase.from('webhook_log').update({ processing_status: 'success', retry_count: ... })`. Live RLS on `webhook_log` has only `webhook_log_insert` (with-check `false`) and `webhook_log_select` (admin+); there is NO `webhook_log_update` policy. Postgres default-denies. Every retry click toasts "Retry failed. Try again." regardless of admin level. No path to recover a failed webhook from the UI.
 - Evidence: MCP `pg_policy` query returns only `(insert, a)` and `(select, r)` for `public.webhook_log`. Page handler at line 151 calls `.update(...)` against this RLS-locked table.
@@ -334,6 +336,7 @@ Top 3 P0/P1: F-1 (top_stories RBAC bypass), F-7 (ticket_messages staff-impersona
 - Verified by: MCP `pg_policy` query, code read at `web/src/app/admin/webhooks/page.tsx:145-170`.
 
 ### [P1] `ticket_messages.is_staff` is client-trusted — non-admin can post staff-flagged replies
+> CLOSED in Session 3 — `check_ticket_message_is_staff` BEFORE INSERT/UPDATE trigger raises `insufficient_privilege` for non-admin sender; new POST /api/admin/support/[id]/reply server-sets is_staff. Trigger hardened to `hierarchy_level >= 80` (immune to role rename).
 - File: RLS policy + `web/src/app/admin/support/page.tsx:174-183`, plus the client-facing send path in `web/src/app/(any)/support` if it shares the table
 - Issue: `ticket_messages` has only `(insert, withcheck=(sender_id = auth.uid()) OR (sender_id IS NULL) OR is_admin_or_above())` and `(select, r)`. The column `is_staff` defaults `false` but has no CHECK constraint or trigger pinning it to admin-or-above when set true. The admin support page sets `is_staff: true` from the client. Any authenticated user can craft an INSERT against a ticket they own (or a NULL-sender row) with `is_staff: true` and impersonate staff in the conversation thread.
 - Evidence: MCP `pg_policy` shows the with-check expression. `information_schema.columns` shows `is_staff boolean default false` with no constraint. Page sends `is_staff: true` directly in the insert payload.
@@ -342,6 +345,7 @@ Top 3 P0/P1: F-1 (top_stories RBAC bypass), F-7 (ticket_messages staff-impersona
 - Verified by: MCP `pg_policy` on ticket_messages, MCP `information_schema.columns`, code read at support/page.tsx:174.
 
 ### [P1] `/admin/access` mutates `access_codes` from the browser — no rank guard, no rate limit, audit-before-mutation anti-pattern
+> CLOSED in Session 3 — 3 page flows moved to POST /api/admin/access-codes + PATCH /api/admin/access-codes/[id] (canonical 8-step + `withDestructiveAction` audit-after). Adversary follow-up added rank check on `grants_role_id` (closes role-grant escalation hole).
 - File: `web/src/app/admin/access/page.tsx:151-217, 244-258`
 - Issue: Three flows (`toggleCode`, `saveExpiry`, `createCode`) mutate `access_codes` directly via the cookie-scoped client. RLS gates writes on `is_admin_or_above()` so non-admins are blocked, but: (a) no rank guard — any admin can flip an owner-tier referral code, (b) no rate limit, (c) the audit row is written via `record_admin_action` BEFORE the mutation. If the mutation fails after the audit lands (network hiccup, RLS rejection due to a future policy tightening, race), the audit log records a phantom action that never happened. This is the exact anti-pattern that `withDestructiveAction()` in `lib/adminMutation.ts:274-287` exists to prevent.
 - Evidence: Page lines 153-176 (`toggleCode`): `record_admin_action` runs first, then `supabase.from('access_codes').update(...)`. Line 244 inserts a row with no rate-limit and no per-actor cap. Sibling routes (`/api/admin/users/[id]/ban`, etc.) all run audit AFTER the mutation per the canonical order documented in `adminMutation.ts:1-88`.
@@ -366,6 +370,7 @@ Top 3 P0/P1: F-1 (top_stories RBAC bypass), F-7 (ticket_messages staff-impersona
 - Verified by: Code read.
 
 ### [P1] `hide_comment` RPC missing rank guard — moderator can hide an owner's comment
+> CLOSED in Session 3 — `requireAdminOutranks(comment.user_id, user.id)` added to `/api/admin/moderation/comments/[id]/hide/route.js` before RPC call. Matches `apply_penalty` pattern.
 - File: `web/src/app/api/admin/moderation/comments/[id]/hide/route.js:57-61` calling `hide_comment` RPC
 - Issue: The route calls `service.rpc('hide_comment', { p_mod_id: user.id, p_comment_id: ..., p_reason: ... })`. The RPC body (verified live) only checks `_user_is_moderator(p_mod_id)` and updates `comments.status = 'hidden'`. There is no check that `p_mod_id` strictly outranks the comment's `user_id`. Sibling routes (`apply_penalty`, ban, role-set) all call `requireAdminOutranks` first; this route is the gap.
 - Evidence: MCP `pg_get_functiondef` on `public.hide_comment` returns the function body — only `_user_is_moderator` check, no rank logic. Route file at line 57 calls the RPC without a preceding `requireAdminOutranks(commentAuthorId, user.id)` call.
@@ -374,6 +379,7 @@ Top 3 P0/P1: F-1 (top_stories RBAC bypass), F-7 (ticket_messages staff-impersona
 - Verified by: MCP `pg_get_functiondef`, code read.
 
 ### [P1] Three pipeline-regenerate routes missing rate limits
+> CLOSED in Session 3 — `checkRateLimit` (10/60s, distinct policy keys per surface) added to sources-regenerate, timeline-regenerate, quiz-regenerate. Note: Session 5 will further wrap these in `lib/pipeline/call-model.ts` (cost-cap + ledger) — the rate-limit is a layered guard, do not remove.
 - File: `web/src/app/api/admin/pipeline/sources-regenerate/route.ts`, `web/src/app/api/admin/pipeline/timeline-regenerate/route.ts`, `web/src/app/api/admin/pipeline/quiz-regenerate/route.ts`
 - Issue: All three routes invoke external LLM APIs (Anthropic) on every call but have no `checkRateLimit`. A misbehaving admin (or compromised admin token) can drain the LLM budget faster than the cost guard can stop it. Other LLM-touching admin routes (`/api/admin/articles/list`, `/api/admin/articles/new-draft`) all rate-limit.
 - Evidence: Grep shows these 3 routes lack `checkRateLimit` while having POST handlers; verified by reading `sources-regenerate/route.ts` (no `checkRateLimit` import or call).
@@ -382,6 +388,7 @@ Top 3 P0/P1: F-1 (top_stories RBAC bypass), F-7 (ticket_messages staff-impersona
 - Verified by: Bash grep over `web/src/app/api/admin` for routes with POST/PATCH/DELETE but no `checkRateLimit`; spot-checked `sources-regenerate/route.ts`.
 
 ### [P1] `/admin/users` page-entry gate uses `admin.users.list.view` permission, but admin-page entry already passes the lower MOD threshold via layout — moderators get bounced to `/` without a clear message
+> NOT CLOSED in Session 3 — this is a UX polish issue (silent redirect vs explicit "insufficient permissions" panel). Documented as deferred in Session 3 status; revisit in Session 6 verification or as a focused permission-set audit.
 - File: `web/src/app/admin/users/page.tsx:133-137`
 - Issue: The admin layout (`app/admin/layout.tsx:35`) gates on `MOD_ROLES` (owner/admin/editor/moderator). Moderators reach the page, then the page-level check at line 134 calls `hasPermission('admin.users.list.view')`. If the moderator role doesn't hold that key, the page silently `router.push('/')`. No toast, no "you need higher access" message, no /admin breadcrumb back. Multiple admin pages duplicate this pattern with slightly different keys (`/admin/newsroom`: ADMIN_ROLES check, `/admin/breaking`: ADMIN_ROLES check) — moderators bounce out inconsistently.
 - Evidence: Layout at lines 31-36 (MOD_ROLES). Page at 134 (hasPermission gate, redirect on fail).
@@ -398,6 +405,7 @@ Top 3 P0/P1: F-1 (top_stories RBAC bypass), F-7 (ticket_messages staff-impersona
 - Verified by: MCP query on `permissions`, route read.
 
 ### [P2] Dead component `KBD.jsx` (keyboard-shortcut chip) — owner banned hotkeys, component should be deleted
+> CLOSED in Session 3 — file deleted (verified zero live imports).
 - File: `web/src/components/admin/KBD.jsx`
 - Issue: Component renders Cmd+K-style keyboard chips. Owner directive (`feedback_no_keyboard_shortcuts.md`) bans hotkeys/command palette from admin. Grep shows zero imports of KBD across `web/src/app` and `web/src/components` — only its own JSDoc references it. The `DataTable.jsx:28` comment says "Click-driven (no keyboard shortcuts — admin UI is mouse-first)", consistent with the directive. KBD.jsx is dead code that contradicts policy.
 - Evidence: `grep -rn "import.*KBD\|from.*KBD"` across web/src returns only the file's own docstring lines. No live import.

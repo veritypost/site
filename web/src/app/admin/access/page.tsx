@@ -1,12 +1,9 @@
 'use client';
 
-// Access codes + access requests admin. Two tabs, one table each,
-// plus a create-code drawer. Toggle / expiry edits go through
-// record_admin_action first so the audit log stays honest.
-
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 
 import Page, { PageHeader } from '@/components/admin/Page';
 import DataTable from '@/components/admin/DataTable';
@@ -62,10 +59,6 @@ const EMPTY_FORM: CodeForm = {
   is_active: true,
 };
 
-function generateCode(): string {
-  return 'VP' + Math.random().toString(36).substring(2, 8).toUpperCase();
-}
-
 export default function AccessAdmin() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -93,13 +86,8 @@ export default function AccessAdmin() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('roles(name)')
-        .eq('user_id', user.id);
-      const names = ((userRoles || []) as Array<{ roles: { name: string } | null }>)
-        .map((r) => r.roles?.name?.toLowerCase()).filter(Boolean) as string[];
-      if (!names.some((n) => n === 'owner' || n === 'admin')) { router.push('/'); return; }
+      await refreshAllPermissions();
+      if (!hasPermission('admin.access_codes.view')) { router.push('/admin'); return; }
       setAuthorized(true);
       await loadAll();
       setLoading(false);
@@ -150,27 +138,16 @@ export default function AccessAdmin() {
 
   const toggleCode = async (code: AccessCode) => {
     const next = !code.is_active;
-    const { error: auditErr } = await supabase.rpc('record_admin_action', {
-      p_action: 'access_code.toggle',
-      p_target_table: 'access_codes',
-      p_target_id: code.id,
-      p_reason: undefined,
-      p_old_value: { is_active: !!code.is_active, code: code.code },
-      p_new_value: { is_active: next, code: code.code },
-    });
-    if (auditErr) {
-      toast.push({ message: `Audit log write failed: ${auditErr.message}`, variant: 'danger' });
-      return;
-    }
-    // Optimistic flip.
     setCodes((prev) => prev.map((c) => c.id === code.id ? { ...c, is_active: next } : c));
-    const { error } = await supabase
-      .from('access_codes')
-      .update({ is_active: next })
-      .eq('id', code.id);
-    if (error) {
-      toast.push({ message: 'Toggle failed. Try again.', variant: 'danger' });
+    const res = await fetch(`/api/admin/access-codes/${code.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ field: 'active', value: next }),
+    });
+    if (!res.ok) {
       setCodes((prev) => prev.map((c) => c.id === code.id ? { ...c, is_active: !next } : c));
+      const json = await res.json().catch(() => ({}));
+      toast.push({ message: (json as { error?: string }).error || 'Toggle failed. Try again.', variant: 'danger' });
       return;
     }
     toast.push({ message: next ? 'Code activated' : 'Code deactivated', variant: 'success' });
@@ -187,74 +164,57 @@ export default function AccessAdmin() {
     const iso = editExpiryValue
       ? new Date(editExpiryValue + 'T23:59:59Z').toISOString()
       : null;
-    const prevExpiry = editExpiryCode.expires_at || null;
-    const { error: auditErr } = await supabase.rpc('record_admin_action', {
-      p_action: 'access_code.update_expiry',
-      p_target_table: 'access_codes',
-      p_target_id: editExpiryCode.id,
-      p_reason: undefined,
-      p_old_value: { expires_at: prevExpiry },
-      p_new_value: { expires_at: iso },
+    const res = await fetch(`/api/admin/access-codes/${editExpiryCode.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ field: 'expiry', value: iso }),
     });
-    if (auditErr) {
-      setExpirySaving(false);
-      toast.push({ message: `Audit log write failed: ${auditErr.message}`, variant: 'danger' });
-      return;
-    }
-    const { error } = await supabase
-      .from('access_codes')
-      .update({ expires_at: iso })
-      .eq('id', editExpiryCode.id);
     setExpirySaving(false);
-    if (error) {
-      toast.push({ message: 'Expiry save failed. Try again.', variant: 'danger' });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      toast.push({ message: (json as { error?: string }).error || 'Expiry save failed. Try again.', variant: 'danger' });
       return;
     }
-    setCodes((prev) => prev.map((c) =>
-      c.id === editExpiryCode.id ? { ...c, expires_at: iso } : c,
-    ));
+    const saved = editExpiryCode.id;
+    setCodes((prev) => prev.map((c) => c.id === saved ? { ...c, expires_at: iso } : c));
     setEditExpiryCode(null);
     setEditExpiryValue('');
     toast.push({ message: 'Expiry updated', variant: 'success' });
   };
 
   const createCode = async () => {
-    const code = (form.code.trim() || generateCode()).toUpperCase();
     const maxUses = form.max_uses === '' ? null : parseInt(form.max_uses, 10);
     if (maxUses !== null && (Number.isNaN(maxUses) || maxUses < 0)) {
       toast.push({ message: 'max_uses must be a non-negative integer or blank', variant: 'danger' });
       return;
     }
     setSaving(true);
-    const row = {
-      code,
-      description: form.description.trim() || null,
-      // S6-A113: type defaulted to 'referral' server-side (the only value
-      // the redemption pipeline honors). Form no longer surfaces a Type
-      // dropdown — see comment near EMPTY_FORM.
-      type: 'referral',
-      grants_plan_id: form.grants_plan_id || null,
-      grants_role_id: form.grants_role_id || null,
-      max_uses: maxUses,
-      expires_at: form.expires_at
-        ? new Date(form.expires_at + 'T23:59:59Z').toISOString()
-        : null,
-      is_active: !!form.is_active,
-    };
-    const { data, error } = await supabase
-      .from('access_codes')
-      .insert(row)
-      .select()
-      .single();
+    const res = await fetch('/api/admin/access-codes', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        code: form.code.trim() || null,
+        description: form.description.trim() || null,
+        grants_plan_id: form.grants_plan_id || null,
+        grants_role_id: form.grants_role_id || null,
+        max_uses: maxUses,
+        expires_at: form.expires_at
+          ? new Date(form.expires_at + 'T23:59:59Z').toISOString()
+          : null,
+        is_active: !!form.is_active,
+      }),
+    });
     setSaving(false);
-    if (error) {
-      toast.push({ message: 'Create failed. Try again.', variant: 'danger' });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      toast.push({ message: (json as { error?: string }).error || 'Create failed. Try again.', variant: 'danger' });
       return;
     }
-    setCodes((prev) => [data as AccessCode, ...prev]);
+    const json = await res.json() as { ok: boolean; data: AccessCode };
+    setCodes((prev) => [json.data, ...prev]);
     setForm(EMPTY_FORM);
     setShowCreate(false);
-    toast.push({ message: `Code ${(data as AccessCode).code} created`, variant: 'success' });
+    toast.push({ message: `Code ${json.data.code} created`, variant: 'success' });
   };
 
   if (loading) {

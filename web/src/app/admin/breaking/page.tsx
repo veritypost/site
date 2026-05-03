@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../lib/supabase/client';
-import { ADMIN_ROLES } from '@/lib/roles';
+import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
 import Button from '@/components/admin/Button';
@@ -45,16 +45,8 @@ function BreakingInner() {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
-      const { data: profile } = await supabase.from('users').select('id').eq('id', user.id).single();
-      const { data: userRoles } = await supabase.from('user_roles').select('roles!fk_user_roles_role_id(name)').eq('user_id', user.id);
-      const roleNames = (
-        (userRoles || []) as Array<{ roles: { name: string | null } | null }>
-      )
-        .map((r) => r.roles?.name?.toLowerCase())
-        .filter((n): n is string => typeof n === 'string');
-      // Ext-K3 — derive admin gate from ADMIN_ROLES instead of hardcoded
-      // ['owner','admin']. Single source of truth in lib/roles.
-      if (!profile || !roleNames.some((r) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
+      await refreshAllPermissions();
+      if (!hasPermission('admin.breaking.view')) { router.push('/admin'); return; }
 
       const { data, error: histError } = await supabase
         .from('articles')

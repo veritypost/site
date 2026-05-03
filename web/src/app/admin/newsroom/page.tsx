@@ -22,7 +22,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { ADMIN_ROLES } from '@/lib/roles';
+import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
@@ -113,23 +113,13 @@ function NewsroomV2Inner() {
         router.push('/login?next=/admin/newsroom');
         return;
       }
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('roles(name)')
-        .eq('user_id', user.id);
-      const roles = (userRoles || [])
-        .map((r: { roles: { name: string } | { name: string }[] | null }) => {
-          const rel = r.roles;
-          if (Array.isArray(rel)) return rel[0]?.name;
-          return rel?.name;
-        })
-        .filter(Boolean) as string[];
+      await refreshAllPermissions();
       if (cancelled) return;
-      if (roles.some((r) => ADMIN_ROLES.has(r))) {
-        setAuthorized(true);
-      } else {
-        router.push('/');
+      if (!hasPermission('admin.newsroom.view')) {
+        router.push('/admin');
+        return;
       }
+      setAuthorized(true);
       setAuthChecked(true);
     })();
     return () => { cancelled = true; };

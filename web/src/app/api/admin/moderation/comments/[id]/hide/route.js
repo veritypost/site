@@ -5,7 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { safeErrorResponse } from '@/lib/apiErrors';
-import { recordAdminAction } from '@/lib/adminMutation';
+import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 
 export async function POST(request, { params }) {
   let user;
@@ -35,6 +35,17 @@ export async function POST(request, { params }) {
       { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
     );
   }
+  const { data: commentRow, error: commentFetchErr } = await service
+    .from('comments')
+    .select('user_id')
+    .eq('id', params.id)
+    .single();
+  if (commentFetchErr || !commentRow) {
+    return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
+  }
+  const rankErr = await requireAdminOutranks(commentRow.user_id, user.id);
+  if (rankErr) return rankErr;
+
   const body = await request.json().catch(() => ({}));
   const reason = body?.reason;
 

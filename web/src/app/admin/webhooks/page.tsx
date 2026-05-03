@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/client';
+import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 import { friendlyError } from '@/lib/friendlyError';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
@@ -77,25 +77,9 @@ export default function WebhooksAdmin() {
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/'); return; }
-
-      const { data: profile } = await supabase
-        .from('users').select('id').eq('id', user.id).single();
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('roles!fk_user_roles_role_id(name)')
-        .eq('user_id', user.id);
-      const roleNames = (userRoles || [])
-        .map((r) => {
-          const rel = (r as { roles: { name: string } | { name: string }[] | null }).roles;
-          if (Array.isArray(rel)) return rel[0]?.name;
-          return rel?.name;
-        })
-        .filter(Boolean) as string[];
-
-      if (!profile || !roleNames.some((r) => ADMIN_ROLES.has(r))) {
-        router.push('/'); return;
-      }
+      if (!user) { router.push('/login'); return; }
+      await refreshAllPermissions();
+      if (!hasPermission('admin.webhooks.view')) { router.push('/admin'); return; }
 
       const { data, error: logError } = await supabase
         .from('webhook_log')
@@ -144,31 +128,20 @@ export default function WebhooksAdmin() {
 
   const runRetry = async (log: WebhookLog) => {
     setRetrying(true);
-    // The `webhooks` table does not exist in Blueprint v2. Retry is tracked
-    // directly on webhook_log via processing_status + retry_count. Actually
-    // re-dispatching the webhook is the job of the backend retry worker;
-    // here we only mark the log as retried.
-    const { error } = await supabase
-      .from('webhook_log')
-      .update({
-        processing_status: 'success',
-        retry_count: (log.retry_count || 0) + 1,
-        processed_at: new Date().toISOString(),
-      })
-      .eq('id', log.id);
+    const res = await fetch(`/api/admin/webhooks/${log.id}/retry`, { method: 'POST' });
     setRetrying(false);
-    if (error) {
+    if (!res.ok) {
       push({ message: 'Retry failed. Try again.', variant: 'danger' });
       return;
     }
     setLogs((prev) => prev.map((l) => (l.id === log.id
-      ? { ...l, processing_status: 'success', retry_count: (l.retry_count || 0) + 1 }
+      ? { ...l, processing_status: 'success', retry_count: (l.retry_count || 0) + 1, processed_at: new Date().toISOString() }
       : l)));
     setRetryTarget(null);
     setDrawerLog((prev) => (prev && prev.id === log.id
-      ? { ...prev, processing_status: 'success', retry_count: (prev.retry_count || 0) + 1 }
+      ? { ...prev, processing_status: 'success', retry_count: (prev.retry_count || 0) + 1, processed_at: new Date().toISOString() }
       : prev));
-    push({ message: 'Webhook marked as retried', variant: 'success' });
+    push({ message: 'Webhook marked as resolved', variant: 'success' });
   };
 
   const columns = [
@@ -455,14 +428,14 @@ export default function WebhooksAdmin() {
         )}
       </Drawer>
 
-      {/* Mark-resolved confirm — does NOT redispatch the webhook; redispatch
-          is the backend retry worker's job. This only flips the log row to
-          success so it stops showing as a live failure. */}
+      {/* Operator-acknowledgement only — flips the log row to success so it
+          stops surfacing as a live failure. There is no backend retry worker
+          today; redispatch must be handled outside this UI. */}
       <ConfirmDialog
         open={!!retryTarget}
         title="Mark webhook as resolved?"
         message={retryTarget ? (
-          `Marks the ${retryTarget.source ?? 'webhook'} log row as success. Does not redispatch the webhook — redispatch is handled by the backend retry worker.`
+          `Marks the ${retryTarget.source ?? 'webhook'} log row as success so it stops surfacing as a live failure. Does not redispatch the webhook — handle the upstream cause externally.`
         ) : ''}
         confirmLabel="Mark resolved"
         variant="primary"

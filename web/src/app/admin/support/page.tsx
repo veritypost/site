@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ADMIN_ROLES } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/client';
+import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 import Page, { PageHeader } from '@/components/admin/Page';
@@ -98,29 +98,13 @@ export default function SupportAdmin() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [reply, setReply] = useState<string>('');
   const [sending, setSending] = useState<boolean>(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/'); return; }
-
-      const { data: profile } = await supabase.from('users').select('id').eq('id', user.id).single();
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('roles!fk_user_roles_role_id(name)')
-        .eq('user_id', user.id);
-      const roleNames = (userRoles || [])
-        .map((r) => {
-          const rel = (r as { roles: { name: string } | { name: string }[] | null }).roles;
-          if (Array.isArray(rel)) return rel[0]?.name;
-          return rel?.name;
-        })
-        .filter(Boolean) as string[];
-      if (!profile || !roleNames.some((r) => ADMIN_ROLES.has(r))) {
-        router.push('/'); return;
-      }
-      setCurrentUserId(user.id);
+      if (!user) { router.push('/login'); return; }
+      await refreshAllPermissions();
+      if (!hasPermission('admin.support.tickets.view_all')) { router.push('/admin'); return; }
 
       // support_tickets has user_id + assigned_to both pointing at users, so
       // we must disambiguate the FK explicitly.
@@ -168,36 +152,30 @@ export default function SupportAdmin() {
   const closedCount  = tickets.filter((t) => t.status === 'closed').length;
 
   const sendReply = useCallback(async () => {
-    if (!reply.trim() || !selected || !currentUserId) return;
+    if (!reply.trim() || !selected) return;
     setSending(true);
     const body = reply.trim();
-    const { data: inserted, error } = await supabase
-      .from('ticket_messages')
-      .insert({
-        ticket_id: selected,
-        sender_id: currentUserId,
-        body,
-        is_staff: true,
-      })
-      .select()
-      .single();
-    if (error || !inserted) {
+    const res = await fetch(`/api/admin/support/${selected}/reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    });
+    if (!res.ok) {
       setSending(false);
-      push({ message: `Could not send reply: ${error?.message ?? 'unknown error'}`, variant: 'danger' });
+      const json = await res.json().catch(() => ({}));
+      push({ message: `Could not send reply: ${json?.error ?? 'unknown error'}`, variant: 'danger' });
       return;
     }
-    await supabase
-      .from('support_tickets')
-      .update({ updated_at: new Date().toISOString(), status: 'pending' })
-      .eq('id', selected);
+    const json = await res.json().catch(() => ({}));
+    const inserted = json?.message as TicketMessage | undefined;
     setTickets((prev) => prev.map((t) => (t.id !== selected
       ? t
-      : { ...t, status: 'pending', messages: [...(t.messages || []), inserted as TicketMessage] }
+      : { ...t, status: 'pending', messages: [...(t.messages || []), ...(inserted ? [inserted] : [])] }
     )));
     setReply('');
     setSending(false);
     push({ message: 'Reply sent', variant: 'success' });
-  }, [reply, selected, currentUserId, supabase, push]);
+  }, [reply, selected, push]);
 
   const setStatus = async (id: string, status: StatusKey) => {
     if (status === 'closed') {

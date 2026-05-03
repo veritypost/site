@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { ADMIN_ROLES } from '@/lib/roles';
+import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
 import Button from '@/components/admin/Button';
@@ -44,7 +44,6 @@ function TopStoriesInner() {
     POSITIONS.map((p) => ({ position: p, article: null }))
   );
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState<number | null>(null);
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PinnedArticle[]>([]);
@@ -71,16 +70,9 @@ function TopStoriesInner() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
 
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('roles(name)')
-        .eq('user_id', user.id);
-      const roleNames = ((userRoles || []) as Array<{ roles: { name: string } | null }>)
-        .map((r) => r.roles?.name?.toLowerCase())
-        .filter((n): n is string => typeof n === 'string');
-      if (!roleNames.some((r) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
+      await refreshAllPermissions();
+      if (!hasPermission('admin.top_stories.manage')) { router.push('/admin'); return; }
 
-      setUserId(user.id);
       await fetchSlots();
       setLoading(false);
     })();
@@ -105,13 +97,16 @@ function TopStoriesInner() {
   }, [query, supabase]);
 
   const pinArticle = async (position: number, article: PinnedArticle) => {
-    if (!userId || mutating) return;
+    if (mutating) return;
     setMutating(true);
-    const { error } = await supabase
-      .from('top_stories')
-      .upsert({ position, article_id: article.id, pinned_by: userId }, { onConflict: 'position' });
-    if (error) {
-      push({ message: `Failed to pin: ${error.message}`, variant: 'danger' });
+    const res = await fetch('/api/admin/top-stories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ position, story_id: article.id }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({})) as { error?: string };
+      push({ message: `Failed to pin: ${json.error ?? res.statusText}`, variant: 'danger' });
     } else {
       push({ message: `Position ${position} pinned.` });
       setSearchOpen(null);
@@ -125,9 +120,10 @@ function TopStoriesInner() {
   const removeSlot = async (position: number) => {
     if (mutating) return;
     setMutating(true);
-    const { error } = await supabase.from('top_stories').delete().eq('position', position);
-    if (error) {
-      push({ message: `Failed to remove: ${error.message}`, variant: 'danger' });
+    const res = await fetch(`/api/admin/top-stories/${position}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({})) as { error?: string };
+      push({ message: `Failed to remove: ${json.error ?? res.statusText}`, variant: 'danger' });
     } else {
       push({ message: `Position ${position} cleared.` });
       await fetchSlots();

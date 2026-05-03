@@ -72,4 +72,58 @@ Each PM dispatches Explore + bug-hunter-security + bug-hunter-flow subagents.
 
 ## Status
 
-(append final status block here)
+### Shipped 2026-05-03 — 8/8 closed (2 P0 + 5 P1 + 1 P2) + 12 reviewer/adversary follow-ups
+
+**Original scope (8 findings):**
+- ✅ P0 top_stories RBAC — RLS swapped (open `top_stories_write_authenticated` dropped, replaced with `top_stories_service_role_all`); new POST /api/admin/top-stories + DELETE /api/admin/top-stories/[position] (canonical 8-step skeleton); page rewritten to fetch(); `admin.top_stories.manage` perm minted + granted.
+- ✅ P0 webhook_log retry — admin-only UPDATE policy added; new POST /api/admin/webhooks/[id]/retry; page wired through fetch.
+- ✅ P1 ticket_messages.is_staff — BEFORE INSERT/UPDATE trigger raises `insufficient_privilege` for non-admin sender_id with `is_staff=true`; new POST /api/admin/support/[id]/reply (server-set is_staff); page rewritten.
+- ✅ P1 /admin/access mutations — 3 page flows moved to POST /api/admin/access-codes + PATCH /api/admin/access-codes/[id]; uses `withDestructiveAction` (audit-after); client-side `record_admin_action` calls dropped.
+- ✅ P1 hide_comment rank guard — `requireAdminOutranks(comment.user_id, user.id)` added before RPC call (matches `apply_penalty` pattern).
+- ✅ P1 admin gate consistency — 6 pages migrated to `refreshAllPermissions()` + `hasPermission(KEY)` + redirect to `/admin` (newsroom, breaking, access, top-stories, webhooks, support).
+- ✅ P1 pipeline-regenerate rate-limits — `checkRateLimit` (10/60s, distinct policy keys) added to sources, timeline, quiz routes.
+- ✅ P2 KBD.jsx — deleted (verified zero live imports).
+
+**Reviewer-surfaced follow-ups (independent-reviewer pass):**
+- Next 15 async params shape applied to webhooks/[id]/retry + support/[id]/reply routes.
+- Date validation in access-codes routes (returns 400 on invalid date instead of 500).
+- Ticket-existence pre-check in support/[id]/reply (404 vs FK 500).
+- top-stories POST: UUID format check + 23505/23503 → 409/400 mapping.
+- New `admin.webhooks.view` perm minted; webhooks + support pages migrated to canonical gate (originally out of scope but caught by reviewer).
+
+**Adversary-surfaced follow-ups (paranoid pass):**
+- ⚠️ Webhook retry truth-up — original P0 fix wrote `processing_status='retrying'` with no consumer (verified via grep; no worker reads that state). Route now sets `processing_status='success'` + audit action `webhooks.manual_resolve` + `manual_resolved: true` in newValue. UI copy clarified — "operator-acknowledged, no automatic redispatch." Honest-fix per `feedback_genuine_fixes_not_patches.md`.
+- Access-codes POST role-grant rank check — `grants_role_id` now compared to actor's max `hierarchy_level`; 403 if target role is at/above actor's rank (privilege-escalation hole closed).
+- Top-stories POST article-state check — preflight `articles.select('status, deleted_at, visibility')`; 422 if not published+public+not-deleted.
+- Access-codes [id] PATCH: Next 15 async params shape (third route, missed in earlier pass).
+- Top-stories DELETE: `.select()` after delete + 404 if 0 rows; audit row only on real change (no more no-op audit pollution).
+- ticket_messages trigger hardened — replaced `JOIN roles req ON req.name='admin'` with `r.hierarchy_level >= 80` constant (immune to future role rename).
+- support_tickets status flip moved into /api/admin/support/[id]/reply server route; client-side write dropped.
+
+**Adversary findings deferred (documented, not fixed in this session):**
+- P1 page perm-gate / route perm-gate split (e.g. `admin.support.tickets.view_all` opens page but `admin.support.reply` may 403 the textarea). UX polish — defer to a focused permission-set audit.
+- P1 `setStatus` audit-first antipattern in support page (REVIEW_REPORT lists this as a separate P1 NOT in Session 3 scope).
+- P2 audit-log denial blind spot (403/429 attempts not audited) — general improvement, not Session 3 specific.
+- P2 `top_stories_service_role_all` policy is no-op cosmetic (service_role bypasses RLS) — leave for now; the actual gate is "no other policy exists for non-service writes."
+- P2 `webhook_log_update` policy permits broader admin client writes than the new route uses — narrow with column-level WITH CHECK in a follow-up if any direct-write surface emerges.
+- P3 migration filename `…access_codes_perms.sql` actually mints `admin.newsroom.view` + `admin.breaking.view` — cosmetic; rename in a future cleanup pass.
+
+**Migrations applied via MCP (5 total):**
+- `2026-05-03_session_3_top_stories_rbac.sql`
+- `20260503000015_session3_webhook_ticket_rbac.sql`
+- `2026-05-03_session_3_access_codes_perms.sql` (mints admin.newsroom.view + admin.breaking.view)
+- `2026-05-03_session_3_webhooks_view_perm.sql`
+- `2026-05-03_session_3_ticket_trigger_harden.sql`
+
+**New permission keys:** admin.top_stories.manage, admin.webhooks.retry, admin.webhooks.view, admin.support.reply, admin.newsroom.view, admin.breaking.view (all granted to admin + owner).
+
+**Verification gates passed:**
+- Pre-impl finding-verifier: 8/8 CONFIRMED before work began.
+- Build-verifier: type-check + lint + 11 sentinel greps all PASS (after 1 round of follow-up cleanup for `withDestructiveAction` Promise wrap + dead `currentUserId`/`generateCode`).
+- Smoke-tester (DB-side): top_stories policy state correct, webhook_log UPDATE policy live, ticket_messages trigger CONFIRMED to RAISE `insufficient_privilege` on non-admin `is_staff=true` insert.
+- Independent reviewer: 8/8 closed (with 5 follow-ups, all addressed).
+- Adversary RBAC: 7 fixes landed (3 P0 + 4 P1), 6 lower-priority items documented as deferred.
+
+**iOS / kids:** N/A — pure web admin slice. None of these tables/routes are touched by iOS or kids client.
+
+**Owner-decision:** none required this session. All locked decisions (Q03 from STATE.md) applied per spec.

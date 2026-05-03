@@ -23,6 +23,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { requirePermission } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -119,6 +120,19 @@ export async function POST(req: Request) {
   }
 
   const service = createServiceClient();
+
+  const rate = await checkRateLimit(service, {
+    key: `admin.pipeline.regenerate.sources:${actor.id}`,
+    policyKey: 'admin.pipeline.regenerate.sources',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
 
   const { data: article, error: articleErr } = await service
     .from('articles')
