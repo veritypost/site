@@ -35,7 +35,7 @@ export function RegistrationWallProvider({
   }
 
   function dismiss() {
-    document.cookie = 'vp_wall_supp=1; path=/; max-age=86400; SameSite=Lax';
+    document.cookie = 'vp_wall_supp=1; path=/; max-age=86400; Secure; SameSite=Strict';
     setSuppressed(true);
     setOpen(false);
   }

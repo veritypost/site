@@ -498,7 +498,7 @@ struct HomeView: View {
 
     private struct TopStoryRow: Decodable {
         let position: Int
-        let articles: Story
+        let articles: Story?
     }
 
     private func loadData() async {
@@ -565,7 +565,7 @@ struct HomeView: View {
                     return aT > bT
                 }
             } else {
-                ranked = topRows.map { $0.articles }
+                ranked = topRows.compactMap { $0.articles }
             }
 
             // T244b — bail before mutating state so a cancelled task can’t

@@ -200,8 +200,8 @@ export default async function HomePage() {
   const hasPins = topRows.length > 0;
   const brokenPinCount = topRows.length - topArticles.length;
 
-  // fetchFailed: only if all data sources errored or threw
-  const fetchFailed = (topArticles.length === 0 && !hasPins && !!storiesRes.error) || fetchThrew;
+  // fetchFailed: if top_stories and date-sort both unavailable, or if storiesRes errored, or if fetch threw
+  const fetchFailed = (topArticles.length === 0 && !hasPins && !!storiesRes.error) || !!storiesRes.error || fetchThrew;
   if (storiesRes.error) {
     console.error('[home.fetch.stories]', storiesRes.error.message);
   }

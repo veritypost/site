@@ -7,6 +7,7 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getSettings, getNumber } from '@/lib/settings';
 import { COPY } from '@/lib/copy';
+import { renderBodyHtml } from '@/lib/pipeline/render-body';
 
 // T173 — defense-in-depth body length cap mirroring POST /api/comments. The
 // edit_comment RPC enforces internally; this fast-fails hostile or runaway
@@ -160,6 +161,7 @@ export async function PATCH(request, { params }) {
       .from('comments')
       .update({
         body: trimmed,
+        body_html: renderBodyHtml(trimmed),
         is_edited: true,
         edited_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

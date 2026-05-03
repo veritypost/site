@@ -104,6 +104,7 @@ export default function CommentThread({
   const supabase = createClient();
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
   const commentsRef = useRef<CommentWithAuthor[]>([]);
+  const mountedRef = useRef<boolean>(true);
   const [authorScores, setAuthorScores] = useState<Record<string, number>>({});
   const [yourReactions, setYourReactions] = useState<Record<string, 'agree' | 'disagree'>>({});
   const [yourTags, setYourTags] = useState<Map<string, Set<TagKind>>>(new Map());
@@ -119,7 +120,7 @@ export default function CommentThread({
   const [permsLoaded, setPermsLoaded] = useState<boolean>(false);
 
   const canViewSection = currentUserId
-    ? (permsLoaded ? hasPermission('comments.section.view') : true)
+    ? (permsLoaded ? hasPermission('comments.section.view') : false)
     : true;
   const canViewScore = permsLoaded ? hasPermission('comments.score.view_subcategory') : false;
   const canSubscribe = permsLoaded ? hasPermission('comments.realtime.subscribe') : false;
@@ -135,6 +136,11 @@ export default function CommentThread({
   useEffect(() => {
     commentsRef.current = comments;
   }, [comments]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // Section A — pull the editorial threshold from /api/settings/public.
   // Same endpoint CommentRow already uses for `comment_max_depth`, so no
@@ -282,7 +288,7 @@ export default function CommentThread({
     }
 
     setLoading(false);
-  }, [articleId, articleCategoryId, currentUserId, canViewScore, supabase]);
+  }, [articleId, articleCategoryId, currentUserId, supabase]);
 
   useEffect(() => {
     loadAll();
@@ -602,13 +608,14 @@ export default function CommentThread({
           .maybeSingle();
         if (authorRow) author = authorRow as unknown as CommentWithAuthor['users'];
       }
+      if (!mountedRef.current) return;
       setComments((prev) =>
         prev.find((c) => c.id === comment.id)
           ? prev
           : [...prev, { ...comment, users: author } as CommentWithAuthor]
       );
     };
-    enrich();
+    enrich().catch((err) => console.error('enrich failed:', err));
   }
 
   const [sort, setSort] = useState<'top' | 'newest'>('newest');

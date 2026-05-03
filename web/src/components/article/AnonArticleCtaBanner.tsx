@@ -1,8 +1,10 @@
 'use client';
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 export default function AnonArticleCtaBanner() {
   const [dismissed, setDismissed] = useState(false);
+  const pathname = usePathname();
   if (dismissed) return null;
   return (
     <div style={{
@@ -27,7 +29,7 @@ export default function AnonArticleCtaBanner() {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <a
-          href="/login"
+          href={`/login?next=${encodeURIComponent(pathname)}`}
           style={{
             display: 'inline-block',
             background: 'var(--accent, #111)',

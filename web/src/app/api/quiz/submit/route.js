@@ -59,7 +59,9 @@ export async function POST(request) {
   const { count: quizCount, error: countErr } = await service
     .from('quizzes')
     .select('*', { count: 'exact', head: true })
-    .eq('article_id', article_id);
+    .eq('article_id', article_id)
+    .eq('is_active', true)
+    .is('deleted_at', null);
   if (countErr) {
     console.error('[quiz.submit] count quizzes', countErr);
     return NextResponse.json({ error: 'Could not validate quiz' }, { status: 500 });
@@ -75,7 +77,7 @@ export async function POST(request) {
   // legitimate retries / multi-tab edge cases; tight enough to stop a
   // scripted attempt to brute-force quiz answers.
   const rate = await checkRateLimit(service, {
-    key: `quiz_submit:${user.id}`,
+    key: `quiz_submit:${user.id}:${article_id}`,
     policyKey: 'quiz_submit',
     max: 30,
     windowSec: 60,
@@ -130,7 +132,14 @@ export async function POST(request) {
     }
   }
 
-  const newAchievements = data?.passed ? await checkAchievements(service, { userId: user.id }) : [];
+  let newAchievements = [];
+  if (data?.passed) {
+    try {
+      newAchievements = await checkAchievements(service, { userId: user.id });
+    } catch (achErr) {
+      console.error('[quiz.submit] checkAchievements failed', achErr);
+    }
+  }
 
   return NextResponse.json({ ...data, scoring, newAchievements });
 }

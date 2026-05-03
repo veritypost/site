@@ -33,6 +33,7 @@ export type ArticleSurfaceProps = {
   bodyHtml: string;
   canEdit: boolean;
   canViewBody?: boolean;
+  isSignedIn?: boolean;
   nearbyArticles?: UpNextArticle[];
   hasQuiz?: boolean;
   quizPassed?: boolean;
@@ -65,7 +66,7 @@ const BODY_STYLE: React.CSSProperties = {
   color: 'var(--text-primary, #111)',
 };
 
-export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true, nearbyArticles = [], hasQuiz = false, quizPassed = false }: ArticleSurfaceProps) {
+export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true, isSignedIn = false, nearbyArticles = [], hasQuiz = false, quizPassed = false }: ArticleSurfaceProps) {
   const editHref = article.is_kids_safe
     ? `/admin/kids-story-manager?article=${article.id}`
     : `/admin/story-manager?article=${article.id}`;
@@ -165,9 +166,9 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
             fontSize: 14,
           }}
         >
-          <p style={{ margin: '0 0 12px' }}>Sign in to read this article.</p>
+          <p style={{ margin: '0 0 12px' }}>{isSignedIn ? 'Upgrade your plan to read this article.' : 'Sign in to read this article.'}</p>
           <a
-            href="/login"
+            href={isSignedIn ? '/pricing' : '/login'}
             style={{
               display: 'inline-block',
               padding: '8px 20px',
@@ -191,7 +192,7 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
               (e.currentTarget as HTMLAnchorElement).style.outlineOffset = '';
             }}
           >
-            Sign in
+            {isSignedIn ? 'Upgrade' : 'Sign in'}
           </a>
         </div>
       )}

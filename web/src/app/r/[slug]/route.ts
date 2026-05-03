@@ -66,9 +66,14 @@ export async function GET(
   // was set at signup and is immutable; overwriting it would corrupt analytics.
   try {
     const userClient = await createClient();
-    const { data: { user: sessionUser } } = await userClient.auth.getUser();
-    if (sessionUser) {
-      return NextResponse.redirect(`${siteUrl}/`, 302);
+    try {
+      const { data: { user: sessionUser } } = await userClient.auth.getUser();
+      if (sessionUser) {
+        return NextResponse.redirect(`${siteUrl}/`, 302);
+      }
+    } catch {
+      // auth.getUser() failure (auth endpoint unreachable, edge runtime) —
+      // treat as anon and continue normal flow.
     }
   } catch {
     // createClient failure (no cookie env, edge case) — treat as anon and

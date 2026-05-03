@@ -218,6 +218,7 @@ export default function ArticleQuiz({
     if (isLast) submittingRef.current = true;
     const next = { ...answers, [q.id]: q.options[oi].text };
     setAnswers(next);
+    if (isLast) setStage('loading-submit');
     setTimeout(() => {
       if (isLast) {
         submitAttempt(next).finally(() => { submittingRef.current = false; });
@@ -328,6 +329,7 @@ export default function ArticleQuiz({
 
   if (stage === 'answering' || stage === 'loading-submit') {
     const q = questions[currentIndex];
+    if (stage === 'answering' && !q) return null;
     const grading = stage === 'loading-submit';
     return (
       <div

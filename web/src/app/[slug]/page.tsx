@@ -15,6 +15,7 @@ import { cookies } from 'next/headers';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { hasPermissionServer } from '@/lib/auth';
 import { renderBodyHtml } from '@/lib/pipeline/render-body';
+import sanitizeHtml from 'sanitize-html';
 import { JsonLd, newsArticle } from '@/components/JsonLd';
 import { getSiteUrlOrNull } from '@/lib/siteUrl';
 import { incrementViewCount } from '@/lib/counters';
@@ -138,7 +139,8 @@ export default async function ArticleSlugPage({
   }
 
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData?.user ?? null;
 
   const isAnon = !user;
   const cookieStore = cookies();
@@ -259,7 +261,23 @@ export default async function ArticleSlugPage({
     incrementViewCount(service, article.id).catch((e) => console.error('[article] incrementViewCount failed', e));
   }
 
-  const bodyHtml = article.body_html ?? (article.body ? renderBodyHtml(article.body) : '');
+  const bodyHtml = article.body_html
+    ? sanitizeHtml(article.body_html, {
+        allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'figure', 'figcaption', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'mark', 'abbr', 'cite', 'q', 'small', 'dl', 'dt', 'dd', 's', 'sub', 'sup', 'pre', 'code', 'kbd', 'samp', 'var', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'col', 'colgroup', 'div', 'span']),
+        allowedAttributes: {
+          ...sanitizeHtml.defaults.allowedAttributes,
+          a: ['href', 'name', 'target', 'rel', 'title'],
+          img: ['src', 'alt', 'title', 'width', 'height'],
+          code: ['class'],
+          pre: ['class'],
+          th: ['scope', 'colspan', 'rowspan'],
+          td: ['colspan', 'rowspan'],
+        },
+        allowedSchemes: ['http', 'https', 'mailto'],
+        allowedSchemesByTag: { img: ['http', 'https', 'data'] },
+        disallowedTagsMode: 'discard',
+      })
+    : (article.body ? renderBodyHtml(article.body) : '');
   const isCoppa = isCoppaBand(article);
   const siteUrl = getSiteUrlOrNull() ?? '';
 
@@ -318,6 +336,7 @@ export default async function ArticleSlugPage({
               nearbyArticles={nearbyArticles}
               hasQuiz={hasQuiz}
               quizPassed={initialPassed}
+              isSignedIn={!!user}
             />
             {!isCoppa && (article.status === 'published' || canEdit || isOwnerModeViewer) && (
               <ArticleActions

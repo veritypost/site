@@ -21,6 +21,7 @@ interface CommentComposerProps {
   // renders a locked state instead of the form. Defaults to true so
   // existing call sites that don't pass this prop are unaffected.
   quizPassed?: boolean;
+  hasQuiz?: boolean;
 }
 
 type MuteState = {
@@ -51,6 +52,7 @@ export default function CommentComposer({
   onCancel,
   autoFocus = false,
   quizPassed = true,
+  hasQuiz = true,
 }: CommentComposerProps) {
   const [body, setBody] = useState<string>('');
   const [busy, setBusy] = useState<boolean>(false);
@@ -339,7 +341,7 @@ export default function CommentComposer({
         }}
       >
         <div style={{ fontSize: 14, color: 'var(--dim, #888)', lineHeight: 1.5 }}>
-          Pass the quiz above to join the discussion.
+          {hasQuiz ? 'Pass the quiz above to join the discussion.' : 'Comments are locked on this article.'}
         </div>
       </div>
     );

@@ -40,6 +40,7 @@ export async function GET(_req: Request, { params }: { params: { slug: string } 
     )
     .eq('story_id', story.id)
     .is('deleted_at', null)
+    .limit(1)
     .maybeSingle();
 
   if (error) {

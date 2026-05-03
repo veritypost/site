@@ -61,6 +61,7 @@ export default function BookmarksPage() {
   const supabase = createClient();
   const { show, dismiss } = useToast();
   const undoTimerRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const mountedRef = useRef(true);
   const [items, setItems] = useState<BookmarkRow[]>([]);
   const [collections, setCollections] = useState<CollectionRow[]>([]);
   const [activeCollection, setActiveCollection] = useState<string>('all'); // 'all' | 'uncategorised' | collection_id
@@ -84,6 +85,7 @@ export default function BookmarksPage() {
 
   const [showNewCollection, setShowNewCollection] = useState<boolean>(false);
   const [newCollectionName, setNewCollectionName] = useState<string>('');
+  const [creatingCollection, setCreatingCollection] = useState<boolean>(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deleteBusy, setDeleteBusy] = useState<boolean>(false);
 
@@ -92,7 +94,7 @@ export default function BookmarksPage() {
   // so rapid clicks don't fire overlapping queries.
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   const atCap = !canUnlimited && items.length >= bookmarkCap;
   // T-088: show a proactive cap counter when a free user is at or above 50% of their cap.
@@ -106,13 +108,13 @@ export default function BookmarksPage() {
         : 'neutral';
 
   async function load() {
-    setLoading(true);
-    setError('');
+    if (mountedRef.current) setLoading(true);
+    if (mountedRef.current) setError('');
     const {
       data: { user: authUser },
     } = await supabase.auth.getUser();
     if (!authUser) {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
       return;
     }
 
@@ -125,10 +127,10 @@ export default function BookmarksPage() {
     const collectionsOk = hasPermission('bookmarks.collection.create');
     const noteOk = hasPermission('bookmarks.note.add');
     const exportOk = hasPermission('bookmarks.export');
-    setCanUnlimited(unlimited);
-    setCanCollections(collectionsOk);
-    setCanNote(noteOk);
-    setCanExport(exportOk);
+    if (mountedRef.current) setCanUnlimited(unlimited);
+    if (mountedRef.current) setCanCollections(collectionsOk);
+    if (mountedRef.current) setCanNote(noteOk);
+    if (mountedRef.current) setCanExport(exportOk);
 
     // T-016: resolve bookmark cap for the user's plan. getPlanLimitValue
     // returns null when unlimited; we only care about it for capped users.
@@ -144,7 +146,7 @@ export default function BookmarksPage() {
         'bookmarks',
         FALLBACK_BOOKMARK_CAP
       );
-      if (typeof cap === 'number') setBookmarkCap(cap);
+      if (typeof cap === 'number' && mountedRef.current) setBookmarkCap(cap);
     }
 
     // First page: PAGE_SIZE most recent bookmarks, cursor-paginated by
@@ -160,13 +162,13 @@ export default function BookmarksPage() {
       .limit(PAGE_SIZE);
     if (bmsErr) {
       console.error('[bookmarks] load failed', bmsErr);
-      setError("Couldn't load bookmarks. Try refreshing.");
-      setLoading(false);
+      if (mountedRef.current) setError("Couldn't load bookmarks. Try refreshing.");
+      if (mountedRef.current) setLoading(false);
       return;
     }
     const firstPage = (bms as unknown as BookmarkRow[] | null) || [];
-    setItems(firstPage);
-    setHasMore(firstPage.length === PAGE_SIZE);
+    if (mountedRef.current) setItems(firstPage);
+    if (mountedRef.current) setHasMore(firstPage.length === PAGE_SIZE);
 
     if (collectionsOk) {
       const { data: cols, error: colsErr } = await supabase
@@ -176,17 +178,21 @@ export default function BookmarksPage() {
         .order('sort_order')
         .order('created_at');
       if (colsErr) console.error('[bookmarks] collections load failed', colsErr);
-      setCollections((cols as unknown as CollectionRow[] | null) || []);
+      if (mountedRef.current) setCollections((cols as unknown as CollectionRow[] | null) || []);
     } else {
-      setCollections([]);
+      if (mountedRef.current) setCollections([]);
     }
 
-    setLoading(false);
+    if (mountedRef.current) setLoading(false);
   }
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
   }, []);
 
   useEffect(() => {
@@ -232,8 +238,8 @@ export default function BookmarksPage() {
 
   function removeBookmark(bookmark: BookmarkRow) {
     const id = bookmark.id;
-    if (deletingId === id) return;
-    setDeletingId(id);
+    if (deletingIds.has(id)) return;
+    setDeletingIds((prev) => { const s = new Set(prev); s.add(id); return s; });
     const originalIndex = items.findIndex((b) => b.id === id);
     setItems((prev) => prev.filter((b) => b.id !== id));
 
@@ -248,7 +254,7 @@ export default function BookmarksPage() {
               clearTimeout(t);
               undoTimerRef.current.delete(id);
             }
-            setDeletingId(null);
+            setDeletingIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
             setItems((prev) => {
               const idx =
                 originalIndex >= 0 && originalIndex <= prev.length ? originalIndex : prev.length;
@@ -277,10 +283,24 @@ export default function BookmarksPage() {
     const timer = setTimeout(async () => {
       undoTimerRef.current.delete(id);
       dismiss(toastId);
-      const res = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        setDeletingId(null);
+      try {
+        const res = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          setDeletingIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
+          setItems((prev) => {
+            const idx =
+              originalIndex >= 0 && originalIndex <= prev.length ? originalIndex : prev.length;
+            const next = [...prev];
+            next.splice(idx, 0, bookmark);
+            return next;
+          });
+          setError(friendlyError(d?.error, 'Remove failed'));
+        } else {
+          setDeletingIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
+        }
+      } catch {
+        setDeletingIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
         setItems((prev) => {
           const idx =
             originalIndex >= 0 && originalIndex <= prev.length ? originalIndex : prev.length;
@@ -288,9 +308,7 @@ export default function BookmarksPage() {
           next.splice(idx, 0, bookmark);
           return next;
         });
-        setError(friendlyError(d?.error, 'Remove failed'));
-      } else {
-        setDeletingId(null);
+        setError('Remove failed. Please try again.');
       }
     }, 5000);
     undoTimerRef.current.set(id, timer);
@@ -329,19 +347,24 @@ export default function BookmarksPage() {
   async function createCollection() {
     const name = newCollectionName.trim();
     if (!name) return;
-    const res = await fetch('/api/bookmark-collections', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      setError(friendlyError(d?.error, 'Create failed'));
-      return;
+    setCreatingCollection(true);
+    try {
+      const res = await fetch('/api/bookmark-collections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(friendlyError(d?.error, 'Create failed'));
+        return;
+      }
+      setNewCollectionName('');
+      setShowNewCollection(false);
+      load();
+    } finally {
+      setCreatingCollection(false);
     }
-    setNewCollectionName('');
-    setShowNewCollection(false);
-    load();
   }
 
   function requestDeleteCollection(col: CollectionRow) {
@@ -514,8 +537,8 @@ export default function BookmarksPage() {
                 outline: 'none',
               }}
             />
-            <button onClick={createCollection} style={btnSolid}>
-              Create
+            <button onClick={createCollection} disabled={creatingCollection} style={{ ...btnSolid, opacity: creatingCollection ? 0.6 : 1, cursor: creatingCollection ? 'default' : 'pointer' }}>
+              {creatingCollection ? 'Creating…' : 'Create'}
             </button>
             <button onClick={() => setShowNewCollection(false)} style={btnGhost}>
               Cancel
@@ -641,15 +664,15 @@ export default function BookmarksPage() {
                   )}
                   <button
                     onClick={() => removeBookmark(b)}
-                    disabled={deletingId === b.id}
+                    disabled={deletingIds.has(b.id)}
                     style={{
                       background: 'none',
                       border: 'none',
                       fontSize: 12,
                       color: '#dc2626',
                       fontWeight: 600,
-                      cursor: deletingId === b.id ? 'not-allowed' : 'pointer',
-                      opacity: deletingId === b.id ? 0.5 : 1,
+                      cursor: deletingIds.has(b.id) ? 'not-allowed' : 'pointer',
+                      opacity: deletingIds.has(b.id) ? 0.5 : 1,
                       minHeight: 44,
                     }}
                   >
