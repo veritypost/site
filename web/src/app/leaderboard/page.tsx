@@ -1,12 +1,11 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified home_feed 2026-04-18
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '../../lib/supabase/client';
 import Avatar from '../../components/Avatar';
-import VerifiedBadge from '../../components/VerifiedBadge';
 import ErrorState from '../../components/ErrorState';
 import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 import { usePageViewTrack } from '@/lib/useTrack';
@@ -73,8 +72,6 @@ type LeaderUser = Pick<
   | 'username'
   | 'avatar_url'
   | 'avatar_color'
-  | 'is_verified_public_figure'
-  | 'is_expert'
   | 'verity_score'
   | 'quizzes_completed_count'
   | 'comment_count'
@@ -92,8 +89,6 @@ interface CategoryScoreRow {
     | 'username'
     | 'avatar_url'
     | 'avatar_color'
-    | 'is_verified_public_figure'
-    | 'is_expert'
     | 'verity_score'
     | 'quizzes_completed_count'
     | 'comment_count'
@@ -104,7 +99,7 @@ interface CategoryScoreRow {
   >;
 }
 
-export default function LeaderboardPage() {
+function LeaderboardPageContent() {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -115,12 +110,12 @@ export default function LeaderboardPage() {
   );
   const [period, setPeriodState] = useState<PeriodKey>(() => {
     const p = searchParams.get('period');
-    return p === 'week' ? 'This Week' : p === 'month' ? 'This Month' : p === 'year' ? 'This Year' : 'All time';
+    return p === 'week' ? 'This week' : p === 'month' ? 'This month' : 'All time';
   });
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcats, setSubcats] = useState<SubcatRow[]>([]);
   const [activeCat, setActiveCatState] = useState<string | null>(() => searchParams.get('cat'));
-  const [activeSub, setActiveSub] = useState<string | null>(null);
+  const [, setActiveSub] = useState<string | null>(null);
 
   const [users, setUsers] = useState<LeaderUser[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -151,7 +146,7 @@ export default function LeaderboardPage() {
   const setPeriod = (p: PeriodKey) => {
     setPeriodState(p);
     const params = new URLSearchParams(searchParams.toString());
-    const key = p === 'This Week' ? 'week' : p === 'This Month' ? 'month' : p === 'This Year' ? 'year' : 'all';
+    const key = p === 'This week' ? 'week' : p === 'This month' ? 'month' : 'all';
     params.set('period', key);
     router.replace(`?${params.toString()}`, { scroll: false });
   };
@@ -197,7 +192,7 @@ export default function LeaderboardPage() {
         const { data: meRow } = await supabase
           .from('users')
           .select(
-            'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count, is_banned, frozen_at'
+            'id, username, avatar_url, avatar_color, verity_score, quizzes_completed_count, comment_count, is_banned, frozen_at'
           )
           .eq('id', authRes.data.user.id)
           .single<MeRow>();
@@ -221,6 +216,21 @@ export default function LeaderboardPage() {
         setMeLoaded(true);
       }
     })();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        setMe(null);
+        setMeLoaded(false);
+        setMyRank(null);
+        setFullAccess(false);
+        setCanCategories(false);
+        setUsers([]);
+        setActiveTabState('Top Verifiers');
+        setPeriodState('All time');
+        setActiveCatState(null);
+      }
+    });
+    return () => { subscription.unsubscribe(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -231,13 +241,19 @@ export default function LeaderboardPage() {
       if (!meLoaded) return;
       setLoading(true);
       setLoadError('');
+      const pageLimit = fullAccess ? 50 : 3;
 
       // Category score path: rank by category_scores.score for the selected category.
       if (activeCat) {
+        if (!canCategories) {
+          setUsers([]);
+          setLoading(false);
+          return;
+        }
         const { data: csRows, error: csErr } = await supabase
           .from('category_scores')
           .select(
-            'user_id, score, users!inner ( id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count, email_verified, is_banned, show_on_leaderboard, frozen_at )'
+            'user_id, score, users!inner ( id, username, avatar_url, avatar_color, verity_score, quizzes_completed_count, comment_count, email_verified, is_banned, show_on_leaderboard, frozen_at )'
           )
           .eq('category_id', activeCat)
           .eq('users.email_verified', true)
@@ -246,7 +262,7 @@ export default function LeaderboardPage() {
           .is('users.frozen_at', null)
           .is('users.deletion_scheduled_for', null)
           .order('score', { ascending: false })
-          .limit(50);
+          .limit(pageLimit);
         if (controller.signal.aborted) return;
         if (csErr) {
           console.error('[leaderboard] category_scores load failed', csErr);
@@ -272,6 +288,7 @@ export default function LeaderboardPage() {
 
       if (activeTab === 'Rising Stars') {
         const thirty = periodSince('This month')!;
+        const risingLimit = fullAccess ? 50 : 3;
         // T300 — read via public_profiles_v. The view pre-filters
         // is_banned=false + deletion_scheduled_for IS NULL, so those
         // explicit filters are dropped. `is_frozen` is a derived
@@ -280,14 +297,14 @@ export default function LeaderboardPage() {
         const { data, error: rsErr } = await supabase
           .from('public_profiles_v')
           .select(
-            'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count'
+            'id, username, avatar_url, avatar_color, verity_score, quizzes_completed_count, comment_count'
           )
           .eq('email_verified', true)
           .eq('show_on_leaderboard', true)
           .eq('is_frozen', false)
           .gte('created_at', thirty.toISOString())
           .order('verity_score', { ascending: false })
-          .limit(50);
+          .limit(risingLimit);
         if (controller.signal.aborted) return;
         if (rsErr) {
           console.error('[leaderboard] rising stars load failed', rsErr);
@@ -319,7 +336,7 @@ export default function LeaderboardPage() {
         // Drop both casts after `npm run types:gen`.
         const { data: rpcRows, error: rpcErr } = await supabase.rpc(
           'leaderboard_period_counts' as never,
-          { p_since: periodCutoff, p_limit: 50 } as never
+          { p_since: periodCutoff, p_limit: pageLimit } as never
         );
         if (controller.signal.aborted) return;
         if (rpcErr) {
@@ -349,10 +366,11 @@ export default function LeaderboardPage() {
         const { data } = await supabase
           .from('public_profiles_v')
           .select(
-            'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count'
+            'id, username, avatar_url, avatar_color, verity_score, quizzes_completed_count, comment_count'
           )
           .in('id', ids)
-          .eq('show_on_leaderboard', true);
+          .eq('show_on_leaderboard', true)
+          .limit(pageLimit);
         if (controller.signal.aborted) return;
         const rows = (data as LeaderUser[] | null) || [];
         const sorted = rows.slice().sort((a, b) => (counts[b.id] || 0) - (counts[a.id] || 0));
@@ -362,14 +380,13 @@ export default function LeaderboardPage() {
       }
 
       // Default: rank by verity_score. Anonymous viewers see only top 3 per D31.
-      const pageLimit = fullAccess ? 50 : 3;
       // T300 — read via public_profiles_v. is_banned + deletion already
       // pre-filtered by the view; `is_frozen` derived boolean filters
       // frozen users without exposing the timestamp.
       const { data, error: defErr } = await supabase
         .from('public_profiles_v')
         .select(
-          'id, username, avatar_url, avatar_color, is_verified_public_figure, is_expert, verity_score, quizzes_completed_count, comment_count'
+          'id, username, avatar_url, avatar_color, verity_score, quizzes_completed_count, comment_count'
         )
         .eq('email_verified', true)
         .eq('show_on_leaderboard', true)
@@ -699,99 +716,35 @@ export default function LeaderboardPage() {
                   isLast={i === Math.min(2, visibleUsers.length - 1) && visibleUsers.length <= 3}
                 />
               ))}
-              {!me && (
-                <div style={{ position: 'relative', overflow: 'hidden' }}>
-                  <div style={{ filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none' }}>
-                    {visibleUsers.slice(3, 8).map((u, i) => (
-                      <div
-                        key={u.id}
-                        style={{
-                          padding: '12px 20px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 12,
-                          borderBottom: '1px solid var(--rule)',
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 14,
-                            fontWeight: 700,
-                            color: 'var(--dim)',
-                            width: 28,
-                            textAlign: 'right',
-                          }}
-                        >
-                          {i + 4}
-                        </span>
-                        <div
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: '50%',
-                            background: 'var(--rule)',
-                          }}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}
-                          >
-                            {u.username}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--dim)' }}>
-                            {(u.verity_score || 0).toLocaleString()} verity
-                          </div>
-                        </div>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
-                          {(u.displayScore || 0).toLocaleString()}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      zIndex: 3,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background:
-                        `linear-gradient(to bottom, rgba(var(--bg-rgb), 0.3), rgba(var(--bg-rgb), 0.95) 70%)`,
-                    }}
-                  >
-                    <p
-                      style={{
-                        margin: '0 0 4px',
-                        fontSize: 16,
-                        fontWeight: 700,
-                        color: 'var(--text)',
-                      }}
-                    >
-                      Sign up to see the full leaderboard
-                    </p>
-                    <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--dim)' }}>
-                      Sign up and verify your email to see the full ranking.
-                    </p>
-                    <a
-                      href="/signup"
-                      style={{
-                        display: 'inline-block',
-                        padding: '10px 28px',
-                        background: 'var(--accent)',
-                        color: '#fff',
-                        borderRadius: 10,
-                        fontSize: 14,
-                        fontWeight: 600,
-                        textDecoration: 'none',
-                      }}
-                    >
-                      Create free account
-                    </a>
-                  </div>
-                </div>
-              )}
+              <div
+                style={{
+                  padding: '24px 20px',
+                  textAlign: 'center',
+                  borderTop: '1px solid var(--rule)',
+                }}
+              >
+                <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                  Sign up to see the full leaderboard
+                </p>
+                <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--dim)' }}>
+                  Sign up and verify your email to see the full ranking.
+                </p>
+                <a
+                  href="/signup"
+                  style={{
+                    display: 'inline-block',
+                    padding: '10px 28px',
+                    background: 'var(--accent)',
+                    color: 'var(--bg)',
+                    borderRadius: 10,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Create free account
+                </a>
+              </div>
             </>
           )}
 
@@ -825,130 +778,70 @@ export default function LeaderboardPage() {
                     isSelf={me?.id === u.id}
                   />
                 ))
-            : me &&
-              visibleUsers.length > 3 && (
-                /* Unverified: blur 4+ with upgrade lock */
-                <div style={{ position: 'relative', overflow: 'hidden' }}>
-                  <div style={{ filter: 'blur(6px)', pointerEvents: 'none', userSelect: 'none' }}>
-                    {visibleUsers.slice(3, 8).map((u, i) => (
-                      <div
-                        key={u.id}
+            : me && (
+                /* Unverified: verify-email CTA always visible. The old
+                   visibleUsers.length > 3 guard made this structurally
+                   unreachable — pageLimit=3 for non-fullAccess users so
+                   visibleUsers never exceeds 3. */
+                <div
+                  style={{
+                    padding: '24px 20px',
+                    textAlign: 'center',
+                    borderTop: '1px solid var(--rule)',
+                  }}
+                >
+                  <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                    Verify your email to see ranks beyond top 3.
+                  </p>
+                  {resendState === 'sent' ? (
+                    <p style={{ marginTop: 8, fontSize: 14, color: 'var(--accent)', fontWeight: 600 }}>
+                      Check your inbox for a verification link.
+                    </p>
+                  ) : resendState === 'rate-limited' ? (
+                    <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
+                      You&apos;ve already requested a verification email recently. Check your inbox.
+                    </p>
+                  ) : resendState === 'error' ? (
+                    <>
+                      <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
+                        Something went wrong. Try again in a moment.
+                      </p>
+                      <button
+                        onClick={() => setResendState('idle')}
                         style={{
-                          padding: '12px 20px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 12,
-                          borderBottom: '1px solid var(--rule)',
+                          marginTop: 8,
+                          padding: '8px 16px',
+                          background: 'var(--accent)',
+                          color: 'var(--bg)',
+                          border: 'none',
+                          borderRadius: 6,
+                          cursor: 'pointer',
+                          fontSize: 13,
                         }}
                       >
-                        <span
-                          style={{
-                            fontSize: 14,
-                            fontWeight: 700,
-                            color: 'var(--dim)',
-                            width: 28,
-                            textAlign: 'right',
-                          }}
-                        >
-                          {i + 4}
-                        </span>
-                        <div
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: '50%',
-                            background: 'var(--rule)',
-                          }}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}
-                          >
-                            {u.username}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--dim)' }}>
-                            {(u.verity_score || 0).toLocaleString()} verity
-                          </div>
-                        </div>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
-                          {(u.displayScore || 0).toLocaleString()}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      zIndex: 3,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background:
-                        `linear-gradient(to bottom, rgba(var(--bg-rgb), 0.3), rgba(var(--bg-rgb), 0.95) 70%)`,
-                    }}
-                  >
-                    <p
+                        Try again
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={handleResendVerification}
+                      disabled={resendState === 'sending'}
                       style={{
-                        margin: '0 0 4px',
-                        fontSize: 16,
-                        fontWeight: 700,
-                        color: 'var(--text)',
+                        display: 'inline-block',
+                        marginTop: 8,
+                        padding: '10px 28px',
+                        background: resendState === 'sending' ? 'var(--dim)' : 'var(--accent)',
+                        color: 'var(--bg)',
+                        borderRadius: 10,
+                        fontSize: 14,
+                        fontWeight: 600,
+                        border: 'none',
+                        cursor: resendState === 'sending' ? 'not-allowed' : 'pointer',
                       }}
                     >
-                      Verify your email to see ranks beyond top 3.
-                    </p>
-                    {resendState === 'sent' ? (
-                      <p style={{ marginTop: 8, fontSize: 14, color: 'var(--accent)', fontWeight: 600 }}>
-                        Check your inbox for a verification link.
-                      </p>
-                    ) : resendState === 'rate-limited' ? (
-                      <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
-                        You've already requested a verification email recently. Check your inbox.
-                      </p>
-                    ) : resendState === 'error' ? (
-                      <>
-                        <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
-                          Something went wrong. Try again in a moment.
-                        </p>
-                        <button
-                          onClick={() => setResendState('idle')}
-                          style={{
-                            marginTop: 8,
-                            padding: '8px 16px',
-                            background: 'var(--accent)',
-                            color: 'var(--bg)',
-                            border: 'none',
-                            borderRadius: 6,
-                            cursor: 'pointer',
-                            fontSize: 13,
-                          }}
-                        >
-                          Try again
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={handleResendVerification}
-                        disabled={resendState === 'sending'}
-                        style={{
-                          display: 'inline-block',
-                          marginTop: 8,
-                          padding: '10px 28px',
-                          background: resendState === 'sending' ? 'var(--dim)' : 'var(--accent)',
-                          color: '#fff',
-                          borderRadius: 10,
-                          fontSize: 14,
-                          fontWeight: 600,
-                          border: 'none',
-                          cursor: resendState === 'sending' ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        {resendState === 'sending' ? 'Sending…' : 'Resend verification link'}
-                      </button>
-                    )}
-                  </div>
+                      {resendState === 'sending' ? 'Sending…' : 'Resend verification link'}
+                    </button>
+                  )}
                 </div>
               )}
         </div>
@@ -998,6 +891,14 @@ export default function LeaderboardPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function LeaderboardPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40 }}>Loading…</div>}>
+      <LeaderboardPageContent />
+    </Suspense>
   );
 }
 
