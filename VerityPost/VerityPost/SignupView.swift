@@ -127,7 +127,7 @@ struct SignupView: View {
             Text("Email")
                 .font(.footnote)
                 .foregroundColor(VP.dim)
-            TextField("you@example.com", text: $email)
+            TextField("Email Address", text: $email)
                 .keyboardType(.emailAddress)
                 .textContentType(.emailAddress)
                 .textInputAutocapitalization(.never)

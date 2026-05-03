@@ -111,7 +111,7 @@ struct LoginView: View {
             Text("Email")
                 .font(.footnote)
                 .foregroundColor(VP.dim)
-            TextField("you@example.com", text: $email)
+            TextField("Email Address", text: $email)
                 .textContentType(.emailAddress)
                 .keyboardType(.emailAddress)
                 .textInputAutocapitalization(.never)
@@ -156,6 +156,14 @@ struct LoginView: View {
             .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
         }
         .disabled(!canSubmit)
+
+        Text("By continuing, you agree to our [Terms](https://verityposts.com/terms) and [Privacy Policy](https://verityposts.com/privacy).")
+            .font(.caption)
+            .foregroundColor(VP.dim)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 12)
+            .tint(VP.accent)
     }
 
     // MARK: - OTP code card

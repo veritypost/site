@@ -88,7 +88,7 @@ export default function AccessFlow() {
           i have an invite, sign in →
         </a>
         <a
-          href="/login?mode=request"
+          href="/request-access"
           style={{
             flex: '1 1 160px',
             padding: '13px 18px',

@@ -1,7 +1,7 @@
 'use client';
 
 // Conversational request-access form.
-// Three fields: email, name, reason. Posts to /api/access-request.
+// Email-only field. Posts to /api/access-request.
 // Privacy posture: same success response regardless of account state.
 
 import { CSSProperties, FormEvent, useState } from 'react';
@@ -21,8 +21,6 @@ type Stage = 'form' | 'sent';
 export default function RequestAccessForm() {
   const [stage, setStage] = useState<Stage>('form');
   const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
@@ -41,12 +39,6 @@ export default function RequestAccessForm() {
     transition: 'border-color 0.15s',
     minHeight: '44px',
   });
-
-  const textareaStyle: CSSProperties = {
-    ...fieldStyle('reason'),
-    minHeight: '88px',
-    resize: 'vertical',
-  };
 
   const btnPrimary = (active: boolean): CSSProperties => ({
     width: '100%',
@@ -75,8 +67,6 @@ export default function RequestAccessForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: trimmedEmail,
-          name: name.trim() || undefined,
-          reason: reason.trim() || undefined,
         }),
       });
       if (!res.ok) {
@@ -122,11 +112,8 @@ export default function RequestAccessForm() {
   return (
     <>
       <h1 style={{ fontSize: '26px', fontWeight: 700, color: C.text, margin: '0 0 8px 0' }}>
-        request access
+        request early access
       </h1>
-      <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px 0', lineHeight: 1.55 }}>
-        we&rsquo;re invite-only right now. tell us a bit and we&rsquo;ll get back to you.
-      </p>
 
       {error && (
         <div
@@ -145,17 +132,12 @@ export default function RequestAccessForm() {
 
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: 16 }}>
-          <label
-            htmlFor="ra-email"
-            style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '7px' }}
-          >
-            what&rsquo;s your email?
-          </label>
           <input
             id="ra-email"
             name="email"
             type="email"
-            placeholder="you@example.com"
+            aria-label="Email address"
+            placeholder="Email Address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             onFocus={() => setFocused('email')}
@@ -170,47 +152,6 @@ export default function RequestAccessForm() {
           />
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <label
-            htmlFor="ra-name"
-            style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '7px' }}
-          >
-            what should we call you?
-          </label>
-          <input
-            id="ra-name"
-            name="name"
-            type="text"
-            placeholder="your name or handle"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onFocus={() => setFocused('name')}
-            onBlur={() => setFocused(null)}
-            autoComplete="name"
-            style={fieldStyle('name')}
-          />
-        </div>
-
-        <div style={{ marginBottom: 24 }}>
-          <label
-            htmlFor="ra-reason"
-            style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: C.text, marginBottom: '7px' }}
-          >
-            what brought you here?
-          </label>
-          <textarea
-            id="ra-reason"
-            name="reason"
-            placeholder="saw it on twitter, friend sent it, curious about the citations thing…"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            onFocus={() => setFocused('reason')}
-            onBlur={() => setFocused(null)}
-            rows={3}
-            style={textareaStyle}
-          />
-        </div>
-
         <button
           type="submit"
           disabled={busy || !email.trim()}
@@ -219,6 +160,13 @@ export default function RequestAccessForm() {
           {busy ? 'sending…' : 'send it →'}
         </button>
       </form>
+
+      <p style={{ fontSize: 12, color: C.dim, textAlign: 'center', marginTop: 14, marginBottom: 0, lineHeight: 1.5 }}>
+        By continuing, you agree to our{' '}
+        <a href="/terms" style={{ color: C.accent, fontWeight: 600 }}>Terms</a>
+        {' '}and{' '}
+        <a href="/privacy" style={{ color: C.accent, fontWeight: 600 }}>Privacy Policy</a>.
+      </p>
 
       <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 20, marginBottom: 0 }}>
         already have an account?{' '}

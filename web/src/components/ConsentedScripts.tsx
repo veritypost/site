@@ -16,11 +16,13 @@ import { type ConsentRecord, readConsent } from '@/lib/consent';
 interface ConsentedScriptsProps {
   gaMeasurementId: string;
   adsensePublisherId: string;
+  nonce?: string;
 }
 
 export default function ConsentedScripts({
   gaMeasurementId,
   adsensePublisherId,
+  nonce,
 }: ConsentedScriptsProps) {
   const [consent, setConsent] = useState<ConsentRecord | null>(null);
 
@@ -51,8 +53,9 @@ export default function ConsentedScripts({
             id="ga4-loader"
             strategy="afterInteractive"
             src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
+            nonce={nonce}
           />
-          <Script id="ga4-init" strategy="afterInteractive">
+          <Script id="ga4-init" strategy="afterInteractive" nonce={nonce}>
             {`
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
@@ -69,6 +72,7 @@ export default function ConsentedScripts({
           strategy="afterInteractive"
           src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsensePublisherId}`}
           crossOrigin="anonymous"
+          nonce={nonce}
         />
       )}
     </>

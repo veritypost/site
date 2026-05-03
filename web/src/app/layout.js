@@ -2,6 +2,7 @@
 // @feature-verified shared_components 2026-04-18
 import './globals.css';
 import { Suspense } from 'react';
+import { headers } from 'next/headers';
 import { Inter, Source_Serif_4 } from 'next/font/google';
 import NavWrapper from './NavWrapper';
 import { ToastProvider } from '../components/Toast';
@@ -106,7 +107,14 @@ export const viewport = {
   ],
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  // Per-request CSP nonce. Middleware mints it and forwards via the
+  // `x-nonce` request header (`NextResponse.next({ request: { headers } })`).
+  // Reading it here also opts the entire route tree into dynamic rendering,
+  // which is mandatory under our `script-src 'strict-dynamic' 'nonce-…'`
+  // CSP — prerendered HTML can never carry a fresh per-request nonce.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
+
   return (
     <html lang="en" className={`${inter.variable} ${sourceSerif.variable}`}>
       <head>
@@ -115,7 +123,7 @@ export default function RootLayout({ children }) {
             hydrates. 'system' (or unset) leaves data-theme absent, letting the
             CSS media query govern. try/catch guards private-browsing contexts
             where localStorage throws. */}
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var p=localStorage.getItem('vp_theme');if(p==='dark')document.documentElement.setAttribute('data-theme','dark');else if(p==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();` }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `(function(){try{var p=localStorage.getItem('vp_theme');if(p==='dark')document.documentElement.setAttribute('data-theme','dark');else if(p==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();` }} />
       </head>
       <body
         style={{
@@ -148,7 +156,7 @@ export default function RootLayout({ children }) {
             non-essential cookies before they fire; this is the
             enforcement point. The GAListener still ships unconditionally
             because it's a no-op until window.gtag is defined. */}
-        <ConsentedScripts gaMeasurementId={GA_ID} adsensePublisherId={ADSENSE_PUB_ID} />
+        <ConsentedScripts gaMeasurementId={GA_ID} adsensePublisherId={ADSENSE_PUB_ID} nonce={nonce} />
         <Suspense fallback={null}>
           <GAListener />
         </Suspense>

@@ -199,15 +199,6 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
   if (stage === 'email') {
     return (
       <>
-        <h1
-          style={{ fontSize: '26px', fontWeight: 700, color: C.text, margin: '0 0 8px 0' }}
-        >
-          Sign in
-        </h1>
-        <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px 0', lineHeight: 1.55 }}>
-          Enter your email to sign in.
-        </p>
-
         {notice && (
           <div
             role="alert"
@@ -264,23 +255,12 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
 
         <form onSubmit={submitEmail}>
           <div style={{ marginBottom: 16 }}>
-            <label
-              htmlFor="email"
-              style={{
-                display: 'block',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: C.text,
-                marginBottom: '7px',
-              }}
-            >
-              Email
-            </label>
             <input
               id="email"
               name="email"
               type="email"
-              placeholder="you@example.com"
+              aria-label="Email address"
+              placeholder="Email Address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onFocus={() => setEmailFocused(true)}
@@ -304,17 +284,17 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
           </button>
         </form>
 
+        <p style={{ fontSize: 12, color: C.dim, textAlign: 'center', marginTop: 14, marginBottom: 0, lineHeight: 1.5 }}>
+          By continuing, you agree to our{' '}
+          <a href="/terms" style={{ color: C.accent, fontWeight: 600 }}>Terms</a>
+          {' '}and{' '}
+          <a href="/privacy" style={{ color: C.accent, fontWeight: 600 }}>Privacy Policy</a>.
+        </p>
+
         <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 20, marginBottom: 8 }}>
           Don't have an account?{' '}
           <a href="/request-access" style={{ color: C.accent, fontWeight: 600 }}>
             Request access →
-          </a>
-        </p>
-
-        <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 0, marginBottom: 0 }}>
-          having trouble?{' '}
-          <a href="/contact" style={{ color: C.accent, fontWeight: 600 }}>
-            get help →
           </a>
         </p>
 

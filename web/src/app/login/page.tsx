@@ -13,8 +13,6 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePageViewTrack } from '@/lib/useTrack';
 import SingleDoorForm from './_SingleDoorForm';
-import WaitlistForm from './_WaitlistForm';
-import RequestAccessForm from './_RequestAccessForm';
 
 const C = {
   bg: 'var(--bg)',
@@ -61,7 +59,6 @@ function LoginPageInner() {
   const searchParams = useSearchParams();
   usePageViewTrack('login');
 
-  const mode = searchParams?.get('mode') ?? null;
   const rawNext = searchParams?.get('next') ?? null;
   const prefillEmail = searchParams?.get('email') ?? '';
   const [notice, setNotice] = useState<string | null>(null);
@@ -69,13 +66,13 @@ function LoginPageInner() {
     const toastParam = searchParams?.get('toast') ?? null;
     const errorParam = searchParams?.get('error') ?? null;
     if (toastParam === 'session_expired') {
-      setNotice('Your session expired. Enter your email to sign back in.');
+      setNotice('Your session expired.');
     } else if (errorParam === 'link_expired') {
-      setNotice('Your sign-in link has expired. Enter your email below for a new one.');
+      setNotice('Your sign-in link has expired.');
     } else if (errorParam === 'missing_params') {
-      setNotice('This sign-in link is invalid. Enter your email below to request a new one.');
+      setNotice('This sign-in link is invalid.');
     } else if (errorParam === 'link_deprecated') {
-      setNotice('Sign-in links are no longer used. Enter your email below and we’ll send you a code.');
+      setNotice('Sign-in links are no longer used. We’ll send you a code instead.');
     }
   }, [searchParams]);
 
@@ -117,13 +114,7 @@ function LoginPageInner() {
           </div>
         </a>
 
-        {mode === 'waitlist' ? (
-          <WaitlistForm />
-        ) : mode === 'request' ? (
-          <RequestAccessForm />
-        ) : (
-          <SingleDoorForm notice={notice} rawNext={rawNext} prefillEmail={prefillEmail} />
-        )}
+        <SingleDoorForm notice={notice} rawNext={rawNext} prefillEmail={prefillEmail} />
       </div>
     </div>
   );
