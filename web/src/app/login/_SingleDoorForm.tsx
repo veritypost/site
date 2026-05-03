@@ -304,7 +304,14 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
           </button>
         </form>
 
-        <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 20, marginBottom: 0 }}>
+        <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 20, marginBottom: 8 }}>
+          Don't have an account?{' '}
+          <a href="/request-access" style={{ color: C.accent, fontWeight: 600 }}>
+            Request access →
+          </a>
+        </p>
+
+        <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 0, marginBottom: 0 }}>
           having trouble?{' '}
           <a href="/contact" style={{ color: C.accent, fontWeight: 600 }}>
             get help →
