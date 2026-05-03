@@ -7,6 +7,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { listCustomerSubscriptions, resumeSubscription } from '@/lib/stripe';
+import { getActiveCrossPlatformSub, CROSS_PLATFORM_409 } from '@/lib/billingPlatformGuard';
 
 // D40: restore from frozen state. Score picks up from frozen_verity_score.
 // Activity during the frozen period does not count.
@@ -93,6 +94,13 @@ export async function POST(request) {
       { error: 'comp_or_trial_active', redirectTo: '/profile/settings?section=plan' },
       { status: 409 }
     );
+  }
+
+  // Q06 — cross-platform precheck. If the user already has an active Apple
+  // subscription, block the web resubscribe with a structured 409.
+  const activeCross = await getActiveCrossPlatformSub(service, user.id);
+  if (activeCross.platform === 'apple') {
+    return NextResponse.json(CROSS_PLATFORM_409.apple_sub_active, { status: 409 });
   }
 
   if (me?.stripe_customer_id) {

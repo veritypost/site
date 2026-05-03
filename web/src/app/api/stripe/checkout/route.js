@@ -6,6 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { createCheckoutSession } from '@/lib/stripe';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { trackServer } from '@/lib/trackServer';
+import { getActiveCrossPlatformSub, CROSS_PLATFORM_409 } from '@/lib/billingPlatformGuard';
 
 // POST /api/stripe/checkout — body: { plan_name }
 //
@@ -106,6 +107,15 @@ export async function POST(request) {
       },
       { status: 409 }
     );
+  }
+
+  // Q06 — cross-platform precheck. If the user already has an active Apple
+  // subscription, block the web checkout with a structured 409 directing them
+  // to cancel in iOS Settings. Must run after user-row fetch (needs user.id)
+  // and before any Stripe call.
+  const activeSub = await getActiveCrossPlatformSub(service, user.id);
+  if (activeSub.platform === 'apple') {
+    return NextResponse.json(CROSS_PLATFORM_409.apple_sub_active, { status: 409 });
   }
 
   const origin = request.nextUrl.origin;

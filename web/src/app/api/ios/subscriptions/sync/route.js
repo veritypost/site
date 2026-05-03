@@ -203,16 +203,18 @@ export async function POST(request) {
       .maybeSingle();
     if (!userRow) throw new Error('user row missing');
 
-    if (userRow.frozen_at) {
-      await service.rpc('billing_resubscribe', {
-        p_user_id: userId,
-        p_new_plan_id: plan.id,
-      });
-    } else {
-      await service.rpc('billing_change_plan', {
-        p_user_id: userId,
-        p_new_plan_id: plan.id,
-      });
+    // Q06 — Stripe precheck (inverse of the web-routes apple_sub_active check).
+    // An iOS sync for a user who already has an active Stripe subscription must
+    // be refused with 409. The iOS app catches this code and shows the conflict
+    // sheet (Stream 4 wires the UI); it calls transaction.finish() — NOT the
+    // C18 retry-on-launch path — so the StoreKit transaction is consumed on
+    // the device side without activating a server-side record.
+    // Import is dynamic so the module graph doesn't hard-fail when Stream 1
+    // hasn't landed yet during local dev.
+    const { getActiveCrossPlatformSub, CROSS_PLATFORM_409 } = await import('@/lib/billingPlatformGuard');
+    const activeSub = await getActiveCrossPlatformSub(service, userId);
+    if (activeSub.platform === 'stripe') {
+      return NextResponse.json(CROSS_PLATFORM_409.stripe_sub_active, { status: 409 });
     }
 
     const periodStartMs = Number(payload.purchaseDate) || Date.now();
@@ -248,10 +250,35 @@ export async function POST(request) {
       return NextResponse.json({ error: 'receipt_missing_user_binding' }, { status: 400 });
     }
 
-    const subRow = {
+    // PM-5 write-order fix: upsert subscriptions with status='pending' FIRST,
+    // then call the billing RPC, then promote to status='active'.
+    //
+    // Ordering rationale: the old code called billing_change_plan/resubscribe
+    // (which writes users.plan_id) BEFORE the subscriptions upsert. A failure
+    // between those two writes left users.plan_id granted with no matching
+    // subscriptions row — the Apple S2S reconciliation path could not roll it
+    // back because lookupUserAndPlan found no record.
+    //
+    // New order:
+    //   1. Upsert subscriptions(status='pending') — keyed on
+    //      apple_original_transaction_id, so a retry replays the upsert
+    //      idempotently (ON CONFLICT the row stays pending until step 3).
+    //   2. Call billing_change_plan / billing_resubscribe — grants plan_id.
+    //   3. Update subscriptions to status='active'.
+    //
+    // If the process dies after step 1: subscriptions row is pending, no plan
+    //   granted — clean state. Retry re-runs from the top, idempotent.
+    // If the process dies after step 2: subscriptions row is pending, plan is
+    //   granted — Apple S2S DID_RENEW will promote the row to active on the
+    //   next notification, and the webhook_log row stays 'received' so a
+    //   replay can re-run. Mildly inconsistent window but self-heals.
+    // If the process dies after step 3: fully consistent — subscriptions.status
+    //   is active, plan_id is granted, webhook_log transitions to 'processed'
+    //   on the next line.
+    const pendingRow = {
       user_id: userId,
       plan_id: plan.id,
-      status: 'active',
+      status: 'pending',
       source: 'apple',
       platform: 'apple',
       apple_original_transaction_id: originalTxId,
@@ -260,10 +287,71 @@ export async function POST(request) {
       auto_renew: true,
     };
 
+    let upsertedSubId;
     if (existingSub?.id) {
-      await service.from('subscriptions').update(subRow).eq('id', existingSub.id);
+      const { error: updateErr } = await service
+        .from('subscriptions')
+        .update(pendingRow)
+        .eq('id', existingSub.id);
+      if (updateErr) {
+        // A failed pending-update must not allow step 2 (plan RPC) to run —
+        // if the RPC granted plan_id but the subscriptions row never reached
+        // 'pending', step 3's promote-to-active would leave an inconsistent row.
+        // Log to webhook_log so the retry path re-executes cleanly.
+        if (logId) {
+          await service
+            .from('webhook_log')
+            .update({
+              processing_status: 'failed',
+              processing_error: `subscriptions update to pending failed: ${updateErr.message}`,
+            })
+            .eq('id', logId);
+        }
+        console.error('[ios.subscriptions.sync] subscriptions update to pending failed:', updateErr.message);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+      upsertedSubId = existingSub.id;
     } else {
-      await service.from('subscriptions').insert(subRow);
+      const { data: inserted, error: insertErr } = await service
+        .from('subscriptions')
+        .insert(pendingRow)
+        .select('id')
+        .single();
+      if (insertErr) {
+        if (logId) {
+          await service
+            .from('webhook_log')
+            .update({
+              processing_status: 'failed',
+              processing_error: `subscriptions insert to pending failed: ${insertErr.message}`,
+            })
+            .eq('id', logId);
+        }
+        console.error('[ios.subscriptions.sync] subscriptions insert to pending failed:', insertErr.message);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+      upsertedSubId = inserted?.id;
+    }
+
+    // Step 2: call billing RPC (grants users.plan_id).
+    if (userRow.frozen_at) {
+      await service.rpc('billing_resubscribe', {
+        p_user_id: userId,
+        p_new_plan_id: plan.id,
+      });
+    } else {
+      await service.rpc('billing_change_plan', {
+        p_user_id: userId,
+        p_new_plan_id: plan.id,
+      });
+    }
+
+    // Step 3: promote subscriptions row to active now that the plan grant succeeded.
+    if (upsertedSubId) {
+      await service
+        .from('subscriptions')
+        .update({ status: 'active' })
+        .eq('id', upsertedSubId);
     }
 
     await service

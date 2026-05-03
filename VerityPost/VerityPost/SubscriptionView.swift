@@ -77,6 +77,9 @@ struct SubscriptionView: View {
         .onReceive(NotificationCenter.default.publisher(for: .vpSubscriptionSyncFailed)) { _ in
             purchaseError = "Your purchase was processed by Apple but couldn't sync to our servers. Tap \"Restore Purchases\" below to retry, or contact support@veritypost.com if the issue persists."
         }
+        .sheet(item: $store.showConflictSheet) { reason in
+            SubscriptionConflictSheet(reason: reason)
+        }
     }
 
     // MARK: - Legal Disclosures (Apple Review 3.1.2)
@@ -84,6 +87,41 @@ struct SubscriptionView: View {
     // Auto-renewing subscriptions must surface: title, billing length,
     // full price per period, renewal terms, cancellation steps, and direct
     // links to Terms + Privacy. Apple rejects paywalls without these.
+
+    /// Returns the Apple-localized displayPrice for a given product ID,
+    /// falling back to a formatted priceCentsForProduct value if the product
+    /// hasn't loaded yet. Never returns a hardcoded literal.
+    private func disclosurePrice(for productID: String, period: String) -> String {
+        if let product = store.products.first(where: { $0.id == productID }) {
+            return "\(product.displayPrice) per \(period)"
+        }
+        let cents = store.priceCentsForProduct(productID)
+        let dollars = Decimal(cents) / 100
+        let formatted = NumberFormatter.localizedString(from: dollars as NSDecimalNumber, number: .currency)
+        return "\(formatted) per \(period)"
+    }
+
+    /// Returns the per-kid delta price using the 2-kid vs 1-kid tier difference,
+    /// falling back to priceCentsForProduct delta if products aren't loaded.
+    private func perKidDisclosurePrice(period: String) -> String {
+        let baseID = isAnnual ? StoreManager.familyAnnual1Kid : StoreManager.familyMonthly1Kid
+        let nextID = isAnnual ? StoreManager.familyAnnual2Kids : StoreManager.familyMonthly2Kids
+        if let base = store.products.first(where: { $0.id == baseID }),
+           let next = store.products.first(where: { $0.id == nextID }) {
+            let delta = next.price - base.price
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .currency
+            formatter.locale = Locale.current
+            let deltaFormatted = formatter.string(from: delta as NSDecimalNumber) ?? next.displayPrice
+            return "\(deltaFormatted) per \(period)"
+        }
+        let baseCents = store.priceCentsForProduct(baseID)
+        let nextCents = store.priceCentsForProduct(nextID)
+        let deltaCents = nextCents - baseCents
+        let dollars = Decimal(deltaCents) / 100
+        let formatted = NumberFormatter.localizedString(from: dollars as NSDecimalNumber, number: .currency)
+        return "\(formatted) per \(period)"
+    }
 
     private var legalDisclosures: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -96,17 +134,21 @@ struct SubscriptionView: View {
             disclosureRow(
                 title: "Verity",
                 length: isAnnual ? "Annual" : "Monthly",
-                price: isAnnual ? "$79.99 per year" : "$7.99 per month"
+                price: isAnnual
+                    ? disclosurePrice(for: StoreManager.verityAnnual, period: "year")
+                    : disclosurePrice(for: StoreManager.verityMonthly, period: "month")
             )
             disclosureRow(
                 title: "Verity Family (1 kid included)",
                 length: isAnnual ? "Annual" : "Monthly",
-                price: isAnnual ? "$149.99 per year" : "$14.99 per month"
+                price: isAnnual
+                    ? disclosurePrice(for: StoreManager.familyAnnual1Kid, period: "year")
+                    : disclosurePrice(for: StoreManager.familyMonthly1Kid, period: "month")
             )
             disclosureRow(
                 title: "Each additional kid",
                 length: isAnnual ? "Annual" : "Monthly",
-                price: isAnnual ? "$49.99 per year" : "$4.99 per month"
+                price: perKidDisclosurePrice(period: isAnnual ? "year" : "month")
             )
 
             Text("Subscriptions automatically renew unless auto-renew is turned off at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period at the price shown above. You can manage your subscription and turn off auto-renewal in your Apple ID account settings after purchase.")
@@ -467,15 +509,34 @@ struct SubscriptionView: View {
         }
     }
 
-    /// Phase 2 pricing — locked 2026-04-26.
-    /// Annual is ~10× monthly across the ladder.
+    /// Returns the Apple-localized price for plan card display.
+    /// Uses Product.displayPrice from store.products keyed by canonical product ID,
+    /// falling back to priceCentsForProduct formatted via NumberFormatter when
+    /// products haven't loaded yet. Never returns a hardcoded literal — owner
+    /// price changes in App Store Connect propagate without a code change.
     private func planPrice(_ plan: String) -> String {
         switch plan {
         case "free": return "Free"
         case "verity":
-            return isAnnual ? "$79.99/yr" : "$7.99/mo"
+            let productID = isAnnual ? StoreManager.verityAnnual : StoreManager.verityMonthly
+            let suffix = isAnnual ? "/yr" : "/mo"
+            if let product = store.products.first(where: { $0.id == productID }) {
+                return "\(product.displayPrice)\(suffix)"
+            }
+            let cents = store.priceCentsForProduct(productID)
+            let dollars = Decimal(cents) / 100
+            let formatted = NumberFormatter.localizedString(from: dollars as NSDecimalNumber, number: .currency)
+            return "\(formatted)\(suffix)"
         case "verity_family":
-            return isAnnual ? "$149.99/yr" : "$14.99/mo"
+            let productID = isAnnual ? StoreManager.familyAnnual1Kid : StoreManager.familyMonthly1Kid
+            let suffix = isAnnual ? "/yr" : "/mo"
+            if let product = store.products.first(where: { $0.id == productID }) {
+                return "\(product.displayPrice)\(suffix)"
+            }
+            let cents = store.priceCentsForProduct(productID)
+            let dollars = Decimal(cents) / 100
+            let formatted = NumberFormatter.localizedString(from: dollars as NSDecimalNumber, number: .currency)
+            return "\(formatted)\(suffix)"
         default: return ""
         }
     }

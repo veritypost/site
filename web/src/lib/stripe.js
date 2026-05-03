@@ -3,6 +3,19 @@
 
 import crypto from 'node:crypto';
 
+// PM-10 — Stripe sandbox/prod env-gate. Mirrors the iOS-side env-match
+// defensive posture: refuse to boot if a test key is wired to production.
+// Catches the most common misconfiguration (accidentally deploying with
+// sk_test_* → real users are charged via sandbox, refunds break, webhooks
+// route to wrong endpoint). Checked once at module import time so the error
+// surfaces during deploy healthcheck rather than first real request.
+const STRIPE_KEY = process.env.STRIPE_SECRET_KEY ?? '';
+const isStripeTest = STRIPE_KEY.startsWith('sk_test_');
+const isProdEnv = process.env.VERCEL_ENV === 'production';
+if (isProdEnv && isStripeTest) {
+  throw new Error('STRIPE_SECRET_KEY is sk_test_* in production env — refusing to boot.');
+}
+
 const STRIPE_API = 'https://api.stripe.com/v1';
 
 function secret() {
@@ -140,6 +153,13 @@ export async function resumeSubscription(subscriptionId) {
 // Idempotency key is stable per (subscription, target price) so a retry
 // within 24h dedupes, but a follow-up change to a *different* price
 // generates a new key and goes through correctly.
+// PM-5 #2 — cancel_at_period_end is intentionally omitted from this call.
+// The Stripe REST API performs partial updates: any field not included in the
+// POST body is left at its current value. Omitting cancel_at_period_end
+// preserves the user's existing cancel-scheduled state rather than silently
+// clearing it on a plan change. Callers that need to un-cancel first must
+// do so explicitly via resumeSubscription (change-plan/route.js now rejects
+// with 409 cancel_pending if the sub is still cancel-pending).
 export async function updateSubscriptionPrice(subscriptionId, itemId, newPriceId) {
   const idempotencyKey = `change-plan-${subscriptionId}-${newPriceId}`;
   return stripeFetch(`/subscriptions/${subscriptionId}`, {
@@ -147,7 +167,6 @@ export async function updateSubscriptionPrice(subscriptionId, itemId, newPriceId
     body: {
       items: [{ id: itemId, price: newPriceId }],
       proration_behavior: 'create_prorations',
-      cancel_at_period_end: 'false',
     },
     idempotencyKey,
   });

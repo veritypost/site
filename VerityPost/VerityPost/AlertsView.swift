@@ -337,7 +337,7 @@ struct AlertsView: View {
     // Hide the entire subscription-manage surface behind this flag until a
     // real `subscription_topics` table + API route ships. Do NOT flip this
     // on until both exist — see OWNER_TO_DO ("Alert subscriptions model").
-    private let manageSubscriptionsEnabled = true
+    private let manageSubscriptionsEnabled = false
 
     @ViewBuilder
     private var manageContent: some View {

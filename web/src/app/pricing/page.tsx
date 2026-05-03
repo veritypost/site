@@ -2,14 +2,26 @@
  * Phase 6 of AI + Plan Change Implementation — public pricing page.
  *
  * Three plan cards (Free / Verity / Family) with the per-kid scaling
- * explainer for Family. Server component — pricing copy is static
- * post-Phase-2 and rendering server-side keeps the page snappy.
+ * explainer for Family. Server component — pricing data is DB-driven
+ * with 5-minute ISR revalidation (revalidate: 300).
+ *
+ * Verity CTA: renders "Subscribe via iOS App" (disabled) when the
+ * verity_monthly row has no stripe_price_id or is_visible=false.
+ * Flips to active "Start Verity" once the owner mints the Stripe price.
  */
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { CheckoutButton } from './_CheckoutButton';
+import {
+  FALLBACK_VERITY_MONTHLY,
+  FALLBACK_FAMILY_MONTHLY,
+  FALLBACK_FAMILY_ANNUAL,
+  formatCents,
+} from '@/lib/pricingCopy';
+
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: 'Pricing — Verity Post',
@@ -27,6 +39,17 @@ const C = {
   highlight: '#fafafa',
 };
 
+type PlanDbRow = {
+  name: string;
+  tier: string;
+  price_cents: number;
+  billing_period: string | null;
+  is_active: boolean;
+  is_visible: boolean;
+  stripe_price_id: string | null;
+  apple_product_id: string | null;
+};
+
 function PlanCard({
   name,
   price,
@@ -38,6 +61,7 @@ function PlanCard({
   planName,
   highlight,
   footer,
+  ctaDisabled,
 }: {
   name: string;
   price: string;
@@ -49,6 +73,7 @@ function PlanCard({
   planName?: string;
   highlight?: boolean;
   footer?: string;
+  ctaDisabled?: boolean;
 }) {
   return (
     <div
@@ -90,7 +115,23 @@ function PlanCard({
         ))}
       </ul>
       {footer && <div style={{ fontSize: 12, color: C.dim, marginTop: 4 }}>{footer}</div>}
-      {planName ? (
+      {ctaDisabled ? (
+        <div
+          style={{
+            marginTop: 'auto',
+            padding: '12px 16px',
+            textAlign: 'center',
+            fontSize: 14,
+            fontWeight: 700,
+            background: 'transparent',
+            color: C.dim,
+            border: `1px solid ${C.border}`,
+            borderRadius: 10,
+          }}
+        >
+          {cta}
+        </div>
+      ) : planName ? (
         <CheckoutButton planName={planName} cta={cta} highlight={highlight} />
       ) : (
         <Link
@@ -128,6 +169,41 @@ export default async function PricingPage() {
   const freeCta = isLoggedIn ? 'You\'re on the free plan' : 'Sign up free';
   const freeCtaHref = isLoggedIn ? '/profile/settings?section=plan' : '/login?redirect=/pricing';
 
+  // Fetch active plans from DB. Fallback to hardcoded constants if DB is unavailable.
+  let plans: PlanDbRow[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('plans')
+      .select('name, tier, price_cents, billing_period, is_active, is_visible, stripe_price_id, apple_product_id')
+      .eq('is_active', true)
+      .order('sort_order');
+    if (!error && data) {
+      plans = data as PlanDbRow[];
+    }
+  } catch {
+    // DB fetch failed — fall through to fallback constants below.
+  }
+
+  const findPlan = (name: string): PlanDbRow | undefined => plans.find((p) => p.name === name);
+
+  // Verity solo: only show active CTA when stripe_price_id is populated + is_visible.
+  const verityRow = findPlan('verity_monthly');
+  const verityPriceCents = verityRow?.price_cents ?? FALLBACK_VERITY_MONTHLY.priceCents;
+  const verityReady =
+    verityRow != null && verityRow.is_visible === true && verityRow.stripe_price_id != null;
+
+  // Family: use DB row if present, else fallback.
+  const familyRow = findPlan('verity_family_monthly');
+  const familyPriceCents = familyRow?.price_cents ?? FALLBACK_FAMILY_MONTHLY.priceCents;
+
+  const familyAnnualRow = findPlan('verity_family_annual');
+  const familyAnnualPriceCents = familyAnnualRow?.price_cents ?? FALLBACK_FAMILY_ANNUAL.priceCents;
+
+  // Per-kid add-on is $4.99/mo; table rows computed from base prices.
+  const kidAddonCents = 499;
+  const familyBase = familyPriceCents;
+  const familyAnnualBase = familyAnnualPriceCents;
+
   return (
     <div
       style={{
@@ -163,7 +239,7 @@ export default async function PricingPage() {
 
         <PlanCard
           name="Verity"
-          price="$7.99"
+          price={formatCents(verityPriceCents)}
           pricePeriod="/mo"
           blurb="Unlimited reading for one adult."
           features={[
@@ -176,14 +252,15 @@ export default async function PricingPage() {
             'Ask an Expert',
             'Weekly recap quizzes',
           ]}
-          cta="Start Verity"
-          planName="verity_monthly"
+          cta={verityReady ? 'Start Verity' : 'Subscribe via iOS App'}
+          planName={verityReady ? 'verity_monthly' : undefined}
+          ctaDisabled={!verityReady}
           highlight
         />
 
         <PlanCard
           name="Verity Family"
-          price="$14.99"
+          price={formatCents(familyPriceCents)}
           pricePeriod="/mo"
           blurb="Up to 6 family members. 1 kid included; add up to 3 more for $4.99/mo each."
           features={[
@@ -232,23 +309,23 @@ export default async function PricingPage() {
           <tbody>
             <tr style={{ borderTop: `1px solid ${C.border}` }}>
               <td style={{ padding: 8 }}>1 (included)</td>
-              <td style={{ padding: 8 }}>$14.99</td>
-              <td style={{ padding: 8 }}>$149.99</td>
+              <td style={{ padding: 8 }}>{formatCents(familyBase)}</td>
+              <td style={{ padding: 8 }}>{formatCents(familyAnnualBase)}</td>
             </tr>
             <tr style={{ borderTop: `1px solid ${C.border}` }}>
               <td style={{ padding: 8 }}>2</td>
-              <td style={{ padding: 8 }}>$19.98</td>
-              <td style={{ padding: 8 }}>$199.98</td>
+              <td style={{ padding: 8 }}>{formatCents(familyBase + kidAddonCents)}</td>
+              <td style={{ padding: 8 }}>{formatCents(familyAnnualBase + kidAddonCents * 12)}</td>
             </tr>
             <tr style={{ borderTop: `1px solid ${C.border}` }}>
               <td style={{ padding: 8 }}>3</td>
-              <td style={{ padding: 8 }}>$24.97</td>
-              <td style={{ padding: 8 }}>$249.97</td>
+              <td style={{ padding: 8 }}>{formatCents(familyBase + kidAddonCents * 2)}</td>
+              <td style={{ padding: 8 }}>{formatCents(familyAnnualBase + kidAddonCents * 2 * 12)}</td>
             </tr>
             <tr style={{ borderTop: `1px solid ${C.border}` }}>
               <td style={{ padding: 8 }}>4 (max)</td>
-              <td style={{ padding: 8 }}>$29.96</td>
-              <td style={{ padding: 8 }}>$299.96</td>
+              <td style={{ padding: 8 }}>{formatCents(familyBase + kidAddonCents * 3)}</td>
+              <td style={{ padding: 8 }}>{formatCents(familyAnnualBase + kidAddonCents * 3 * 12)}</td>
             </tr>
           </tbody>
         </table>

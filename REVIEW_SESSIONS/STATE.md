@@ -3,7 +3,7 @@
 **This is the source of truth.** Whoever picks up next reads this first, then acts.
 
 ## Current phase
-`ready_for_session_4`
+`ready_for_session_5`
 
 ## What's done
 - 11-PM review pass complete. 156 findings in `REVIEW_REPORT.md` (18 P0, 56 P1, 63 P2, 19 P3).
@@ -15,9 +15,10 @@
 - **Session 1 shipped 2026-05-03. 9/9 P0 CLOSED. 5 migrations applied + Session-0 pair-code body retroactively log-recorded. 4 PMs in parallel + independent reviewer 9/9 + adversary 9/9 structural; adversary surfaced 3 new findings (P0 #13 kid_profiles INSERT bypass, P0 #12 metadata escape hatch, P1 users INSERT denylist gap) — all closed in Session 1b follow-up migration `20260503000014`. Types regen'd. Remaining adversary deferrals: P1 #4 (comments policy → Session 2), P2 #9 (articles UPDATE WITH CHECK → Session 6), P2 #15 (DEFAULT PRIVILEGES for `supabase_admin` → Session 6).**
 - **Session 2 shipped 2026-05-03. 6/10 closed + 4/10 refuted in pre-impl pass + 5 reviewer-surfaced follow-ups closed in same session. 13 files touched. Q04 + Q05 owner-locked decisions applied. Smoke-test deferred (needs test inbox + live Supabase).**
 - **Session 3 shipped 2026-05-03. 8/8 P0+P1+P2 closed (2 P0 + 5 P1 + 1 P2). Q03 owner-locked decision applied. 5 migrations applied via MCP; 6 new permission keys minted. 5 reviewer follow-ups + 7 adversary follow-ups closed in same session — including a P0 truth-up where the "retry" route was cosmetic theater (honest-fix per `feedback_genuine_fixes_not_patches.md`). 6 lower-priority adversary items documented as deferred. iOS / kids N/A.**
+- **Session 4 shipped 2026-05-03. 2 P0 + 11 P1 + 6 polish closed (Q06 cross-platform precheck + Q07 pricing-source-of-truth + Q12c kill-switch + iOS S2S ordering guard + cancel-state correctness). 4-stream parallel + 1 second-pass slice on adversary follow-ups (cancel-route precheck reverted, is_active filters added, iOS sync .update() error captured, StoreManager seenConflict cleanup). 16 files modified + 5 new files (billingPlatformGuard.ts, pricingCopy.ts, SubscriptionConflictSheet.swift, 2 migrations). Owner action required: apply 2 migrations (MCP read-only blocked auto-apply) + mint Stripe price IDs for verity_monthly/verity_annual then flip is_visible=true. Pre-existing LeaderboardView.swift:319 build error unchanged (out-of-scope).**
 
 ## What's blocked
-- Owner's "fire Session 4" signal unblocks the next run (Billing — PM-5 territory: Apple/Stripe cross-platform, change-plan un-cancel).
+- Owner's "fire Session 5" signal unblocks the next run (Pipeline Polish — PM-9 territory: 5 LLM routes bypassing call-model.ts, kid_url_sanitizer non-fatal, score-comments cron, plus iOS bundling for Q12c handler implementation if owner wants it now vs post-launch).
 
 ## Next action (read this carefully)
 

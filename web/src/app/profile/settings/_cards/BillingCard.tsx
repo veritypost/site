@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
 import { createClient } from '@/lib/supabase/client';
@@ -25,6 +25,9 @@ import { C, F, FONT, R, S } from '../../_lib/palette';
 
 type UserRow = Tables<'users'>;
 
+// Plan names that do not count as a paid subscription for the retry loop.
+const FREE_PLAN_NAMES = new Set(['free']);
+
 interface Props {
   user: UserRow;
   preview: boolean;
@@ -43,8 +46,8 @@ interface PlanRow {
   tier: string;
   name: string;
   display_name: string | null;
-  monthly_price_cents: number | null;
-  annual_price_cents: number | null;
+  price_cents: number | null;
+  billing_period: string | null;
 }
 
 export function BillingCard({ user, preview }: Props) {
@@ -92,11 +95,16 @@ export function BillingCard({ user, preview }: Props) {
       if (subData?.plan_id) {
         const pRes = await supabase
           .from('plans')
-          .select('id, tier, name, display_name, monthly_price_cents, annual_price_cents')
+          .select('id, tier, name, display_name, price_cents, billing_period')
           .eq('id', subData.plan_id)
           .maybeSingle();
         if (!pRes.error) {
-          setPlan((pRes.data ?? null) as PlanRow | null);
+          const planData = (pRes.data ?? null) as PlanRow | null;
+          setPlan(planData);
+          // Signal the retry loop that a paid sub is now confirmed so it stops.
+          if (planData && !FREE_PLAN_NAMES.has(planData.name)) {
+            gotPaidSubRef.current = true;
+          }
         } else {
           console.error('[billing] plan fetch failed', pRes.error);
           // Plan fetch failed — set error so the user sees the retry card
@@ -138,25 +146,31 @@ export function BillingCard({ user, preview }: Props) {
     void fetchData();
   }, [forceRefreshTrigger, fetchData]);
 
+  // gotPaidSubRef guards the retry loop against closure-stale sub state.
+  // Once a paid sub is confirmed we flip the ref synchronously so the next
+  // scheduled attempt bails before issuing another fetchData.
+  const gotPaidSubRef = useRef(false);
+
   // Webhook-wait retry loop: when the ?success=1 landing fires, poll up to
   // 6 times with 1s spacing so BillingCard catches the webhook write before
   // giving up and showing whatever state is currently in the DB.
-  // Uses a FREE_TIER_STATUSES check: if the returned sub is still absent or
-  // on a free-looking state after checkout, keep retrying.
+  // Uses a ref to detect a confirmed paid sub rather than reading stale
+  // closure state; avoids calling setState from the cleanup return.
   useEffect(() => {
     if (!retryOnSuccess) return;
+    gotPaidSubRef.current = false;
     let attempt = 0;
     const MAX = 6;
     let cancelled = false;
 
     const retry = async () => {
-      if (cancelled) return;
+      if (cancelled || gotPaidSubRef.current) return;
       await fetchData();
       attempt += 1;
-      // Re-read sub from state after fetchData settles is not reliable inside
-      // the closure; instead we schedule the next attempt and let it re-check
-      // via the component re-render. The loop caps at MAX attempts regardless.
-      if (attempt < MAX) {
+      // gotPaidSubRef is set synchronously inside fetchData when a paid plan
+      // row is confirmed. We cap at MAX attempts regardless and rely on the
+      // ref to short-circuit once the paid sub is visible.
+      if (attempt < MAX && !gotPaidSubRef.current) {
         setTimeout(retry, 1000);
       } else {
         if (!cancelled) setRetryOnSuccess(false);
@@ -166,7 +180,8 @@ export function BillingCard({ user, preview }: Props) {
     void retry();
     return () => {
       cancelled = true;
-      setRetryOnSuccess(false);
+      // Do NOT call setRetryOnSuccess here — setState from cleanup
+      // triggers a React warning when the component has unmounted.
     };
     // fetchData is stable (useCallback); retryOnSuccess is the trigger.
     // eslint-disable-next-line react-hooks/exhaustive-deps

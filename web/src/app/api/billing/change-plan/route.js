@@ -7,6 +7,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { listCustomerSubscriptions, updateSubscriptionPrice } from '@/lib/stripe';
+import { getActiveCrossPlatformSub, CROSS_PLATFORM_409 } from '@/lib/billingPlatformGuard';
 
 // Upgrade/downgrade between paid plans. Stripe-first: swap the
 // subscription's price item upstream, then mirror state locally.
@@ -99,6 +100,13 @@ export async function POST(request) {
     );
   }
 
+  // Q06 — cross-platform precheck. If the user already has an active Apple
+  // subscription, block the web change-plan with a structured 409.
+  const activeCross = await getActiveCrossPlatformSub(service, user.id);
+  if (activeCross.platform === 'apple') {
+    return NextResponse.json(CROSS_PLATFORM_409.apple_sub_active, { status: 409 });
+  }
+
   if (me?.stripe_customer_id) {
     try {
       const subs = await listCustomerSubscriptions(me.stripe_customer_id, { status: 'all' });
@@ -106,6 +114,21 @@ export async function POST(request) {
         (s) => s.status === 'active' || s.status === 'trialing' || s.status === 'past_due'
       );
       if (active) {
+        // PM-5 #2 — cancel-state guard. If the user has a scheduled
+        // cancellation, block the plan change. The user must explicitly resume
+        // first; silently clearing cancel_at_period_end on a plan change would
+        // un-cancel without the user's knowledge.
+        if (active.cancel_at_period_end === true) {
+          return NextResponse.json(
+            {
+              error: 'cancel_pending',
+              code: 'cancel_pending',
+              resume_first: true,
+              message: 'Resume your subscription before changing plans.',
+            },
+            { status: 409 }
+          );
+        }
         const item = active.items?.data?.[0];
         if (!item) {
           console.error('[billing.change_plan] subscription has no item', active.id);

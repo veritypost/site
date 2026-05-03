@@ -7,13 +7,22 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { listCustomerSubscriptions, cancelSubscriptionAtPeriodEnd } from '@/lib/stripe';
-
 // D40: user cancels → DMs revoked immediately, 7-day grace for
 // everything else, freeze on day 7. The DB-side state machine handles
 // access; Stripe needs to learn about the cancel so future invoices
 // stop. Reconciliation order: Stripe FIRST (so we never flip local
 // state without the upstream change landing). If Stripe fails, the
 // local DB stays untouched and the user can retry.
+//
+// WHY NO CROSS-PLATFORM PRECHECK HERE:
+// The cross-platform guard (getActiveCrossPlatformSub / CROSS_PLATFORM_409)
+// belongs on routes that ADD billing — checkout, change-plan, resubscribe.
+// Cancel is a "stop billing me" action that operates exclusively on the
+// user's Stripe subscription. A user who has an Apple sub and a stale Stripe
+// sub must still be able to cancel the Stripe sub via this route. Blocking
+// them with a 409 would strand them with two active billing records. If no
+// Stripe subscription exists the route already no-ops (falls through to the
+// local RPC which cleans up state without making any Stripe call).
 //
 // TODO(T177) — sensitive-action recent-auth gate.
 // Under magic-link auth, the natural recency token is the most recent

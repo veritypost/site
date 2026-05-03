@@ -635,7 +635,11 @@ async function handleSubscriptionUpdated(service, sub) {
         .eq('user_id', userRow.id)
         .eq('stripe_subscription_id', sub.id);
     }
-    return;
+    // PM-5 — do NOT return here. A single subscription.updated event can carry
+    // both cancel_at_period_end=true AND a price change on the same object.
+    // The early return was dropping the plan-change branch below when cancel +
+    // price-change coincided. Fall through; the plan-change block is guarded
+    // by `planRow && planRow.id !== userRow.plan_id` (idempotent).
   }
 
   // DA-159 — un-cancel. User had scheduled cancellation (visible to us
@@ -795,7 +799,10 @@ async function handleChargeRefunded(service, charge) {
     .select('value')
     .eq('key', 'billing.refund_auto_freeze')
     .maybeSingle();
-  const autoFreeze = settingRow?.value === 'true';
+  // PM-5 — coerce to boolean via String normalisation. The settings.value
+  // column is text; a direct === 'true' comparison silently fails if the
+  // stored value has leading/trailing whitespace or wrong case.
+  const autoFreeze = String(settingRow?.value ?? '').toLowerCase() === 'true';
 
   // Determine audit action before writing: pending-review path gets a
   // distinct action so admin queries can filter without touching freeze path.

@@ -58,6 +58,26 @@ final class StoreManager: ObservableObject {
     @Published var serverConfirmedProductIDs: Set<String> = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    /// Q06 — set when /api/ios/subscriptions/sync returns 409 stripe_sub_active.
+    /// SubscriptionView binds to this via .sheet(item:) to present
+    /// SubscriptionConflictSheet. Cleared on dismiss.
+    @Published var showConflictSheet: ConflictReason?
+
+    // MARK: - Sync result
+
+    /// Internal result type for syncPurchaseToServer. Callers call
+    /// transaction.finish() on both .success and .conflict (Q06 sub-decision).
+    enum SyncResult {
+        case success
+        case conflict
+        case failure
+    }
+
+    // MARK: - UserDefaults key for seen conflict transactions
+    private static let seenConflictTransactionsKey = "vp.seenConflictTransactionIDs"
+    /// Cap on the seen-set size. When exceeded, the oldest entries are evicted
+    /// (FIFO) so the array doesn't grow unbounded across the user's lifetime.
+    private static let seenConflictTransactionsMaxCount = 200
 
     // MARK: - Product IDs (Phase 2: Verity solo + 8 Family-tier SKUs)
 
@@ -123,15 +143,39 @@ final class StoreManager: ObservableObject {
     ]
 
     private var updateListenerTask: Task<Void, Error>?
+    private var subscriptionDidChangeObserver: NSObjectProtocol?
     private let client = SupabaseManager.shared.client
 
     private init() {
         updateListenerTask = listenForTransactions()
         Task { await loadProducts() }
+        // When the user's billing state changes — either via web cancel propagated
+        // by webhook, or via App Store Server-to-Server — invalidate the
+        // conflict-suppression cache so a NEW StoreKit purchase attempt that
+        // legitimately conflicts will re-arm the sheet. Without this, a user who
+        // resolves the conflict on the web and then re-attempts the same StoreKit
+        // transaction would silently skip the conflict sheet because the txId is
+        // still in the seen set.
+        subscriptionDidChangeObserver = NotificationCenter.default.addObserver(
+            forName: .vpSubscriptionDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.clearSeenConflictTransactions()
+        }
     }
 
     deinit {
         updateListenerTask?.cancel()
+        if let observer = subscriptionDidChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    /// Clears the conflict-suppression cache. Called when subscription state
+    /// changes so the next purchase attempt re-evaluates conflict status fresh.
+    private func clearSeenConflictTransactions() {
+        UserDefaults.standard.removeObject(forKey: Self.seenConflictTransactionsKey)
     }
 
     // MARK: - Load Products
@@ -197,17 +241,25 @@ final class StoreManager: ObservableObject {
             // also notified via .vpSubscriptionSyncFailed for UI recovery
             // (SubscriptionView surfaces a "Purchase didn't sync — tap
             // Restore Purchases" banner).
-            let ok = await syncPurchaseToServer(
+            let syncResult = await syncPurchaseToServer(
                 productID: product.id,
                 transactionID: transaction.id,
                 receipt: transaction.jsonRepresentation.base64EncodedString(),
                 price: product.price
             )
-            if ok {
+            switch syncResult {
+            case .success:
                 serverConfirmedProductIDs.insert(product.id)
                 purchasedProductIDs.insert(product.id)
                 await transaction.finish()
-            } else {
+            case .conflict:
+                // Q06 — Stripe sub active. Finish the transaction so StoreKit
+                // does not re-deliver it; do NOT grant local entitlement.
+                // showConflictSheet is already set by syncPurchaseToServer.
+                purchasedProductIDs.remove(product.id)
+                serverConfirmedProductIDs.remove(product.id)
+                await transaction.finish()
+            case .failure:
                 // Ensure the product is NOT in the local cache if sync failed.
                 purchasedProductIDs.remove(product.id)
                 serverConfirmedProductIDs.remove(product.id)
@@ -243,19 +295,27 @@ final class StoreManager: ObservableObject {
                     // C18 — same gate as purchase(): only finish on
                     // server-confirmed sync. Un-synced re-deliveries
                     // bounce back through this listener on next launch.
-                    let ok = await self.syncPurchaseToServer(
+                    let syncResult = await self.syncPurchaseToServer(
                         productID: transaction.productID,
                         transactionID: transaction.id,
                         receipt: transaction.jsonRepresentation.base64EncodedString(),
                         price: product?.price
                     )
-                    if ok {
+                    switch syncResult {
+                    case .success:
                         await MainActor.run {
                             self.serverConfirmedProductIDs.insert(transaction.productID)
                             self.purchasedProductIDs.insert(transaction.productID)
                         }
                         await transaction.finish()
-                    } else {
+                    case .conflict:
+                        // Q06 — finish immediately; do not grant entitlement.
+                        await MainActor.run {
+                            self.purchasedProductIDs.remove(transaction.productID)
+                            self.serverConfirmedProductIDs.remove(transaction.productID)
+                        }
+                        await transaction.finish()
+                    case .failure:
                         await MainActor.run {
                             self.purchasedProductIDs.remove(transaction.productID)
                             self.serverConfirmedProductIDs.remove(transaction.productID)
@@ -300,18 +360,23 @@ final class StoreManager: ObservableObject {
 
     // MARK: - Sync to server
 
-    // C18 — returns true when the server confirmed entitlement. Callers
+    // C18 — returns .success when the server confirmed entitlement. Callers
     // (purchase(), Transaction.updates listener, restorePurchases) MUST
     // gate their `transaction.finish()` on this return value so StoreKit
     // re-delivers the transaction on next app launch if the server sync
     // never confirmed. Prior code always called `.finish()` — un-synced
     // purchases then silently dropped off StoreKit and the only recovery
     // was a manual Restore.
+    //
+    // Q06 — .conflict is returned when /api/ios/subscriptions/sync returns
+    // 409 with code='stripe_sub_active'. Callers MUST call transaction.finish()
+    // on .conflict (Apple requires we not leave a conflict transaction dangling)
+    // and must NOT insert into purchasedProductIDs / serverConfirmedProductIDs.
     @discardableResult
-    private func syncPurchaseToServer(productID: String, transactionID: UInt64, receipt: String?, price: Decimal?) async -> Bool {
+    private func syncPurchaseToServer(productID: String, transactionID: UInt64, receipt: String?, price: Decimal?) async -> SyncResult {
         guard let session = try? await client.auth.session else {
             Log.d("StoreManager: No auth session for sync")
-            return false
+            return .failure
         }
 
         let priceCents: Int = {
@@ -343,19 +408,54 @@ final class StoreManager: ObservableObject {
         // notification. Prior code swallowed non-2xx as debug-only;
         // a 4xx/5xx means the server never recorded entitlement, and
         // the local app would flip to "paid" while the DB stayed stale.
-        var syncedOk = false
+        var syncResult: SyncResult = .failure
         do {
-            let (_, response) = try await URLSession.shared.data(for: req)
+            let (data, response) = try await URLSession.shared.data(for: req)
             if let http = response as? HTTPURLResponse {
-                let code = http.statusCode
-                if (200..<300).contains(code) {
-                    syncedOk = true
+                let statusCode = http.statusCode
+                if (200..<300).contains(statusCode) {
+                    syncResult = .success
+                } else if statusCode == 409 {
+                    // Q06 — 409 may indicate cross-platform conflict.
+                    // Parse the response body to check for stripe_sub_active.
+                    struct ConflictBody: Decodable {
+                        let code: String?
+                        let message: String?
+                    }
+                    if let body = try? JSONDecoder().decode(ConflictBody.self, from: data),
+                       body.code == "stripe_sub_active" {
+                        let txKey = String(transactionID)
+                        var seen = UserDefaults.standard.stringArray(
+                            forKey: Self.seenConflictTransactionsKey) ?? []
+                        if !seen.contains(txKey) {
+                            seen.append(txKey)
+                            // FIFO eviction: cap the seen-set at seenConflictTransactionsMaxCount
+                            // so the UserDefaults entry doesn't grow unbounded over the user's
+                            // lifetime. Drop the oldest entries when over the limit.
+                            if seen.count > Self.seenConflictTransactionsMaxCount {
+                                seen = Array(seen.suffix(Self.seenConflictTransactionsMaxCount))
+                            }
+                            UserDefaults.standard.set(seen,
+                                forKey: Self.seenConflictTransactionsKey)
+                            let msg = body.message
+                                ?? "You have an active web subscription. Manage it at veritypost.com/profile/settings#billing."
+                            showConflictSheet = .stripeSubActive(message: msg)
+                        }
+                        syncResult = .conflict
+                    } else {
+                        Log.d("StoreManager: server sync returned 409 (non-conflict)", statusCode)
+                        NotificationCenter.default.post(
+                            name: .vpSubscriptionSyncFailed,
+                            object: nil,
+                            userInfo: ["statusCode": statusCode, "productID": productID]
+                        )
+                    }
                 } else {
-                    Log.d("StoreManager: server sync returned non-2xx", code)
+                    Log.d("StoreManager: server sync returned non-2xx", statusCode)
                     NotificationCenter.default.post(
                         name: .vpSubscriptionSyncFailed,
                         object: nil,
-                        userInfo: ["statusCode": code, "productID": productID]
+                        userInfo: ["statusCode": statusCode, "productID": productID]
                     )
                 }
             }
@@ -368,10 +468,10 @@ final class StoreManager: ObservableObject {
             )
         }
 
-        if syncedOk {
+        if syncResult == .success {
             NotificationCenter.default.post(name: .vpSubscriptionDidChange, object: nil)
         }
-        return syncedOk
+        return syncResult
     }
 
     // MARK: - Restore Purchases
@@ -390,19 +490,23 @@ final class StoreManager: ObservableObject {
                let tx = try? await product.latestTransaction,
                case .verified(let transaction) = tx {
                 let receipt = transaction.jsonRepresentation.base64EncodedString()
-                let ok = await syncPurchaseToServer(
+                let syncResult = await syncPurchaseToServer(
                     productID: transaction.productID,
                     transactionID: transaction.id,
                     receipt: receipt,
                     price: product.price
                 )
-                if ok {
+                switch syncResult {
+                case .success:
                     await MainActor.run {
                         serverConfirmedProductIDs.insert(transaction.productID)
                         purchasedProductIDs.insert(transaction.productID)
                     }
                     await transaction.finish()
-                } else {
+                case .conflict:
+                    // Q06 — finish immediately; showConflictSheet already set.
+                    await transaction.finish()
+                case .failure:
                     errorMessage = "Couldn't confirm your subscription with the server. Check your connection and try again."
                 }
             } else {
@@ -431,16 +535,33 @@ final class StoreManager: ObservableObject {
         }
     }
 
+    // Source-of-truth: canonical Apple product IDs declared at lines 64-92.
+    // Maps each productID to its TIER-LEVEL plan name. iOS uses these locally for
+    // priority comparison (`planPriority` keys at line 136) and feature-gating; web reads
+    // `plans.name` directly from the DB (period-qualified) via stripe_price_id/apple_product_id.
+    // This dict is exact-match to remove the prior substring-contains brittleness.
+    private static let planByProductID: [String: String] = [
+        StoreManager.verityMonthly: "verity",
+        StoreManager.verityAnnual: "verity",
+        StoreManager.familyMonthly1Kid: "verity_family",
+        StoreManager.familyAnnual1Kid: "verity_family",
+        StoreManager.familyMonthly2Kids: "verity_family",
+        StoreManager.familyAnnual2Kids: "verity_family",
+        StoreManager.familyMonthly3Kids: "verity_family",
+        StoreManager.familyAnnual3Kids: "verity_family",
+        StoreManager.familyMonthly4Kids: "verity_family",
+        StoreManager.familyAnnual4Kids: "verity_family",
+        StoreManager.legacyVerityProMonthly: "verity_pro",
+        StoreManager.legacyVerityProAnnual: "verity_pro",
+        StoreManager.legacyFamilyMonthly: "verity_family",
+        StoreManager.legacyFamilyAnnual: "verity_family",
+    ]
+
     /// Map a StoreKit product ID to the `users.plan` string.
     /// Phase 2 lineup: verity, verity_family. Pro grandfathers as
     /// 'verity_pro' so the server-side migration cron can detect + flip.
     func planName(for productID: String) -> String {
-        if productID.contains(".family.") || productID.contains("verity_family") {
-            return "verity_family"
-        }
-        if productID.contains("verity_pro") { return "verity_pro" }
-        if productID.contains("verity") { return "verity" }
-        return "free"
+        return Self.planByProductID[productID] ?? "free"
     }
 
     /// How many kid seats does this Family SKU correspond to?
@@ -472,7 +593,7 @@ final class StoreManager: ObservableObject {
 
     /// Approximate fallback — the real price always comes from Product.price
     /// at purchase/restore time. Numbers match Phase 2 pricing.
-    private func priceCentsForProduct(_ productID: String) -> Int {
+    func priceCentsForProduct(_ productID: String) -> Int {
         switch productID {
         case Self.verityMonthly: return 799
         case Self.verityAnnual: return 7999

@@ -2,7 +2,7 @@
 // v2 plan catalog -- 4 marketed tiers, 7 DB plan rows.
 // DB rows (see schema/reset_and_rebuild_v2.sql INSERT INTO plans):
 //   free
-//   verity_monthly           / verity_annual         -- LEGACY GRANDFATHERED
+//   verity_monthly           / verity_annual         -- ACTIVE SOLO VERITY ($7.99/mo)
 //   verity_pro_monthly       / verity_pro_annual
 //   verity_family_monthly    / verity_family_annual
 //
@@ -12,12 +12,11 @@
 // DB row deletion ships via the T319 migration in
 // `Ongoing Projects/migrations/`.
 //
-// T318 — `verity_monthly` ($3.99) and `verity_pro_monthly` ($9.99)
-// intentionally grant identical perm sets. The cheaper SKU is
-// grandfathered legacy (per `cron/pro-grandfather-notify`); existing
-// `verity_monthly` subscribers keep $3.99 forever. New subscribers can
-// only buy `verity_pro_monthly` at $9.99. DO NOT "fix" the duplication
-// as a bug — the price gap is the legacy promise.
+// Session 4 / Q07 — `verity_monthly` is the active solo Verity SKU at
+// $7.99/mo (price_cents=799). Inserted via migration
+// 20260503000019_session4_verity_solo_plans.sql. The legacy $3.99
+// grandfathering note (T318) is retired: no $3.99 subscribers existed
+// at launch. `verity_pro_monthly` ($9.99) remains a distinct tier.
 //
 // TIER_ORDER is a static string list used for ordering and upgrade
 // comparison. It carries no price or display data -- those come from

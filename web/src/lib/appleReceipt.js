@@ -281,11 +281,17 @@ export function assertReceiptStillActive(payload, { graceMs = 0 } = {}) {
 
 // Resolve the StoreKit product ID to the plans row. plans.apple_product_id
 // is seeded by migration schema/036_ios_subscription_plans.sql.
+//
+// is_active=true filter: without this guard, a retired SKU (e.g.
+// verity_pro_monthly with is_active=false) would still resolve — an S2S
+// DID_RENEW for a retired Apple product would reactivate the plan on a
+// subscriber who should have been auto-migrated. Only match live plans.
 export async function resolvePlanByAppleProductId(service, productId) {
   const { data, error } = await service
     .from('plans')
     .select('id, name, tier')
     .eq('apple_product_id', productId)
+    .eq('is_active', true)
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error(`no plan for apple_product_id=${productId}`);

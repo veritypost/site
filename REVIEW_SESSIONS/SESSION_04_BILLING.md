@@ -85,4 +85,43 @@ Each PM dispatches Explore + bug-hunter-security + bug-hunter-flow + adversary s
 
 ## Status
 
-(append final status block here)
+### 2026-05-03 — Session 4 SHIPPED
+
+**Headline:** 2 P0 + 11 P1 + 6 polish closed in 4-stream parallel + 1 second-pass slice. Adversary surfaced 4 P1 follow-ups + 2 polish items the first pass missed; all closed in second pass.
+
+**Streams (parallel, file-disjoint):**
+- **Stream 1** (web billing routes + cancel-state) — `billingPlatformGuard.ts` helper, Apple precheck wired into `checkout`/`change-plan`/`resubscribe`/`cancel` routes (cancel reverted in second pass — see below), `change-plan` cancel-pending guard, `stripe.js` `cancel_at_period_end` preservation + sandbox/prod env-gate, webhook early-return drop, `handleChargeRefunded` String coercion. 7 files. Type-check + lint clean.
+- **Stream 2** (iOS sync + Apple S2S ordering) — Stripe precheck on `ios/subscriptions/sync`, RPC-after-upsert 3-step ordering, Apple S2S ordering guard via `subscriptions.last_terminal_event_at`/`_type` columns, audit_log entry on out-of-order ignore. 3 files. Migration `20260503000020_session4_subscriptions_ordering_token.sql` written.
+- **Stream 3** (pricing source-of-truth — Q07) — Migration `20260503000019_session4_verity_solo_plans.sql` (verity_monthly $7.99 + verity_annual $79.99 rows, idempotent UPSERT preserving owner-populated stripe_price_id), `pricingCopy.ts` shared fallback constants + `formatCents`, `pricing/page.tsx` refactored to RSC reading from DB with `revalidate: 300` + Subscribe-CTA-disabled fallback when `stripe_price_id IS NULL`, `messages/page.tsx` $3.99 hardcode replaced with `FALLBACK_VERITY_MONTHLY`, `BillingCard.tsx` schema bug fix (`monthly_price_cents`/`annual_price_cents` → `price_cents` + `billing_period`) + retry-loop closure-stale fix, `plans.js` header comment updated. 6 files.
+- **Stream 4** (iOS Swift + Q12c kill-switch) — Q12c flip `manageSubscriptionsEnabled = false` at `AlertsView.swift:340`, `CLAUDE.md` row 5 updated (305 → 340), `StoreManager.planByProductID` exact-match dict (tier-level values matching `planPriority`/`hasAccess`), `SubscriptionView.legalDisclosures` switched to `Product.displayPrice`, new `SubscriptionConflictSheet.swift` with billing/refund CTAs, `StoreManager` 409 stripe_sub_active handler + `SyncResult` enum + sheet binding. 4 files + 1 new + CLAUDE.md.
+
+**Second pass (post-adversary):**
+- Cancel-route Apple precheck REMOVED (would have stranded users with both Apple + stale Stripe subs from cancelling the Stripe side). Comment documents why cancel doesn't get the guard.
+- `billingPlatformGuard` + `appleReceipt.resolvePlanByAppleProductId` now filter `is_active=true` (prevents retired SKU reactivation via DID_RENEW).
+- `ios/subscriptions/sync` `.update()` error captured + 500s on failure (prevents silent stale-row promotion).
+- `StoreManager.seenConflictTransactions` capped at 200 with FIFO eviction + cleared on `vpSubscriptionDidChange` (re-arms conflict sheet after web-side cancel).
+- `SubscriptionView.planPrice` switched to `Product.displayPrice` (parity miss in first pass — only legalDisclosures got fixed).
+- `billingPlatformGuard` fail-open path now logs to console + best-effort audit_log.
+- `SubscriptionConflictSheet` derives billing URL from `SupabaseManager.shared.siteURL` (no longer hardcoded to prod).
+
+**Verification:**
+- Pre-impl finding-verifier: 15/16 CONFIRMED, 1 PARTIAL (AlertsView.swift line drift, expected per Q12c).
+- DB MCP query confirmed `verity_monthly` row absent (hidden P0).
+- Build-verifier: web TS clean, lint clean, all sentinels PASS, file-existence PASS, kill-switch CLAUDE.md update PASS. iOS xcodebuild fails on pre-existing `LeaderboardView.swift:319` String/uuidString error — unchanged in Session 4 (`git diff HEAD -- VerityPost/VerityPost/LeaderboardView.swift` returns empty).
+- Independent reviewer: SHIP — all 13 listed P0/P1 CLOSED + 7 new findings (4 P1 fed into second pass, 3 polish + non-issues documented).
+- Adversary: NEEDS-ANOTHER-PASS first pass; NEEDS-ANOTHER-PASS items 1-4 + polish 5-7 closed in second pass; remaining items deferred (race window via SERIALIZABLE transaction, Stripe livemode env gate parity, BillingCard handling of `is_active=false` plans — all non-Session-4-regression).
+
+**Owner action required (CANNOT be done by agent):**
+1. **Apply both migrations** — MCP is in read-only mode for this project. Files written:
+   - `supabase/migrations/20260503000019_session4_verity_solo_plans.sql`
+   - `supabase/migrations/20260503000020_session4_subscriptions_ordering_token.sql`
+   Apply via `supabase db push` from project root, or paste into Supabase dashboard SQL editor.
+2. **Mint Stripe price IDs for verity_monthly + verity_annual** — set `stripe_price_id` on both rows + flip `is_visible = true` so the pricing page renders the Subscribe CTA. Until populated, the pricing page correctly shows "Subscribe via iOS App" fallback (no broken checkout).
+3. **(optional) Address adversary deferrals** — race window via SERIALIZABLE transaction on the precheck+upsert window; Stripe `livemode` env-gate; BillingCard handling of `is_active=false` legacy Pro rows. None are payment-correctness regressions; all suitable for a follow-up session.
+
+**Files touched:**
+- New: `web/src/lib/billingPlatformGuard.ts`, `web/src/lib/pricingCopy.ts`, `VerityPost/VerityPost/SubscriptionConflictSheet.swift`, `supabase/migrations/20260503000019_*`, `supabase/migrations/20260503000020_*`
+- Modified web: `lib/stripe.js`, `lib/plans.js`, `lib/appleReceipt.js`, `app/api/billing/{cancel,change-plan,resubscribe}/route.js`, `app/api/stripe/{checkout,webhook}/route.js`, `app/api/ios/subscriptions/sync/route.js`, `app/api/ios/appstore/notifications/route.js`, `app/pricing/page.tsx`, `app/messages/page.tsx`, `app/profile/settings/_cards/BillingCard.tsx`
+- Modified iOS: `StoreManager.swift`, `SubscriptionView.swift`, `AlertsView.swift`
+- Modified docs: `/Users/veritypost/Desktop/CLAUDE.md` (kill-switch row 5)
+

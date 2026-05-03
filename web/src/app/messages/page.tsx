@@ -12,6 +12,7 @@ import type { Tables } from '@/types/database-helpers';
 import type { User } from '@supabase/supabase-js';
 import { Z } from '@/lib/zIndex';
 import { friendlyError } from '@/lib/friendlyError';
+import { FALLBACK_VERITY_MONTHLY } from '@/lib/pricingCopy';
 
 // Messages / DM page. Permission swap:
 //   • The former PermissionGate + PERM.PROFILE_MESSAGES / SECTIONS.PROFILE
@@ -1003,7 +1004,7 @@ function MessagesPageInner() {
                 }}
               >
                 <span style={{ fontSize: 15, fontWeight: 800, color: '#111' }}>Verity</span>
-                <span style={{ fontSize: 13, color: '#666' }}>$3.99/mo</span>
+                <span style={{ fontSize: 13, color: '#666' }}>{FALLBACK_VERITY_MONTHLY.formatted}/mo</span>
               </div>
               <ul
                 style={{

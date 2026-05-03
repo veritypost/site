@@ -383,6 +383,14 @@ export async function POST(request) {
       case 'EXPIRED':
       case 'GRACE_PERIOD_EXPIRED':
       case 'REVOKE': {
+        // PM-11 ordering token: record the JWS-signed signedDate of this terminal
+        // event so that renewal handlers arriving out of order (DID_RENEW with an
+        // older signedDate delivered AFTER this REVOKE) are detected and ignored.
+        // We use transaction.signedDate (from the JWS payload) not wall-clock time,
+        // so the invariant holds even when Apple's delivery is hours delayed.
+        const terminalSignedAt = transaction.signedDate
+          ? new Date(Number(transaction.signedDate)).toISOString()
+          : new Date().toISOString();
         await service.rpc('billing_freeze_profile', { p_user_id: userId });
         await service
           .from('subscriptions')
@@ -390,12 +398,18 @@ export async function POST(request) {
             status: 'cancelled',
             cancelled_at: new Date().toISOString(),
             cancel_reason: `apple_${notificationType.toLowerCase()}`,
+            last_terminal_event_at: terminalSignedAt,
+            last_terminal_event_type: notificationType,
           })
           .eq('id', sub.id);
         break;
       }
 
       case 'REFUND': {
+        // PM-11: same ordering-token write as REVOKE/EXPIRED.
+        const terminalSignedAt = transaction.signedDate
+          ? new Date(Number(transaction.signedDate)).toISOString()
+          : new Date().toISOString();
         await service.rpc('billing_freeze_profile', { p_user_id: userId });
         await service
           .from('subscriptions')
@@ -403,6 +417,8 @@ export async function POST(request) {
             status: 'cancelled',
             cancelled_at: new Date().toISOString(),
             cancel_reason: 'apple_refund',
+            last_terminal_event_at: terminalSignedAt,
+            last_terminal_event_type: 'REFUND',
           })
           .eq('id', sub.id);
         break;
@@ -413,6 +429,57 @@ export async function POST(request) {
       case 'DID_CHANGE_RENEWAL_PREF':
       case 'OFFER_REDEEMED':
       case 'REFUND_REVERSED': {
+        // PM-11 out-of-order delivery guard.
+        //
+        // Apple's S2S delivery is best-effort. A REVOKE or REFUND notification
+        // can land AFTER a DID_RENEW for the same originalTransactionId. Without
+        // a guard the renewal handler calls billing_resubscribe, reactivating a
+        // refunded subscription. The signedDate fields in each JWS payload let us
+        // detect this: a renewal whose signedDate <= the last terminal event's
+        // signedDate must be out-of-order and must NOT reactivate.
+        //
+        // Invariant: last_terminal_event_at stores the JWS signedDate (ms epoch
+        // cast to timestamptz), not wall-clock processing time, so comparisons
+        // work correctly even across delayed delivery windows.
+        //
+        // For REFUND_REVERSED: Apple legitimately un-refunds (Apple docs). We
+        // still apply the signedDate ordering check (the reversed notification
+        // must be newer than the refund's signedDate), and on success we CLEAR
+        // last_terminal_event_at so the sub is fully reactivated without a
+        // lingering terminal marker.
+        const renewalSignedMs = Number(transaction.signedDate) || 0;
+
+        // Re-fetch the subscriptions row to get the latest last_terminal_event_at.
+        const { data: freshSub } = await service
+          .from('subscriptions')
+          .select('id, last_terminal_event_at')
+          .eq('id', sub.id)
+          .maybeSingle();
+
+        if (freshSub?.last_terminal_event_at) {
+          const terminalMs = Date.parse(freshSub.last_terminal_event_at);
+          if (renewalSignedMs > 0 && renewalSignedMs <= terminalMs) {
+            // Out-of-order: this renewal is older than the last terminal event.
+            // Log to audit_log for ops visibility, then 200 without reactivating.
+            await service.from('audit_log').insert({
+              actor_id: userId,
+              action: 'apple_notif_reorder_ignored',
+              target_type: 'subscription',
+              target_id: sub.id,
+              metadata: {
+                notification_type: notificationType,
+                original_transaction_id: originalTxId,
+                renewal_signed_date: new Date(renewalSignedMs).toISOString(),
+                last_terminal_event_at: freshSub.last_terminal_event_at,
+                notification_uuid: notificationUUID,
+              },
+            });
+            // Fall through to the webhook_log 'processed' update below without
+            // calling any billing RPCs or touching subscriptions status.
+            break;
+          }
+        }
+
         const plan = await resolvePlanByAppleProductId(service, transaction.productId);
 
         const { data: userRow } = await service
@@ -441,6 +508,16 @@ export async function POST(request) {
 
         const periodStartMs = Number(transaction.purchaseDate) || Date.now();
         const periodEndMs = Number(transaction.expiresDate) || periodStartMs;
+
+        // For REFUND_REVERSED: clear the terminal event marker so future renewals
+        // are not blocked. For all other renewal types leave the marker alone
+        // (it will only be set if a prior terminal event wrote it; clearing it
+        // unconditionally would mask a subsequent REVOKE).
+        const terminalClear =
+          notificationType === 'REFUND_REVERSED'
+            ? { last_terminal_event_at: null, last_terminal_event_type: null }
+            : {};
+
         await service
           .from('subscriptions')
           .update({
@@ -451,6 +528,7 @@ export async function POST(request) {
             cancelled_at: null,
             cancel_reason: null,
             auto_renew: renewal?.autoRenewStatus !== 0,
+            ...terminalClear,
           })
           .eq('id', sub.id);
         break;
