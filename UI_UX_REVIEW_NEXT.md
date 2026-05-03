@@ -9,8 +9,8 @@ CURRENT_TITLE: Unit 7 — Public profile + card (/u/[username], /card/[username]
 CURRENT_WAVE: A
 CURRENT_DOC: UI_UX_REVIEW/A-7-public-profile.md
 STATUS: findings
-NEXT_BUILD_SLICE: Slice 14 (Unit 6 / Leaderboard) — READY, execute immediately. Slice 15 (Unit 7) blocked on DECISION #060 (Q1: show_activity on card).
-ANCHOR: Unit 7 review complete 2026-05-02. 44 findings logged (25 crit, 19 polish). Elevated-care: F01 (CSAM escalation), F15 (targetType injection), F16 (wrong permission) — adversary required in Slice 15. Panel Q1 (show_activity on card) 2-1 divergent — owner adjudication required. DECISIONs #059+#061 auto-locked. Next session auto-detect fires (c) → execute Slice 14 (all decisions locked).
+NEXT_BUILD_SLICE: Slice 15 (Unit 7 / Public profile chrome) — BLOCKED on DECISION #060 (Q1: show_activity on card). Owner adjudication required before Slice 15 can proceed.
+ANCHOR: Slice 14 shipped 2026-05-02. 46 findings fixed; adversary closed 4 gaps (Rising Stars/category data leaks via URL bypass, useSearchParams Suspense, sign-out race). tsc clean, smoke PASS. Auto-detect fires owner-adjudication → surface DECISION #060 Q1 to owner.
 LAST_UPDATED: 2026-05-02
 
 PARKED_UNITS:
@@ -19,7 +19,7 @@ PARKED_UNITS:
 - Unit 3 (Browse) — status: fixed (Slice 11 shipped 2026-05-02). All 38 findings resolved.
 - Unit 4 (Search) — status: fixed (Slice 12 shipped 2026-05-02). 29 findings fixed.
 - Unit 5 (Category) — status: fixed (Slice 13 shipped 2026-05-02). 36 findings fixed (F33 refuted). 2 non-blocking adversary gaps deferred.
-- Unit 6 (Leaderboard) — status: findings (Slice 14 READY). 46 findings. All decisions locked (DECISION #057 C, #058).
+- Unit 6 (Leaderboard) — status: fixed (Slice 14 shipped 2026-05-02). 46 findings fixed. 4 adversary gaps closed.
 - Unit 7 (Public profile + card) — status: findings (Slice 15 blocked on DECISION #060). 44 findings. 3 elevated-care (adversary req'd). DECISIONs #059+#061 auto-locked.
 
 EXECUTION_PLAN: UI_UX_REVIEW_SLICES.md

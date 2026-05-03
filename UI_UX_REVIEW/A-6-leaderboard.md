@@ -1,9 +1,9 @@
 # Unit 6 — Leaderboard (`/leaderboard`)
 
 **Surface(s):** `web/src/app/leaderboard/page.tsx` (902 lines), `web/src/app/leaderboard/layout.js`, `web/src/components/VerifiedBadge.tsx`, `web/src/components/Avatar.tsx`, `web/src/lib/leaderboardPeriod.ts`, `VerityPost/VerityPost/LeaderboardView.swift`
-**Status:** findings (Slice 14 ready — all decisions locked)
+**Status:** fixed (Slice 14 shipped 2026-05-02)
 **Date:** 2026-05-02
-**Anchor:** Review complete. DECISION #057 locked (owner: C — suppress both badges from LeaderRow). DECISION #058 auto-locked (URL state). F41 closes without iOS code change. Slice 14 now unblocked.
+**Anchor:** Slice 14 shipped. 46 findings fixed (0 refuted). Adversary found 4 gaps — Rising Stars/category data leak (URL bypass), useSearchParams Suspense, sign-out race — all closed. tsc clean, smoke PASS. Unit 6 complete.
 
 ---
 

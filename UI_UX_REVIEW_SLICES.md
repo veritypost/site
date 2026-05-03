@@ -525,7 +525,7 @@ Seed `ad_placements` rows + add `<Ad placement="..."/>` calls:
 | Slice 11 — Unit 3 / Browse (38 findings) | Unit fix | shipped 2026-05-02 (2-stream parallel; tsc + build clean; smoke PASS; all 38 findings fixed) | 1 + 2 | #029, #053, #054 | 1 |
 | Slice 12 — Unit 4 / Search (32 findings) | Unit fix | shipped 2026-05-02 (2-stream parallel; Suspense boundary fix post-smoke; tsc + smoke PASS; 29 findings fixed; F20 refuted; F28/F32 deferred) | none | #022, #029, #031, #032, #043, #053, #054 | 1 |
 | Slice 13 — Unit 5 / Category (37 findings) | Unit fix | shipped 2026-05-02 (2-stream parallel + adversary 5 gaps (2 blocking fixed: deleted_at filter + is_kids_safe guard); tsc + build clean; smoke PASS; 36 findings fixed; F33 refuted) | 1 + 2 | #022, #029, #043, #053, #055, #056 | 2 + adversary |
-| Slice 14 — Unit 6 / Leaderboard (46 findings) | Unit fix | ready | 1 + 2 | #057, #058 | — |
+| Slice 14 — Unit 6 / Leaderboard (46 findings) | Unit fix | shipped 2026-05-02 (3-stream parallel + adversary 4 gaps closed: Rising Stars/category data leak, useSearchParams Suspense, sign-out race; tsc clean; smoke PASS; 46 findings fixed) | 1 + 2 | #057, #058 | 3 (parallel streams) + 1 adversary |
 
 ---
 
