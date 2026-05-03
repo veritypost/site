@@ -1,7 +1,7 @@
 'use client';
 
 import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { resolveNext } from '@/lib/authRedirect';
 import { createClient } from '@/lib/supabase/client';
 
@@ -24,13 +24,12 @@ type Stage = 'email' | 'code';
 
 interface Props {
   notice?: string | null;
+  rawNext?: string | null;
+  prefillEmail?: string;
 }
 
-export default function SingleDoorForm({ notice }: Props) {
+export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = '' }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const rawNext = searchParams?.get('next') ?? null;
-  const prefillEmail = searchParams?.get('email') ?? '';
 
   const [stage, setStage] = useState<Stage>('email');
   const [email, setEmail] = useState(prefillEmail);

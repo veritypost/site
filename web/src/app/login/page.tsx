@@ -62,6 +62,8 @@ function LoginPageInner() {
   usePageViewTrack('login');
 
   const mode = searchParams?.get('mode') ?? null;
+  const rawNext = searchParams?.get('next') ?? null;
+  const prefillEmail = searchParams?.get('email') ?? '';
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     const toastParam = searchParams?.get('toast') ?? null;
@@ -120,7 +122,7 @@ function LoginPageInner() {
         ) : mode === 'request' ? (
           <RequestAccessForm />
         ) : (
-          <SingleDoorForm notice={notice} />
+          <SingleDoorForm notice={notice} rawNext={rawNext} prefillEmail={prefillEmail} />
         )}
       </div>
     </div>
