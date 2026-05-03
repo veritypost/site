@@ -3,6 +3,7 @@
 import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { resolveNext } from '@/lib/authRedirect';
+import { createClient } from '@/lib/supabase/client';
 
 // [S3-Q2-d] OAuth feature flag. Default false during closed beta /
 // pre-launch hide. Code preserved — one-line flip re-enables.
@@ -126,7 +127,15 @@ export default function SingleDoorForm({ notice }: Props) {
         setCodeError('Could not sign in. Please try again or request a new code.');
         return;
       }
-      // Success — session cookie is set. Navigate to next or home.
+      // Privacy posture: route returns 200 { ok:true } for both valid and
+      // invalid codes. Confirm a session was actually minted before we
+      // navigate, otherwise wrong-OTP would land the user on home as anon.
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setCodeError('Invalid code. Please try again or request a new code.');
+        return;
+      }
       const safe = resolveNext(rawNext, null);
       router.replace(safe || '/');
     } catch {

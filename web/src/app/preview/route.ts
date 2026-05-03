@@ -8,16 +8,25 @@
 // every existing cookie (owner lost device, teammate left, etc.).
 
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'node:crypto';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+function tokensMatch(a: string, b: string): boolean {
+  // Length pre-check guards against the throw in timingSafeEqual when
+  // buffers differ in size. The pre-check itself leaks length, which is
+  // acceptable: PREVIEW_BYPASS_TOKEN length is fixed and not secret.
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const token = url.searchParams.get('token');
   const expected = process.env.PREVIEW_BYPASS_TOKEN;
 
-  if (!expected || token !== expected) {
+  if (!expected || !token || !tokensMatch(token, expected)) {
     // Missing or bad token → send to the holding page, no cookie.
     return NextResponse.redirect(new URL('/welcome', request.url));
   }

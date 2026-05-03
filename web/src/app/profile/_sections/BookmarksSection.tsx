@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 import { createClient } from '@/lib/supabase/client';
@@ -30,40 +30,63 @@ export function BookmarksSection({ preview }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-      const { data, error: queryError } = await supabase
-        .from('bookmarks')
-        .select('id, created_at, article_id, notes, articles(title, subtitle, stories(slug))')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (cancelled) return;
-      if (queryError) {
-        setError(true);
-        setLoading(false);
-        return;
-      }
-      setRows((data ?? []) as unknown as BookmarkRow[]);
+  const load = useCallback(async (signal?: { cancelled: boolean }) => {
+    setLoading(true);
+    setError(false);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      if (signal?.cancelled) return;
       setLoading(false);
-    })();
+      return;
+    }
+    const { data, error: queryError } = await supabase
+      .from('bookmarks')
+      .select('id, created_at, article_id, notes, articles(title, subtitle, stories(slug))')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (signal?.cancelled) return;
+    if (queryError) {
+      setError(true);
+      setLoading(false);
+      toast.error('Could not load bookmarks. Tap Retry to try again.');
+      return;
+    }
+    setRows((data ?? []) as unknown as BookmarkRow[]);
+    setLoading(false);
+  }, [supabase, toast]);
+
+  useEffect(() => {
+    const signal = { cancelled: false };
+    void load(signal);
     return () => {
-      cancelled = true;
+      signal.cancelled = true;
     };
-  }, [preview, supabase]);
+  }, [preview, load]);
 
   if (loading) return <SkeletonBlock height={120} />;
   if (error) return (
     <div style={{ padding: '24px 0', textAlign: 'center', color: C.inkMuted, fontSize: 14 }}>
-      Could not load bookmarks — try refreshing.
+      <div style={{ marginBottom: S[2] }}>Could not load bookmarks.</div>
+      <button
+        type="button"
+        onClick={() => { void load(); }}
+        style={{
+          fontFamily: FONT.sans,
+          fontSize: F.sm,
+          fontWeight: 600,
+          color: C.ink,
+          background: 'transparent',
+          border: `1px solid ${C.border}`,
+          borderRadius: R.sm,
+          padding: `${S[1]}px ${S[3]}px`,
+          cursor: 'pointer',
+        }}
+      >
+        Retry
+      </button>
     </div>
   );
   if (rows.length === 0) {

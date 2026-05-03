@@ -32,6 +32,18 @@ import {
 
 const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 
+// Map upstream verifyOtp errors to a closed set of audit codes. Avoids
+// dumping raw provider strings (which can carry email/IP/user-id hints
+// or change wording across Supabase releases) into audit_log.
+function classifyOtpError(message: string | undefined | null): string {
+  if (!message) return 'no_user';
+  const m = message.toLowerCase();
+  if (m.includes('expired')) return 'expired';
+  if (m.includes('invalid') || m.includes('not found')) return 'invalid';
+  if (m.includes('rate') || m.includes('too many')) return 'rate_limited_upstream';
+  return 'other';
+}
+
 function genericOk() {
   return NextResponse.json({ ok: true }, { status: 200, headers: NO_STORE });
 }
@@ -143,7 +155,7 @@ export async function POST(request: NextRequest) {
     });
     await writeAuditRow(service, {
       email,
-      reason: `otp_failed:${(error?.message || 'no_user').slice(0, 80)}`,
+      reason: `otp_failed:${classifyOtpError(error?.message)}`,
       ipTruncated,
     });
     return genericOk();
