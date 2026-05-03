@@ -8,9 +8,9 @@ CURRENT_UNIT: 8
 CURRENT_TITLE: Unit 8 — Marketing bundle (/pricing, /how-it-works, /about, /contact, /kids-app)
 CURRENT_WAVE: A
 CURRENT_DOC: UI_UX_REVIEW/A-8-marketing-bundle.md
-STATUS: pending
-NEXT_BUILD_SLICE: Slice 16 (Unit 8 / Marketing bundle) — pending review
-ANCHOR: Slice 15 shipped 2026-05-03 (commit c831e9d). All Unit 7 findings resolved. Next: review Unit 8 (marketing bundle). Auto-detect fires (e) → review Unit 8.
+STATUS: findings
+NEXT_BUILD_SLICE: Slice 16 (Unit 8 / Marketing bundle) — blocked on owner approval of Q1 + Q2
+ANCHOR: Review complete 2026-05-03. 29 findings logged. Q1 (Family plan web) + Q2 (annual pricing) panels dispatched — both 3/3 convergent. Presented to owner for approval. Session paused for adjudication. Next: owner approves Q1/Q2 → lock DECISIONS → open Slice 16.
 LAST_UPDATED: 2026-05-03
 
 PARKED_UNITS:

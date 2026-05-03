@@ -17,7 +17,7 @@ Findings docs live at `UI_UX_REVIEW/<wave>-<n>-<slug>.md`.
 | 5  | Category | `/category/[id]` | fixed (Slice 13 shipped 2026-05-02) |
 | 6  | Leaderboard | `/leaderboard` | fixed (Slice 14 shipped 2026-05-02) |
 | 7  | Public profile + card | `/u/[username]`, `/card/[username]` *(flag is live — full review applied)* | fixed (Slice 15 shipped 2026-05-03) |
-| 8  | Marketing bundle | `/pricing`, `/how-it-works`, `/about`, `/contact`, `/kids-app` | pending |
+| 8  | Marketing bundle | `/pricing`, `/how-it-works`, `/about`, `/contact`, `/kids-app` | findings (29 findings; Q1+Q2 panels complete — owner approval pending) |
 | 9  | Legal/info sweep | `/privacy`, `/privacy/kids`, `/terms`, `/cookies`, `/dmca`, `/corrections`, `/editorial-standards`, `/methodology`, `/help`, `/accessibility` | pending |
 | 10 | Auth flow | `/login`, `/signup` (redirect), `/request-access` (redirect), `/welcome`, `/beta-locked` | pending |
 | 11 | Logout flow | `/logout` | pending |
