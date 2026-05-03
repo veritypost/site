@@ -1,10 +1,10 @@
 # Unit 7 — Public profile + card (`/u/[username]`, `/card/[username]`)
 
 **Surface(s):** `web/src/app/u/[username]/page.tsx` (766 lines), `web/src/app/u/[username]/layout.js`, `web/src/app/card/[username]/page.js` (295 lines), `web/src/app/card/[username]/layout.js`, `web/src/app/card/[username]/opengraph-image.js` (200 lines), `web/src/app/profile/card/page.js` (136 lines), `web/src/app/profile/[id]/page.tsx`, `web/src/components/FollowButton.tsx`, `web/src/lib/scoreTiers.ts`, `web/src/lib/reportReasons.js`, `web/src/app/api/users/[id]/block/route.js`, `web/src/app/api/reports/route.js`
-**Status:** findings (Slice 15 READY — DECISION #060 locked 2026-05-02, all decisions locked)
+**Status:** fixed (Slice 15 shipped 2026-05-03)
 **Date:** 2026-05-02
 **Note on kill-switch:** INDEX previously labelled this "(KILL-SWITCHED — chrome only)". `PUBLIC_PROFILE_ENABLED` is currently `true` — surface is live. Full review applied.
-**Anchor:** All decisions locked 2026-05-02. DECISION #060 owner answer: A (exempt). F21 → wontfix. Slice 15 now unblocked. Elevated-care: F01 (CSAM escalation), F15 (targetType injection), F16 (wrong permission) — adversary mandatory.
+**Anchor:** Slice 15 shipped 2026-05-03. 43 findings fixed (F21 wontfix). Adversary gaps closed. Build + smoke test clean. Commit c831e9d.
 
 ---
 

@@ -16,7 +16,7 @@ Findings docs live at `UI_UX_REVIEW/<wave>-<n>-<slug>.md`.
 | 4  | Search | `/search` | fixed (Slice 12 shipped 2026-05-02) |
 | 5  | Category | `/category/[id]` | fixed (Slice 13 shipped 2026-05-02) |
 | 6  | Leaderboard | `/leaderboard` | fixed (Slice 14 shipped 2026-05-02) |
-| 7  | Public profile + card | `/u/[username]`, `/card/[username]` *(flag is live — full review applied)* | findings (44 findings; Slice 15 READY — DECISION #060 locked 2026-05-02) |
+| 7  | Public profile + card | `/u/[username]`, `/card/[username]` *(flag is live — full review applied)* | fixed (Slice 15 shipped 2026-05-03) |
 | 8  | Marketing bundle | `/pricing`, `/how-it-works`, `/about`, `/contact`, `/kids-app` | pending |
 | 9  | Legal/info sweep | `/privacy`, `/privacy/kids`, `/terms`, `/cookies`, `/dmca`, `/corrections`, `/editorial-standards`, `/methodology`, `/help`, `/accessibility` | pending |
 | 10 | Auth flow | `/login`, `/signup` (redirect), `/request-access` (redirect), `/welcome`, `/beta-locked` | pending |
@@ -105,7 +105,7 @@ Findings docs live at `UI_UX_REVIEW/<wave>-<n>-<slug>.md`.
 `S<n> — <pattern>` — e.g. `S1 — Empty-state CTA missing on list views (web)`. Listed inline in the wave they're discovered in.
 
 **Sweep candidates surfaced from Unit 2:**
-- `dark-mode-token-sweep` — hardcoded hex colors violating PRINCIPLE §1.1. Unit 2: `not-found.tsx`, `ArticleSurface.tsx`, `ArticleQuiz.tsx`, `CommentThread.tsx`, `CommentRow.tsx`, `CommentComposer.tsx`, `BookmarkButton.tsx`. Unit 3: `browse/page.tsx` C.soft/C.muted/C.breakingBg/etc + header rgba. **Count: 2 units.** Promote at 5.
+- `dark-mode-token-sweep` — hardcoded hex colors violating PRINCIPLE §1.1. Unit 2: `not-found.tsx`, `ArticleSurface.tsx`, `ArticleQuiz.tsx`, `CommentThread.tsx`, `CommentRow.tsx`, `CommentComposer.tsx`, `BookmarkButton.tsx`. Unit 3: `browse/page.tsx` C.soft/C.muted/C.breakingBg/etc + header rgba. Unit 7: `u/[username]/page.tsx` (F37–F43 fixed in Slice 15), `FollowButton.tsx`, `card/page.js`, `profile/card/page.js` (all fixed in Slice 15). **Count: 3 units.** Promote at 5.
 - `edition-copy-sweep` — "today's edition" / "back to edition" / "today's front page" framing violating DECISION #021. Unit 2 findings #2+#3; likely repeats. **Count: 1 unit.**
 - `<h2>-section-headings-sweep` — section headings using `<div>` or `<p>` instead of `<h2>`/`<h3>`. Unit 2: Sources/Timeline/Discussion/Quiz card. Unit 3: SectionHeader (`TODAY`, `YESTERDAY` etc). **Count: 2 units.** Promote at 5.
 - `body-scroll-lock-sweep` — no `document.body.style.overflow = 'hidden'` when modal/sheet overlays open. Unit 2 finding #83 (CommentThread dialogs). Unit 3 finding #23 (FilterSheet). **Count: 2 units.** Promote at 5.

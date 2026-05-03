@@ -3,15 +3,15 @@
 Single-line state for the review system. Updated automatically at session end.
 
 ```
-CURRENT_PHASE: fix-slice
-CURRENT_UNIT: 7
-CURRENT_TITLE: Unit 7 — Public profile + card (/u/[username], /card/[username])
+CURRENT_PHASE: unit-review
+CURRENT_UNIT: 8
+CURRENT_TITLE: Unit 8 — Marketing bundle (/pricing, /how-it-works, /about, /contact, /kids-app)
 CURRENT_WAVE: A
-CURRENT_DOC: UI_UX_REVIEW/A-7-public-profile.md
-STATUS: findings
-NEXT_BUILD_SLICE: Slice 15 (Unit 7 / Public profile chrome) — READY. DECISION #060 locked 2026-05-02 (owner: A). All decisions locked. Elevated-care: F01 (CSAM escalation), F15 (targetType injection), F16 (wrong permission) — adversary pass mandatory.
-ANCHOR: DECISION #060 locked 2026-05-02 (Option A: card exempt from show_activity). F21 → wontfix. Slice 15 unblocked. Next session auto-detect fires (c) → execute Slice 15.
-LAST_UPDATED: 2026-05-02
+CURRENT_DOC: UI_UX_REVIEW/A-8-marketing-bundle.md
+STATUS: pending
+NEXT_BUILD_SLICE: Slice 16 (Unit 8 / Marketing bundle) — pending review
+ANCHOR: Slice 15 shipped 2026-05-03 (commit c831e9d). All Unit 7 findings resolved. Next: review Unit 8 (marketing bundle). Auto-detect fires (e) → review Unit 8.
+LAST_UPDATED: 2026-05-03
 
 PARKED_UNITS:
 - Unit 1 (Home) — status: fixed (Slice 3 shipped 2026-05-02). HomeBrokenPinBanner admin signal TODO in page.tsx.
@@ -20,7 +20,7 @@ PARKED_UNITS:
 - Unit 4 (Search) — status: fixed (Slice 12 shipped 2026-05-02). 29 findings fixed.
 - Unit 5 (Category) — status: fixed (Slice 13 shipped 2026-05-02). 36 findings fixed (F33 refuted). 2 non-blocking adversary gaps deferred.
 - Unit 6 (Leaderboard) — status: fixed (Slice 14 shipped 2026-05-02). 46 findings fixed. 4 adversary gaps closed.
-- Unit 7 (Public profile + card) — status: findings (Slice 15 READY — all decisions locked). 44 findings. F21 wontfix. 3 elevated-care (adversary req'd). DECISIONs #059+#060+#061 locked.
+- Unit 7 (Public profile + card) — status: fixed (Slice 15 shipped 2026-05-03). 43 findings fixed (F21 wontfix). Commit c831e9d.
 
 EXECUTION_PLAN: UI_UX_REVIEW_SLICES.md
 SLICE_NAMING: sequential numbers (Slice 1, 2, 3, ...). See SLICES.md tracking table for type (Foundation / Unit fix / Cross-cutting / Verification) and dependencies.

@@ -50,6 +50,14 @@ Format: `S?<n> — <pattern>` — `S?` = sweep candidate, becomes `S<n>` if prom
 - **Fix shape:** Split `ReportReason` into per-surface enums or filter `allCases` at call site by surface. Mirror web's subset design.
 - **Decision needed at wave-end:** fold into iOS parity sweep (Slice 9 or separate iOS surface pass).
 
+### S?9 — events_* partition tables have RLS disabled (Supabase advisory)
+- **First sighted:** Slice 15 Supabase MCP call, 2026-05-03
+- **Pattern:** 6 `events_*` partition tables (`events_20260430`, `events_20260501`, `events_20260502`, `events_20260503`, `events_20260504`, `permission_key_aliases`) have RLS disabled. Per Supabase advisory: "anyone with the anon key can read or modify every row."
+- **Affected surfaces:** analytics pipeline; not a UI surface.
+- **Fix shape:** Enable RLS + add appropriate policies. Enabling without policies blocks all access — owner must decide which roles need SELECT. Recommended: SELECT for authenticated (internal queries) only; no public reads.
+- **Decision needed:** owner to confirm policy shape before enabling. Do NOT auto-apply.
+- **Out of UI/UX scope** — flag for security review.
+
 ### S?8 — VerityPostKids has no in-app report path (Guideline 1.2 / NCMEC gap)
 - **First sighted:** Slice 8 adversary pass, 2026-05-02
 - **Pattern:** Kids iOS app has no `ReportService`, no `ReportReason`, and no content-report affordance. If any user-visible content surface exists in the kids app (expert sessions, leaderboard names, etc.) where exploitative content could appear, Apple Guideline 1.2 requires a report path.
