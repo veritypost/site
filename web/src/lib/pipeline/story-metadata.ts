@@ -207,6 +207,16 @@ export async function pickStoryMetadata(
   input: PickStoryMetadataInput,
   pipelineRunId: string,
 ): Promise<PickStoryMetadataResult> {
+  // Wave 7 hotfix — gate behind env var so the per-story Haiku call
+  // doesn't make the run handler exceed Vercel's 300s lambda timeout
+  // when many stories form in one Run. Default OFF until the call
+  // is batched into a single end-of-run pass. Stories form
+  // uncategorized when this is off; cards render an "Uncategorized"
+  // chip and operator can fill in later.
+  if (process.env.STORY_AI_METADATA_ENABLED !== 'true') {
+    return { category_id: null, subcategory_id: null };
+  }
+
   const service = createServiceClient();
 
   // Load categories. We split into top-level categories and subcategories
