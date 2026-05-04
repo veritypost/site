@@ -53,14 +53,18 @@ import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import { captureWithRedact } from '@/lib/pipeline/redact';
 import type { Database, Json } from '@/types/database';
 import { preCluster, getClusterOverlapPct, type ClusterInputArticle } from '@/lib/pipeline/cluster';
-import {
-  findBestMatch,
-  loadStoryMatchCandidates,
-  getStoryMatchOverlapPct,
-} from '@/lib/pipeline/story-match';
+import { getStoryMatchOverlapPct } from '@/lib/pipeline/story-match';
 import { scrapeDiscovery, type DiscoveredArticle } from '@/lib/pipeline/scrape-discovery';
 import { scrapeJson } from '@/lib/pipeline/scrape-json';
 import { validateExtractionConfig } from '@/lib/pipeline/extraction-config';
+import { reserveCostOrFail } from '@/lib/pipeline/cost-reservation';
+import {
+  runGrabPlan,
+  applyGrabPlanFilter,
+  GrabPlanParseError,
+  type GrabPlan,
+} from '@/lib/pipeline/grab-plan';
+import { keywordOverlap } from '@/lib/pipeline/cluster';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -71,6 +75,35 @@ export const maxDuration = 300;
 // ----------------------------------------------------------------------------
 
 type DiscoveryInsert = Database['public']['Tables']['discovery_items']['Insert'];
+type ResearchJobInsert = Database['public']['Tables']['research_jobs']['Insert'];
+type StoryObservationInsert = Database['public']['Tables']['story_observations']['Insert'];
+
+// Wave 2 — Run Feed body shape per AI_Redesign.md § Run Feed entry point.
+//
+// `lookbackMs` drives both the pubDate filter and the clustering window
+// (replaces the hardcoded 24h + 6h pair). Default 24h when omitted.
+//
+// Topic mode: either `query.text` (operator-typed, optionally `saveAs` a
+// new research_queries row) OR `queryId` (pick a saved query). General
+// mode = both omitted; the grab plan is skipped.
+const DEFAULT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+const MIN_LOOKBACK_MS = 15 * 60 * 1000;        // 15 min
+const MAX_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const GRAB_PLAN_RESERVATION_USD = 0.01;
+
+interface RunFeedBody {
+  lookbackMs: number;
+  feedIds: string[] | null;        // null = all active
+  query: { text: string; saveAs?: string } | null;
+  queryId: string | null;
+}
+
+class CancelledError extends Error {
+  constructor() {
+    super('research_job cancelled');
+    this.name = 'CancelledError';
+  }
+}
 type FeedRow = Pick<
   Database['public']['Tables']['feeds']['Row'],
   'id' | 'url' | 'source_name' | 'feed_type'
@@ -151,15 +184,66 @@ export async function POST(req: Request) {
   }
   const actorId = actor.id as string;
 
-  // Body parse — the legacy shape included an `audience` field; we still
-  // accept it for back-compat but ignore it. The unified-feed pivot polls
-  // every active feed in one pass.
+  // Wave 2 — strict body parse for the Run Feed shape. Empty body is
+  // valid (defaults to General-mode, 24h lookback, all active feeds —
+  // matches today's "Refresh feeds" click semantics).
+  let body: RunFeedBody;
   try {
-    const text = await req.text();
-    if (text.trim().length > 0) {
-      // Validate JSON only — ignore the parsed body.
-      JSON.parse(text);
+    const text = (await req.text()).trim();
+    const raw = text.length > 0 ? JSON.parse(text) : {};
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+      return NextResponse.json({ error: 'Invalid body shape' }, { status: 422 });
     }
+    const r = raw as Record<string, unknown>;
+
+    let lookbackMs = DEFAULT_LOOKBACK_MS;
+    if (r.lookbackMs !== undefined) {
+      const n = Number(r.lookbackMs);
+      if (!Number.isFinite(n) || n < MIN_LOOKBACK_MS || n > MAX_LOOKBACK_MS) {
+        return NextResponse.json(
+          { error: `lookbackMs must be ${MIN_LOOKBACK_MS}..${MAX_LOOKBACK_MS}` },
+          { status: 422 },
+        );
+      }
+      lookbackMs = Math.floor(n);
+    }
+
+    let feedIds: string[] | null = null;
+    if (r.feedIds !== undefined) {
+      if (!Array.isArray(r.feedIds) || !r.feedIds.every((v) => typeof v === 'string' && v.length > 0)) {
+        return NextResponse.json({ error: 'feedIds must be string[]' }, { status: 422 });
+      }
+      feedIds = r.feedIds.length > 0 ? (r.feedIds as string[]) : null;
+    }
+
+    let query: RunFeedBody['query'] = null;
+    if (r.query !== undefined && r.query !== null) {
+      if (typeof r.query !== 'object' || Array.isArray(r.query)) {
+        return NextResponse.json({ error: 'query must be an object' }, { status: 422 });
+      }
+      const q = r.query as Record<string, unknown>;
+      if (typeof q.text !== 'string' || q.text.trim().length === 0) {
+        return NextResponse.json({ error: 'query.text required' }, { status: 422 });
+      }
+      const saveAs = typeof q.saveAs === 'string' && q.saveAs.trim().length > 0 ? q.saveAs.trim() : undefined;
+      query = { text: q.text.trim(), saveAs };
+    }
+
+    let queryId: string | null = null;
+    if (r.queryId !== undefined && r.queryId !== null) {
+      if (typeof r.queryId !== 'string' || r.queryId.length === 0) {
+        return NextResponse.json({ error: 'queryId must be a string' }, { status: 422 });
+      }
+      queryId = r.queryId;
+    }
+    if (query && queryId) {
+      return NextResponse.json(
+        { error: 'pass either query OR queryId, not both' },
+        { status: 422 },
+      );
+    }
+
+    body = { lookbackMs, feedIds, query, queryId };
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 422 });
   }
@@ -225,6 +309,25 @@ export async function POST(req: Request) {
     console.info('[newsroom.ingest.orphan_reap]', { count: reapedOrphans!.length });
   }
 
+  // Wave 2 — same orphan-reap semantics on research_jobs. Without this,
+  // a Vercel-killed lambda leaves a permanently-running research_jobs
+  // row that blocks the parallel singleflight index until the next day.
+  const { error: reapJobsErr, data: reapedJobs } = await service
+    .from('research_jobs')
+    .update({
+      status: 'failed',
+      finished_at: new Date().toISOString(),
+      error: 'orphan run reaped — lambda likely killed',
+    })
+    .eq('status', 'running')
+    .lt('started_at', orphanCutoff)
+    .select('id');
+  if (reapJobsErr) {
+    console.warn('[newsroom.ingest.research_jobs_orphan_reap_failed]', reapJobsErr.message);
+  } else if ((reapedJobs?.length ?? 0) > 0) {
+    console.info('[newsroom.ingest.research_jobs_orphan_reap]', { count: reapedJobs!.length });
+  }
+
   // 5. Create pipeline_runs row (status=running). Singleflight-protected.
   const startedAtDate = new Date();
   const startedAtMs = startedAtDate.getTime();
@@ -275,21 +378,217 @@ export async function POST(req: Request) {
   }
   const runId = runRow.id as string;
 
+  // Wave 2 — resolve / persist the research_query, then insert the
+  // research_jobs row. This is the parallel singleflight + audit lane;
+  // pipeline_runs above is the cost / observability lane (callModel
+  // writes pipeline_costs against runId). One operator click = one row
+  // in each table, joined via discovery_runs at finalize.
+  let researchQueryId: string | null = body.queryId;
+  let researchQueryNameSnapshot: string | null = null;
+  let researchQueryTextSnapshot: string | null = null;
+
+  if (body.queryId) {
+    const { data: existing, error: qErr } = await service
+      .from('research_queries')
+      .select('id, name, query_text')
+      .eq('id', body.queryId)
+      .maybeSingle();
+    if (qErr || !existing) {
+      // Mark the pipeline_runs row failed so it doesn't pin singleflight.
+      await service
+        .from('pipeline_runs')
+        .update({
+          status: 'failed',
+          completed_at: new Date().toISOString(),
+          error_message: 'queryId not found',
+          error_type: 'validation',
+        })
+        .eq('id', runId);
+      return NextResponse.json({ error: 'queryId not found' }, { status: 404 });
+    }
+    researchQueryId = existing.id;
+    researchQueryNameSnapshot = existing.name ?? null;
+    researchQueryTextSnapshot = existing.query_text ?? null;
+  } else if (body.query) {
+    if (body.query.saveAs) {
+      const { data: inserted, error: insErr } = await service
+        .from('research_queries')
+        .insert({ name: body.query.saveAs, query_text: body.query.text })
+        .select('id, name, query_text')
+        .single();
+      if (insErr || !inserted) {
+        await service
+          .from('pipeline_runs')
+          .update({
+            status: 'failed',
+            completed_at: new Date().toISOString(),
+            error_message: `research_queries insert failed: ${insErr?.message ?? 'unknown'}`,
+            error_type: 'db',
+          })
+          .eq('id', runId);
+        return NextResponse.json({ error: 'Could not save query' }, { status: 500 });
+      }
+      researchQueryId = inserted.id;
+      researchQueryNameSnapshot = inserted.name ?? null;
+      researchQueryTextSnapshot = inserted.query_text ?? null;
+    } else {
+      // Inline (one-off) topic-mode call — snapshot the text so the
+      // discovery_runs audit row carries forensics even though no
+      // research_queries row exists.
+      researchQueryTextSnapshot = body.query.text;
+    }
+  }
+
+  const isTopicMode = !!(body.query || researchQueryId);
+  const lookbackMs = body.lookbackMs;
+
+  // research_jobs insert. Singleflight via the WHERE status='running'
+  // partial unique index (Wave 1 migration). Postgres 23505 → 409.
+  const researchJobInsert: ResearchJobInsert = {
+    status: 'running',
+    request_body: body as unknown as Json,
+    phase: 'planning',
+    started_at: new Date().toISOString(),
+  };
+  const { data: jobRow, error: jobErr } = await service
+    .from('research_jobs')
+    .insert(researchJobInsert)
+    .select('id')
+    .single();
+  if (jobErr || !jobRow) {
+    if (jobErr && jobErr.code === '23505') {
+      const { data: blocker } = await service
+        .from('research_jobs')
+        .select('id, started_at')
+        .eq('status', 'running')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      // Roll back the pipeline_runs row so it doesn't leak.
+      await service
+        .from('pipeline_runs')
+        .update({
+          status: 'failed',
+          completed_at: new Date().toISOString(),
+          error_message: 'research_jobs singleflight collision',
+          error_type: 'abort',
+        })
+        .eq('id', runId);
+      return NextResponse.json(
+        {
+          error: 'Run already in progress',
+          runningJobId: (blocker?.id as string | undefined) ?? null,
+          startedAt: (blocker?.started_at as string | undefined) ?? null,
+        },
+        { status: 409 },
+      );
+    }
+    console.error('[newsroom.ingest.run] research_jobs insert failed:', jobErr?.message);
+    captureWithRedact(jobErr ?? new Error('research_jobs insert returned no row'));
+    await service
+      .from('pipeline_runs')
+      .update({
+        status: 'failed',
+        completed_at: new Date().toISOString(),
+        error_message: `research_jobs insert failed: ${jobErr?.message ?? 'unknown'}`,
+        error_type: 'db',
+      })
+      .eq('id', runId);
+    return NextResponse.json({ error: 'Could not start research job' }, { status: 500 });
+  }
+  const jobId = jobRow.id as string;
+
+  // Phase-checkpoint helpers — single source of truth for phase writes
+  // and cancel detection. Cancel button writes status='cancelled' on the
+  // research_jobs row; we sample the row between phases. SELECT-only
+  // contention is cheap (4 sub-100ms queries per run).
+  const setPhase = async (phase: 'planning' | 'fetching' | 'forming' | 'finalizing'): Promise<void> => {
+    const { error } = await service
+      .from('research_jobs')
+      .update({ phase })
+      .eq('id', jobId);
+    if (error) {
+      console.warn('[newsroom.ingest.phase_write_failed]', { phase, error: error.message });
+    }
+  };
+  const checkCancel = async (): Promise<void> => {
+    const { data, error } = await service
+      .from('research_jobs')
+      .select('status')
+      .eq('id', jobId)
+      .maybeSingle();
+    if (error) {
+      console.warn('[newsroom.ingest.cancel_check_failed]', error.message);
+      return;
+    }
+    if (data?.status === 'cancelled') {
+      throw new CancelledError();
+    }
+  };
+
   // 5. Main body — on any throw, mark run failed and return 500
+  let grabPlan: GrabPlan | null = null;
   try {
+    // Wave 2 — Topic mode: one Haiku call inside the planning phase
+    // produces the deterministic grab plan that the post-fetch filter
+    // executes. reserveCostOrFail guards the daily cap; second parse
+    // failure throws and the catch block flips the job to 'failed'.
+    if (isTopicMode) {
+      const queryText = body.query?.text ?? researchQueryTextSnapshot ?? '';
+      if (queryText.trim().length === 0) {
+        throw new Error('topic mode requires non-empty query.text');
+      }
+      const reservation = await reserveCostOrFail(runId, GRAB_PLAN_RESERVATION_USD);
+      if (!reservation.accepted) {
+        throw new Error(
+          `cost_cap_exceeded: today=${reservation.today_usd} cap=${reservation.cap_usd}`,
+        );
+      }
+      try {
+        const { plan } = await runGrabPlan({
+          queryText,
+          pipelineRunId: runId,
+        });
+        grabPlan = plan;
+      } catch (err) {
+        if (err instanceof GrabPlanParseError) {
+          // Re-throw with the canonical error tag the spec calls out.
+          throw new Error(`grab_plan_failed: ${err.message}`);
+        }
+        throw err;
+      }
+      // Persist the plan onto research_jobs so the result screen and
+      // post-mortem can read it without a separate audit lookup.
+      await service
+        .from('research_jobs')
+        .update({ grab_plan: grabPlan as unknown as Json })
+        .eq('id', jobId);
+    }
+
+    // Phase boundary — planning done, fetching starts.
+    await checkCancel();
+    await setPhase('fetching');
+
     // 6. Fetch active feeds across all four consumer types. The unified-feed
     // pivot dropped audience filtering — every active feed contributes to the
     // same discovery pool. The audience column stays in DB (defaulted to
     // 'adult') for back-compat with the cluster-mutation RPCs that still take
     // it as a defensive parameter.
+    //
+    // Wave 2 — when `body.feedIds` is provided, the feeds query narrows to
+    // that explicit set. Empty / null → all active (today's behavior).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const serviceAny = service as any;
-    const { data: feedsData, error: feedsErr } = await serviceAny
+    let feedsQuery = serviceAny
       .from('feeds')
       .select('id,url,source_name,feed_type,name,priority_weight,allowed_category_slugs,error_count,extraction_config,metadata')
       .eq('is_active', true)
       .is('deleted_at', null)
       .in('feed_type', ['feed', 'rss', 'scrape_html', 'scrape_json']);
+    if (body.feedIds && body.feedIds.length > 0) {
+      feedsQuery = feedsQuery.in('id', body.feedIds);
+    }
+    const { data: feedsData, error: feedsErr } = await feedsQuery;
     if (feedsErr) {
       throw new Error(`feeds lookup failed: ${(feedsErr as { message: string }).message}`);
     }
@@ -586,7 +885,18 @@ export async function POST(req: Request) {
     }
 
     // 9. Dedup + insert into the single discovery_items pool.
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    // Wave 2 — lookback cutoff is operator-driven (`body.lookbackMs`),
+    // replacing the hardcoded 24h pubDate floor.
+    const lookbackCutoffMs = Date.now() - lookbackMs;
+
+    // Wave 2 — Topic mode applies the grab plan deterministically against
+    // fetched items: title+excerpt include pass, then negative-keyword
+    // exclusion. Runs BEFORE discovery_items insert so the keep-rate is
+    // honest in `items_kept` accounting.
+    let scopedItems = dedupedItems;
+    if (grabPlan) {
+      scopedItems = applyGrabPlanFilter(dedupedItems, grabPlan);
+    }
 
     async function processItems(items: FlatItem[]): Promise<{
       inserted: number;
@@ -625,7 +935,7 @@ export async function POST(req: Request) {
         }
         if (it.pubDate) {
           const pubMs = new Date(it.pubDate).getTime();
-          if (!Number.isNaN(pubMs) && pubMs < oneDayAgo) {
+          if (!Number.isNaN(pubMs) && pubMs < lookbackCutoffMs) {
             skipped++;
             continue;
           }
@@ -645,6 +955,7 @@ export async function POST(req: Request) {
         raw_body: null,
         raw_published_at: it.pubDate ? new Date(it.pubDate).toISOString() : null,
         state: 'pending',
+        research_job_id: jobId,
         metadata: { outlet: it.outlet, excerpt: it.excerpt } as Json,
       }));
 
@@ -690,7 +1001,11 @@ export async function POST(req: Request) {
       skipped: itemsSkipped,
       raceDeduped: itemsRaceDeduped,
       insertedByFeed,
-    } = await processItems(dedupedItems);
+    } = await processItems(scopedItems);
+
+    // Phase boundary — fetching done, story-formation starts.
+    await checkCancel();
+    await setPhase('forming');
 
     // ----------------------------------------------------------------------
     // 10. Clustering orchestration (F7 Phase 2 wire-up — closes F1).
@@ -707,14 +1022,14 @@ export async function POST(req: Request) {
 
     interface ClusteringSummary {
       itemsConsidered: number;
-      clustersCreated: number;
+      clustersCreated: number;       // legacy feed_clusters writes (back-compat)
       singletons: number;
-      matchedExisting: number;
-      itemsIgnored: number;
+      storiesFormed: number;         // Wave 2 — new stories created at ingest
+      storiesExtended: number;       // Wave 2 — existing stories that gained observations
+      observationsWritten: number;
       clusterErrors: { title: string; error: string }[];
     }
 
-    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
     const clusterThresholdPct = await getClusterOverlapPct();
     const storyMatchThresholdPct = await getStoryMatchOverlapPct();
 
@@ -728,25 +1043,18 @@ export async function POST(req: Request) {
         itemsConsidered: 0,
         clustersCreated: 0,
         singletons: 0,
-        matchedExisting: 0,
-        itemsIgnored: 0,
+        storiesFormed: 0,
+        storiesExtended: 0,
+        observationsWritten: 0,
         clusterErrors: [],
       };
 
-      // Load story-match candidates ONCE — the adult article pool. Kid
-      // articles aren't matched against here because the unified feed
-      // produces both adult and kid from the same cluster, so a kid-side
-      // story match would create a false dedupe against an adult article
-      // that happens to share keywords.
-      const storyMatchStart = Date.now();
-      const candidates = await loadStoryMatchCandidates(service);
-      const storyMatchMs = Date.now() - storyMatchStart;
-
-      // Pull recently-fetched pending items.
-      const cutoffIso = new Date(Date.now() - SIX_HOURS_MS).toISOString();
+      // Pull recently-fetched pending items. Wave 2 — cluster window
+      // matches the operator-chosen lookback.
+      const cutoffIso = new Date(Date.now() - lookbackMs).toISOString();
       const { data: pendingRows, error: pendingErr } = await service
         .from('discovery_items')
-        .select('id, raw_title, metadata')
+        .select('id, raw_title, raw_url, raw_published_at, feed_id, metadata')
         .eq('state', 'pending')
         .gte('fetched_at', cutoffIso)
         .order('fetched_at', { ascending: false });
@@ -755,18 +1063,40 @@ export async function POST(req: Request) {
           title: '[load-pending]',
           error: `discovery_items pending lookup failed: ${pendingErr.message}`,
         });
-        return { summary, durationMs: Date.now() - audienceStart, storyMatchMs };
+        return { summary, durationMs: Date.now() - audienceStart, storyMatchMs: 0 };
       }
 
       const rows = pendingRows ?? [];
       summary.itemsConsidered = rows.length;
       if (rows.length === 0) {
-        return { summary, durationMs: Date.now() - audienceStart, storyMatchMs };
+        return { summary, durationMs: Date.now() - audienceStart, storyMatchMs: 0 };
       }
 
-      // Build cluster input. Items without a usable title become singletons
-      // (preCluster handles 0-keyword articles), but we keep them in the input
-      // so their state isn't disturbed.
+      // Index full discovery rows by id so the observation snapshot can
+      // capture url / title / outlet without a second round-trip.
+      type PendingRow = {
+        id: string;
+        raw_title: string | null;
+        raw_url: string;
+        raw_published_at: string | null;
+        feed_id: string | null;
+        metadata: { outlet?: string | null; excerpt?: string | null } | null;
+      };
+      const rowById = new Map<string, PendingRow>();
+      for (const r of rows) {
+        rowById.set(r.id, r as unknown as PendingRow);
+      }
+
+      // Pre-load source_class per feed once so we can stamp observations
+      // without a per-item lookup. Same feed-set as the fetch fanout.
+      const feedSourceClass = new Map<string, 'rss' | 'scrape_html' | 'scrape_json' | 'search_api'>();
+      for (const f of feeds) {
+        const fc = f.feed_type;
+        if (fc === 'feed' || fc === 'rss') feedSourceClass.set(f.id, 'rss');
+        else if (fc === 'scrape_html') feedSourceClass.set(f.id, 'scrape_html');
+        else if (fc === 'scrape_json') feedSourceClass.set(f.id, 'scrape_json');
+      }
+
       const inputs: ClusterInputArticle[] = rows.map((r) => {
         const md = (r.metadata ?? {}) as { outlet?: string | null };
         return {
@@ -779,30 +1109,41 @@ export async function POST(req: Request) {
       const { clusters, singletons } = preCluster(inputs, clusterThresholdPct);
       summary.singletons = singletons.length;
 
+      const storyMatchStart = Date.now();
+
       for (const cluster of clusters) {
         try {
-          const match = findBestMatch(cluster.keywords, candidates, storyMatchThresholdPct);
           const itemIds = cluster.articles.map((a) => a.id);
 
-          if (match.matchedArticleId) {
-            // Existing-story duplicate: mark items 'ignored', no cluster row.
-            const updateRes = await service
-              .from('discovery_items')
-              .update({ state: 'ignored', updated_at: new Date().toISOString() })
-              .in('id', itemIds);
-            if (updateRes.error) {
-              throw new Error(`mark-ignored failed: ${updateRes.error.message}`);
+          // Wave 2 — unbounded story match against stories.keywords using
+          // the GIN index added in Wave 1. No recency cap, no time window
+          // ("3-year revival is the feature" per AI_Redesign.md). Locked
+          // stories are excluded from auto-attach via is_locked filter.
+          let matchedStoryId: string | null = null;
+          let matchScore = 0;
+          if (cluster.keywords.length > 0) {
+            const { data: candidates, error: candErr } = await service
+              .from('stories')
+              .select('id, keywords')
+              .overlaps('keywords', cluster.keywords)
+              .eq('is_locked', false);
+            if (candErr) {
+              throw new Error(`stories overlap lookup failed: ${candErr.message}`);
             }
-            summary.matchedExisting += 1;
-            summary.itemsIgnored += itemIds.length;
-            continue;
+            for (const c of candidates ?? []) {
+              const ck = (c.keywords ?? []) as string[];
+              if (ck.length === 0) continue;
+              const score = keywordOverlap(cluster.keywords, ck);
+              if (score > matchScore && score >= storyMatchThresholdPct) {
+                matchScore = score;
+                matchedStoryId = c.id as string;
+              }
+            }
           }
 
-          // Net-new story: insert feed_clusters row, then link items.
-          // audience defaults to 'adult' for back-compat with the cluster
-          // mutation RPCs (require_audience checks on move/merge/split).
-          // The UI no longer surfaces this column — operators pick adult vs
-          // kid at generation time.
+          // Legacy feed_clusters write — kept until Wave 5 rebuilds the
+          // Discovery tab on stories. Existing /admin/newsroom UI still
+          // reads from this table.
           const insertPayload = {
             title: cluster.title,
             summary: '',
@@ -837,8 +1178,84 @@ export async function POST(req: Request) {
           if (linkRes.error) {
             throw new Error(`link-cluster failed: ${linkRes.error.message}`);
           }
-
           summary.clustersCreated += 1;
+
+          // Story side — match-extends or new-formation.
+          let storyId: string;
+          const nowIso = new Date().toISOString();
+          if (matchedStoryId) {
+            storyId = matchedStoryId;
+            // Bump last_observed_at; keywords on existing stories are SET
+            // ONCE at formation per spec (re-compute deferred to v1.1 at
+            // article-generation time when the LLM context is loaded).
+            const { error: bumpErr } = await service
+              .from('stories')
+              .update({ last_observed_at: nowIso })
+              .eq('id', storyId);
+            if (bumpErr) {
+              throw new Error(`stories last_observed_at bump failed: ${bumpErr.message}`);
+            }
+            summary.storiesExtended += 1;
+          } else {
+            // Net-new story. Slug = slugified cluster title + 8-hex hash
+            // for guaranteed uniqueness against the existing UNIQUE index.
+            const baseSlug = (cluster.title || 'story')
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '')
+              .slice(0, 72);
+            const hashSuffix = Math.random().toString(16).slice(2, 10);
+            const slug = `${baseSlug || 'story'}-${hashSuffix}`;
+            const { data: newStory, error: newErr } = await service
+              .from('stories')
+              .insert({
+                slug,
+                title: cluster.title || 'Untitled',
+                keywords: cluster.keywords,
+                first_seen_at: nowIso,
+                last_observed_at: nowIso,
+                generation_state: 'forming',
+                research_query_id: researchQueryId,
+              })
+              .select('id')
+              .single();
+            if (newErr || !newStory) {
+              throw new Error(`stories insert failed: ${newErr?.message ?? 'no row returned'}`);
+            }
+            storyId = newStory.id as string;
+            summary.storiesFormed += 1;
+          }
+
+          // story_observations — one per cluster article. Snapshot the
+          // url / title / outlet so provenance survives later soft-deletes
+          // of the feed or cleanup of the discovery row.
+          const observations: StoryObservationInsert[] = [];
+          for (const id of itemIds) {
+            const r = rowById.get(id);
+            if (!r) continue;
+            const md = r.metadata ?? {};
+            observations.push({
+              story_id: storyId,
+              discovery_item_id: id,
+              observed_at: nowIso,
+              match_score: matchedStoryId ? matchScore : null,
+              url_snapshot: r.raw_url,
+              title_snapshot: r.raw_title,
+              excerpt_snapshot: md.excerpt ?? null,
+              outlet_snapshot: md.outlet ?? null,
+              source_class: r.feed_id ? feedSourceClass.get(r.feed_id) ?? null : null,
+              feed_id: r.feed_id,
+            });
+          }
+          if (observations.length > 0) {
+            const { error: obsErr } = await service
+              .from('story_observations')
+              .insert(observations);
+            if (obsErr) {
+              throw new Error(`story_observations insert failed: ${obsErr.message}`);
+            }
+            summary.observationsWritten += observations.length;
+          }
         } catch (err) {
           const message = err instanceof Error ? err.message : 'unknown error';
           console.error('[newsroom.ingest.run] cluster persist failed:', message);
@@ -850,7 +1267,11 @@ export async function POST(req: Request) {
         }
       }
 
-      return { summary, durationMs: Date.now() - audienceStart, storyMatchMs };
+      return {
+        summary,
+        durationMs: Date.now() - audienceStart,
+        storyMatchMs: Date.now() - storyMatchStart,
+      };
     }
 
     const clusterRun = await clusterPool();
@@ -1070,6 +1491,49 @@ export async function POST(req: Request) {
       captureWithRedact(updateErr);
     }
 
+    // Wave 2 — final phase + research_jobs flip + discovery_runs audit.
+    // Sequential (not a true xact — Supabase JS client doesn't expose
+    // BEGIN/COMMIT) but ordered so that even a partial failure leaves
+    // discoverable state: research_jobs is the singleflight lane and
+    // MUST flip to 'done' or the next operator click is wedged.
+    await checkCancel();
+    await setPhase('finalizing');
+
+    const itemsKept = itemsInserted;
+    const { error: jobDoneErr } = await service
+      .from('research_jobs')
+      .update({
+        status: 'done',
+        finished_at: completedAt.toISOString(),
+        items_fetched: itemsProcessed,
+        items_kept: itemsKept,
+        stories_formed: clusterRun.summary.storiesFormed,
+        stories_extended: clusterRun.summary.storiesExtended,
+      })
+      .eq('id', jobId);
+    if (jobDoneErr) {
+      console.error('[newsroom.ingest.run] research_jobs done flip failed:', jobDoneErr.message);
+      captureWithRedact(jobDoneErr);
+    }
+
+    const { error: drunErr } = await service
+      .from('discovery_runs')
+      .insert({
+        pipeline_run_id: runId,
+        research_query_id: researchQueryId,
+        query_name_snapshot: researchQueryNameSnapshot,
+        query_text_snapshot: researchQueryTextSnapshot,
+        lookback_ms: lookbackMs,
+        items_fetched: itemsProcessed,
+        items_kept: itemsKept,
+        stories_formed: clusterRun.summary.storiesFormed,
+        stories_extended: clusterRun.summary.storiesExtended,
+      });
+    if (drunErr) {
+      console.error('[newsroom.ingest.run] discovery_runs insert failed:', drunErr.message);
+      captureWithRedact(drunErr);
+    }
+
     // 12. Audit log — best-effort via SECDEF RPC on cookie-scoped client
     await recordAdminAction({
       action: 'newsroom.ingest.run',
@@ -1079,7 +1543,8 @@ export async function POST(req: Request) {
         itemsCreated,
         durationMs,
         clustersCreated: clusterRun.summary.clustersCreated,
-        matchedExisting: clusterRun.summary.matchedExisting,
+        storiesFormed: clusterRun.summary.storiesFormed,
+        storiesExtended: clusterRun.summary.storiesExtended,
         feedsByType,
         itemsBySource,
       },
@@ -1089,6 +1554,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       runId,
+      jobId,
       feedsSucceeded,
       feedsFailed,
       feedsByType,
@@ -1100,26 +1566,75 @@ export async function POST(req: Request) {
       durationMs,
       clustering: clusterRun.summary,
       staleStreaks, // Phase C — feeds with zero_results_streak >= 3
+      grabPlan, // null in General mode
     });
   } catch (err) {
+    const cancelled = err instanceof CancelledError;
     const message = err instanceof Error ? err.message : 'unknown error';
     const stack = err instanceof Error ? (err.stack ?? null) : null;
     const completedAt = new Date();
     const durationMs = completedAt.getTime() - startedAtMs;
-    console.error('[newsroom.ingest.run] run failed:', message);
-    captureWithRedact(err);
+    if (!cancelled) {
+      console.error('[newsroom.ingest.run] run failed:', message);
+      captureWithRedact(err);
+    } else {
+      console.info('[newsroom.ingest.run] run cancelled mid-flight');
+    }
 
     await service
       .from('pipeline_runs')
       .update({
-        status: 'failed',
-        error_message: message,
-        error_stack: stack,
+        status: cancelled ? 'completed' : 'failed',
+        error_message: cancelled ? null : message,
+        error_stack: cancelled ? null : stack,
+        error_type: cancelled ? null : 'pipeline',
         completed_at: completedAt.toISOString(),
         duration_ms: durationMs,
       })
       .eq('id', runId);
 
+    // Wave 2 — research_jobs flip. Cancelled runs already have status
+    // ='cancelled' written by the operator's Cancel button; preserve it.
+    // Failed runs get the spec-mandated 'failed' + error string.
+    if (!cancelled) {
+      await service
+        .from('research_jobs')
+        .update({
+          status: 'failed',
+          finished_at: completedAt.toISOString(),
+          error: message.slice(0, 500),
+        })
+        .eq('id', jobId);
+    } else {
+      await service
+        .from('research_jobs')
+        .update({ finished_at: completedAt.toISOString() })
+        .eq('id', jobId);
+    }
+
+    // Always insert the discovery_runs audit row — partial counters are
+    // better than no record. ON DELETE RESTRICT on pipeline_run_id keeps
+    // the join intact even after legacy reaper passes.
+    await service
+      .from('discovery_runs')
+      .insert({
+        pipeline_run_id: runId,
+        research_query_id: researchQueryId,
+        query_name_snapshot: researchQueryNameSnapshot,
+        query_text_snapshot: researchQueryTextSnapshot,
+        lookback_ms: lookbackMs,
+        items_fetched: 0,
+        items_kept: 0,
+        stories_formed: 0,
+        stories_extended: 0,
+      });
+
+    if (cancelled) {
+      return NextResponse.json(
+        { ok: false, cancelled: true, runId, jobId, durationMs },
+        { status: 200 },
+      );
+    }
     return NextResponse.json({ error: 'Ingest run failed' }, { status: 500 });
   }
 }

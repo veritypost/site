@@ -27,23 +27,40 @@ Implementing the design. Design is LOCKED through four trim sweeps
 listed in § Decisions the owner needs to make.
 
 ### Current status
-- **Last shipped wave:** Wave 1 — Stream A1 schema reshape
-  (commit `3fab5e0`, 2026-05-04). Migration
-  `20260504230000_research_pipeline_schema.sql` applied to prod via
-  Supabase MCP; created `research_queries`,
-  `research_jobs`, `discovery_runs`, `story_observations`; ALTERed
-  `stories` (+6 cols, GIN on `keywords`); ALTERed `discovery_items`
-  (+`research_job_id`); partial unique `research_jobs_singleflight`
-  smoke-verified (second `running` insert raised `unique_violation`
-  as designed). Types regenerated to `web/src/types/database.ts`,
-  `tsc --noEmit` clean.
-- **Next wave to ship:** **Wave 2 — Stream B handler.** New
-  `grab-plan.ts` module + handler changes in
-  `/api/newsroom/ingest/run/route.ts` (replace `oneDayAgo` +
-  `SIX_HOURS_MS` with `lookbackMs`, grab plan filter, unbounded
-  GIN-index story match, final transaction with `discovery_runs`
-  audit + `query_*_snapshot` pair). `reserve_cost_or_fail` before
-  the Haiku call.
+- **Last shipped wave:** Wave 2 — Stream B handler (commit `__PENDING__`,
+  2026-05-04). New `web/src/lib/pipeline/grab-plan.ts` (Haiku JSON-mode
+  call, one retry, `GrabPlanParseError`). `/api/newsroom/ingest/run/route.ts`
+  rewritten end-to-end: strict body parse for
+  `{lookbackMs, feedIds, query?: {text, saveAs}, queryId?}`; orphan
+  reaper extended to `research_jobs`; query resolution path inserts
+  `research_queries` rows (when `saveAs`) and snapshots
+  `name`/`query_text` for the audit; `research_jobs` insert + 409 on
+  the parallel singleflight; `reserve_cost_or_fail` before the grab-
+  plan call; `oneDayAgo` + `SIX_HOURS_MS` replaced with `lookbackMs`
+  driving both pubDate cutoff and clustering window; `applyGrabPlanFilter`
+  on dedupedItems before insert; `discovery_items.research_job_id`
+  stamped; phase writes at `planning → fetching → forming → finalizing`
+  with cancel checkpoints between each; story-match path replaced —
+  `loadStoryMatchCandidates` + `findBestMatch` removed in favor of
+  unbounded `stories.keywords` overlap via Wave 1 GIN index, then
+  `keywordOverlap` scoring above `storyMatchThresholdPct`; matched →
+  `last_observed_at` bump + `story_observations` rows; unmatched →
+  new `stories` row (`generation_state='forming'`, slug = slugified
+  title + 8-hex hash, `keywords = cluster.keywords`,
+  `research_query_id` snapshotted) + `story_observations` rows;
+  `feed_clusters` write retained as legacy primitive until Wave 5;
+  finalize tx flips `research_jobs.status='done'` + counters and
+  inserts `discovery_runs` audit with `query_*_snapshot` pair;
+  catch-block separates `CancelledError` (status preserved as
+  `cancelled`) from `failed` and always writes the `discovery_runs`
+  audit row. `tsc --noEmit` clean.
+- **Next wave to ship:** **Wave 3 — Stream C Wikipedia.** New
+  `web/src/lib/pipeline/wikipedia-search.ts` module (silent-fail);
+  one `feed_type='search_api'` row pointing at MediaWiki; polling-cron
+  `WHERE feed_type != 'search_api'` so Wikipedia rows aren't polled
+  on the normal feed schedule. Hooks into the grab plan's
+  `wikipedia_topics` list — fetched in parallel during the fetching
+  phase, results flow into `discovery_items` like any other source.
 - **Branch:** main (direct commit per repo workflow — recent history
   is single-branch).
 - **Open blockers:** none.
