@@ -28,8 +28,9 @@ listed in § Decisions the owner needs to make.
 
 ### Current status
 - **Last shipped wave:** Wave 1 — Stream A1 schema reshape
-  (2026-05-04). Migration `20260504230000_research_pipeline_schema.sql`
-  applied to prod via Supabase MCP; created `research_queries`,
+  (commit `3fab5e0`, 2026-05-04). Migration
+  `20260504230000_research_pipeline_schema.sql` applied to prod via
+  Supabase MCP; created `research_queries`,
   `research_jobs`, `discovery_runs`, `story_observations`; ALTERed
   `stories` (+6 cols, GIN on `keywords`); ALTERed `discovery_items`
   (+`research_job_id`); partial unique `research_jobs_singleflight`
