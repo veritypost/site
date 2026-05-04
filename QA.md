@@ -899,16 +899,73 @@ Keep ≤8 lines. If investigation grows, spin a finding doc under `UI_UX_REVIEW/
 - **Ready for fix:** no — owner decision required.
 - **Notes for next agent:** if path (a): bundle with Finding #5 (chrome) and ship as one dark-mode session. Watch `/login`, `/welcome`, `/logout`, `/signup` — they use legacy palette but suppress NavWrapper chrome; need full flip. Watch hard-coded white-card pages (`[slug]/not-found.tsx:35` uses `background:'#fff'`+`var(--text-primary)`) — those will go dark-text-on-white-bg, intentional for them. `StoryArticlePicker.tsx:56` reads `var(--foreground)` — also not redefined dark; include in path-(a) sweep.
 
+#### 15. Migration `_210000_grant_feed_clusters_browse_access.sql` not idempotent
+
+- **Cluster:** pipeline-data
+- **What was seen:** `CREATE POLICY feed_clusters_public_read` and `feed_cluster_articles_public_read` lack `IF NOT EXISTS` guards. Re-running the migration (e.g., on a fresh dev DB or after a partial-apply situation) errors `42710: policy already exists`. Already hit this once in prod-apply on 2026-05-04 — required manual workaround applying only the GRANT statements.
+- **Surface:** `supabase/migrations/20260503210000_grant_feed_clusters_browse_access.sql:23,29`
+- **Associated:** none — standalone migration cleanup
+- **Cross-platform parity:** DB-only — N/A
+- **Known context:** Postgres has no `CREATE POLICY IF NOT EXISTS`. Canonical pattern: `DROP POLICY IF EXISTS …; CREATE POLICY …`. Migration is already applied to prod, so the fix is for fresh-DB / re-apply scenarios.
+- **Confirmed:** yes (2026-05-04, audit agent verified via prod re-apply attempt).
+- **Owner decision needed:** no — pure cleanup.
+- **Status:** ready-for-fix
+- **Ready for fix:** yes — small, no risk. Wrap both CREATE POLICY blocks with `DROP POLICY IF EXISTS` guards + add a header comment noting the prior partial-state recovery.
+- **Notes for next agent:** edit the existing migration file in place (it is already in `supabase_migrations.schema_migrations` so re-running is a no-op for tracker purposes; the new guards just make the body safe to re-run).
+
+#### 16. iOS push notification tap-through is unimplemented
+
+- **Cluster:** pipeline-data
+- **What was seen:** `PushRegistration` class implements `userNotificationCenter(_:willPresent:)` (foreground banner) but has no `userNotificationCenter(_:didReceive:)` handler. When the app is backgrounded and a push lands, tapping the notification opens the app to the last-shown screen — there is no deep-link routing to the article slug carried in the payload.
+- **Surface:** `VerityPost/VerityPost/PushRegistration.swift:94-101`
+- **Associated:** `VerityPost/VerityPost/VerityPostApp.swift:53-66` (existing `onOpenURL` handler routes `/story/<slug>` URLs via `ArticleRouter.slug` — same hook can be used or extended for notification taps); cron webpush branch (web push deferred per CLAUDE.md kill-switch row 8).
+- **Cross-platform parity:** iOS adult only. Web push deferred (kill-switch). Kids iOS — N/A.
+- **Known context:** Push IS a live feature per CLAUDE.md kill-switch inventory (iOS-only by design). Last touched 2026-04-27 in autonomous wave shipping; never finished. Header comment in PushRegistration.swift explicitly says "No feature gate here" — confirms not a launch-hide.
+- **Confirmed:** yes (2026-05-04, audit agent).
+- **Owner decision needed:** no — straightforward feature completion.
+- **Status:** ready-for-fix
+- **Ready for fix:** yes — add `didReceive` UNUserNotificationCenterDelegate method that reads `slug` (or article_id) from `response.notification.request.content.userInfo` and routes via the same path `onOpenURL` uses.
+- **Notes for next agent:** verify the server-side push payload format (cron worker / send-push edge function) actually puts a `slug` or `article_id` field into `userInfo`. If payload format isn't set up, scope expands to include payload schema. Read the existing cron push branch first.
+
+#### 17. iOS `RecapListView` hub view is unreachable
+
+- **Cluster:** layout
+- **What was seen:** `RecapListView` was added 2026-04-26 (T-115/T-117) as the "hub" entry point for recaps that fetches `/api/recap` and navigates to `RecapQuizView`. No code path actually navigates to `RecapListView` — `HomeRecapCard` jumps directly to `RecapQuizView`, bypassing the hub.
+- **Surface:** `VerityPost/VerityPost/RecapView.swift:11`
+- **Associated:** `VerityPost/VerityPost/HomeFeedSlots.swift:10` (HomeRecapCard direct-to-quiz path); `VerityPost/VerityPost/HomeView.swift` (potential "See all recaps" entry point); `ProfileView.swift` (potential profile-section entry point).
+- **Cross-platform parity:** iOS adult only. Web — N/A. Kids iOS — N/A.
+- **Known context:** Created with explicit T-115 intent ("Hub view fetches /api/recap and navigates to RecapQuizView"). No kill-switch, no launch-hide marker. Either an unfinished wire-up OR a design decision to ship single-card surface only.
+- **Confirmed:** yes (2026-05-04, audit agent).
+- **Owner decision needed:** YES — wire it (e.g., HomeView "See all recaps" link, or Profile section) OR mark as launch-hide (header comment + accept that it's parked).
+- **Status:** decision-needed
+- **Ready for fix:** no — owner call required.
+- **Notes for next agent:** if owner says wire-up, the natural entry point is HomeView right next to HomeRecapCard. If owner says launch-hide, add a header comment matching the pattern used for ForgotPasswordView / following/page.tsx in commit `707fc71`.
+
+#### 18. iOS Profile Followers/Following stat tiles non-tappable
+
+- **Cluster:** layout
+- **What was seen:** The Followers and Following count tiles on ProfileView's social row render counts but are plain `VStack` (the `statTile` helper) with no `Button`, `NavigationLink`, or tap gesture. Tapping does nothing. iOS already has a working `FollowingView` (the pre-launch-hidden tab destination) that COULD render here.
+- **Surface:** `VerityPost/VerityPost/ProfileView.swift:478-491` (tiles), `VerityPost/VerityPost/ProfileView.swift:449` (statTile helper).
+- **Associated:** `VerityPost/VerityPost/FollowingView.swift` (existing implementation, kept alive launch-hidden — could be reused or repurposed); no equivalent FollowersList view exists.
+- **Cross-platform parity:** iOS adult only (web has the equivalent `/profile` social row). Web side parity check needed before fix.
+- **Known context:** No kill-switch entry, no comment explaining non-tappability. ProfileView was last touched 2026-05-03 in owner-mode session-5; stat tiles were not the focus of any recent edit. Likely original-design oversight, but possibly intentional display-only.
+- **Confirmed:** yes (2026-05-04, audit agent).
+- **Owner decision needed:** YES — make tappable (drill into followers list / following list view) OR keep display-only by design.
+- **Status:** decision-needed
+- **Ready for fix:** no — owner call required. If owner says tappable: scope includes building a FollowersList view that doesn't exist yet, plus making FollowingView re-reachable from outside the dropped Tab.following surface (which is its OWN launch-hide).
+- **Notes for next agent:** if tappable wins, also do web parity sweep on `/profile` social row to keep platforms aligned.
+
 ### 8.3. Roll-up by cluster
 
 #### Ready for fix (decision-locked, fix session can pull these)
 
-*(empty — apply backfill migration for #2, then this stays empty until owner decisions on #3 / #4 / #5 / #8 land)*
+- **pipeline-data:** #15 (migration `_210000` idempotency — small, no risk), #16 (iOS push tap-through — feature completion)
 
 #### Decision needed (owner Q&A pass before fix)
 
 - **dark-mode:** #5 (chrome flip — token strategy), #8 (article text — path a vs b) — recommend bundling
 - **article-reader:** #3 (sources placement micro-decision), #4 (back-to-home button — keep / delete / relocate)
+- **layout:** #17 (RecapListView — wire up vs launch-hide), #18 (Profile Followers/Following tiles — tappable vs display-only)
 
 #### Diagnosis blocked (runtime capture needed)
 
