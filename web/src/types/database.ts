@@ -3434,6 +3434,7 @@ export type Database = {
           raw_published_at: string | null
           raw_title: string | null
           raw_url: string
+          research_job_id: string | null
           state: string
           updated_at: string
         }
@@ -3449,6 +3450,7 @@ export type Database = {
           raw_published_at?: string | null
           raw_title?: string | null
           raw_url: string
+          research_job_id?: string | null
           state?: string
           updated_at?: string
         }
@@ -3464,6 +3466,7 @@ export type Database = {
           raw_published_at?: string | null
           raw_title?: string | null
           raw_url?: string
+          research_job_id?: string | null
           state?: string
           updated_at?: string
         }
@@ -3494,6 +3497,70 @@ export type Database = {
             columns: ["feed_id"]
             isOneToOne: false
             referencedRelation: "feeds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_discovery_items_research_job"
+            columns: ["research_job_id"]
+            isOneToOne: false
+            referencedRelation: "research_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discovery_runs: {
+        Row: {
+          created_at: string
+          id: string
+          items_fetched: number
+          items_kept: number
+          lookback_ms: number
+          pipeline_run_id: string
+          query_name_snapshot: string | null
+          query_text_snapshot: string | null
+          research_query_id: string | null
+          stories_extended: number
+          stories_formed: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          items_fetched?: number
+          items_kept?: number
+          lookback_ms: number
+          pipeline_run_id: string
+          query_name_snapshot?: string | null
+          query_text_snapshot?: string | null
+          research_query_id?: string | null
+          stories_extended?: number
+          stories_formed?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          items_fetched?: number
+          items_kept?: number
+          lookback_ms?: number
+          pipeline_run_id?: string
+          query_name_snapshot?: string | null
+          query_text_snapshot?: string | null
+          research_query_id?: string | null
+          stories_extended?: number
+          stories_formed?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_discovery_runs_pipeline_run"
+            columns: ["pipeline_run_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_discovery_runs_research_query"
+            columns: ["research_query_id"]
+            isOneToOne: false
+            referencedRelation: "research_queries"
             referencedColumns: ["id"]
           },
         ]
@@ -9320,6 +9387,75 @@ export type Database = {
           },
         ]
       }
+      research_jobs: {
+        Row: {
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          grab_plan: Json | null
+          id: string
+          items_fetched: number
+          items_kept: number
+          phase: string | null
+          request_body: Json
+          started_at: string | null
+          status: string
+          stories_extended: number
+          stories_formed: number
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          grab_plan?: Json | null
+          id?: string
+          items_fetched?: number
+          items_kept?: number
+          phase?: string | null
+          request_body?: Json
+          started_at?: string | null
+          status: string
+          stories_extended?: number
+          stories_formed?: number
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          grab_plan?: Json | null
+          id?: string
+          items_fetched?: number
+          items_kept?: number
+          phase?: string | null
+          request_body?: Json
+          started_at?: string | null
+          status?: string
+          stories_extended?: number
+          stories_formed?: number
+        }
+        Relationships: []
+      }
+      research_queries: {
+        Row: {
+          created_at: string
+          id: string
+          name: string | null
+          query_text: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string | null
+          query_text: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string | null
+          query_text?: string
+        }
+        Relationships: []
+      }
       reserved_usernames: {
         Row: {
           created_at: string
@@ -9974,32 +10110,125 @@ export type Database = {
       stories: {
         Row: {
           created_at: string
+          first_seen_at: string | null
+          generation_state: string | null
           id: string
+          is_locked: boolean
+          keywords: string[] | null
+          last_observed_at: string | null
           lifecycle_status: string
           published_at: string | null
+          research_query_id: string | null
           slug: string
           title: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          first_seen_at?: string | null
+          generation_state?: string | null
           id?: string
+          is_locked?: boolean
+          keywords?: string[] | null
+          last_observed_at?: string | null
           lifecycle_status?: string
           published_at?: string | null
+          research_query_id?: string | null
           slug: string
           title?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          first_seen_at?: string | null
+          generation_state?: string | null
           id?: string
+          is_locked?: boolean
+          keywords?: string[] | null
+          last_observed_at?: string | null
           lifecycle_status?: string
           published_at?: string | null
+          research_query_id?: string | null
           slug?: string
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_stories_research_query"
+            columns: ["research_query_id"]
+            isOneToOne: false
+            referencedRelation: "research_queries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      story_observations: {
+        Row: {
+          detached_at: string | null
+          discovery_item_id: string | null
+          excerpt_snapshot: string | null
+          feed_id: string | null
+          id: string
+          match_score: number | null
+          observed_at: string
+          outlet_snapshot: string | null
+          source_class: string | null
+          story_id: string
+          title_snapshot: string | null
+          url_snapshot: string
+        }
+        Insert: {
+          detached_at?: string | null
+          discovery_item_id?: string | null
+          excerpt_snapshot?: string | null
+          feed_id?: string | null
+          id?: string
+          match_score?: number | null
+          observed_at?: string
+          outlet_snapshot?: string | null
+          source_class?: string | null
+          story_id: string
+          title_snapshot?: string | null
+          url_snapshot: string
+        }
+        Update: {
+          detached_at?: string | null
+          discovery_item_id?: string | null
+          excerpt_snapshot?: string | null
+          feed_id?: string | null
+          id?: string
+          match_score?: number | null
+          observed_at?: string
+          outlet_snapshot?: string | null
+          source_class?: string | null
+          story_id?: string
+          title_snapshot?: string | null
+          url_snapshot?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_story_observations_discovery_item"
+            columns: ["discovery_item_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_story_observations_feed"
+            columns: ["feed_id"]
+            isOneToOne: false
+            referencedRelation: "feeds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_story_observations_story"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscription_events: {
         Row: {
@@ -13121,3 +13350,4 @@ export const Constants = {
     },
   },
 } as const
+

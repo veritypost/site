@@ -27,15 +27,22 @@ Implementing the design. Design is LOCKED through four trim sweeps
 listed in § Decisions the owner needs to make.
 
 ### Current status
-- **Last shipped wave:** Wave 0 — `article_sources` table + PATCH hook
-  (commit `d83266c`, 2026-05-04). Migration applied to prod via SQL
-  editor; RLS on, blanket service-role-only; PATCH hook upserts with
-  `ON CONFLICT (article_id, url_snapshot) DO NOTHING`; smoke-verified
-  via PostgREST (insert + replay returned `[]` with original snapshot
-  intact).
-- **Next wave to ship:** **Wave 1 — Stream A1 schema + GIN index**
-  (remaining four tables + `stories` ALTERs + `discovery_items` ALTER
-  + GIN on `stories.keywords` + partial unique on `research_jobs`).
+- **Last shipped wave:** Wave 1 — Stream A1 schema reshape
+  (2026-05-04). Migration `20260504230000_research_pipeline_schema.sql`
+  applied to prod via Supabase MCP; created `research_queries`,
+  `research_jobs`, `discovery_runs`, `story_observations`; ALTERed
+  `stories` (+6 cols, GIN on `keywords`); ALTERed `discovery_items`
+  (+`research_job_id`); partial unique `research_jobs_singleflight`
+  smoke-verified (second `running` insert raised `unique_violation`
+  as designed). Types regenerated to `web/src/types/database.ts`,
+  `tsc --noEmit` clean.
+- **Next wave to ship:** **Wave 2 — Stream B handler.** New
+  `grab-plan.ts` module + handler changes in
+  `/api/newsroom/ingest/run/route.ts` (replace `oneDayAgo` +
+  `SIX_HOURS_MS` with `lookbackMs`, grab plan filter, unbounded
+  GIN-index story match, final transaction with `discovery_runs`
+  audit + `query_*_snapshot` pair). `reserve_cost_or_fail` before
+  the Haiku call.
 - **Branch:** main (direct commit per repo workflow — recent history
   is single-branch).
 - **Open blockers:** none.
