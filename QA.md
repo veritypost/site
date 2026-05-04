@@ -52,6 +52,7 @@ Smoke checklist (owner runs on veritypost.com/admin/newsroom + /admin/feeds whil
 
 **Recently closed** (last ~5; trims as new ones land):
 
+- 2026-05-04 — Discovery scraper Phase B (commit `c3ab23c`) — pending owner prod smoke + env-var setup per Finding #21
 - 2026-05-04 — Discovery scraper Phase A (commits `5627445` scraper, `e7c6000` domain-drift docfix) — pending owner prod smoke per Finding #20
 - 2026-05-04 — /admin/feeds rebuild (commits `aee2701` rebuild, `da49459` bookkeep, `4558b82` tier-1 anchor seed) — pending owner prod smoke per Finding #19
 - 2026-05-04 — /browse redesign + audit fixes (commits `5e4beee` redesign, `4120b89` strip-mock, `8bdb0b2` search subtitle/excerpt, `360a1e4` audience filter + iOS dark-mode, `9b10fff` AbortController, `db64f1c` inclusive UTC date filter)
@@ -1043,7 +1044,7 @@ Keep ≤8 lines. If investigation grows, spin a finding doc under `UI_UX_REVIEW/
 
 - **chrome / pipeline-data:** #19 (/admin/feeds rebuild) — shipped 2026-05-04 `aee2701`. **Owner action pending:** in-browser smoke per §0 checklist; on green, owner writes a `[LOCKED]` line in §8.4 if freezing is desired.
 - **chrome / pipeline-data:** #20 (Discovery scraper layer Phase A) — shipped 2026-05-04 `5627445`. **Owner action pending:** in-browser smoke per §0 checklist (Discovery tab Refresh feeds + /admin/feeds Type column verification + Story Manager item provenance check). Phase B (Finding #21) supersedes the deferred-stub portion of this finding.
-- **chrome / pipeline-data:** #21 (Discovery scraper layer Phase B) — shipped 2026-05-04 (this commit). **Owner action pending:** (a) set env vars NEWSAPI_KEY / NEWSDATA_KEY / MEDIASTACK_KEY / GNEWS_KEY in Vercel project (without keys, configured scrape_json rows return cleanly with zero items, no failure mode); (b) in-browser smoke per §0 checklist 7-step list (drawer editor + Defaults dropdown + Save + Test + ingest run with new shape + env-var → host binding rejection + audit-log redaction).
+- **chrome / pipeline-data:** #21 (Discovery scraper layer Phase B) — shipped 2026-05-04 `c3ab23c`. **Owner action pending:** (a) set env vars NEWSAPI_KEY / NEWSDATA_KEY / MEDIASTACK_KEY / GNEWS_KEY in Vercel project (without keys, configured scrape_json rows return cleanly with zero items, no failure mode); (b) in-browser smoke per §0 checklist 7-step list (drawer editor + Defaults dropdown + Save + Test + ingest run with new shape + env-var → host binding rejection + audit-log redaction).
 
 #### Shipped
 
