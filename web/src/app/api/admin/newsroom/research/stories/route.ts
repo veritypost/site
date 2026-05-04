@@ -149,29 +149,38 @@ export async function GET(req: Request) {
 
   const service = createServiceClient();
 
-  // job= scoping: discovery_items.research_job_id → story_observations
-  // → stories. Pull the eligible story_id set first, then constrain
-  // the main query.
+  // job= scoping: scope by OBSERVATION TIME, not by
+  // discovery_items.research_job_id linkage. When a Run reprocesses
+  // items that were already in discovery_items (dedup by URL skips
+  // re-insertion), those items keep their original research_job_id
+  // pointing at an EARLIER run, so filtering by item.research_job_id
+  // misses every story extended or formed during this Run. Use
+  // story_observations.observed_at between job.started_at and
+  // job.finished_at (or now() if still running).
   let jobScopedStoryIds: string[] | null = null;
   if (jobId) {
-    const { data: jobItems, error: jobItemsErr } = await service
-      .from('discovery_items')
-      .select('id')
-      .eq('research_job_id', jobId)
-      .limit(2000);
-    if (jobItemsErr) {
-      console.error('[research.stories.list.job_items]', jobItemsErr.message);
-      return NextResponse.json({ error: 'Could not resolve job items' }, { status: 500 });
+    const { data: jobRow, error: jobRowErr } = await service
+      .from('research_jobs')
+      .select('started_at, finished_at')
+      .eq('id', jobId)
+      .maybeSingle();
+    if (jobRowErr) {
+      console.error('[research.stories.list.job_row]', jobRowErr.message);
+      return NextResponse.json({ error: 'Could not resolve job' }, { status: 500 });
     }
-    const itemIds = (jobItems ?? []).map((r) => r.id as string);
-    if (itemIds.length === 0) {
+    if (!jobRow || !jobRow.started_at) {
       return NextResponse.json({ stories: [], cursor: null });
     }
+    const winStart = jobRow.started_at as string;
+    const winEnd = (jobRow.finished_at as string | null) ?? new Date().toISOString();
+
     const { data: obsRows, error: obsErr } = await service
       .from('story_observations')
       .select('story_id')
-      .in('discovery_item_id', itemIds)
-      .is('detached_at', null);
+      .gte('observed_at', winStart)
+      .lte('observed_at', winEnd)
+      .is('detached_at', null)
+      .limit(10000);
     if (obsErr) {
       console.error('[research.stories.list.job_obs]', obsErr.message);
       return NextResponse.json({ error: 'Could not resolve job stories' }, { status: 500 });

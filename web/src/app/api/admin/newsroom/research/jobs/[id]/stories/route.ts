@@ -107,29 +107,29 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: 'Job not found' }, { status: 404 });
   }
   const startedAt = jobRow.started_at ?? null;
+  const finishedAt = jobRow.finished_at ?? null;
 
-  // 2. Resolve all discovery_items belonging to this job.
-  const { data: jobItems, error: jobItemsErr } = await service
-    .from('discovery_items')
-    .select('id')
-    .eq('research_job_id', params.id)
-    .limit(10000);
-  if (jobItemsErr) {
-    console.error('[research.jobs.stories.items]', jobItemsErr.message);
-    return NextResponse.json({ error: 'Could not load job items' }, { status: 500 });
-  }
-  const jobItemIds = new Set<string>((jobItems ?? []).map((r) => r.id as string));
-  if (jobItemIds.size === 0) {
+  // 2. Resolve scope by OBSERVATION TIME, not by discovery_items linkage.
+  //
+  // Why: when a Run reprocesses items already in discovery_items (dedup by
+  // URL skips re-insertion), those items keep their original
+  // research_job_id pointing at an EARLIER run. Filtering by
+  // discovery_items.research_job_id then misses every story extended or
+  // formed during this Run. The honest scope is "observations recorded
+  // during this run's window" — story_observations.observed_at between
+  // started_at and finished_at (or now() if still running).
+  if (!startedAt) {
     return NextResponse.json({ stories: [] });
   }
-  const jobItemIdsArr = Array.from(jobItemIds);
+  const windowEnd = finishedAt ?? new Date().toISOString();
 
-  // 3. Find all active story_observations for the job's items to get story_ids.
   const { data: obsForJob, error: obsForJobErr } = await service
     .from('story_observations')
     .select('id, story_id, discovery_item_id, observed_at, url_snapshot, title_snapshot, excerpt_snapshot, outlet_snapshot, source_class')
-    .in('discovery_item_id', jobItemIdsArr)
-    .is('detached_at', null);
+    .gte('observed_at', startedAt)
+    .lte('observed_at', windowEnd)
+    .is('detached_at', null)
+    .limit(10000);
   if (obsForJobErr) {
     console.error('[research.jobs.stories.obs_for_job]', obsForJobErr.message);
     return NextResponse.json({ error: 'Could not load story observations' }, { status: 500 });
