@@ -141,7 +141,10 @@ const RequestSchema = z.object({
   age_band: z.enum(['adult', 'kids', 'tweens']).optional(),
   freeform_instructions: z.string().max(2000).optional(),
   provider: z.enum(['anthropic', 'openai']).default('anthropic'),
-  model: z.string().min(3).max(100).default('claude-sonnet-4-6'),
+  // Default to Haiku 4.5 — keeps a request without an explicit model
+  // cheap by default (~$0.05–$0.20 per article vs $1–$3 for Sonnet).
+  // Operators pick Sonnet/Opus/GPT-4o explicitly via the model dropdown.
+  model: z.string().min(3).max(100).default('claude-haiku-4-5-20251001'),
   source_urls: z.array(SourceUrlSchema).max(20).optional(),
   // Subset of source_urls to persist as `public.sources` rows on the
   // published article. Omitted = attach every source_urls entry (legacy
