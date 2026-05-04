@@ -28,7 +28,7 @@ listed in § Decisions the owner needs to make.
 
 ### Current status
 - **Last shipped wave:** Wave 6 — Stream F provenance UI
-  (commit `<pending>`, 2026-05-04). New `/admin/sources`
+  (commit `aa5158f`, 2026-05-04). New `/admin/sources`
   standalone page reads from `article_sources` (the no-delete
   provenance log populated by Wave 0). Two new endpoints:
   `GET /api/admin/sources` (keyset paginated list filtered by
