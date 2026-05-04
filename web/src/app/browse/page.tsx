@@ -26,7 +26,7 @@ const C = {
 type Density = 'comfortable' | 'compact' | 'grid';
 type SortKey = 'newest' | 'oldest' | 'most_articles';
 
-interface Article { id: string; date: string; headline: string; slug?: string }
+interface Article { id: string; date: string; headline: string; subtitle?: string; excerpt?: string; slug?: string }
 interface Story {
   id: string;
   title: string;
@@ -53,7 +53,7 @@ type ClusterRow = {
   categories: { name: string | null } | null;
   feed_cluster_articles: {
     added_at: string | null;
-    articles: { id: string; title: string | null; published_at: string | null; status: string | null; stories: { slug: string } | null } | null;
+    articles: { id: string; title: string | null; subtitle: string | null; excerpt: string | null; published_at: string | null; status: string | null; stories: { slug: string } | null } | null;
   }[];
 };
 
@@ -65,6 +65,8 @@ function toStory(row: ClusterRow): Story | null {
       id:       fca.articles!.id,
       date:     fca.articles!.published_at!.slice(0, 10),
       headline: fca.articles!.title!,
+      subtitle: fca.articles!.subtitle ?? undefined,
+      excerpt:  fca.articles!.excerpt ?? undefined,
       slug:     fca.articles!.stories?.slug ?? undefined,
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -87,7 +89,7 @@ async function loadStories(): Promise<Story[]> {
     .select(`
       id, title, is_active, updated_at,
       categories(name),
-      feed_cluster_articles(added_at, articles(id, title, published_at, status, stories(slug)))
+      feed_cluster_articles(added_at, articles(id, title, subtitle, excerpt, published_at, status, stories(slug)))
     `)
     .eq('is_active', true)
     .is('dismissed_at', null)
@@ -465,7 +467,11 @@ function BrowsePageInner() {
       list = list.filter(s =>
         s.title.toLowerCase().includes(q)
         || s.category.toLowerCase().includes(q)
-        || s.articles.some(a => a.headline.toLowerCase().includes(q))
+        || s.articles.some(a =>
+            a.headline.toLowerCase().includes(q)
+            || (a.subtitle ?? '').toLowerCase().includes(q)
+            || (a.excerpt ?? '').toLowerCase().includes(q)
+          )
       );
     }
     return [...list].sort((a, b) => {
