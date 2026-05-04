@@ -29,6 +29,7 @@ import ArticleEngagementZone from '@/components/ArticleEngagementZone';
 import ArticleActions from '@/components/ArticleActions';
 import ArticleTracker from '@/components/article/ArticleTracker';
 import StoryArticlePicker from '@/components/article/StoryArticlePicker';
+// kept-alive — launch-hide pattern (see line 347); do not remove
 import AnonArticleCtaBanner from '@/components/article/AnonArticleCtaBanner';
 import ArticleFetchFailed from './_ArticleFetchFailed';
 import NextStoryFooter from '@/components/NextStoryFooter';

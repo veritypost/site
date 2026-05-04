@@ -1,5 +1,12 @@
 'use client';
 
+// LAUNCH-HIDE — kept alive, no nav link pre-launch.
+// "Active Stories" / Following slot was removed from web NavWrapper in
+// commit 5e4beee (2026-05-03 /browse redesign). Mirror of iOS decision
+// in VerityPost/VerityPost/ContentView.swift (Tab.following dropped).
+// Page is reachable by direct URL but not promoted. Preserved for
+// one-line re-expose: re-add the nav array entry in NavWrapper.tsx.
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';

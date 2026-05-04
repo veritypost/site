@@ -2,6 +2,13 @@ import SwiftUI
 
 // @migrated-to-permissions 2026-04-18
 // @feature-verified system_auth 2026-04-18
+//
+// LAUNCH-HIDE — kept alive, intentionally uncalled.
+// Per QA.md §8.4 LOCKED 2026-05-03 /login: recovery flow is forbidden
+// pre-launch (no "having trouble", no contact link, no recovery flow).
+// iOS LoginView mirrors web (LOCKED 2026-05-03 T&C), so no "Forgot
+// password?" entry point exists on iOS either. View is preserved for
+// one-line re-expose if the lock is later unlocked.
 
 struct ForgotPasswordView: View {
     @Environment(\.dismiss) var dismiss
