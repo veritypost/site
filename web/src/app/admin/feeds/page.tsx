@@ -67,6 +67,28 @@ type FilterChip = 'all' | 'producing' | 'silent7d' | 'failing';
 // Default chip: producing today.
 const DEFAULT_FILTER: FilterChip = 'producing';
 
+// Human label for the `feeds.feed_type` column. RSS variants ('feed' / 'rss')
+// collapse to "RSS" since the operator distinction is irrelevant; scrape modes
+// get explicit labels. Falls back to the raw value defensively for unknown
+// future values so a misconfigured row stays visible rather than silently
+// rendering as an empty cell.
+function feedTypeLabel(feed_type: string | null | undefined): string {
+  switch (feed_type) {
+    case 'feed':
+    case 'rss':
+    case null:
+    case undefined:
+    case '':
+      return 'RSS';
+    case 'scrape_html':
+      return 'Scrape HTML';
+    case 'scrape_json':
+      return 'Scrape JSON';
+    default:
+      return feed_type;
+  }
+}
+
 function FeedsAdminInner() {
   const router = useRouter();
   const supabase = createClient();
@@ -447,6 +469,15 @@ function FeedsAdminInner() {
       },
     },
     {
+      key: 'feed_type',
+      header: 'Type',
+      sortable: false,
+      render: (row: DisplayFeed) => (
+        <Badge variant="neutral">{feedTypeLabel(row.feed_type)}</Badge>
+      ),
+      width: 120,
+    },
+    {
       key: 'status',
       header: 'Status',
       render: (row: DisplayFeed) => <Badge variant={statusVariant(row.status)} dot>{statusLabel(row.status)}</Badge>,
@@ -766,7 +797,7 @@ function FeedsAdminInner() {
             <KV label="Items / 24h" value={String(selected.items_24h)} />
             <KV label="Items / 7d" value={String(selected.items_7d)} />
             <KV label="Error count" value={String(selected.failCount)} />
-            <KV label="Feed type" value={selected.feed_type || 'rss'} />
+            <KV label="Feed type" value={feedTypeLabel(selected.feed_type)} />
             <KV label="Language" value={selected.language || '—'} />
             <KV label="Auto-publish" value={selected.is_auto_publish ? 'Yes' : 'No'} />
             <KV label="Wire rewrite" value={selected.is_ai_rewrite ? 'Yes' : 'No'} />

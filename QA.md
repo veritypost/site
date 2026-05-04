@@ -21,20 +21,26 @@ NOTES:   <one line — anything the next turn needs to know>
 **Active:**
 
 ```
-CURRENT: /admin/feeds rebuild — owner-facing smoke test on prod, plus tier-1 anchor seed (26 rows) staged 2026-05-04. Five-stream rebuild shipped (commit aee2701, Vercel dpl_5J8LAvy9bDrpApif9t7HyZ6BnnwC READY): soft-delete + restore-on-re-add, honest UI counters from discovery_items joins, per-feed health writeback (last_polled_at / error_count / last_error / last_error_at), articles_imported_count writeback removed (UI no longer reads it), max_items_per_run column dropped, editor revoked from admin.feeds.manage. Three migrations applied to prod via mcp_supabase__apply_migration.
-SHAPE:   fix-cluster (admin chrome — not on §8.4 lock list, free to edit)
-TARGET:  /admin/feeds · web/src/app/admin/feeds/page.tsx + web/src/app/api/admin/feeds/{route.ts,[id]/route.ts,bulk/route.ts,list/route.ts} + supabase/migrations/{20260504130000_drop_feeds_max_items_per_run.sql,20260504140000_add_feeds_deleted_at.sql,20260504150000_lock_feeds_to_admin.sql} + lib/pipeline/ingestRun
+CURRENT: Discovery scraper layer — Phase A shipped. /api/newsroom/ingest/run now fans out to RSS + scrape_html consumers in parallel via Promise.allSettled, with scrape_json deferred for Phase B. Migration applied: 129 non-RSS-shaped active rows reclassified (96 → scrape_html, 33 → scrape_json), stamped metadata.reclassified_from_pipeline='rss_only_default'. New /admin/feeds Type column shows RSS / Scrape HTML / Scrape JSON badges. /admin/newsroom Discovery → "Refresh feeds" button unchanged (route gains new behavior).
+SHAPE:   fix-cluster (admin chrome + pipeline-data — not on §8.4 lock list, free to edit)
+TARGET:  /api/newsroom/ingest/run · web/src/app/api/newsroom/ingest/run/route.ts + web/src/lib/pipeline/scrape-discovery.ts (new) + web/src/app/admin/feeds/page.tsx + supabase/migrations/20260504160000_feed_type_scraper_values.sql
 STATUS:  pending-prod-confirm
-NOTES:   CLI-side checks done — Vercel READY, schema matches (deleted_at column + partial index, max_items_per_run gone, permission_set_perms editor row gone), POST route correctly restores soft-deleted rows on re-add (route.ts:144-181). Tier-1 anchor seed inserted 2026-05-04 (26 rows: 23 first-party RSS active + 3 Google News fallbacks staged is_active=false because of the GNews ToS gray area for commercial aggregation; metadata.tier='1-anchor', metadata.source_class='first_party'|'gnews_fallback'). Counts now: 255 total feeds / 252 active / 3 inactive / 0 soft-deleted. After smoke: option 3 = bulk-deactivate the 108 dead non-RSS legacy feeds via the new UI, option 5 = drop articles_imported_count column. Owner can flip the 3 GNews rows to is_active=true at /admin/feeds when ready (they're inert until then).
+NOTES:   CLI-side gates green — tsc 0 errors, lint 0 errors, build clean. Adversary review surfaced 11 findings; 3 fixed in slice (migration replay guard, multi-part TLD bug in sameRegistrableDomain, audit-log payload includes feedsByType), 8 documented as Phase B/C. Active feed_type distribution post-migration: 100 feed + 23 rss + 96 scrape_html + 33 scrape_json (252 total). Cross-bucket dedup contract preserved via stable sort on source_class before first-occurrence-wins (RSS still wins over scrape on duplicate URLs). scrape_json rows are polled-as-deferred — last_polled_at updates, error_count untouched, no fetch (Phase B builds the JSON consumer).
 
-Smoke checklist (owner runs on verityposts.com/admin/feeds while signed in as admin@veritypost.com):
-  1. Page loads as owner — no 403; table renders with Items/24h + Items/7d columns
-  2. Click "Refresh feeds" / trigger ingest — after run, refresh: at least some rows show non-zero error_count OR last_polled_at moves into the last 24h (proves writeback works on real data)
-  3. Add Feed with a JSON-API URL (e.g. https://catfact.ninja) — should reject 422 with helpful message
-  4. Add Feed with a real RSS URL (e.g. https://feeds.npr.org/1014/rss.xml) — should succeed; row appears in table
-  5. Bulk-select 5 rows + Pause — confirm only 5 rows flip is_active=false (no off-by-one)
-  6. Delete a feed — confirm articles + discovery_items survive (soft-delete)
-  7. Re-add the deleted feed's URL — should restore the existing row, not error on UNIQUE
+Known limits / Phase C followups:
+  - scrape_html zero-results doesn't alert (parser regression on a site looks healthy forever) — file Phase C.
+  - Concurrent-run error_count race is pre-existing; runs single-flighted via pipeline_runs in practice.
+  - Article-URL heuristic accepts year-archive paths like /archive/2024-news in some cases — Phase C tightening.
+  - Worst-case wall-clock for 96 scrape_html feeds running in parallel ~30-60s; well inside the 300s lambda budget.
+
+Smoke checklist (owner runs on verityposts.com/admin/newsroom Discovery tab + /admin/feeds while signed in as admin@veritypost.com):
+  1. /admin/newsroom Discovery → click "Refresh feeds" — toast confirms run completed; response includes feedsByType { rss, scrape_html, scrape_json } and itemsBySource { rss, scrape_html }.
+  2. /admin/feeds → confirm Type column renders RSS / Scrape HTML / Scrape JSON badges; no per-tier color (single neutral badge style).
+  3. /admin/feeds → after the refresh in step 1, scrape_html rows show last_polled_at moved into the last 24h; scrape_json rows ALSO show last_polled_at moved (proves deferred-but-polled).
+  4. /admin/feeds → at least some scrape_html rows show non-zero items in Items/24h (proves Jina+Cheerio actually parsed real homepages).
+  5. /admin/feeds → no scrape_json row has error_count incremented (deferred ≠ failure).
+  6. Story Manager → confirm new discovery_items appear from sources that previously produced zero (e.g. apnews.com, reuters.com, bbc.com if those reclassified as scrape_html).
+  7. /admin/feeds → previously broken non-RSS rows that were inflating error_count every cycle now show a clean status (error_count reset on first successful scrape).
 ```
 
 **Parking lot** (intent the owner mentioned but didn't switch to — pulled from here after CURRENT closes):
@@ -44,6 +50,7 @@ Smoke checklist (owner runs on verityposts.com/admin/feeds while signed in as ad
 
 **Recently closed** (last ~5; trims as new ones land):
 
+- 2026-05-04 — /admin/feeds rebuild (commits `aee2701` rebuild, `da49459` bookkeep, `4558b82` tier-1 anchor seed) — pending owner prod smoke per Finding #19
 - 2026-05-04 — /browse redesign + audit fixes (commits `5e4beee` redesign, `4120b89` strip-mock, `8bdb0b2` search subtitle/excerpt, `360a1e4` audience filter + iOS dark-mode, `9b10fff` AbortController, `db64f1c` inclusive UTC date filter)
 - 2026-05-03 — Finding #10 admin/owner backstage-pass for /profile (commit `ee9ea19`, locked in §8.4)
 
@@ -973,11 +980,26 @@ Keep ≤8 lines. If investigation grows, spin a finding doc under `UI_UX_REVIEW/
 - **Associated:** `supabase/migrations/20260504130000_drop_feeds_max_items_per_run.sql`, `…140000_add_feeds_deleted_at.sql`, `…150000_lock_feeds_to_admin.sql` (all applied to prod).
 - **Cross-platform parity:** web admin chrome only — N/A iOS / kids.
 - **Known context:** Vercel `dpl_5J8LAvy9bDrpApif9t7HyZ6BnnwC` for `aee2701` is `READY` on production. Schema verified via Supabase MCP: `feeds.deleted_at` + `feeds_deleted_at_idx` partial index exist; `feeds.max_items_per_run` gone; `permission_set_perms` for `admin.feeds.manage` is now `{owner, admin}` only. After tier-1 anchor seed (2026-05-04): 255 live feeds / 252 active / 3 inactive (the 3 Google News fallback rows for AP / AP Sports / Reuters are staged `is_active=false` because of GNews ToS gray area — owner flips on at /admin/feeds when ready). All 26 new rows tagged `metadata.tier='1-anchor'`, source_class first_party (23) or gnews_fallback (3). `feeds.url` UNIQUE has no partial filter, so soft-delete-then-re-add relies on the POST route's restore branch — verified in place at route.ts:144-181.
+- **Amended 2026-05-04 by Finding #20:** the 129 non-RSS-shaped active rows that previously inflated `error_count` every ingest cycle (RSS-only filter, no scraper handler) are now reclassified to `scrape_html` (96) or `scrape_json` (33) and handled by the new fanout. Type column added to /admin/feeds table renders RSS / Scrape HTML / Scrape JSON badges. After Phase A smoke passes, the broken-rows symptom in step 2 of the original smoke checklist is moot — scrape_html rows will be polled cleanly by the new path.
 - **Confirmed:** yes (2026-05-04 — Vercel + Supabase MCP + file read).
 - **Owner decision needed:** no for the rebuild itself; yes once smoke passes — promote to `[LOCKED]` in §8.4? The chrome is non-trivial and worth freezing while the long-tail seed work (options 2/3/5 in CURRENT) runs.
 - **Status:** pending-prod-confirm (per §0 smoke checklist)
 - **Ready for fix:** n/a — shipped 2026-05-04 `aee2701`. Awaiting owner in-browser run.
 - **Notes for next agent:** do NOT re-edit /admin/feeds files until smoke passes or owner reports a failure. If smoke step 2 (writeback) reports zero movement after a real ingest, check `lib/pipeline/ingestRun.ts` — the writeback Map relies on the upsert RETURNING rows; if the ingest cron uses a different code path, writeback won't fire there.
+
+#### 20. Discovery scraper layer Phase A — RSS-only ingest extended to all active sources
+
+- **Cluster:** chrome / pipeline-data
+- **What was seen:** Pre-fix, 129 of 252 active feeds had non-RSS-shaped URLs (publisher homepages, encyclopedia portals, gov data sites, JSON APIs). The RSS-only filter on /api/newsroom/ingest/run dropped them every cycle, fail-parsed them as RSS, and inflated `error_count` on each. The "Refresh feeds" button polled less than half the active source list. Bug originated in the pipeline pivot when a discovery scraper was specced alongside RSS but never built.
+- **Surface:** `web/src/app/api/newsroom/ingest/run/route.ts` (widened feeds query, dual-fanout via Promise.allSettled, source_class stable sort before dedup, deferred-handler branch for scrape_json), `web/src/lib/pipeline/scrape-discovery.ts` (NEW — Jina Reader primary + Cheerio fallback, article-URL heuristic, multi-part-TLD-aware sameRegistrableDomain, silent-fail contract), `web/src/app/admin/feeds/page.tsx` (new Type column badge + module-scope `feedTypeLabel` helper).
+- **Associated:** `supabase/migrations/20260504160000_feed_type_scraper_values.sql` (applied to prod via Supabase MCP). Reclassify preview retained at `Ongoing Projects/Current/scraper_reclassify_preview_2026-05-04.md` for audit.
+- **Cross-platform parity:** web admin only — N/A iOS / kids (server-only route + lib).
+- **Known context:** Migration is data-only — no CHECK constraint exists on `feeds.feed_type`. 129 rows touched, stamped `metadata.reclassified_at='2026-05-04'` and `metadata.reclassified_from_pipeline='rss_only_default'`. Idempotent: re-running the WHERE rule returns 0 affected. Migration file edited post-apply to add `AND feed_type IN ('feed','rss')` defensive guard for future replays. Cross-bucket dedup contract preserved: `Array.prototype.sort` is stable in V8/Node and orders RSS before scrape_html before the existing first-occurrence-wins dedup. scrape_json rows are deferred — they get `last_polled_at` updated but no fetch and no error_count change. Adversary review surfaced 11 findings; 3 fixed in slice (migration replay guard, multi-part TLD bug for `co.uk`/`com.au`/etc., audit-log payload), 8 documented as Phase B/C followup. CLI gates green: tsc 0 errors, lint 0 errors on touched files, `npm run build` clean.
+- **Confirmed:** yes (2026-05-04 — Supabase MCP query + tsc/lint/build).
+- **Owner decision needed:** no for Phase A itself. Phase B (JSON API handler + per-source `extraction_config` JSONB column + admin UI for the field-mapping config) and Phase C (cross-path dedup hardening + Story Manager scraper provenance + zero-results-streak alerting + numeric-id heuristic tightening + concurrent-run single-flight enforcement) are split out and need separate owner go.
+- **Status:** pending-prod-confirm (per §0 smoke checklist)
+- **Ready for fix:** n/a — shipped 2026-05-04. Awaiting owner in-browser run.
+- **Notes for next agent:** do NOT re-edit any of the four touched surfaces until smoke passes or owner reports a failure. If smoke step 4 (scrape_html rows show zero items in Items/24h) fails on EVERY scrape_html row, the article-URL heuristic in `scrape-discovery.ts` is over-rejecting — start by loosening `looksLikeSlug` length threshold or `looksLikeNumericId`; do NOT widen `sameRegistrableDomain`, that fix is correct. If only some rows yield zero, that's normal — 96 publishers don't all expose article links cleanly on their homepage HTML.
 
 ### 8.3. Roll-up by cluster
 
@@ -1002,6 +1024,7 @@ Keep ≤8 lines. If investigation grows, spin a finding doc under `UI_UX_REVIEW/
 #### Shipped — pending owner prod confirm
 
 - **chrome / pipeline-data:** #19 (/admin/feeds rebuild) — shipped 2026-05-04 `aee2701`. **Owner action pending:** in-browser smoke per §0 checklist; on green, owner writes a `[LOCKED]` line in §8.4 if freezing is desired.
+- **chrome / pipeline-data:** #20 (Discovery scraper layer Phase A) — shipped 2026-05-04 (this commit). **Owner action pending:** in-browser smoke per §0 checklist (Discovery tab Refresh feeds + /admin/feeds Type column verification + Story Manager item provenance check).
 
 #### Shipped
 

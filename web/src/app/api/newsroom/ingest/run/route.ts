@@ -2,8 +2,16 @@
  * F7 Phase 2 Task 9 — /api/newsroom/ingest/run
  *
  * POST handler for the admin "Refresh feeds" button. Fetches all active
- * RSS feeds, deduplicates against discovery_items by raw_url, and inserts
- * new pending rows for the pipeline orchestrator (Task 10) to pick up.
+ * feeds across two consumer types in parallel, deduplicates against
+ * discovery_items by raw_url, and inserts new pending rows for the
+ * pipeline orchestrator (Task 10) to pick up.
+ *
+ * Consumer types fanned out in parallel:
+ *   - 'feed' / 'rss'    — rss-parser path (fetchWithTimeout)
+ *   - 'scrape_html'     — Jina+Cheerio discovery scrape (scrapeDiscovery)
+ *   - 'scrape_json'     — Phase A: handler not implemented; rows are
+ *                         polled-as-deferred to keep their last_polled_at
+ *                         fresh without inflating error_count.
  *
  * Ported from snapshot: verity-post-pipeline-snapshot/src/app/api/ingest/route.js
  * Differences from snapshot:
@@ -13,7 +21,6 @@
  *   - The legacy `feeds.audience` column stays in DB for back-compat with
  *     mutation RPCs but is no longer a UI primary; ingest writes every
  *     active feed regardless of its audience tag
- *   - No scraping here (snapshot also deferred scraping per line 287)
  *   - Writes pipeline_runs row for observability
  *   - Admin-gated via admin.pipeline.run_ingest (not open)
  *   - Rate-limited via rate_limits.newsroom_ingest (5 per 600s)
@@ -34,6 +41,7 @@ import {
   loadStoryMatchCandidates,
   getStoryMatchOverlapPct,
 } from '@/lib/pipeline/story-match';
+import { scrapeDiscovery, type DiscoveredArticle } from '@/lib/pipeline/scrape-discovery';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -61,6 +69,7 @@ interface FlatItem {
   excerpt: string;
   pubDate: string | null;
   outlet: string | null;
+  source_class: 'rss' | 'scrape_html';
 }
 
 // ----------------------------------------------------------------------------
@@ -189,11 +198,11 @@ export async function POST(req: Request) {
 
   // 5. Main body — on any throw, mark run failed and return 500
   try {
-    // 6. Fetch active feeds (rss/feed types only). The unified-feed pivot
-    // dropped audience filtering — every active feed contributes to the same
-    // discovery pool. The audience column stays in DB (defaulted to 'adult')
-    // for back-compat with the cluster-mutation RPCs that still take it as
-    // a defensive parameter.
+    // 6. Fetch active feeds across all four consumer types. The unified-feed
+    // pivot dropped audience filtering — every active feed contributes to the
+    // same discovery pool. The audience column stays in DB (defaulted to
+    // 'adult') for back-compat with the cluster-mutation RPCs that still take
+    // it as a defensive parameter.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const serviceAny = service as any;
     const { data: feedsData, error: feedsErr } = await serviceAny
@@ -201,30 +210,35 @@ export async function POST(req: Request) {
       .select('id,url,source_name,feed_type,name,priority_weight,allowed_category_slugs,error_count')
       .eq('is_active', true)
       .is('deleted_at', null)
-      .in('feed_type', ['feed', 'rss']);
+      .in('feed_type', ['feed', 'rss', 'scrape_html', 'scrape_json']);
     if (feedsErr) {
       throw new Error(`feeds lookup failed: ${(feedsErr as { message: string }).message}`);
     }
     // Sort feeds by priority_weight DESC so that when two feeds carry the same
     // URL, the higher-weight feed's version appears first in allItems and wins
-    // the first-occurrence-wins dedup below.
+    // the first-occurrence-wins dedup below. Sort applies before bucket
+    // partition so each bucket retains the same DESC ordering.
     const feeds: FeedRow[] = ((feedsData as FeedRow[]) ?? []).sort(
       (a, b) => (b.priority_weight ?? 5) - (a.priority_weight ?? 5)
     );
 
-    // 7. Fetch all feeds — full Promise.allSettled fanout, 6s timeout per feed.
-    // Promise.allSettled preserves input order in results, so higher-weight feeds
-    // appear first in fetchResults, matching the sorted feeds array above.
-    const fetchResults = await Promise.allSettled(
-      feeds.map((f) => fetchWithTimeout(f.url).then((rss) => ({ feed: f, rss })))
-    );
+    // Partition into per-consumer buckets. Unknown feed_type rows are silently
+    // skipped (defensive — no throw); they get no writeback and no items.
+    const rssFeeds: FeedRow[] = [];
+    const scrapeHtmlFeeds: FeedRow[] = [];
+    const scrapeJsonFeeds: FeedRow[] = [];
+    for (const f of feeds) {
+      if (f.feed_type === 'feed' || f.feed_type === 'rss') rssFeeds.push(f);
+      else if (f.feed_type === 'scrape_html') scrapeHtmlFeeds.push(f);
+      else if (f.feed_type === 'scrape_json') scrapeJsonFeeds.push(f);
+    }
 
-    let feedsSucceeded = 0;
-    let feedsFailed = 0;
-    const allItems: FlatItem[] = [];
-
-    // Per-feed outcome map — populated during flatten, consumed after insert.
-    // ok=true: fetch succeeded; ok=false: fetch rejected.
+    // Per-feed outcome map — populated during fanout, consumed after insert.
+    // ok=true: fetch succeeded (regardless of item count);
+    // ok=false: fetch rejected;
+    // deferred=true: scrape_json bucket — no handler this phase; row is
+    //   polled-as-deferred so last_polled_at advances without inflating
+    //   error_count.
     // currentErrorCount is read from the already-fetched feeds row so we can
     // compute error_count + 1 without an extra round-trip.
     // Known race: if two ingest runs overlap, error_count increments can race.
@@ -233,46 +247,174 @@ export async function POST(req: Request) {
       ok: boolean;
       error?: string;
       currentErrorCount: number;
+      deferred?: boolean;
     }
     const feedOutcomes = new Map<string, FeedOutcome>();
+    const allItems: FlatItem[] = [];
 
-    // 8. Flatten — ignore items without .link
-    for (let i = 0; i < fetchResults.length; i++) {
-      const result = fetchResults[i];
-      const feed = feeds[i];
-      if (result.status === 'fulfilled') {
-        feedsSucceeded++;
-        const { rss } = result.value;
-        feedOutcomes.set(feed.id, { ok: true, currentErrorCount: feed.error_count ?? 0 });
+    let rssSucceeded = 0;
+    let rssFailed = 0;
+    let scrapeHtmlSucceeded = 0;
+    let scrapeHtmlFailed = 0;
+    let itemsFromRss = 0;
+    let itemsFromScrapeHtml = 0;
 
-        const items = rss?.items ?? [];
-        const allowedSlugs = feed.allowed_category_slugs ?? [];
-        for (const item of items) {
-          if (!item.link) continue;
-          if (allowedSlugs.length > 0) {
-            const text = `${item.title ?? ''} ${item.contentSnippet ?? ''}`.toLowerCase();
-            if (!allowedSlugs.some((slug) => text.includes(slug.toLowerCase()))) continue;
+    // 7a. RSS fanout — full Promise.allSettled, 6s timeout per feed via
+    // fetchWithTimeout. Promise.allSettled preserves input order so
+    // higher-weight feeds appear first in fetchResults, matching the sorted
+    // rssFeeds array.
+    const rssRun = (async () => {
+      const fetchResults = await Promise.allSettled(
+        rssFeeds.map((f) => fetchWithTimeout(f.url).then((rss) => ({ feed: f, rss })))
+      );
+
+      // 7a.i Flatten — ignore items without .link
+      for (let i = 0; i < fetchResults.length; i++) {
+        const result = fetchResults[i];
+        const feed = rssFeeds[i];
+        if (result.status === 'fulfilled') {
+          rssSucceeded++;
+          const { rss } = result.value;
+          feedOutcomes.set(feed.id, { ok: true, currentErrorCount: feed.error_count ?? 0 });
+
+          const items = rss?.items ?? [];
+          const allowedSlugs = feed.allowed_category_slugs ?? [];
+          for (const item of items) {
+            if (!item.link) continue;
+            if (allowedSlugs.length > 0) {
+              const text = `${item.title ?? ''} ${item.contentSnippet ?? ''}`.toLowerCase();
+              if (!allowedSlugs.some((slug) => text.includes(slug.toLowerCase()))) continue;
+            }
+            const outlet = feed.source_name || feed.name || null;
+            allItems.push({
+              feed_id: feed.id,
+              raw_url: item.link,
+              raw_title: item.title?.trim() || null,
+              excerpt: (item.contentSnippet || '').slice(0, 500),
+              pubDate: item.pubDate || item.isoDate || null,
+              outlet,
+              source_class: 'rss',
+            });
+            itemsFromRss++;
           }
-          const outlet = feed.source_name || feed.name || null;
-          allItems.push({
-            feed_id: feed.id,
-            raw_url: item.link,
-            raw_title: item.title?.trim() || null,
-            excerpt: (item.contentSnippet || '').slice(0, 500),
-            pubDate: item.pubDate || item.isoDate || null,
-            outlet,
+        } else {
+          rssFailed++;
+          const errMsg = String((result as PromiseRejectedResult).reason).slice(0, 500);
+          feedOutcomes.set(feed.id, {
+            ok: false,
+            error: errMsg,
+            currentErrorCount: feed.error_count ?? 0,
           });
         }
-      } else {
-        feedsFailed++;
-        const errMsg = String((result as PromiseRejectedResult).reason).slice(0, 500);
-        feedOutcomes.set(feed.id, {
-          ok: false,
-          error: errMsg,
-          currentErrorCount: feed.error_count ?? 0,
-        });
       }
+    })();
+
+    // 7b. Scrape HTML fanout — scrapeDiscovery silent-fails to [] internally.
+    // An empty array is a SUCCESSFUL fetch with zero items, NOT a failure
+    // (mirrors the RSS path's "fetch succeeded but feed had zero items").
+    // Defense-in-depth: if scrapeDiscovery throws despite its silent-fail
+    // contract, catch inline so a single feed never aborts the batch.
+    const scrapeHtmlRun = (async () => {
+      const fetchResults = await Promise.allSettled(
+        scrapeHtmlFeeds.map(async (f) => {
+          try {
+            const items = await scrapeDiscovery(f.url, 15_000);
+            return { feed: f, items, error: null as string | null };
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            console.warn('[newsroom.ingest.scrape_html_failed]', {
+              feed_id: f.id,
+              url: f.url,
+              error: errMsg.slice(0, 500),
+            });
+            return { feed: f, items: [] as DiscoveredArticle[], error: errMsg.slice(0, 500) };
+          }
+        })
+      );
+
+      for (let i = 0; i < fetchResults.length; i++) {
+        const result = fetchResults[i];
+        const feed = scrapeHtmlFeeds[i];
+        // Promise.allSettled here is belt-and-braces — the inner try/catch
+        // already swallows throws into a fulfilled { error } shape — so a
+        // 'rejected' branch indicates an unexpected failure path.
+        if (result.status === 'fulfilled') {
+          const { items, error } = result.value;
+          if (error) {
+            scrapeHtmlFailed++;
+            feedOutcomes.set(feed.id, {
+              ok: false,
+              error,
+              currentErrorCount: feed.error_count ?? 0,
+            });
+            continue;
+          }
+          scrapeHtmlSucceeded++;
+          feedOutcomes.set(feed.id, { ok: true, currentErrorCount: feed.error_count ?? 0 });
+
+          const allowedSlugs = feed.allowed_category_slugs ?? [];
+          const outlet = feed.source_name || feed.name || null;
+          for (const item of items) {
+            if (!item.url) continue;
+            if (allowedSlugs.length > 0) {
+              const text = `${item.title ?? ''} ${item.excerpt ?? ''}`.toLowerCase();
+              if (!allowedSlugs.some((slug) => text.includes(slug.toLowerCase()))) continue;
+            }
+            allItems.push({
+              feed_id: feed.id,
+              raw_url: item.url,
+              raw_title: item.title?.trim() || null,
+              excerpt: (item.excerpt ?? '').slice(0, 500),
+              pubDate: item.pubDate ?? null,
+              outlet,
+              source_class: 'scrape_html',
+            });
+            itemsFromScrapeHtml++;
+          }
+        } else {
+          scrapeHtmlFailed++;
+          const errMsg = String((result as PromiseRejectedResult).reason).slice(0, 500);
+          console.warn('[newsroom.ingest.scrape_html_failed]', {
+            feed_id: feed.id,
+            url: feed.url,
+            error: errMsg,
+          });
+          feedOutcomes.set(feed.id, {
+            ok: false,
+            error: errMsg,
+            currentErrorCount: feed.error_count ?? 0,
+          });
+        }
+      }
+    })();
+
+    // 7c. Run the two consumer fanouts concurrently.
+    await Promise.all([rssRun, scrapeHtmlRun]);
+
+    // Restore the priority contract: RSS-found URLs win over scrape-found URLs
+    // when the same raw_url appears in both. Within each bucket, items were
+    // pushed in priority_weight-DESC order, which the stable sort preserves.
+    allItems.sort((a, b) => {
+      if (a.source_class === b.source_class) return 0;
+      return a.source_class === 'rss' ? -1 : 1;
+    });
+
+    // 7d. Phase A: handler not implemented; rows are polled-as-deferred to
+    // keep their last_polled_at fresh without inflating error_count.
+    let scrapeJsonDeferred = 0;
+    for (const feed of scrapeJsonFeeds) {
+      feedOutcomes.set(feed.id, {
+        ok: true,
+        currentErrorCount: feed.error_count ?? 0,
+        deferred: true,
+      });
+      scrapeJsonDeferred++;
     }
+
+    // Aggregate counters preserved for back-compat with existing consumers
+    // of the response/output_summary shape.
+    const feedsSucceeded = rssSucceeded + scrapeHtmlSucceeded + scrapeJsonDeferred;
+    const feedsFailed = rssFailed + scrapeHtmlFailed;
 
     // Deduplicate allItems by raw_url — keep first occurrence.
     // Feeds were sorted by priority_weight DESC above, so higher-weight feeds
@@ -588,7 +730,16 @@ export async function POST(req: Request) {
       async ([feedId, outcome]) => {
         try {
           const counters = feedCounters.get(feedId) ?? { errorCount: 0 };
-          if (outcome.ok) {
+          if (outcome.deferred) {
+            // scrape_json: polled-as-deferred — advance last_polled_at only.
+            // Do not touch error_count / last_error / last_error_at since
+            // the row was deliberately not handed to a consumer this phase.
+            const { error: wErr } = await service
+              .from('feeds')
+              .update({ last_polled_at: nowIso })
+              .eq('id', feedId);
+            if (wErr) throw wErr;
+          } else if (outcome.ok) {
             const { error: wErr } = await service
               .from('feeds')
               .update({
@@ -630,10 +781,33 @@ export async function POST(req: Request) {
     const itemsCreated = itemsInserted;
     const itemsProcessed = dedupedItems.length;
     const skippedDuplicates = itemsSkipped;
+    const feedsByType = {
+      rss: {
+        polled: rssFeeds.length,
+        succeeded: rssSucceeded,
+        failed: rssFailed,
+      },
+      scrape_html: {
+        polled: scrapeHtmlFeeds.length,
+        succeeded: scrapeHtmlSucceeded,
+        failed: scrapeHtmlFailed,
+      },
+      scrape_json: {
+        polled: scrapeJsonFeeds.length,
+        deferred: scrapeJsonDeferred,
+      },
+    };
+    const itemsBySource = {
+      rss: itemsFromRss,
+      scrape_html: itemsFromScrapeHtml,
+    };
+
     const output: Json = {
       feedsSucceeded,
       feedsFailed,
+      feedsByType,
       itemsInserted,
+      itemsBySource,
       itemsSkipped,
       itemsRaceDeduped, // M6 — surface concurrent-ingest dedup count
       clustering: clusterRun.summary,
@@ -673,6 +847,8 @@ export async function POST(req: Request) {
         durationMs,
         clustersCreated: clusterRun.summary.clustersCreated,
         matchedExisting: clusterRun.summary.matchedExisting,
+        feedsByType,
+        itemsBySource,
       },
     });
 
@@ -682,8 +858,10 @@ export async function POST(req: Request) {
       runId,
       feedsSucceeded,
       feedsFailed,
+      feedsByType,
       totalScanned: itemsProcessed,
       itemsInserted,
+      itemsBySource,
       skippedDuplicates,
       raceDeduped: itemsRaceDeduped, // M6 — visibility on concurrent-ingest collisions
       durationMs,
