@@ -57,6 +57,19 @@ export default function HomeSidebar({
         @media (max-width: ${HOME_SIDEBAR_BREAKPOINT_PX - 1}px) {
           .vp-home-sidebar { display: none !important; }
         }
+        .vp-home-sidebar {
+          scrollbar-width: thin;
+          scrollbar-color: var(--p-border, transparent) transparent;
+        }
+        .vp-home-sidebar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .vp-home-sidebar::-webkit-scrollbar-track { background: transparent; }
+        .vp-home-sidebar::-webkit-scrollbar-thumb {
+          background: transparent;
+          border-radius: 3px;
+          transition: background 200ms ease-out;
+        }
+        .vp-home-sidebar:hover::-webkit-scrollbar-thumb { background: var(--p-border, rgba(0,0,0,0.12)); }
+        .vp-home-sidebar::-webkit-scrollbar-thumb:hover { background: var(--p-border-strong, rgba(0,0,0,0.22)); }
       `}</style>
       <aside
         className="vp-home-sidebar"

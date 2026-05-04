@@ -294,8 +294,6 @@ export default async function HomePage() {
           the permission. The permission check is client-only (the perms
           cache lives in the browser), so the strip is rendered through a
           small client island that hydrates the perms before showing. */}
-      {breaking && showBreaking && <HomeBreakingStrip story={breaking} />}
-
       <div
         style={{
           display: 'flex',
@@ -313,9 +311,13 @@ export default async function HomePage() {
             minWidth: 0,
             maxWidth: 720,
             margin: '0 auto',
-            padding: '32px 20px 64px',
+            padding: '0 20px 64px',
           }}
         >
+        {breaking && showBreaking && <HomeBreakingStrip story={breaking} />}
+
+        <div style={{ height: 32 }} />
+
         {fetchFailed && <HomeFetchFailed />}
 
         {/* TODO: HomeBrokenPinBanner — see DECISION #028 — admin banner for broken pins */}
