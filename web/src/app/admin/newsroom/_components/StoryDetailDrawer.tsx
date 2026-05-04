@@ -314,9 +314,17 @@ export default function StoryDetailDrawer({
           {/* Meta block */}
           <section>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[2], alignItems: 'center', marginBottom: S[2] }}>
-              <Badge variant={generationVariant(story.generation_state)} size="xs">
-                {story.generation_state ?? 'unknown'}
-              </Badge>
+              {/* Lifecycle badge only renders for explicit end-states the
+                  operator set (rejected / archived) or a publish marker.
+                  Internal states (forming / clustered / ready / generating)
+                  are not surfaced — story exists ⇒ ready to generate. */}
+              {(story.generation_state === 'rejected' ||
+                story.generation_state === 'archived' ||
+                story.generation_state === 'published') && (
+                <Badge variant={generationVariant(story.generation_state)} size="xs">
+                  {story.generation_state}
+                </Badge>
+              )}
               {story.is_locked && (
                 <Badge variant="warn" size="xs">
                   Locked
@@ -384,9 +392,14 @@ export default function StoryDetailDrawer({
                     )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>
-                    <Badge variant={bandStateVariant(b.state)} size="xs">
-                      {b.state}
-                    </Badge>
+                    {/* The button or Edit link IS the state — no need
+                        for a redundant "pending" badge. Only show a
+                        badge for non-pending states. */}
+                    {b.state !== 'pending' && (
+                      <Badge variant={bandStateVariant(b.state)} size="xs">
+                        {b.state}
+                      </Badge>
+                    )}
                     {b.article_id ? (
                       <a
                         href={

@@ -469,9 +469,18 @@ function StoryRowItem({
               Locked
             </Badge>
           )}
-          <Badge variant={generationBadgeVariant(story.generation_state)} size="xs">
-            {story.generation_state ?? 'unknown'}
-          </Badge>
+          {/* Only render the lifecycle badge when it's an explicit end-state
+              the operator set (rejected / archived) or a publish marker.
+              Internal states (forming / clustered / ready / generating)
+              are not surfaced — the card existing IS the "ready to
+              generate" signal. */}
+          {(story.generation_state === 'rejected' ||
+            story.generation_state === 'archived' ||
+            story.generation_state === 'published') && (
+            <Badge variant={generationBadgeVariant(story.generation_state)} size="xs">
+              {story.generation_state}
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -483,11 +492,24 @@ function StoryRowItem({
           {story.observation_count} {story.observation_count === 1 ? 'observation' : 'observations'}
         </span>
         <div style={{ display: 'flex', gap: S[1], marginLeft: 'auto' }}>
-          {story.articles.map((a) => (
-            <Badge key={a.band} variant={bandBadgeVariant(a.state)} size="xs">
-              {bandLabel(a.band)}: {a.state}
-            </Badge>
-          ))}
+          {story.articles.map((a) => {
+            // pending = no article exists for this band yet → render
+            // a plain "Generate" affordance (clicking the row opens the
+            // drawer where the actual button lives). Only show a badge
+            // when there's a real article state to convey.
+            if (a.state === 'pending') {
+              return (
+                <Badge key={a.band} variant="neutral" size="xs">
+                  {bandLabel(a.band)}: Generate
+                </Badge>
+              );
+            }
+            return (
+              <Badge key={a.band} variant={bandBadgeVariant(a.state)} size="xs">
+                {bandLabel(a.band)}: {a.state}
+              </Badge>
+            );
+          })}
         </div>
       </div>
     </article>
