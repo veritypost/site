@@ -28,7 +28,7 @@ listed in § Decisions the owner needs to make.
 
 ### Current status
 - **Last shipped wave:** Wave 5 — Stream E Stories list rebuild
-  (commit `<pending>`, 2026-05-04). The Discovery tab at
+  (commit `f46f4e9`, 2026-05-04). The Discovery tab at
   `/admin/newsroom` no longer renders the legacy `feed_clusters`
   list; it now reads from `stories` via three new endpoints:
   `GET /api/admin/newsroom/research/stories` (paginated keyset
