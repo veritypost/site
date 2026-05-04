@@ -19,7 +19,7 @@
  * live on the API routes via requirePermission dual-check.
  */
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
@@ -32,15 +32,13 @@ import Field from '@/components/admin/Field';
 import Select from '@/components/admin/Select';
 import TextInput from '@/components/admin/TextInput';
 import Textarea from '@/components/admin/Textarea';
-import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 
-import StoryCard, { type StoryCardCluster } from './_components/StoryCard';
-import type { SourceItem } from './_components/SourcesBlock';
 import type { AudienceBand } from './_components/PipelineStepLabels';
 import ArticlesTable from './_components/ArticlesTable';
+import StoriesList from './_components/StoriesList';
 import RunsSubpage from './_subpages/Runs';
 import CostsSubpage from './_subpages/Costs';
 import CleanupSubpage from './_subpages/Cleanup';
@@ -48,39 +46,10 @@ import Research from './_subpages/Research';
 import { MODEL_OPTIONS } from '@/lib/newsroomModels';
 
 type TabId = 'discovery' | 'articles';
-type ViewId = 'active' | 'completed';
 type PanelId = 'runs' | 'costs' | 'cleanup';
-
-type ListResponse = {
-  clusters: Array<{
-    cluster: StoryCardCluster;
-    audience_state: Array<{
-      cluster_id: string;
-      audience_band: AudienceBand;
-      state: string;
-      article_id: string | null;
-      skipped_at: string | null;
-      generated_at: string | null;
-      updated_at: string | null;
-    }>;
-    sources: SourceItem[];
-    recent_run_per_band: Array<{
-      audience_band: AudienceBand;
-      id: string;
-      status: string | null;
-      started_at: string | null;
-      completed_at: string | null;
-      error_type: string | null;
-    } | null>;
-  }>;
-  cursor: string | null;
-};
 
 function parseTab(raw: string | null): TabId {
   return raw === 'articles' ? 'articles' : 'discovery';
-}
-function parseView(raw: string | null): ViewId {
-  return raw === 'completed' ? 'completed' : 'active';
 }
 function parsePanel(raw: string | null): PanelId | null {
   if (raw === 'runs' || raw === 'costs' || raw === 'cleanup') return raw;
@@ -99,7 +68,6 @@ function NewsroomV2Inner() {
   const router = useRouter();
   const sp = useSearchParams();
   const tab = parseTab(sp.get('tab'));
-  const view = parseView(sp.get('view'));
   const panel = parsePanel(sp.get('panel'));
 
   const [authorized, setAuthorized] = useState(false);
@@ -126,7 +94,7 @@ function NewsroomV2Inner() {
     return () => { cancelled = true; };
   }, [router]);
 
-  const writeUrl = useCallback((updates: Partial<Record<'tab' | 'view' | 'panel', string | null>>) => {
+  const writeUrl = useCallback((updates: Partial<Record<'tab' | 'panel', string | null>>) => {
     const params = new URLSearchParams(sp.toString());
     for (const [key, value] of Object.entries(updates)) {
       if (value == null) params.delete(key);
@@ -162,7 +130,7 @@ function NewsroomV2Inner() {
       />
 
       {tab === 'discovery' && !panel && (
-        <DiscoveryTab view={view} onView={(v) => writeUrl({ view: v })} onPanel={(p) => writeUrl({ panel: p })} />
+        <DiscoveryTab onPanel={(p) => writeUrl({ panel: p })} />
       )}
       {tab === 'discovery' && panel === 'runs' && <PanelShell title="Pipeline runs" onClose={() => writeUrl({ panel: null })}><RunsSubpage /></PanelShell>}
       {tab === 'discovery' && panel === 'costs' && <PanelShell title="Pipeline costs" onClose={() => writeUrl({ panel: null })}><CostsSubpage /></PanelShell>}
@@ -226,175 +194,17 @@ function PanelShell({ title, onClose, children }: { title: string; onClose: () =
   );
 }
 
-function DiscoveryTab({
-  view,
-  onView,
-  onPanel,
-}: {
-  view: ViewId;
-  onView: (v: ViewId) => void;
-  onPanel: (p: PanelId) => void;
-}) {
-  const sp = useSearchParams();
-  const router = useRouter();
-  const toast = useToast();
-
-  // URL filter params
-  const [dqInput, setDqInput] = useState(() => sp.get('dq') ?? '');
-  const dq = sp.get('dq') ?? '';
-  const cat = sp.get('cat') ?? '';
-  const so = sp.get('so') ?? '';
-
-  // Existing state
-  const [data, setData] = useState<ListResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+function DiscoveryTab({ onPanel }: { onPanel: (p: PanelId) => void }) {
   const [newOpen, setNewOpen] = useState(false);
 
-  // Merge state
-  const [mergeMode, setMergeMode] = useState(false);
-  const [mergeSelected, setMergeSelected] = useState<string[]>([]);
-
-  // Categories for filter select (parent_id powers the subcategory cascade)
-  const [categories, setCategories] = useState<
-    Array<{ id: string; name: string; slug: string; parent_id: string | null }>
-  >([]);
-
-  // Global model picker — drives every per-card generate in this Discovery tab
+  // Global model picker — passed to the StoryDetailDrawer so per-band
+  // Generate from a story uses the operator's chosen model.
   const [selectedModelIdx, setSelectedModelIdx] = useState(0);
-
-  // Debounce dqInput → URL (only fires when dqInput differs from current URL param)
-  useEffect(() => {
-    if (dqInput === dq) return;
-    const timer = setTimeout(() => {
-      const params = new URLSearchParams(sp.toString());
-      if (dqInput) params.set('dq', dqInput);
-      else params.delete('dq');
-      router.replace(`?${params.toString()}`, { scroll: false });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [dqInput, dq, sp, router]);
-
-  // Load categories once on mount
-  useEffect(() => {
-    const supabase = createClient();
-    supabase
-      .from('categories')
-      .select('id, name, slug, parent_id')
-      .eq('is_active', true)
-      .order('name')
-      .then(({ data: rows }) => { if (rows) setCategories(rows); });
-  }, []);
-
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ tab: view, limit: '50' });
-      if (dq) params.set('q', dq);
-      if (cat) params.set('category', cat);
-      if (so) params.set('sort', so);
-      const res = await fetch(`/api/admin/newsroom/clusters/list?${params.toString()}`);
-      const json = (await res.json().catch(() => ({}))) as ListResponse & { error?: string };
-      if (!res.ok) {
-        setError(json.error ?? `Load failed (${res.status})`);
-        setData({ clusters: [], cursor: null });
-        return;
-      }
-      setData({ clusters: json.clusters ?? [], cursor: json.cursor ?? null });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Network error');
-    } finally {
-      setLoading(false);
-    }
-  }, [view, dq, cat, so]);
-
-  useEffect(() => { void reload(); }, [reload]);
-
-  function handleMergeToggle(clusterId: string) {
-    setMergeSelected((prev) => {
-      if (prev.includes(clusterId)) return prev.filter((id) => id !== clusterId);
-      if (prev.length >= 2) return prev;
-      return [...prev, clusterId];
-    });
-  }
-
-  async function handleMerge() {
-    if (mergeSelected.length !== 2) return;
-    if (mergeSelected[0] === mergeSelected[1]) {
-      toast.push({ message: 'Select two different stories.', variant: 'warn' });
-      return;
-    }
-    try {
-      const res = await fetch(`/api/admin/newsroom/clusters/${mergeSelected[0]}/merge`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ target_id: mergeSelected[1] }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.push({ message: body.error ?? 'Merge failed', variant: 'danger' });
-        return;
-      }
-      toast.push({ message: 'Stories merged.', variant: 'success' });
-      setMergeMode(false);
-      setMergeSelected([]);
-      await reload();
-    } catch (err) {
-      toast.push({ message: err instanceof Error ? err.message : 'Network error', variant: 'danger' });
-    }
-  }
-
-  // The `cat` URL param holds whichever category id (parent or leaf) the
-  // operator most recently picked at the most-specific level. The API
-  // expands a parent id to itself + descendants, so a parent pick returns
-  // every cluster under that branch; a leaf pick narrows to that subcat.
-  const catById = useMemo(() => {
-    const m = new Map<string, { id: string; name: string; parent_id: string | null }>();
-    for (const c of categories) m.set(c.id, c);
-    return m;
-  }, [categories]);
-  const parentCats = useMemo(
-    () => categories.filter((c) => c.parent_id === null),
-    [categories]
-  );
-  const picked = cat ? catById.get(cat) ?? null : null;
-  const parentVal = picked ? (picked.parent_id ?? picked.id) : '';
-  const subVal = picked && picked.parent_id ? picked.id : '';
-  const subOptions = useMemo(
-    () => (parentVal ? categories.filter((c) => c.parent_id === parentVal) : []),
-    [categories, parentVal]
-  );
-
-  function setCatParam(value: string | null) {
-    const params = new URLSearchParams(sp.toString());
-    if (value) params.set('cat', value);
-    else params.delete('cat');
-    router.replace(`?${params.toString()}`, { scroll: false });
-  }
-  function handleParentCatChange(value: string) {
-    setCatParam(value || null);
-  }
-  function handleSubCatChange(value: string) {
-    setCatParam(value || parentVal || null);
-  }
-
-  function handleSoChange(value: string) {
-    const params = new URLSearchParams(sp.toString());
-    if (value) params.set('so', value);
-    else params.delete('so');
-    router.replace(`?${params.toString()}`, { scroll: false });
-  }
-
-  const clusters = data?.clusters ?? [];
 
   return (
     <div>
-      {/* Wave 4 — Stream D Run Feed UI: Research panel replaces the
-          legacy Run Feed button + health pill. The panel handles all
-          run triggers (general / topic, lookback, source scope) plus
-          inline progress + result screen. */}
-      <Research onJobComplete={() => { void reload(); }} />
+      {/* Wave 4 — Run Feed Research panel. */}
+      <Research onJobComplete={() => {}} />
 
       {/* Toolbar */}
       <div
@@ -417,14 +227,17 @@ function DiscoveryTab({
           <Button onClick={() => setNewOpen(true)} variant="secondary" size="sm">
             + New article
           </Button>
-          <ViewToggle view={view} onView={onView} />
-          <Button
-            onClick={() => { setMergeMode((v) => !v); setMergeSelected([]); }}
-            variant={mergeMode ? 'primary' : 'secondary'}
-            size="sm"
+          <Select
+            aria-label="Generation model"
+            value={String(selectedModelIdx)}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedModelIdx(Number(e.target.value))}
+            block={false}
+            style={{ minWidth: 180, minHeight: 40 }}
           >
-            {mergeMode ? 'Cancel merge' : 'Merge stories'}
-          </Button>
+            {MODEL_OPTIONS.map((opt, i) => (
+              <option key={opt.model} value={i}>{opt.label}</option>
+            ))}
+          </Select>
         </div>
         <div style={{ display: 'flex', gap: S[2] }}>
           <Button onClick={() => onPanel('runs')} variant="ghost" size="sm">Runs</Button>
@@ -433,166 +246,10 @@ function DiscoveryTab({
         </div>
       </div>
 
-      {/* Filter row */}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: S[2],
-          marginBottom: S[3],
-          alignItems: 'center',
-        }}
-      >
-        <TextInput
-          value={dqInput}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDqInput(e.target.value)}
-          placeholder="Search across all feeds (e.g. tigers)"
-          style={{ flex: '1 1 200px', minWidth: 160, minHeight: 44, padding: '0 10px' } as React.CSSProperties}
-        />
-        <Select
-          value={parentVal}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleParentCatChange(e.target.value)}
-          block={false}
-          style={{ minWidth: 140, minHeight: 44 }}
-        >
-          <option value="">All categories</option>
-          {parentCats.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </Select>
-        {parentVal && subOptions.length > 0 && (
-          <Select
-            value={subVal}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleSubCatChange(e.target.value)}
-            block={false}
-            style={{ minWidth: 160, minHeight: 44 }}
-            aria-label="Subcategory"
-          >
-            <option value="">All subcategories</option>
-            {subOptions.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </Select>
-        )}
-        <Select
-          value={so}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleSoChange(e.target.value)}
-          block={false}
-          style={{ minWidth: 140, minHeight: 44 }}
-        >
-          <option value="">Newest</option>
-          <option value="oldest">Oldest</option>
-          <option value="most_sources">Most sources</option>
-          <option value="breaking_first">Breaking first</option>
-        </Select>
-        <Select
-          aria-label="Generation model"
-          value={String(selectedModelIdx)}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedModelIdx(Number(e.target.value))}
-          block={false}
-          style={{ minWidth: 180, minHeight: 44 }}
-        >
-          {MODEL_OPTIONS.map((opt, i) => (
-            <option key={opt.model} value={i}>{opt.label}</option>
-          ))}
-        </Select>
-      </div>
-
-      {/* Merge confirmation bar */}
-      {mergeMode && mergeSelected.length === 2 && (
-        <div
-          style={{
-            display: 'flex',
-            gap: S[2],
-            alignItems: 'center',
-            padding: `${S[2]}px ${S[3]}px`,
-            marginBottom: S[3],
-            background: C.card,
-            border: `1px solid ${C.border}`,
-            borderRadius: 8,
-            fontSize: F.sm,
-            color: C.ink,
-          }}
-        >
-          <span style={{ flex: 1 }}>Merge story 1 into story 2?</span>
-          <Button onClick={handleMerge} variant="primary" size="sm">Merge</Button>
-          <Button onClick={() => setMergeSelected([])} variant="ghost" size="sm">Clear</Button>
-        </div>
-      )}
-
-      {error && <div style={{ padding: S[3], color: C.danger, fontSize: F.sm }}>{error}</div>}
-
-      {loading ? (
-        <div style={{ padding: S[8], display: 'flex', justifyContent: 'center' }}>
-          <Spinner />
-        </div>
-      ) : clusters.length === 0 ? (
-        <EmptyState
-          title={view === 'completed' ? 'No completed Stories' : 'No Stories yet'}
-          description={
-            view === 'completed'
-              ? 'Stories appear here once every audience is generated or skipped.'
-              : 'Click Run Feed to ingest the latest RSS.'
-          }
-        />
-      ) : (
-        <div>
-          {clusters.map((row) => (
-            <StoryCard
-              key={row.cluster.id}
-              cluster={row.cluster}
-              audienceState={row.audience_state}
-              sources={row.sources}
-              recentRunPerBand={row.recent_run_per_band}
-              mergeMode={mergeMode}
-              mergeSelected={mergeSelected.includes(row.cluster.id)}
-              onMergeToggle={handleMergeToggle}
-              selectedModelIdx={selectedModelIdx}
-            />
-          ))}
-        </div>
-      )}
+      {/* Wave 5 — Stream E Stories list rebuild */}
+      <StoriesList selectedModelIdx={selectedModelIdx} />
 
       {newOpen && <NewArticleModal onClose={() => setNewOpen(false)} />}
-    </div>
-  );
-}
-
-function ViewToggle({ view, onView }: { view: ViewId; onView: (v: ViewId) => void }) {
-  return (
-    <div
-      style={{
-        display: 'inline-flex',
-        alignItems: 'stretch',
-        gap: 0,
-        border: `1px solid ${C.divider}`,
-        borderRadius: 6,
-        minHeight: 44,
-        overflow: 'hidden',
-      }}
-    >
-      {(['active', 'completed'] as const).map((v) => (
-        <button
-          key={v}
-          type="button"
-          onClick={() => onView(v)}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: 44,
-            padding: `0 ${S[3]}px`,
-            background: view === v ? C.accent : 'transparent',
-            color: view === v ? C.bg : C.ink,
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: F.sm,
-            fontFamily: 'inherit',
-          }}
-        >
-          {v === 'active' ? 'Active' : 'Completed'}
-        </button>
-      ))}
     </div>
   );
 }

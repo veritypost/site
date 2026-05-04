@@ -27,57 +27,53 @@ Implementing the design. Design is LOCKED through four trim sweeps
 listed in § Decisions the owner needs to make.
 
 ### Current status
-- **Last shipped wave:** Wave 4 — Stream D Run Feed UI (commit
-  `a18da71`, 2026-05-04). New
-  `web/src/app/admin/newsroom/_subpages/Research.tsx` (Research
-  panel — three-state machine: idle → running → done), mounted at
-  the top of the Discovery tab in
-  `web/src/app/admin/newsroom/page.tsx` (replaces the legacy Run
-  Feed button + health pill). URL state: `?lb=` (7 lookback
-  options), `?fid=` (comma-sep feed ids — multi-select picker with
-  in-place filter / select-filtered / clear), `?mode=`,
-  `?q=` (free text), `?qid=` (saved query id), `?job=` (active
-  job id; presence drives the running/done screens). Saved-queries
-  dropdown with inline edit (pencil) + hard-delete (trash); a
-  "Save as query" affordance promotes a new free-text topic to a
-  persistent row. Running state: 2 s polling on
-  `research_jobs.phase` with phase labels (Planning… / Fetching
-  feeds… / Forming stories… / Finalizing…) plus a Cancel button
-  that flips `status='cancelled'`. Done state: counters
-  (items_fetched / items_kept / stories_formed / stories_extended),
-  flat sortable table of the job's `discovery_items` (outlet /
-  title / fetched date / source class badge / match score), per-row
-  Promote (idempotent — re-attaches to existing story or forms a
-  new one via `getStoryMatchOverlapPct` / `extractKeywords`) +
-  Discard (hard delete with confirm, with story_observations.
-  discovery_item_id explicitly nulled first), View stories CTA.
-  Backing API endpoints (all gated by
-  `admin.pipeline.run_ingest`):
-  `/api/admin/newsroom/research/queries` GET+POST,
-  `/api/admin/newsroom/research/queries/[id]` PATCH+DELETE,
-  `/api/admin/newsroom/research/feeds` GET (lightweight feed list),
-  `/api/admin/newsroom/research/jobs/[id]` GET (status / phase /
-  counters), `/api/admin/newsroom/research/jobs/[id]/cancel` POST,
-  `/api/admin/newsroom/research/jobs/[id]/items` GET (item table
-  with feed/observation/story joins + sort),
-  `/api/admin/newsroom/research/items/[id]/promote` POST,
-  `/api/admin/newsroom/research/items/[id]` DELETE. No audience
-  toggle, no feed-group picker, no match-mode picker, no
-  recent-jobs tab, no keyboard shortcuts. `tsc --noEmit` clean;
-  `next lint` clean for the touched dirs (one pre-existing
-  ArticlesTable warning untouched).
-- **Next wave to ship:** **Wave 5 — Stream E Stories list rebuild.**
-  Replaces the current Discovery cluster list at `/admin/newsroom`
-  with a paginated stories list. Filters: research_query, date
-  range (first-seen), generation_state. Source count + observation
-  count rendered via `COUNT(*)` over `story_observations` (no
-  denormalized counters). Story detail drawer with read-only
-  observation timeline. Generate / Reject / Archive controls per
-  story; manual attach via a Promote button on any result screen
-  (already shipped in Wave 4 — wire the post-promote inline state
-  to the new story drawer). The result-screen "View stories" CTA
-  in Research.tsx already navigates with `?job=…` retained — Wave
-  5 should honor that param to scope the list to the job.
+- **Last shipped wave:** Wave 5 — Stream E Stories list rebuild
+  (commit `<pending>`, 2026-05-04). The Discovery tab at
+  `/admin/newsroom` no longer renders the legacy `feed_clusters`
+  list; it now reads from `stories` via three new endpoints:
+  `GET /api/admin/newsroom/research/stories` (paginated keyset
+  list with filters `research_query_id`, `generation_state`,
+  `date_from` / `date_to`, `job` for run-scoping, free-text `q`),
+  `GET /api/admin/newsroom/research/stories/[id]` (story detail
+  with chronological observation timeline + per-band article
+  rollup + `default_cluster_id` resolved from the latest active
+  observation), and `POST /api/admin/newsroom/research/stories/
+  [id]/state` (idempotent flip to `rejected` | `archived` |
+  `forming`; blocks flip when the story has published articles).
+  Two new client components:
+  `web/src/app/admin/newsroom/_components/StoriesList.tsx`
+  (filter row: title/slug search + saved-query picker +
+  generation-state picker + first-seen date range; story rows
+  show source count, observation count, generation_state badge,
+  per-band status badges; Load more keyset pagination; honors
+  `?job=` with a "Showing stories from this run" banner +
+  Clear) and `web/src/app/admin/newsroom/_components/
+  StoryDetailDrawer.tsx` (right-side `Drawer` showing keywords
+  chips, dates, per-band article rollup with Generate buttons
+  that call `/api/admin/pipeline/generate` against
+  `default_cluster_id` + audience/age_band, observation timeline
+  with outlet/match score/source class/excerpt; footer Reject
+  + Archive + Restore buttons calling the state route).
+  `page.tsx` rewired: removed StoryCard / cluster fetch / merge
+  mode / category cascade / sort selector / Active+Completed view
+  toggle; the global model picker at the top of the Discovery tab
+  still drives Generate (passed through StoriesList →
+  StoryDetailDrawer). Research.tsx `viewStories()` now strips
+  legacy cluster filter params (`view`, `cat`, `so`, `dq`) on
+  navigate while preserving `?job=` so the rebuilt list scopes
+  to the run. `tsc --noEmit` clean; `next lint` clean for the
+  touched dirs (the one pre-existing ArticlesTable warning is
+  untouched).
+- **Next wave to ship:** **Wave 6 — Stream F provenance UI.**
+  New `/admin/sources` standalone page (NOT a tab on
+  `/admin/feeds` per § Stream F) showing every URL ever cited.
+  Default sort `created_at DESC`. Three header filters: outlet
+  text search, first-cited date range. CSV export of the current
+  filter (load-bearing for "show every X article we've cited"
+  asks). Reads from `article_sources` (already populated by Wave
+  0). No source-class filter, no feed-status filter, no view
+  toggle, no free-text URL search — those were dropped in the
+  fourth trim sweep.
 - **Branch:** main (direct commit per repo workflow — recent history
   is single-branch).
 - **Open blockers:** none.

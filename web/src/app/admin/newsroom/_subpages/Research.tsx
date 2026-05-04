@@ -1038,13 +1038,14 @@ function ResultBody({
   const sp = useSearchParams();
 
   function viewStories() {
-    // Wave 5 will rebuild the stories list and honor ?job= to scope.
-    // For now jump back to the Discovery cluster list (the nearest live
-    // surface) — the ?job= param remains so a future Wave 5 build can
-    // pick it up.
+    // Wave 5 — StoriesList honors ?job= to scope the stories list to
+    // this run. Drop legacy cluster-list filter params on the way out.
     const params = new URLSearchParams(sp.toString());
     params.delete('panel');
-    params.set('view', 'active');
+    params.delete('view');
+    params.delete('cat');
+    params.delete('so');
+    params.delete('dq');
     router.replace(`?${params.toString()}`, { scroll: false });
   }
 
