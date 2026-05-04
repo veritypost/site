@@ -397,7 +397,13 @@ function isValidMDY(s: string) {
 function mdyToMs(s: string): number | null {
   if (!isValidMDY(s)) return null;
   const [m, d, y] = s.split('-').map(Number);
-  return new Date(y, m - 1, d).getTime();
+  return Date.UTC(y, m - 1, d);
+}
+
+function mdyToMsEndOfDay(s: string): number | null {
+  if (!isValidMDY(s)) return null;
+  const [m, d, y] = s.split('-').map(Number);
+  return Date.UTC(y, m - 1, d, 23, 59, 59, 999);
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────
@@ -471,7 +477,7 @@ function BrowsePageInner() {
     let list = stories;
     if (activeCat) list = list.filter(s => s.category === activeCat);
     const fromMs = mdyToMs(dateFrom);
-    const toMs   = mdyToMs(dateTo);
+    const toMs   = mdyToMsEndOfDay(dateTo);
     if (fromMs) list = list.filter(s => latestMs(s) >= fromMs);
     if (toMs)   list = list.filter(s => earliestMs(s) <= toMs);
     if (query.trim().length >= 2) {
