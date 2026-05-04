@@ -39,6 +39,8 @@ type SourceItem = {
   article_status: string | null;
   article_age_band: string | null;
   article_deleted: boolean;
+  feed_name: string | null;
+  feed_deleted: boolean;
 };
 
 type ListResponse = {
@@ -307,7 +309,7 @@ export default function SourcesAdminPage() {
               >
                 <thead>
                   <tr>
-                    {(['First cited', 'Outlet', 'URL', 'Article', 'Class'] as const).map((h) => (
+                    {(['First cited', 'Outlet', 'URL', 'Article', 'Feed', 'Class'] as const).map((h) => (
                       <th
                         key={h}
                         scope="col"
@@ -422,6 +424,16 @@ function SourceRow({ row }: { row: SourceItem }) {
             ) : null}
             {row.article_deleted && <Badge variant="danger" size="xs">Deleted</Badge>}
           </div>
+        </div>
+      </td>
+      <td style={cellStyle()}>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'nowrap' }}>
+          <span style={{ fontSize: F.sm, color: C.dim, whiteSpace: 'nowrap' }}>
+            {row.feed_name ?? '—'}
+          </span>
+          {row.feed_deleted && row.feed_name !== null && (
+            <Badge variant="danger" size="xs">Removed</Badge>
+          )}
         </div>
       </td>
       <td style={cellStyle()}>

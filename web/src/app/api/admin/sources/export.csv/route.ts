@@ -46,6 +46,12 @@ type ArticleStub = {
   status: string | null;
 };
 
+type FeedStub = {
+  id: string;
+  source_name: string | null;
+  name: string;
+};
+
 function escapeIlike(raw: string): string {
   return raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
@@ -120,6 +126,26 @@ export async function GET(req: Request) {
     }
   }
 
+  const feedIds = Array.from(new Set(rows.map((r) => r.feed_id).filter((id): id is string => id !== null)));
+  const feedById = new Map<string, FeedStub>();
+  if (feedIds.length > 0) {
+    const CHUNK = 500;
+    for (let i = 0; i < feedIds.length; i += CHUNK) {
+      const slice = feedIds.slice(i, i + CHUNK);
+      const { data: feedsRaw, error: feedsErr } = await service
+        .from('feeds')
+        .select('id, source_name, name')
+        .in('id', slice);
+      if (feedsErr) {
+        console.error('[admin.sources.export.feeds]', feedsErr.message);
+        return NextResponse.json({ error: 'Export failed' }, { status: 500 });
+      }
+      for (const f of (feedsRaw ?? []) as FeedStub[]) {
+        feedById.set(f.id, f);
+      }
+    }
+  }
+
   const header = [
     'created_at',
     'outlet',
@@ -130,12 +156,14 @@ export async function GET(req: Request) {
     'article_id',
     'article_title',
     'article_status',
+    'feed_name',
     'feed_id',
   ];
 
   const lines: string[] = [header.join(',')];
   for (const r of rows) {
     const a = articleById.get(r.article_id);
+    const f = r.feed_id ? feedById.get(r.feed_id) : undefined;
     lines.push(
       [
         r.created_at,
@@ -147,6 +175,7 @@ export async function GET(req: Request) {
         r.article_id,
         a?.title ?? null,
         a?.status ?? null,
+        f ? (f.source_name ?? f.name) : null,
         r.feed_id,
       ]
         .map(csvCell)

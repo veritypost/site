@@ -35,7 +35,10 @@ listed in § Decisions the owner needs to make.
   `outlet` ilike on `outlet_snapshot`, `date_from` / `date_to`
   on `created_at`; default order is `created_at DESC, id DESC`;
   joins `articles` for title + status + age_band + deleted flag
-  so the row links into the right editor surface) and
+  so the row links into the right editor surface, and `feeds`
+  for `source_name`/`name` + `deleted_at` so each row shows
+  which feed the URL came from with a "Removed" badge when the
+  feed has been soft-deleted) and
   `GET /api/admin/sources/export.csv` (same filters, no
   pagination, capped at 50,000 rows, sorted oldest-first for
   audit pasteability, returns a `text/csv` Response with a
@@ -47,7 +50,8 @@ listed in § Decisions the owner needs to make.
   download. Source rows render outlet, URL (opens new tab),
   title snapshot, citing article (linked to story-manager or
   kids-story-manager based on `articles.age_band`) with
-  Published/Archived/Deleted badges, and source class label.
+  Published/Archived/Deleted badges, feed name (with a Removed
+  badge when soft-deleted), and source class label.
   Load more keyset pagination. Empty state explains the
   no-delete contract. Sources card added to the Content
   Pipeline group on the admin hub at `/admin`. Per § Stream F
@@ -909,12 +913,13 @@ list, sources page is the historical receipts log) shows:
 rows fast):**
 - Default sort: `created_at DESC`.
 - Header filters: outlet name (text search), date range (first
-  cited), source class (RSS / scrape_html / scrape_json /
-  search_api), feed (still-active / soft-deleted / any).
-- View toggle: flat list (one row per `article_sources` row) vs
-  group-by-outlet (one row per outlet, expandable to show URLs).
-- Free-text URL search across `url_snapshot`.
+  cited).
 - CSV export of the current filter (audit value).
+- (Source-class filter, feed-status filter, view toggle, free-text
+  URL search dropped 2026-05-04 in the fourth trim sweep — start
+  with two controls and revisit when the table actually has
+  thousands of rows and operators are hunting in it. See § Stream
+  F below for the canonical filter set.)
 
 This is the public-facing ethics receipt — "every link we've ever used
 to write an article is on file."

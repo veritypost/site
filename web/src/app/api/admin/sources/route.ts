@@ -59,6 +59,13 @@ type ArticleStub = {
   deleted_at: string | null;
 };
 
+type FeedStub = {
+  id: string;
+  source_name: string | null;
+  name: string;
+  deleted_at: string | null;
+};
+
 function parseLimit(raw: string | null): number {
   if (!raw) return DEFAULT_LIMIT;
   const n = Number.parseInt(raw, 10);
@@ -151,8 +158,25 @@ export async function GET(req: Request) {
     articleById.set(a.id, a);
   }
 
+  const feedIds = Array.from(new Set(page.map((r) => r.feed_id).filter((id): id is string => id !== null)));
+  const feedById = new Map<string, FeedStub>();
+  if (feedIds.length > 0) {
+    const { data: feedsRaw, error: feedsErr } = await service
+      .from('feeds')
+      .select('id, source_name, name, deleted_at')
+      .in('id', feedIds);
+    if (feedsErr) {
+      console.error('[admin.sources.list.feeds]', feedsErr.message);
+      return NextResponse.json({ error: 'Could not load feed names' }, { status: 500 });
+    }
+    for (const f of (feedsRaw ?? []) as FeedStub[]) {
+      feedById.set(f.id, f);
+    }
+  }
+
   const sources = page.map((r) => {
     const a = articleById.get(r.article_id);
+    const f = r.feed_id ? feedById.get(r.feed_id) : undefined;
     return {
       id: r.id,
       article_id: r.article_id,
@@ -167,6 +191,8 @@ export async function GET(req: Request) {
       article_status: a?.status ?? null,
       article_age_band: a?.age_band ?? null,
       article_deleted: a ? a.deleted_at !== null : false,
+      feed_name: f ? (f.source_name ?? f.name) : null,
+      feed_deleted: f ? f.deleted_at !== null : false,
     };
   });
 
