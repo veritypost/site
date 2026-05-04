@@ -64,6 +64,7 @@ import {
   GrabPlanParseError,
   type GrabPlan,
 } from '@/lib/pipeline/grab-plan';
+import { searchWikipedia } from '@/lib/pipeline/wikipedia-search';
 import { keywordOverlap } from '@/lib/pipeline/cluster';
 
 export const runtime = 'nodejs';
@@ -123,7 +124,7 @@ interface FlatItem {
   excerpt: string;
   pubDate: string | null;
   outlet: string | null;
-  source_class: 'rss' | 'scrape_html' | 'scrape_json';
+  source_class: 'rss' | 'scrape_html' | 'scrape_json' | 'search_api';
 }
 
 // ----------------------------------------------------------------------------
@@ -579,12 +580,19 @@ export async function POST(req: Request) {
     // that explicit set. Empty / null → all active (today's behavior).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const serviceAny = service as any;
+    // Wave 3 — `search_api` feeds (Wikipedia today, paid news search later)
+    // are included in this query but DO NOT participate in the normal feed
+    // fanout. They only fire when the grab plan emits non-empty
+    // `wikipedia_topics` (Topic mode); General-mode runs leave them dormant.
+    // Equivalent to "polling cron WHERE feed_type != 'search_api'" — the
+    // fanout below partitions search_api into its own bucket and only the
+    // wikipediaRun consumer ever calls fetch() on those rows.
     let feedsQuery = serviceAny
       .from('feeds')
       .select('id,url,source_name,feed_type,name,priority_weight,allowed_category_slugs,error_count,extraction_config,metadata')
       .eq('is_active', true)
       .is('deleted_at', null)
-      .in('feed_type', ['feed', 'rss', 'scrape_html', 'scrape_json']);
+      .in('feed_type', ['feed', 'rss', 'scrape_html', 'scrape_json', 'search_api']);
     if (body.feedIds && body.feedIds.length > 0) {
       feedsQuery = feedsQuery.in('id', body.feedIds);
     }
@@ -605,10 +613,12 @@ export async function POST(req: Request) {
     const rssFeeds: FeedRow[] = [];
     const scrapeHtmlFeeds: FeedRow[] = [];
     const scrapeJsonFeeds: FeedRow[] = [];
+    const searchApiFeeds: FeedRow[] = [];
     for (const f of feeds) {
       if (f.feed_type === 'feed' || f.feed_type === 'rss') rssFeeds.push(f);
       else if (f.feed_type === 'scrape_html') scrapeHtmlFeeds.push(f);
       else if (f.feed_type === 'scrape_json') scrapeJsonFeeds.push(f);
+      else if (f.feed_type === 'search_api') searchApiFeeds.push(f);
     }
 
     // Per-feed outcome map — populated during fanout, consumed after insert.
@@ -638,9 +648,13 @@ export async function POST(req: Request) {
     let scrapeJsonSucceeded = 0;
     let scrapeJsonFailed = 0;
     let scrapeJsonUnconfigured = 0;
+    let searchApiSucceeded = 0;
+    let searchApiFailed = 0;
+    let searchApiSkipped = 0;
     let itemsFromRss = 0;
     let itemsFromScrapeHtml = 0;
     let itemsFromScrapeJson = 0;
+    let itemsFromSearchApi = 0;
 
     // 7a. RSS fanout — full Promise.allSettled, 6s timeout per feed via
     // fetchWithTimeout. Promise.allSettled preserves input order so
@@ -847,8 +861,74 @@ export async function POST(req: Request) {
       }
     })();
 
-    // 7d. Run all three consumer fanouts concurrently.
-    await Promise.all([rssRun, scrapeHtmlRun, scrapeJsonRun]);
+    // 7d. Wikipedia fanout (Wave 3) — only fires when grab plan emits a
+    // non-empty `wikipedia_topics` list AND a `feed_type='search_api'`
+    // row is configured for provider='wikipedia'. Silent-fail per topic;
+    // the whole consumer is silent-fail if no row is configured.
+    const wikipediaRun = (async () => {
+      if (!grabPlan || grabPlan.wikipedia_topics.length === 0) return;
+      const wikiFeed = searchApiFeeds.find((f) => {
+        const cfg = f.extraction_config;
+        if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) return false;
+        return (cfg as { provider?: unknown }).provider === 'wikipedia';
+      });
+      if (!wikiFeed) return;
+
+      const cfg = wikiFeed.extraction_config as { endpoint?: unknown };
+      const endpoint = typeof cfg.endpoint === 'string' ? cfg.endpoint : '';
+      if (!endpoint) {
+        feedOutcomes.set(wikiFeed.id, {
+          ok: false,
+          error: 'wikipedia extraction_config missing endpoint',
+          currentErrorCount: wikiFeed.error_count ?? 0,
+        });
+        searchApiFailed++;
+        return;
+      }
+
+      try {
+        const { items, failed } = await searchWikipedia({
+          endpoint,
+          topics: grabPlan.wikipedia_topics,
+        });
+        feedOutcomes.set(wikiFeed.id, {
+          ok: true,
+          currentErrorCount: wikiFeed.error_count ?? 0,
+        });
+        searchApiSucceeded++;
+        if (failed > 0) searchApiSkipped += failed;
+
+        const outlet = wikiFeed.source_name || wikiFeed.name || 'Wikipedia';
+        for (const it of items) {
+          if (!it.url) continue;
+          allItems.push({
+            feed_id: wikiFeed.id,
+            raw_url: it.url,
+            raw_title: it.title.trim() || null,
+            excerpt: it.excerpt.slice(0, 500),
+            pubDate: null,
+            outlet,
+            source_class: 'search_api',
+          });
+          itemsFromSearchApi++;
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.warn('[newsroom.ingest.wikipedia_failed]', {
+          feed_id: wikiFeed.id,
+          error: errMsg.slice(0, 500),
+        });
+        feedOutcomes.set(wikiFeed.id, {
+          ok: false,
+          error: errMsg.slice(0, 500),
+          currentErrorCount: wikiFeed.error_count ?? 0,
+        });
+        searchApiFailed++;
+      }
+    })();
+
+    // 7e. Run all four consumer fanouts concurrently.
+    await Promise.all([rssRun, scrapeHtmlRun, scrapeJsonRun, wikipediaRun]);
 
     // Restore the priority contract: RSS-found URLs win over scrape_html-found
     // URLs win over scrape_json-found URLs when the same raw_url appears in
@@ -858,6 +938,9 @@ export async function POST(req: Request) {
       rss: 0,
       scrape_html: 1,
       scrape_json: 2,
+      // Wave 3 — Wikipedia is encyclopedic; if a topic also surfaces on a
+      // news feed, the news version's outlet attribution should win.
+      search_api: 3,
     };
     allItems.sort(
       (a, b) => SOURCE_CLASS_PRIORITY[a.source_class] - SOURCE_CLASS_PRIORITY[b.source_class]
@@ -868,8 +951,12 @@ export async function POST(req: Request) {
     // feedsSucceeded because they are intentionally polled-with-no-fetch
     // (last_polled_at advances, error_count untouched).
     const feedsSucceeded =
-      rssSucceeded + scrapeHtmlSucceeded + scrapeJsonSucceeded + scrapeJsonUnconfigured;
-    const feedsFailed = rssFailed + scrapeHtmlFailed + scrapeJsonFailed;
+      rssSucceeded +
+      scrapeHtmlSucceeded +
+      scrapeJsonSucceeded +
+      scrapeJsonUnconfigured +
+      searchApiSucceeded;
+    const feedsFailed = rssFailed + scrapeHtmlFailed + scrapeJsonFailed + searchApiFailed;
 
     // Deduplicate allItems by raw_url — keep first occurrence.
     // Feeds were sorted by priority_weight DESC above, so higher-weight feeds
@@ -1095,6 +1182,7 @@ export async function POST(req: Request) {
         if (fc === 'feed' || fc === 'rss') feedSourceClass.set(f.id, 'rss');
         else if (fc === 'scrape_html') feedSourceClass.set(f.id, 'scrape_html');
         else if (fc === 'scrape_json') feedSourceClass.set(f.id, 'scrape_json');
+        else if (fc === 'search_api') feedSourceClass.set(f.id, 'search_api');
       }
 
       const inputs: ClusterInputArticle[] = rows.map((r) => {
@@ -1304,7 +1392,7 @@ export async function POST(req: Request) {
       errorCount: number;
       metadata: Record<string, unknown>;
       name: string | null;
-      sourceClass: 'rss' | 'scrape_html' | 'scrape_json' | 'feed';
+      sourceClass: 'rss' | 'scrape_html' | 'scrape_json' | 'search_api' | 'feed';
     }
     const feedCounters = new Map<string, FeedCounter>();
     for (const f of feeds) {
@@ -1448,11 +1536,18 @@ export async function POST(req: Request) {
         failed: scrapeJsonFailed,
         unconfigured: scrapeJsonUnconfigured,
       },
+      search_api: {
+        polled: searchApiFeeds.length,
+        succeeded: searchApiSucceeded,
+        failed: searchApiFailed,
+        skippedTopics: searchApiSkipped,
+      },
     };
     const itemsBySource = {
       rss: itemsFromRss,
       scrape_html: itemsFromScrapeHtml,
       scrape_json: itemsFromScrapeJson,
+      search_api: itemsFromSearchApi,
     };
 
     const output: Json = {
