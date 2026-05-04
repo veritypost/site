@@ -1513,6 +1513,57 @@ export type Database = {
           },
         ]
       }
+      article_sources: {
+        Row: {
+          article_id: string
+          created_at: string
+          feed_id: string | null
+          fetched_at: string
+          id: string
+          outlet_snapshot: string
+          source_class: string | null
+          title_snapshot: string | null
+          url_snapshot: string
+        }
+        Insert: {
+          article_id: string
+          created_at?: string
+          feed_id?: string | null
+          fetched_at: string
+          id?: string
+          outlet_snapshot: string
+          source_class?: string | null
+          title_snapshot?: string | null
+          url_snapshot: string
+        }
+        Update: {
+          article_id?: string
+          created_at?: string
+          feed_id?: string | null
+          fetched_at?: string
+          id?: string
+          outlet_snapshot?: string
+          source_class?: string | null
+          title_snapshot?: string | null
+          url_snapshot?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_article_sources_article"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_article_sources_feed"
+            columns: ["feed_id"]
+            isOneToOne: false
+            referencedRelation: "feeds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       articles: {
         Row: {
           age_band: string | null
