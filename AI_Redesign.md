@@ -27,53 +27,40 @@ Implementing the design. Design is LOCKED through four trim sweeps
 listed in § Decisions the owner needs to make.
 
 ### Current status
-- **Last shipped wave:** Wave 5 — Stream E Stories list rebuild
-  (commit `f46f4e9`, 2026-05-04). The Discovery tab at
-  `/admin/newsroom` no longer renders the legacy `feed_clusters`
-  list; it now reads from `stories` via three new endpoints:
-  `GET /api/admin/newsroom/research/stories` (paginated keyset
-  list with filters `research_query_id`, `generation_state`,
-  `date_from` / `date_to`, `job` for run-scoping, free-text `q`),
-  `GET /api/admin/newsroom/research/stories/[id]` (story detail
-  with chronological observation timeline + per-band article
-  rollup + `default_cluster_id` resolved from the latest active
-  observation), and `POST /api/admin/newsroom/research/stories/
-  [id]/state` (idempotent flip to `rejected` | `archived` |
-  `forming`; blocks flip when the story has published articles).
-  Two new client components:
-  `web/src/app/admin/newsroom/_components/StoriesList.tsx`
-  (filter row: title/slug search + saved-query picker +
-  generation-state picker + first-seen date range; story rows
-  show source count, observation count, generation_state badge,
-  per-band status badges; Load more keyset pagination; honors
-  `?job=` with a "Showing stories from this run" banner +
-  Clear) and `web/src/app/admin/newsroom/_components/
-  StoryDetailDrawer.tsx` (right-side `Drawer` showing keywords
-  chips, dates, per-band article rollup with Generate buttons
-  that call `/api/admin/pipeline/generate` against
-  `default_cluster_id` + audience/age_band, observation timeline
-  with outlet/match score/source class/excerpt; footer Reject
-  + Archive + Restore buttons calling the state route).
-  `page.tsx` rewired: removed StoryCard / cluster fetch / merge
-  mode / category cascade / sort selector / Active+Completed view
-  toggle; the global model picker at the top of the Discovery tab
-  still drives Generate (passed through StoriesList →
-  StoryDetailDrawer). Research.tsx `viewStories()` now strips
-  legacy cluster filter params (`view`, `cat`, `so`, `dq`) on
-  navigate while preserving `?job=` so the rebuilt list scopes
-  to the run. `tsc --noEmit` clean; `next lint` clean for the
-  touched dirs (the one pre-existing ArticlesTable warning is
-  untouched).
-- **Next wave to ship:** **Wave 6 — Stream F provenance UI.**
-  New `/admin/sources` standalone page (NOT a tab on
-  `/admin/feeds` per § Stream F) showing every URL ever cited.
-  Default sort `created_at DESC`. Three header filters: outlet
-  text search, first-cited date range. CSV export of the current
-  filter (load-bearing for "show every X article we've cited"
-  asks). Reads from `article_sources` (already populated by Wave
-  0). No source-class filter, no feed-status filter, no view
-  toggle, no free-text URL search — those were dropped in the
-  fourth trim sweep.
+- **Last shipped wave:** Wave 6 — Stream F provenance UI
+  (commit `<pending>`, 2026-05-04). New `/admin/sources`
+  standalone page reads from `article_sources` (the no-delete
+  provenance log populated by Wave 0). Two new endpoints:
+  `GET /api/admin/sources` (keyset paginated list filtered by
+  `outlet` ilike on `outlet_snapshot`, `date_from` / `date_to`
+  on `created_at`; default order is `created_at DESC, id DESC`;
+  joins `articles` for title + status + age_band + deleted flag
+  so the row links into the right editor surface) and
+  `GET /api/admin/sources/export.csv` (same filters, no
+  pagination, capped at 50,000 rows, sorted oldest-first for
+  audit pasteability, returns a `text/csv` Response with a
+  `verity-sources-YYYY-MM-DD.csv` Content-Disposition).
+  New page `web/src/app/admin/sources/page.tsx` shows the three
+  required filter controls (outlet text search debounced 350ms
+  to URL, first-cited date_from, first-cited date_to) plus an
+  Export CSV anchor that bundles the current filter into the
+  download. Source rows render outlet, URL (opens new tab),
+  title snapshot, citing article (linked to story-manager or
+  kids-story-manager based on `articles.age_band`) with
+  Published/Archived/Deleted badges, and source class label.
+  Load more keyset pagination. Empty state explains the
+  no-delete contract. Sources card added to the Content
+  Pipeline group on the admin hub at `/admin`. Per § Stream F
+  trim sweep: no source-class filter, no feed-status filter,
+  no view toggle, no free-text URL search. `tsc --noEmit`
+  clean; `next lint` clean for the touched dirs.
+- **Next wave to ship:** **none — wave order complete.** All
+  seven waves (0 through 6) of AI_Redesign.md are shipped. Open
+  follow-ups now belong to v1.1 (per the Out of scope and
+  v1-deferred lists below): public-facing surfacing of
+  `article_sources` on the article reader, Detach + Lock UI
+  for `story_observations.detached_at` / `stories.is_locked`,
+  paid news-search vendor as a second `search_api` feed.
 - **Branch:** main (direct commit per repo workflow — recent history
   is single-branch).
 - **Open blockers:** none.

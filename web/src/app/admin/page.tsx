@@ -19,6 +19,7 @@ type HubGroup = { group: string; desc: string; items: HubPage[] };
 const CONTENT_PIPELINE: HubPage[] = [
   { href: '/admin/newsroom', title: 'Newsroom', desc: 'Discovery + Articles + runs/costs/cleanup panels — the operator workspace' },
   { href: '/admin/feeds', title: 'Feeds', desc: 'RSS sources — outlets, audience routing, health, last poll' },
+  { href: '/admin/sources', title: 'Sources', desc: 'No-delete provenance log — every URL we have ever cited; outlet + date filters; CSV export' },
   { href: '/admin/pipeline-config', title: 'Pipeline Config', desc: 'Kill switches, thresholds, prompt presets, categories — all in one place' },
   { href: '/admin/top-stories', title: 'Top Stories', desc: 'Pin up to 5 articles to the front page in fixed positions.' },
 ];
