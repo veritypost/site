@@ -2258,8 +2258,7 @@ Empty array if all correct.`;
       }
     }
 
-    // b3. Session A — reconcile the cost reservation. Fire-and-forget;
-    // log on error. Unsettled reservations age out via the cron sweep.
+    // b3. Session A — reconcile the cost reservation.
     try {
       await reconcileCostReservation(runId);
     } catch (reconcileErr) {

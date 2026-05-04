@@ -87,6 +87,10 @@
     {
       "path": "/api/cron/expire-mutes",
       "schedule": "55 2 * * *"
+    },
+    {
+      "path": "/api/cron/reap-cost-reservations",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

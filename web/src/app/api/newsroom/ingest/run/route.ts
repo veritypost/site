@@ -63,7 +63,7 @@ import { getStoryMatchOverlapPct } from '@/lib/pipeline/story-match';
 import { scrapeDiscovery, type DiscoveredArticle } from '@/lib/pipeline/scrape-discovery';
 import { scrapeJson } from '@/lib/pipeline/scrape-json';
 import { validateExtractionConfig } from '@/lib/pipeline/extraction-config';
-import { reserveCostOrFail } from '@/lib/pipeline/cost-reservation';
+import { reserveCostOrFail, reconcileCostReservation } from '@/lib/pipeline/cost-reservation';
 import {
   runGrabPlan,
   applyGrabPlanFilter,
@@ -535,6 +535,7 @@ export async function POST(req: Request) {
 
   // 5. Main body — on any throw, mark run failed and return 500
   let grabPlan: GrabPlan | null = null;
+  let topicReservationCreated = false;
   try {
     // Wave 2 — Topic mode: one Haiku call inside the planning phase
     // produces the deterministic grab plan that the post-fetch filter
@@ -546,6 +547,7 @@ export async function POST(req: Request) {
         throw new Error('topic mode requires non-empty query.text');
       }
       const reservation = await reserveCostOrFail(runId, GRAB_PLAN_RESERVATION_USD);
+      topicReservationCreated = true;
       if (!reservation.accepted) {
         throw new Error(
           `cost_cap_exceeded: today=${reservation.today_usd} cap=${reservation.cap_usd}`,
@@ -1976,5 +1978,13 @@ export async function POST(req: Request) {
       );
     }
     return NextResponse.json({ error: 'Ingest run failed' }, { status: 500 });
+  } finally {
+    if (topicReservationCreated) {
+      try {
+        await reconcileCostReservation(runId);
+      } catch (reconcileErr) {
+        console.error('[newsroom.ingest.run.finally.reconcile]', reconcileErr);
+      }
+    }
   }
 }

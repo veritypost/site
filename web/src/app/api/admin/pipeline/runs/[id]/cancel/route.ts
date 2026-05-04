@@ -29,6 +29,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import { captureWithRedact } from '@/lib/pipeline/redact';
+import { reconcileCostReservation } from '@/lib/pipeline/cost-reservation';
 import type { Json } from '@/types/database';
 
 export const runtime = 'nodejs';
@@ -112,6 +113,12 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     console.error('[admin.pipeline.runs.cancel.mark]', markErr);
     captureWithRedact(markErr);
     return NextResponse.json({ error: 'Cancel failed' }, { status: 500 });
+  }
+
+  try {
+    await reconcileCostReservation(params.id);
+  } catch (reconcileErr) {
+    console.error('[admin.pipeline.runs.cancel.reconcile]', reconcileErr);
   }
 
   // Session A — derive audience_band from input_params.age_band (written
