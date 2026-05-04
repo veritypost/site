@@ -81,7 +81,7 @@ function toStory(row: ClusterRow): Story | null {
   };
 }
 
-async function loadStories(): Promise<Story[]> {
+async function loadStories(signal: AbortSignal): Promise<Story[]> {
   const supabase = createClient();
   const cutoff = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
   const { data, error } = await supabase
@@ -96,8 +96,14 @@ async function loadStories(): Promise<Story[]> {
     .is('dismissed_at', null)
     .gte('updated_at', cutoff)
     .order('updated_at', { ascending: false })
-    .limit(120);
-  if (error) throw new Error(error.message);
+    .limit(120)
+    .abortSignal(signal);
+  if (error) {
+    if (signal.aborted) {
+      throw new DOMException('aborted', 'AbortError');
+    }
+    throw new Error(error.message);
+  }
   if (!data) return [];
   return (data as unknown as ClusterRow[]).map(toStory).filter((s): s is Story => s !== null);
 }
@@ -421,11 +427,16 @@ function BrowsePageInner() {
     const controller = new AbortController();
     abortRef.current = controller;
     setStories([]); setLoadFailed(false); setLoading(true);
-    loadStories()
+    loadStories(controller.signal)
       .then(data => { if (controller.signal.aborted) return; setStories(data); setLoading(false); })
-      .catch(() => { if (controller.signal.aborted) return; setLoadFailed(true); setLoading(false); });
+      .catch((err) => { if (controller.signal.aborted || err?.name === 'AbortError') return; setLoadFailed(true); setLoading(false); });
   }, []);
-  useEffect(() => { fetchStories(); }, [fetchStories]);
+  useEffect(() => {
+    fetchStories();
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, [fetchStories]);
 
   useEffect(() => {
     const p = new URLSearchParams();
