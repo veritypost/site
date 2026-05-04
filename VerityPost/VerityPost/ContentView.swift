@@ -220,7 +220,7 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Main Tab View — 4-tab layout: Today, Browse, Following, Profile
+// MARK: - Main Tab View — 3-tab layout: Today, Browse, Profile (Following intentionally dropped, FollowingView retained for re-expose)
 
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthViewModel
@@ -234,11 +234,11 @@ struct MainTabView: View {
     @State private var deepLinkStory: Story?
     private let deepLinkClient = SupabaseManager.shared.client
 
-    // IA Wave 4 (Slice 03 locked): Today / Browse / Following / Profile.
-    // "Browse" is discovery by category; "Following" tracks stories the
-    // reader is engaged with. Notifications and Rankings moved into Profile.
+    // IA Wave 4 (Slice 03 locked): Today / Browse / Profile.
+    // "Browse" is discovery by category. Following dropped pre-launch.
+    // Notifications and Rankings moved into Profile.
     // Profile slot relabels to "Sign up" for anon users.
-    enum Tab: Hashable { case today, browse, following, profile }
+    enum Tab: Hashable { case today, browse, profile }
 
     private var isLoggedIn: Bool { auth.currentUser != nil }
 
@@ -264,9 +264,9 @@ struct MainTabView: View {
 
     // MARK: - Adult tab bar
     //
-    // 4 tabs: Today, Browse, Following, Profile.
+    // 3 tabs: Today, Browse, Profile.
     // Text-only (no icons), bottom-fixed, translucent white with a blur.
-    // Active tab renders in accent color, bold. Anon users see the same 4
+    // Active tab renders in accent color, bold. Anon users see the same 3
     // slots; the Profile slot flips to "Sign up" via the SignInGate
     // destination. Alerts and Rankings are accessed from Profile.
 
@@ -275,7 +275,6 @@ struct MainTabView: View {
             switch selectedTab {
             case .today: NavigationStack { HomeView() }
             case .browse: NavigationStack { BrowseLanding() }
-            case .following: NavigationStack { FollowingView() }
             case .profile:
                 NavigationStack {
                     if isLoggedIn {
@@ -454,11 +453,7 @@ struct TextTabBar: View {
     }
 
     private var items: [Item] {
-        // Following dropped from bottom-tab to mirror web's 3-slot nav
-        // (owner override of cross-platform panel — kept the original
-        // "remove for everyone" call). Following remains accessible
-        // inside Profile / from FollowingView push targets; only the
-        // dedicated tab slot is removed.
+        // Following dropped pre-launch; FollowingView.swift kept alive for one-line re-expose if needed.
         [
             Item(id: .today, label: "Today"),
             Item(id: .browse, label: "Browse"),
