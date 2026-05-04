@@ -34,6 +34,7 @@ import HomeBreakingStrip from './_HomeBreakingStrip';
 import HomeFooter from './_HomeFooter';
 import HomeFetchFailed from './_HomeFetchFailed';
 import HomeVisitTimestamp from './_HomeVisitTimestamp';
+import HomeSidebar from './_HomeSidebar';
 import Ad from '@/components/Ad';
 
 // Curated front page — top_stories is the source of truth. Owner pins
@@ -43,7 +44,7 @@ import Ad from '@/components/Ad';
 // Story projection the home feed renders lives in `_homeShared.ts` so the
 // client islands can import the same shape without pulling this server
 // component into the client bundle.
-type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug' | 'color_hex'>;
+type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug' | 'color_hex' | 'parent_id' | 'sort_order'>;
 
 // The home is wall-free by design — the registration-wall gate fires
 // inside `web/src/app/story/[slug]/page.tsx` per article view, not on
@@ -169,8 +170,9 @@ export default async function HomePage() {
         .limit(1),
       service
         .from('categories')
-        .select('id, name, slug, color_hex')
+        .select('id, name, slug, color_hex, parent_id, sort_order')
         .eq('is_active', true)
+        .is('deleted_at', null)
         .order('sort_order', {
           ascending: true,
           nullsFirst: false,
@@ -296,11 +298,24 @@ export default async function HomePage() {
 
       <div
         style={{
-          maxWidth: 720,
+          display: 'flex',
+          alignItems: 'flex-start',
+          maxWidth: 1280,
           margin: '0 auto',
-          padding: '32px 20px 64px',
+          padding: '0 20px',
         }}
       >
+        <HomeSidebar categories={catRows} />
+
+        <main
+          style={{
+            flex: 1,
+            minWidth: 0,
+            maxWidth: 720,
+            margin: '0 auto',
+            padding: '32px 20px 64px',
+          }}
+        >
         {fetchFailed && <HomeFetchFailed />}
 
         {/* TODO: HomeBrokenPinBanner — see DECISION #028 — admin banner for broken pins */}
@@ -364,6 +379,7 @@ export default async function HomePage() {
 
         {!fetchFailed && hero && <HomeFooter />}
 
+        </main>
       </div>
 
       {/* T91 — refresh the last-visit cookie after first paint. Never
