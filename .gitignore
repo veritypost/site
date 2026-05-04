@@ -124,3 +124,10 @@ web/tests/e2e/.auth/
 .cache/
 tmp/
 temp/
+
+# --- Owner-local scratch — never commit -----------------------------------
+# Per CLAUDE.md memory: only web/, VerityPost/, VerityPostKids/, supabase/
+# + repo-root product files count as source of truth. Owner scratch dirs
+# and local prototypes must not enter version control.
+Ongoing Projects/
+new home layout.md
