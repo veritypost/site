@@ -273,7 +273,7 @@ export default function ArticleQuiz({
               </a>
               {' · '}
               <a
-                href="/browse"
+                href="/"
                 style={{ color: C.accent, textDecoration: 'underline', fontWeight: 600 }}
               >
                 Browse for your next article

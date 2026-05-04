@@ -330,10 +330,7 @@ export default async function HomePage() {
             color: C.dim,
             margin: '32px 0 0',
           }}>
-            {"Nothing here yet. "}
-            <Link href="/browse" style={{ color: C.accent, textDecoration: 'underline', textUnderlineOffset: 4 }}>
-              Browse &rarr;
-            </Link>
+            Nothing here yet.
           </p>
         )}
 

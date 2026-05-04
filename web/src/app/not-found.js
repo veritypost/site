@@ -49,7 +49,7 @@ export default function NotFound() {
           Today&rsquo;s front page
         </a>
         <a
-          href="/browse"
+          href="/"
           style={{
             ...linkBase,
             background: '#ffffff',

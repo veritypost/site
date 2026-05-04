@@ -111,7 +111,7 @@ export default function HomeFooter() {
     return (
       <footer style={footerStyle}>
         <p style={{ margin: '12px 0 0' }}>
-          <Link href="/browse" style={linkStyle}>
+          <Link href="/" style={linkStyle}>
             Browse all categories &rarr;
           </Link>
         </p>

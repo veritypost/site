@@ -482,7 +482,7 @@ export async function middleware(request) {
 
   // Anon read counter — increment for article pages only
   const KNOWN_NON_ARTICLE_PATHS = new Set([
-    '/', '/browse', '/search', '/leaderboard', '/notifications', '/login',
+    '/', '/search', '/leaderboard', '/notifications', '/login',
     '/signup', '/logout', '/welcome', '/beta-locked', '/request-access',
     '/about', '/pricing', '/how-it-works', '/contact', '/help', '/accessibility',
     '/privacy', '/terms', '/cookies', '/dmca', '/corrections',

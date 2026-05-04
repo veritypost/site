@@ -377,12 +377,10 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   const navItems: NavItem[] = loggedIn
     ? [
         { label: 'Home', href: '/' },
-        { label: 'Browse', href: '/browse' },
         { label: 'Profile', href: '/profile' },
       ]
     : [
         { label: 'Home', href: '/' },
-        { label: 'Browse', href: '/browse' },
         { label: 'Sign up', href: '/signup' },
       ];
 

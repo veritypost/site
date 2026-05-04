@@ -756,7 +756,7 @@ export default function BookmarksPage() {
             <EmptyState
               headline="No bookmarks yet"
               body="Save articles here. Tap the bookmark icon on any story to come back later."
-              cta={{ label: 'Browse articles', href: '/browse' }}
+              cta={{ label: 'Browse articles', href: '/' }}
             />
           )}
           {/* Load more — keyset cursor on created_at desc. Only shown

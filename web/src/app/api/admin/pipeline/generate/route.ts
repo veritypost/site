@@ -776,6 +776,84 @@ export async function POST(req: Request) {
     );
   }
 
+  // 5. Orphan reaper — pre-flight sweep for stuck generate runs.
+  //
+  // A Vercel-killed lambda leaves a pipeline_runs row with status='running'
+  // and a feed_cluster_locks entry held by that run id.  That story+band
+  // is permanently bricked until manual SQL.  Reaping here (before creating
+  // a new run or claiming a new lock) means the next operator click
+  // self-heals immediately.  The daily cron (pipeline-cleanup) stays as
+  // defense-in-depth.
+  //
+  // Threshold: 2× maxDuration (2 × 300 s = 600 s).  A legitimate slow run
+  // finishes inside maxDuration; anything older than 600 s was definitely
+  // abandoned by Vercel.
+  //
+  // Per-row isolation: one bad row must not abort the sweep.
+  {
+    const orphanCutoffMs = Date.now() - 2 * maxDuration * 1000; // 600 000 ms
+    const orphanCutoff = new Date(orphanCutoffMs).toISOString();
+    const { data: stuckRuns, error: stuckErr } = await service
+      .from('pipeline_runs')
+      .select('id, cluster_id, input_params')
+      .eq('status', 'running')
+      .eq('pipeline_type', 'generate')
+      .lt('started_at', orphanCutoff);
+    if (stuckErr) {
+      // Non-fatal — log and continue.  Worst case the cluster lock is still
+      // held and the operator gets a 409 they can retry once the daily cron
+      // runs.
+      console.warn('[newsroom.generate.orphan_reap_select_failed]', stuckErr.message);
+    } else if ((stuckRuns?.length ?? 0) > 0) {
+      let reapedCount = 0;
+      for (const stuck of stuckRuns!) {
+        try {
+          const now = new Date().toISOString();
+          // a. Flip status → failed.
+          await service
+            .from('pipeline_runs')
+            .update({
+              status: 'failed',
+              completed_at: now,
+              error_message: 'orphan run reaped — lambda likely killed',
+              error_type: 'timeout',
+            })
+            .eq('id', stuck.id)
+            .eq('status', 'running'); // guard: don't clobber if already terminalized
+
+          // b. Release the cluster lock the orphan was holding.
+          const params = stuck.input_params as Record<string, unknown> | null;
+          const ageBand =
+            params && typeof params['age_band'] === 'string'
+              ? (params['age_band'] as string)
+              : 'adult';
+          if (stuck.cluster_id) {
+            await service.rpc('release_cluster_lock_v2', {
+              p_cluster_id: stuck.cluster_id,
+              p_audience_band: ageBand,
+              p_locked_by: stuck.id,
+            });
+          }
+
+          // c. Settle any active cost reservation.
+          await reconcileCostReservation(stuck.id);
+
+          reapedCount += 1;
+        } catch (rowErr) {
+          // Per-row isolation — log and continue to the next orphan.
+          console.warn(
+            '[newsroom.generate.orphan_reap_row_failed]',
+            stuck.id,
+            rowErr instanceof Error ? rowErr.message : String(rowErr)
+          );
+        }
+      }
+      if (reapedCount > 0) {
+        console.info('[newsroom.generate.orphan_reap]', { count: reapedCount });
+      }
+    }
+  }
+
   // T242 — capture an active-prompt-preset snapshot at run start so a
   // generation run can be re-derived from its captured prompt regardless
   // of what the active row says now (an admin can edit a preset between

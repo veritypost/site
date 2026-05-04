@@ -369,7 +369,7 @@ export default function ProfilePage() {
         <p style={{ color: 'var(--dim)', marginBottom: 24 }}>
           This user has set their profile to private.
         </p>
-        <a href="/browse" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
+        <a href="/" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
           Browse Verity Post →
         </a>
       </main>

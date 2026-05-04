@@ -450,7 +450,7 @@ function SearchPageContent() {
               Try shorter keywords, or browse by category.
             </div>
             <Link
-              href="/browse"
+              href="/"
               aria-label="Browse categories"
               style={{
                 display: 'inline-block',
@@ -504,7 +504,7 @@ function SearchPageContent() {
                 <li>Check spelling.</li>
                 <li>
                   Browse{' '}
-                  <Link href="/browse" style={{ color: '#111', fontWeight: 600 }}>
+                  <Link href="/" style={{ color: '#111', fontWeight: 600 }}>
                     categories
                   </Link>
                   .

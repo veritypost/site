@@ -31,7 +31,7 @@ export default function ArticleSlugNotFound() {
           Front page
         </a>
         <a
-          href="/browse"
+          href="/"
           style={{ ...linkBase, background: '#ffffff', color: 'var(--text-primary, #111)', border: '1px solid var(--text-primary, #111)' }}
         >
           Browse categories

@@ -317,7 +317,7 @@ function CategoryPageInner() {
       <div style={{ maxWidth: 680, margin: '80px auto', textAlign: 'center', padding: '0 16px' }}>
         <h1 style={{ fontSize: 24, marginBottom: 12 }}>Kids category</h1>
         <p style={{ fontSize: 16, color: '#444', marginBottom: 24 }}>Browse this category in the Verity Post Kids app.</p>
-        <Link href="/browse" style={{ color: '#0369a1', textDecoration: 'underline' }}>Browse all categories</Link>
+        <Link href="/" style={{ color: '#0369a1', textDecoration: 'underline' }}>Browse all categories</Link>
       </div>
     );
   }
@@ -342,7 +342,7 @@ function CategoryPageInner() {
             We couldn&rsquo;t find that category. It may have been renamed or removed.
           </p>
           <Link
-            href="/browse"
+            href="/"
             style={{
               display: 'inline-block',
               padding: '12px 24px',
@@ -407,7 +407,7 @@ function CategoryPageInner() {
           <div style={{ marginBottom: 12 }}>
             <nav aria-label="Breadcrumb">
               <Link
-                href="/browse"
+                href="/"
                 style={{
                   background: 'none',
                   border: 'none',
@@ -589,7 +589,7 @@ function CategoryPageInner() {
                 }}
               >
                 <Link
-                  href={story.stories?.slug ? `/${story.stories.slug}` : '/browse'}
+                  href={story.stories?.slug ? `/${story.stories.slug}` : '/'}
                   style={{
                     display: 'flex',
                     cursor: 'pointer',

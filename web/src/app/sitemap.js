@@ -2,7 +2,7 @@ import { createClient } from '../lib/supabase/server';
 import { getSiteUrl } from '../lib/siteUrl';
 
 // Coming-soon gate: while the site is in holding, sitemap.xml advertises
-// only the root URL. Broadcasting /story/*, /category/*, /browse, /privacy,
+// only the root URL. Broadcasting /story/*, /category/*, /privacy,
 // etc. tells Google the URL structure even though middleware redirects
 // each of those to /welcome (which is disallowed in robots.js). Keep the
 // sitemap silent in coming-soon mode so the crawler doesn't have a list
@@ -66,7 +66,6 @@ export default async function sitemap({ id }) {
   if (id === STATIC_CHUNK_ID) {
     const staticRoutes = [
       '',
-      '/browse',
       '/contact',
       '/privacy',
       '/terms',

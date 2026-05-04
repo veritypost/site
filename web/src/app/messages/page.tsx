@@ -1132,7 +1132,7 @@ function MessagesPageInner() {
                     your question to a verified expert in that category.
                   </div>
                   <a
-                    href="/browse"
+                    href="/"
                     style={{
                       display: 'inline-block',
                       padding: '8px 14px',
