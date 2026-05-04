@@ -480,6 +480,15 @@ function classifyError(err: unknown): string {
 // ----------------------------------------------------------------------------
 
 export async function POST(req: Request) {
+  // EMERGENCY STOP — owner-triggered hard halt 2026-05-04. Article
+  // generation is disabled at the route layer, regardless of settings
+  // or auth, to prevent any further LLM cost while the pipeline is
+  // investigated. Remove this block to re-enable.
+  return NextResponse.json(
+    { error: 'Article generation is disabled.', code: 'EMERGENCY_STOP' },
+    { status: 503 },
+  );
+  // eslint-disable-next-line @typescript-eslint/no-unreachable-code-after-return
   // 1. Permission gate
   let actor: { id: string };
   try {
