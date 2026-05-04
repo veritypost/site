@@ -33,7 +33,7 @@ Known limits / Phase C followups:
   - Article-URL heuristic accepts year-archive paths like /archive/2024-news in some cases — Phase C tightening.
   - Worst-case wall-clock for 96 scrape_html feeds running in parallel ~30-60s; well inside the 300s lambda budget.
 
-Smoke checklist (owner runs on verityposts.com/admin/newsroom Discovery tab + /admin/feeds while signed in as admin@veritypost.com):
+Smoke checklist (owner runs on veritypost.com/admin/newsroom Discovery tab + /admin/feeds while signed in as admin@veritypost.com):
   1. /admin/newsroom Discovery → click "Refresh feeds" — toast confirms run completed; response includes feedsByType { rss, scrape_html, scrape_json } and itemsBySource { rss, scrape_html }.
   2. /admin/feeds → confirm Type column renders RSS / Scrape HTML / Scrape JSON badges; no per-tier color (single neutral badge style).
   3. /admin/feeds → after the refresh in step 1, scrape_html rows show last_polled_at moved into the last 24h; scrape_json rows ALSO show last_polled_at moved (proves deferred-but-polled).
@@ -598,7 +598,7 @@ Every page (and every fix) walks this exact sequence. No skipping.
        ▼
 [PROD]  → live on Vercel; awaiting owner prod confirmation
        │
-       │  owner loads the route on production (verityposts.com), confirms
+       │  owner loads the route on production (veritypost.com), confirms
        │  it matches §5 Ground truth + the finding's expected fix
        │
        │  owner writes the confirmation line into §8.4 Lock log:
@@ -764,7 +764,7 @@ Keep ≤8 lines. If investigation grows, spin a finding doc under `UI_UX_REVIEW/
 - **Owner decision needed:** no — runtime diagnosis first.
 - **Status:** symptom confirmed / cause unresolved (needs runtime cookie capture).
 - **Ready for fix:** no — diagnosis blocks fix.
-- **Notes for next agent:** owner needs to do this in browser, agents can't repro: (1) DevTools → Application → Cookies on `verityposts.com` immediately after fresh sign-in; capture name + Max-Age + Expires + SameSite + Secure for every `sb-*` cookie; (2) close browser, return >2h later, capture again; note which dropped; (3) if all cookies survive → access expired and refresh failed; instrument middleware refresh path; (4) if cookies missing → look for accidental `auth.signOut()` or third-party cookie purge. Do NOT speculatively expand `needsUser` to all routes — perf hit; fix should be middleware doing a non-blocking `getSession()` to drive refresh.
+- **Notes for next agent:** owner needs to do this in browser, agents can't repro: (1) DevTools → Application → Cookies on `veritypost.com` immediately after fresh sign-in; capture name + Max-Age + Expires + SameSite + Secure for every `sb-*` cookie; (2) close browser, return >2h later, capture again; note which dropped; (3) if all cookies survive → access expired and refresh failed; instrument middleware refresh path; (4) if cookies missing → look for accidental `auth.signOut()` or third-party cookie purge. Do NOT speculatively expand `needsUser` to all routes — perf hit; fix should be middleware doing a non-blocking `getSession()` to drive refresh.
 
 #### 7. /login renders only a spinner — never resolves
 
@@ -1109,7 +1109,7 @@ LOCKED 2026-05-03: Owner-mode backstage pass for /profile (Finding #10 — owner
   Roles: any user holding `admin.owner_mode` (currently admin@veritypost.com only); does NOT change behavior for any other role
 ```
 
-Each of the locks above awaits prod confirmation per §7.5 (`[FIXED]` → `[PROD]` → `[LOCKED]`). When owner confirms each on `verityposts.com`, append `confirmed prod YYYY-MM-DD by owner` to the entry.
+Each of the locks above awaits prod confirmation per §7.5 (`[FIXED]` → `[PROD]` → `[LOCKED]`). When owner confirms each on `veritypost.com`, append `confirmed prod YYYY-MM-DD by owner` to the entry.
 
 #### Lock history
 
