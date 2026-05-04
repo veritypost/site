@@ -93,18 +93,16 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const completedAt = new Date();
   const startedAtMs = new Date(run.started_at as string).getTime();
   const durationMs = completedAt.getTime() - startedAtMs;
-  const ERROR_MSG = 'Cancelled by admin';
-  const ERROR_TYPE = 'abort';
 
   try {
     await service
       .from('pipeline_runs')
       .update({
-        status: 'failed',
+        status: 'cancelled',
         completed_at: completedAt.toISOString(),
         duration_ms: durationMs,
-        error_message: ERROR_MSG,
-        error_type: ERROR_TYPE,
+        error_message: 'Cancelled by admin',
+        error_type: null,
         output_summary: { cancelled_by_admin: true } as Json,
       })
       .eq('id', params.id)
@@ -191,7 +189,6 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       newValue: {
         cluster_id: run.cluster_id,
         audience: run.audience,
-        soft_cancel: true,
         was_status: run.status,
         was_started_at: run.started_at,
       },
@@ -203,7 +200,5 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   return NextResponse.json({
     ok: true,
     run_id: params.id,
-    cancel_kind: 'soft',
-    note: 'Worker may complete the current step before exiting',
   });
 }

@@ -155,7 +155,7 @@ function AudienceCard(props: AudienceCardProps) {
         setErrorType(json.run.error_type ?? null);
         setErrorStep(lastStep?.step ?? null);
         stopPolling();
-      } else if (status === 'cancelled' || status === 'aborted') {
+      } else if (status === 'cancelled') {
         setState('idle');
         setRunId(null);
         stopPolling();

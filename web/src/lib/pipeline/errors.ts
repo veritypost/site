@@ -51,8 +51,8 @@ export class RetryExhaustedError extends Error {
 }
 
 export class AbortedError extends Error {
-  constructor() {
-    super('Aborted');
+  constructor(message = 'Aborted') {
+    super(message);
     this.name = 'AbortedError';
   }
 }

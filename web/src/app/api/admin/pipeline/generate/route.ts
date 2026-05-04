@@ -39,6 +39,7 @@ import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import * as Sentry from '@sentry/nextjs';
 import { captureWithRedact } from '@/lib/pipeline/redact';
 import { callModel, type CallModelResult } from '@/lib/pipeline/call-model';
+import { checkCancel } from '@/lib/pipeline/check-cancel';
 import {
   ModelNotSupportedError,
   CostCapExceededError,
@@ -1191,6 +1192,7 @@ export async function POST(req: Request) {
         .join('\n');
       const userTurn = `Classify the following cluster for kid-safety.\nReturn JSON: {"audience":"kids"|"adults"|"both","reasons":[...]}.\n\nCLUSTER:\n${preview}`;
       promptParts.push({ step: stepName, system: AUDIENCE_PROMPT, user: userTurn });
+      await checkCancel(runId);
       const result = await callModel({
         provider: 'anthropic',
         model: HAIKU_MODEL,
@@ -1409,6 +1411,7 @@ ${catListText}`;
       });
     }
 
+    await checkCancel(runId);
     const [headlineRes, summaryRes, catResOrNull] = await Promise.all([
       callModel({
         provider,
@@ -1508,6 +1511,7 @@ Return ONLY a valid JSON object:
 SOURCES:
 ${corpus}`;
     promptParts.push({ step: bodyStepName, system: bodySystem, user: bodyUser });
+    await checkCancel(runId);
     const bodyRes = await callModel({
       provider,
       model,
@@ -1561,6 +1565,7 @@ Return JSON:
       user: groundingUser,
     });
     try {
+      await checkCancel(runId);
       const groundingRes = await callModel({
         provider: 'anthropic',
         model: HAIKU_MODEL,
@@ -1755,6 +1760,7 @@ Return JSON:
       system: timelineSystem,
       user: timelineUser,
     });
+    await checkCancel(runId);
     const timelineRes = await callModel({
       provider,
       model,
@@ -1800,6 +1806,7 @@ Return JSON:
         user: sanitizerUser,
       });
       try {
+        await checkCancel(runId);
         const sanRes = await callModel({
           provider: 'anthropic',
           model: HAIKU_MODEL,
@@ -1880,6 +1887,7 @@ Return JSON:
 }
 Each option MUST be an object with a "text" field — never a bare string.${freeformBlock}`;
     promptParts.push({ step: quizStepName, system: quizSystem, user: quizUser });
+    await checkCancel(runId);
     const quizRes = await callModel({
       provider,
       model,
@@ -1939,6 +1947,7 @@ Each option MUST be an object with a "text" field — never a bare string.${free
 Empty array if all correct.`;
     const verifyUser = `ARTICLE:\n${finalBodyMarkdown}\n\nQUIZ:\n${quizJSON}`;
     promptParts.push({ step: verifyStepName, system: verifySystem, user: verifyUser });
+    await checkCancel(runId);
     const verifyRes = await callModel({
       provider: 'anthropic',
       model: HAIKU_MODEL,
