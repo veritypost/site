@@ -10,7 +10,6 @@ import DataTable from '@/components/admin/DataTable';
 import Toolbar from '@/components/admin/Toolbar';
 import Button from '@/components/admin/Button';
 import TextInput from '@/components/admin/TextInput';
-import Select from '@/components/admin/Select';
 import NumberInput from '@/components/admin/NumberInput';
 import Switch from '@/components/admin/Switch';
 import Drawer from '@/components/admin/Drawer';
@@ -35,37 +34,86 @@ import { ADMIN_C, F, S } from '@/lib/adminPalette';
 type FeedRow = Tables<'feeds'>;
 type FeedStatus = 'ok' | 'stale' | 'broken';
 
-type DisplayFeed = FeedRow & {
+type EnrichedFeed = FeedRow & {
+  items_24h: number;
+  items_7d: number;
+};
+
+type DisplayFeed = EnrichedFeed & {
   outlet: string;
   status: FeedStatus;
   lastPull: string;
-  articles: number;
   active: boolean;
   failCount: number;
   priority_weight: number;
   allowed_category_slugs: string[];
 };
 
+type ListResponse = {
+  feeds: EnrichedFeed[];
+  topContributor: { feed_id: string; outlet: string; items_7d: number; share_pct: number } | null;
+  totals: {
+    items_24h: number;
+    items_7d: number;
+    active: number;
+    inactive: number;
+    silent_7d: number;
+    failing: number;
+  };
+};
+
+type FilterChip = 'all' | 'producing' | 'silent7d' | 'failing';
+
+// Default chip: producing today.
+const DEFAULT_FILTER: FilterChip = 'producing';
+
 function FeedsAdminInner() {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
 
-  const [feeds, setFeeds] = useState<FeedRow[]>([]);
+  const [feeds, setFeeds] = useState<EnrichedFeed[]>([]);
+  const [totals, setTotals] = useState<ListResponse['totals'] | null>(null);
+  const [topContributor, setTopContributor] = useState<ListResponse['topContributor']>(null);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [newOutlet, setNewOutlet] = useState('');
   const [newUrl, setNewUrl] = useState('');
-  const [filter, setFilter] = useState<'all' | 'ok' | 'issues'>('all');
+  const [filter, setFilter] = useState<FilterChip>(DEFAULT_FILTER);
   const [search, setSearch] = useState('');
-  const [staleHours, setStaleHours] = useState(6);
-  const [brokenFailCount, setBrokenFailCount] = useState(10);
-  const [pullIntervalMin, setPullIntervalMin] = useState(30);
+  const [staleHours] = useState(6);
+  const [brokenFailCount] = useState(10);
   const [selected, setSelected] = useState<DisplayFeed | null>(null);
   const [adding, setAdding] = useState(false);
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string }>>([]);
   const [alertDismissed, setAlertDismissed] = useState(false);
   const priorityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Bulk selection state.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkWorking, setBulkWorking] = useState(false);
+  // Typed delete confirmation state.
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+  const loadFeeds = async () => {
+    const res = await fetch('/api/admin/feeds/list');
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      toast.push({ message: (j as { error?: string }).error ?? 'Failed to load feeds', variant: 'danger' });
+      return;
+    }
+    const data = (await res.json()) as ListResponse;
+    setFeeds(data.feeds ?? []);
+    setTotals(data.totals ?? null);
+    setTopContributor(data.topContributor ?? null);
+    // Cold-start filter: if no items have been seen in the last 24h (fresh install
+    // or ingest never run), default to 'all' so the operator sees their feeds
+    // rather than an empty 'producing' view.
+    if ((data.totals?.items_24h ?? 0) === 0) {
+      setFilter((prev) => (prev === DEFAULT_FILTER ? 'all' : prev));
+    }
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -89,35 +137,7 @@ function FeedsAdminInner() {
         return;
       }
 
-      const { data, error: feedsError } = await supabase
-        .from('feeds')
-        .select('*')
-        .order('name');
-
-      if (feedsError) {
-        toast.push({ message: `Feeds request failed: ${feedsError.message}`, variant: 'danger' });
-        setFeeds([]);
-      } else {
-        setFeeds(data || []);
-      }
-
-      // S6-A59: hydrate stale + broken thresholds from `settings` so this
-      // page and /admin/system read the same source of truth. Prior code
-      // kept local-state-only values that diverged silently.
-      const { data: settingsRows } = await supabase
-        .from('settings')
-        .select('key, value')
-        .in('key', ['stale_feed_hours', 'broken_feed_failures', 'pull_interval_minutes']);
-      if (settingsRows) {
-        (settingsRows as Array<{ key: string; value: string | null }>).forEach((r) => {
-          if (r.value == null) return;
-          const n = parseInt(String(r.value), 10);
-          if (!Number.isFinite(n) || n <= 0) return;
-          if (r.key === 'stale_feed_hours') setStaleHours(n);
-          if (r.key === 'broken_feed_failures') setBrokenFailCount(n);
-          if (r.key === 'pull_interval_minutes') setPullIntervalMin(n);
-        });
-      }
+      await loadFeeds();
 
       const { data: catRows } = await supabase.from('categories').select('id, name, slug').eq('is_active', true).order('name');
       if (catRows) setCategories(catRows as Array<{ id: string; name: string; slug: string }>);
@@ -127,29 +147,6 @@ function FeedsAdminInner() {
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // S6-A59: persist threshold edits via the canonical settings upsert
-  // so /admin/system + /admin/feeds + the runtime cron read the same
-  // value.
-  const saveThreshold = async (key: string, value: number) => {
-    try {
-      const res = await fetch('/api/admin/settings/upsert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value: String(value) }),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        toast.push({
-          message: j.error || `Could not save ${key}`,
-          variant: 'danger',
-        });
-      }
-    } catch (err) {
-      console.error('[admin.feeds] saveThreshold failed:', err);
-      toast.push({ message: 'Save failed — try again', variant: 'danger' });
-    }
-  };
 
   const saveFeedField = async (id: string, key: string, value: unknown) => {
     const res = await fetch(`/api/admin/feeds/${id}`, {
@@ -167,7 +164,7 @@ function FeedsAdminInner() {
     toast.push({ message: 'Saved', variant: 'success', duration: 1200 });
   };
 
-  const deriveStatus = (f: FeedRow): FeedStatus => {
+  const deriveStatus = (f: EnrichedFeed): FeedStatus => {
     const errors = f.error_count ?? 0;
     if (errors >= brokenFailCount) return 'broken';
     const lastPolled = f.last_polled_at ? new Date(f.last_polled_at).getTime() : 0;
@@ -176,14 +173,13 @@ function FeedsAdminInner() {
     return 'ok';
   };
 
-  const normFeed = (f: FeedRow): DisplayFeed => {
-    const r = f as FeedRow & { priority_weight?: number | null; allowed_category_slugs?: string[] | null };
+  const normFeed = (f: EnrichedFeed): DisplayFeed => {
+    const r = f as EnrichedFeed & { priority_weight?: number | null; allowed_category_slugs?: string[] | null };
     return {
       ...f,
       outlet: f.source_name || f.name || '',
       status: deriveStatus(f),
       lastPull: (f.last_polled_at || '').replace('T', ' ').slice(0, 16) || 'Never',
-      articles: f.articles_imported_count ?? 0,
       active: f.is_active ?? true,
       failCount: f.error_count ?? 0,
       priority_weight: r.priority_weight ?? 5,
@@ -191,16 +187,14 @@ function FeedsAdminInner() {
     };
   };
 
-  // normFeed closes over staleHours + brokenFailCount; listing those as
-  // deps is equivalent to listing the function itself (re-created each
-  // render, same inputs). Lint can't see the capture.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const displayFeeds = useMemo(() => feeds.map(normFeed), [feeds, staleHours, brokenFailCount]);
 
   const filtered = useMemo(() => {
     let list = displayFeeds;
-    if (filter === 'ok') list = list.filter((f) => f.status === 'ok');
-    if (filter === 'issues') list = list.filter((f) => f.status !== 'ok');
+    if (filter === 'producing') list = list.filter((f) => f.items_24h > 0);
+    if (filter === 'silent7d') list = list.filter((f) => f.active && f.items_7d === 0);
+    if (filter === 'failing') list = list.filter((f) => f.failCount > 0);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter(
@@ -229,7 +223,7 @@ function FeedsAdminInner() {
   const removeFeed = async (feed: DisplayFeed) => {
     const ok = await confirm({
       title: `Remove feed "${feed.outlet}"?`,
-      message: 'The feed will stop polling and the row is deleted. Articles already imported remain.',
+      message: 'The feed will stop polling and is hidden from the admin list. Imported articles, comments, and reading history are kept. Re-adding the same URL restores the feed.',
       confirmLabel: 'Remove feed',
       variant: 'danger',
     });
@@ -245,22 +239,22 @@ function FeedsAdminInner() {
     toast.push({ message: 'Feed removed', variant: 'success' });
   };
 
-  const rePull = async (id: string) => {
+  const clearErrors = async (id: string) => {
     const res = await fetch(`/api/admin/feeds/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'repull' }),
+      body: JSON.stringify({ action: 'clear_errors' }),
     });
     if (!res.ok) {
-      const json = await res.json().catch(() => ({ error: 're-pull failed' }));
-      toast.push({ message: `Re-pull failed: ${json.error || 'unknown error'}`, variant: 'danger' });
+      const json = await res.json().catch(() => ({ error: 'clear errors failed' }));
+      toast.push({ message: `Failed to clear errors: ${json.error || 'unknown error'}`, variant: 'danger' });
       return;
     }
     const now = new Date().toISOString();
     setFeeds((prev) => prev.map((f) => (f.id === id
       ? { ...f, error_count: 0, last_error: null, last_error_at: null, last_polled_at: now }
       : f)));
-    toast.push({ message: 'Error count cleared. Next poll will retry.', variant: 'success' });
+    toast.push({ message: 'Error count cleared. The feed will retry on its next ingest run.', variant: 'success' });
   };
 
   const addFeed = async () => {
@@ -275,25 +269,115 @@ function FeedsAdminInner() {
         url: newUrl.trim(),
         feed_type: 'rss',
         is_active: true,
-        // audience defaults to 'adult' server-side. The unified-feed pivot
-        // dropped this column from the UI; the server still accepts it for
-        // back-compat with the cluster-mutation RPCs.
       }),
     });
     const json = await res.json().catch(() => ({}));
     setAdding(false);
     if (!res.ok || !json.row) { toast.push({ message: `Add failed: ${json.error || 'unknown error'}`, variant: 'danger' }); return; }
-    setFeeds((prev) => [...prev, json.row]);
+    // Reload to get enriched counts on the new row.
+    await loadFeeds();
     toast.push({ message: 'Feed added', variant: 'success' });
     setNewOutlet('');
     setNewUrl('');
     setShowAdd(false);
   };
 
-  const okCount = displayFeeds.filter((f) => f.status === 'ok').length;
-  const issueCount = displayFeeds.filter((f) => f.status !== 'ok').length;
-  const totalArticles = displayFeeds.reduce((a, f) => a + f.articles, 0);
-  const totalFails = displayFeeds.reduce((a, f) => a + f.failCount, 0);
+  // ── Bulk operations ──────────────────────────────────────────────────────────
+
+  // Server bulk endpoint rejects payloads > 200 ids. Cap client-side to give
+  // a clear message rather than a silent 400.
+  const MAX_BULK_IDS = 200;
+
+  const visibleIds = filtered.map((f) => f.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id));
+
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        // Cap at MAX_BULK_IDS: if the filtered list has > 200 rows, select-all
+        // selects only the first 200 so the bulk operation stays within limits.
+        const toAdd = visibleIds.slice(0, MAX_BULK_IDS);
+        toAdd.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const toggleSelectRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const doBulkOp = async (op: 'pause' | 'resume' | 'delete') => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    if (op === 'pause' || op === 'resume') {
+      const label = op === 'pause' ? 'Pause' : 'Resume';
+      const msg = `${label} ${ids.length} feed${ids.length === 1 ? '' : 's'}?`;
+      if (!window.confirm(msg)) return;
+    }
+
+    setBulkWorking(true);
+    try {
+      const res = await fetch('/api/admin/feeds/bulk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, op }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.push({ message: (json as { error?: string }).error ?? `${op} failed`, variant: 'danger' });
+        return;
+      }
+      toast.push({ message: `${op === 'delete' ? 'Deleted' : op === 'pause' ? 'Paused' : 'Resumed'} ${(json as { affected?: number }).affected ?? ids.length} feed(s)`, variant: 'success' });
+      setSelectedIds(new Set());
+      await loadFeeds();
+    } finally {
+      setBulkWorking(false);
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size > 5) {
+      setDeleteConfirmText('');
+      setShowBulkDeleteModal(true);
+    } else {
+      const ids = Array.from(selectedIds);
+      if (!window.confirm(`Hide ${ids.length} feed(s) from the list? Imported articles and history are kept; re-adding the same URL restores them.`)) return;
+      void doBulkOp('delete');
+    }
+  };
+
+  const confirmTypedDelete = async () => {
+    if (deleteConfirmText !== 'delete') return;
+    setShowBulkDeleteModal(false);
+    setDeleteConfirmText('');
+    await doBulkOp('delete');
+  };
+
+  // ── Stat values ──────────────────────────────────────────────────────────────
+
+  const producingToday = displayFeeds.filter((f) => f.items_24h > 0).length;
+  const silent7dCount = totals?.silent_7d ?? displayFeeds.filter((f) => f.active && f.items_7d === 0).length;
+  const failingCount = totals?.failing ?? displayFeeds.filter((f) => f.failCount > 0).length;
+  const items24h = totals?.items_24h ?? 0;
+
+  const topLabel = topContributor
+    ? `${topContributor.outlet} — ${topContributor.items_7d} items / 7d`
+    : '—';
 
   const statusVariant = (s: FeedStatus): 'success' | 'warn' | 'danger' => {
     if (s === 'ok') return 'success';
@@ -302,7 +386,35 @@ function FeedsAdminInner() {
   };
   const statusLabel = (s: FeedStatus) => (s === 'ok' ? 'OK' : s === 'stale' ? 'Stale' : 'Broken');
 
+  // ── Table columns ────────────────────────────────────────────────────────────
+
   const columns = [
+    {
+      key: 'checkbox',
+      header: (
+        <input
+          type="checkbox"
+          checked={allVisibleSelected}
+          ref={(el) => { if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected; }}
+          onChange={toggleSelectAll}
+          aria-label="Select all filtered feeds"
+          style={{ cursor: 'pointer' }}
+        />
+      ),
+      render: (row: DisplayFeed) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selectedIds.has(row.id)}
+            onChange={() => toggleSelectRow(row.id)}
+            aria-label={`Select ${row.outlet}`}
+            style={{ cursor: 'pointer' }}
+          />
+        </div>
+      ),
+      width: 40,
+      sortable: false,
+    },
     {
       key: 'outlet',
       header: 'Source',
@@ -311,6 +423,7 @@ function FeedsAdminInner() {
         if (row.active) {
           dotColor = row.status === 'ok' ? ADMIN_C.success : row.status === 'stale' ? ADMIN_C.warn : ADMIN_C.danger;
         }
+        const showError = row.status === 'broken' && row.last_error;
         return (
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: S[2], fontWeight: 600, color: row.active ? ADMIN_C.ink : ADMIN_C.muted }}>
@@ -324,6 +437,11 @@ function FeedsAdminInner() {
             <div style={{ fontSize: F.xs, color: ADMIN_C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>
               {row.url}
             </div>
+            {showError && (
+              <div style={{ fontSize: F.xs, color: ADMIN_C.danger, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>
+                {(row.last_error ?? '').length > 60 ? (row.last_error ?? '').slice(0, 60) + '…' : (row.last_error ?? '')}
+              </div>
+            )}
           </div>
         );
       },
@@ -343,6 +461,31 @@ function FeedsAdminInner() {
       width: 170,
     },
     {
+      key: 'items_24h',
+      header: 'Items / 24h',
+      align: 'right' as const,
+      render: (row: DisplayFeed) => (
+        <span
+          style={{
+            fontWeight: row.items_24h > 50 ? 700 : 400,
+            color: row.items_24h === 0 ? ADMIN_C.muted : ADMIN_C.ink,
+          }}
+        >
+          {row.items_24h}
+        </span>
+      ),
+      width: 100,
+    },
+    {
+      key: 'items_7d',
+      header: 'Items / 7d',
+      align: 'right' as const,
+      render: (row: DisplayFeed) => (
+        <span style={{ fontSize: F.xs, color: ADMIN_C.dim }}>{row.items_7d}</span>
+      ),
+      width: 90,
+    },
+    {
       key: 'failCount',
       header: 'Errors',
       align: 'right' as const,
@@ -359,19 +502,14 @@ function FeedsAdminInner() {
       width: 80,
     },
     {
-      key: 'articles',
-      header: 'Articles',
-      align: 'right' as const,
-      render: (row: DisplayFeed) => row.articles,
-      width: 100,
-    },
-    {
       key: 'active',
       header: 'Active',
       sortable: false,
+      // bulkWorking guard: disable per-row switch while a bulk op is in flight
+      // to prevent conflicting individual saves during the batch request.
       render: (row: DisplayFeed) => (
         <div onClick={(e) => e.stopPropagation()}>
-          <Switch checked={row.active} onChange={(next) => toggleFeed(row.id, next)} />
+          <Switch checked={row.active} onChange={(next) => toggleFeed(row.id, next)} disabled={bulkWorking} />
         </div>
       ),
       width: 80,
@@ -398,7 +536,7 @@ function FeedsAdminInner() {
             <Badge variant="neutral">
               {displayFeeds.length} feeds
             </Badge>
-            <Button variant="primary" onClick={() => setShowAdd(true)}>Add feed</Button>
+            <Button variant="primary" onClick={() => setShowAdd(true)} disabled={bulkWorking}>Add feed</Button>
           </>
         }
       />
@@ -412,54 +550,11 @@ function FeedsAdminInner() {
           }}
         >
           <StatCard label="Total feeds" value={displayFeeds.length} />
-          <StatCard label="Healthy" value={okCount} />
-          <StatCard label="Issues" value={issueCount} />
-          <StatCard label="Articles imported" value={totalArticles} />
-          <StatCard label="Total errors" value={totalFails} />
-        </div>
-      </PageSection>
-
-      <PageSection title="Health thresholds" description="Tune when feeds are flagged stale or broken. Values affect the dashboard in real-time.">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[4], alignItems: 'flex-end' }}>
-          <div style={{ flex: '1 1 140px', minWidth: 120 }}>
-            <label style={labelStyle}>Stale after (hours)</label>
-            <NumberInput
-              size="sm"
-              value={staleHours}
-              min={1}
-              onChange={(e) => {
-                const n = parseInt(e.target.value, 10) || 0;
-                setStaleHours(n);
-                if (n > 0) saveThreshold('stale_feed_hours', n);
-              }}
-            />
-          </div>
-          <div style={{ flex: '1 1 140px', minWidth: 120 }}>
-            <label style={labelStyle}>Broken after (errors)</label>
-            <NumberInput
-              size="sm"
-              value={brokenFailCount}
-              min={1}
-              onChange={(e) => {
-                const n = parseInt(e.target.value, 10) || 0;
-                setBrokenFailCount(n);
-                if (n > 0) saveThreshold('broken_feed_failures', n);
-              }}
-            />
-          </div>
-          <div style={{ flex: '1 1 140px', minWidth: 120 }}>
-            <label style={labelStyle}>Pull interval (min)</label>
-            <NumberInput
-              size="sm"
-              value={pullIntervalMin}
-              min={1}
-              onChange={(e) => {
-                const n = parseInt(e.target.value, 10) || 0;
-                setPullIntervalMin(n);
-                if (n > 0) saveThreshold('pull_interval_minutes', n);
-              }}
-            />
-          </div>
+          <StatCard label="Producing today" value={producingToday} />
+          <StatCard label="Silent 7d" value={silent7dCount} />
+          <StatCard label="Failing" value={failingCount} />
+          <StatCard label="Items today" value={items24h} />
+          <StatCard label="Top contributor" value={topLabel} />
         </div>
       </PageSection>
 
@@ -473,11 +568,72 @@ function FeedsAdminInner() {
       )}
 
       <PageSection title="Feeds">
+        {/* Bulk action bar — shown when ≥1 row is selected */}
+        {selectedIds.size > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: S[2],
+              padding: `${S[2]}px ${S[3]}px`,
+              marginBottom: S[2],
+              background: ADMIN_C.card,
+              border: `1px solid ${ADMIN_C.border}`,
+              borderRadius: 8,
+              fontSize: F.sm,
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
+            }}
+          >
+            <span style={{ flex: 1, fontWeight: 600, color: ADMIN_C.ink }}>
+              {selectedIds.size} selected
+              {selectedIds.size > MAX_BULK_IDS && (
+                <span style={{ fontWeight: 400, color: ADMIN_C.warn, marginLeft: S[2] }}>
+                  Select up to {MAX_BULK_IDS} feeds at a time. Currently {selectedIds.size} selected.
+                </span>
+              )}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={bulkWorking || selectedIds.size > MAX_BULK_IDS}
+              onClick={() => void doBulkOp('pause')}
+            >
+              Pause
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={bulkWorking || selectedIds.size > MAX_BULK_IDS}
+              onClick={() => void doBulkOp('resume')}
+            >
+              Resume
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={bulkWorking || selectedIds.size > MAX_BULK_IDS}
+              onClick={handleBulkDelete}
+            >
+              Delete
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={bulkWorking}
+              onClick={() => setSelectedIds(new Set())}
+            >
+              Clear
+            </Button>
+          </div>
+        )}
+
         <DataTable
           rowKey={(r: DisplayFeed) => r.id}
           columns={columns}
           rows={filtered}
-          onRowClick={(r: DisplayFeed) => setSelected(r)}
+          onRowClick={bulkWorking ? undefined : (r: DisplayFeed) => setSelected(r)}
           toolbar={
             <Toolbar
               left={
@@ -489,17 +645,37 @@ function FeedsAdminInner() {
                     onChange={(e) => setSearch(e.target.value)}
                     style={{ maxWidth: 280 }}
                   />
-                  <Select
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value as typeof filter)}
-                    block={false}
-                    style={{ width: 160 }}
-                    options={[
-                      { value: 'all', label: 'All statuses' },
-                      { value: 'ok', label: 'Healthy only' },
-                      { value: 'issues', label: 'Issues only' },
-                    ]}
-                  />
+                  {/* Filter chips */}
+                  <div style={{ display: 'flex', gap: S[1] }}>
+                    {(
+                      [
+                        { key: 'all', label: 'All' },
+                        { key: 'producing', label: 'Producing today' },
+                        { key: 'silent7d', label: 'Silent 7d' },
+                        { key: 'failing', label: 'Failing' },
+                      ] as { key: FilterChip; label: string }[]
+                    ).map((chip) => (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        onClick={() => setFilter(chip.key)}
+                        style={{
+                          padding: `${S[1]}px ${S[2]}px`,
+                          borderRadius: 20,
+                          border: `1px solid ${filter === chip.key ? ADMIN_C.border : ADMIN_C.divider}`,
+                          background: filter === chip.key ? ADMIN_C.ink : ADMIN_C.bg,
+                          color: filter === chip.key ? '#ffffff' : ADMIN_C.dim,
+                          fontSize: F.sm,
+                          fontWeight: filter === chip.key ? 600 : 400,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
                 </>
               }
             />
@@ -514,9 +690,19 @@ function FeedsAdminInner() {
         />
       </PageSection>
 
+      {/* Feed detail drawer */}
       <Drawer
         open={!!selected}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          // Flush any pending priority_weight debounce so the operator's last
+          // keystroke saves even if the drawer is closed within the 300ms window.
+          if (priorityDebounceRef.current) {
+            clearTimeout(priorityDebounceRef.current);
+            priorityDebounceRef.current = null;
+            if (selected) void saveFeedField(selected.id, 'priority_weight', selected.priority_weight);
+          }
+          setSelected(null);
+        }}
         title={selected?.outlet || 'Feed detail'}
         description={selected?.url}
         width="md"
@@ -524,9 +710,7 @@ function FeedsAdminInner() {
           selected && (
             <>
               <Button variant="ghost" onClick={() => selected && removeFeed(selected)}>Remove</Button>
-              {selected.status !== 'ok' && (
-                <Button variant="primary" onClick={() => selected && rePull(selected.id)}>Re-pull</Button>
-              )}
+              <Button variant="ghost" onClick={() => selected && clearErrors(selected.id)}>Clear errors</Button>
             </>
           )
         }
@@ -579,8 +763,9 @@ function FeedsAdminInner() {
               </div>
             </div>
             <KV label="Last polled" value={selected.lastPull} />
+            <KV label="Items / 24h" value={String(selected.items_24h)} />
+            <KV label="Items / 7d" value={String(selected.items_7d)} />
             <KV label="Error count" value={String(selected.failCount)} />
-            <KV label="Articles imported" value={String(selected.articles)} />
             <KV label="Feed type" value={selected.feed_type || 'rss'} />
             <KV label="Language" value={selected.language || '—'} />
             <KV label="Auto-publish" value={selected.is_auto_publish ? 'Yes' : 'No'} />
@@ -609,6 +794,7 @@ function FeedsAdminInner() {
         )}
       </Drawer>
 
+      {/* Add feed modal */}
       <Modal
         open={showAdd}
         onClose={() => setShowAdd(false)}
@@ -632,6 +818,41 @@ function FeedsAdminInner() {
             <label style={labelStyle}>RSS URL</label>
             <TextInput type="url" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} placeholder="https://example.com/rss" />
           </div>
+        </div>
+      </Modal>
+
+      {/* Bulk delete typed-confirmation modal (used when N > 5) */}
+      <Modal
+        open={showBulkDeleteModal}
+        onClose={() => { setShowBulkDeleteModal(false); setDeleteConfirmText(''); }}
+        title={`Delete ${selectedIds.size} feeds?`}
+        description="Feeds are hidden from the list and stop polling. Imported articles, comments, discovery items, and reading history are kept. Re-adding the same URL restores a feed."
+        width="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => { setShowBulkDeleteModal(false); setDeleteConfirmText(''); }}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              disabled={deleteConfirmText !== 'delete'}
+              onClick={confirmTypedDelete}
+            >
+              Delete feeds
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
+          <div style={{ fontSize: F.sm, color: ADMIN_C.dim }}>
+            Type <strong style={{ color: ADMIN_C.ink }}>delete</strong> to confirm.
+          </div>
+          <TextInput
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            placeholder="delete"
+            autoFocus
+          />
         </div>
       </Modal>
 

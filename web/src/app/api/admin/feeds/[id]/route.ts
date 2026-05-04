@@ -1,4 +1,4 @@
-// T-005 — server route for admin/feeds update + delete + re-pull.
+// T-005 — server route for admin/feeds update + delete + clear-errors (formerly re-pull).
 // Replaces direct `supabase.from('feeds').{update,delete}(...)` from the client.
 import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
@@ -7,7 +7,7 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 type PatchBody = {
-  action?: 'toggle' | 'repull';
+  action?: 'toggle' | 'clear_errors' | 'repull';
   is_active?: boolean;
   priority_weight?: unknown;
   allowed_category_slugs?: unknown;
@@ -40,7 +40,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const body = (await request.json().catch(() => ({}))) as PatchBody;
 
-  if (body.action === 'repull') {
+  // alias kept for back-compat with audit log queries; new code uses clear_errors
+  if (body.action === 'clear_errors' || body.action === 'repull') {
     const update = {
       error_count: 0,
       last_error: null,
@@ -49,11 +50,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     };
     const { error } = await service.from('feeds').update(update).eq('id', id);
     if (error) {
-      console.error('[admin.feeds.repull]', error.message);
+      console.error('[admin.feeds.clear_errors]', error.message);
       return NextResponse.json({ error: 'Could not reset feed' }, { status: 500 });
     }
     await recordAdminAction({
-      action: 'feed.repull',
+      action: 'feed.clear_errors',
       targetTable: 'feeds',
       targetId: id,
       newValue: update,
@@ -86,7 +87,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   // priority_weight and allowed_category_slugs
-  const patch: { priority_weight?: number; allowed_category_slugs?: string[] } = {};
+  const patch: {
+    priority_weight?: number;
+    allowed_category_slugs?: string[];
+  } = {};
   if (body.priority_weight !== undefined) {
     const n = body.priority_weight;
     if (!Number.isInteger(n) || (n as number) < 1 || (n as number) > 10) {
@@ -164,7 +168,17 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     .maybeSingle();
   if (!prior) return NextResponse.json({ error: 'Feed not found' }, { status: 404 });
 
-  const { error } = await service.from('feeds').delete().eq('id', id);
+  // Soft-delete: row stays for provenance; cascade FKs remain as safety net but
+  // are not exercised through this path.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (service as any)
+    .from('feeds')
+    .update({
+      deleted_at: new Date().toISOString(),
+      is_active: false,  // also pause it so ingest stops polling immediately
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
   if (error) {
     console.error('[admin.feeds.delete]', error.message);
     return NextResponse.json({ error: 'Could not delete feed' }, { status: 500 });

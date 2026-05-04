@@ -51,6 +51,7 @@ type FeedRow = Pick<
   name?: string | null;
   priority_weight?: number | null;
   allowed_category_slugs?: string[] | null;
+  error_count?: number | null;
 };
 
 interface FlatItem {
@@ -197,8 +198,9 @@ export async function POST(req: Request) {
     const serviceAny = service as any;
     const { data: feedsData, error: feedsErr } = await serviceAny
       .from('feeds')
-      .select('id,url,source_name,feed_type,name,priority_weight,allowed_category_slugs')
+      .select('id,url,source_name,feed_type,name,priority_weight,allowed_category_slugs,error_count')
       .eq('is_active', true)
+      .is('deleted_at', null)
       .in('feed_type', ['feed', 'rss']);
     if (feedsErr) {
       throw new Error(`feeds lookup failed: ${(feedsErr as { message: string }).message}`);
@@ -221,11 +223,27 @@ export async function POST(req: Request) {
     let feedsFailed = 0;
     const allItems: FlatItem[] = [];
 
+    // Per-feed outcome map — populated during flatten, consumed after insert.
+    // ok=true: fetch succeeded; ok=false: fetch rejected.
+    // currentErrorCount is read from the already-fetched feeds row so we can
+    // compute error_count + 1 without an extra round-trip.
+    // Known race: if two ingest runs overlap, error_count increments can race.
+    // Runs are single-flighted via pipeline_runs, so this is acceptable.
+    interface FeedOutcome {
+      ok: boolean;
+      error?: string;
+      currentErrorCount: number;
+    }
+    const feedOutcomes = new Map<string, FeedOutcome>();
+
     // 8. Flatten — ignore items without .link
-    for (const result of fetchResults) {
+    for (let i = 0; i < fetchResults.length; i++) {
+      const result = fetchResults[i];
+      const feed = feeds[i];
       if (result.status === 'fulfilled') {
         feedsSucceeded++;
-        const { feed, rss } = result.value;
+        const { rss } = result.value;
+        feedOutcomes.set(feed.id, { ok: true, currentErrorCount: feed.error_count ?? 0 });
 
         const items = rss?.items ?? [];
         const allowedSlugs = feed.allowed_category_slugs ?? [];
@@ -247,6 +265,12 @@ export async function POST(req: Request) {
         }
       } else {
         feedsFailed++;
+        const errMsg = String((result as PromiseRejectedResult).reason).slice(0, 500);
+        feedOutcomes.set(feed.id, {
+          ok: false,
+          error: errMsg,
+          currentErrorCount: feed.error_count ?? 0,
+        });
       }
     }
 
@@ -266,10 +290,15 @@ export async function POST(req: Request) {
     // 9. Dedup + insert into the single discovery_items pool.
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
 
-    async function processItems(
-      items: FlatItem[]
-    ): Promise<{ inserted: number; skipped: number; raceDeduped: number }> {
-      if (items.length === 0) return { inserted: 0, skipped: 0, raceDeduped: 0 };
+    async function processItems(items: FlatItem[]): Promise<{
+      inserted: number;
+      skipped: number;
+      raceDeduped: number;
+      insertedByFeed: Map<string, number>;
+    }> {
+      if (items.length === 0) {
+        return { inserted: 0, skipped: 0, raceDeduped: 0, insertedByFeed: new Map() };
+      }
 
       // Dedup query in batches of 100
       const existingUrls = new Set<string>();
@@ -306,7 +335,9 @@ export async function POST(req: Request) {
         fresh.push(it);
       }
 
-      if (fresh.length === 0) return { inserted: 0, skipped, raceDeduped: 0 };
+      if (fresh.length === 0) {
+        return { inserted: 0, skipped, raceDeduped: 0, insertedByFeed: new Map() };
+      }
 
       // Map to insert rows
       const rows: DiscoveryInsert[] = fresh.map((it) => ({
@@ -322,6 +353,7 @@ export async function POST(req: Request) {
       // Upsert in batches of 500
       let inserted = 0;
       let raceDeduped = 0;
+      const insertedByFeed = new Map<string, number>();
       for (let i = 0; i < rows.length; i += 500) {
         const batch = rows.slice(i, i + 500);
         const { data: insData, error: insErr } = await service
@@ -330,12 +362,18 @@ export async function POST(req: Request) {
             onConflict: 'raw_url',
             ignoreDuplicates: true,
           })
-          .select('id');
+          .select('id, feed_id');
         if (insErr) {
           throw new Error(`discovery_items upsert failed: ${insErr.message}`);
         }
         const written = (insData ?? []).length;
         inserted += written;
+        // Tally per-feed inserted counts from the actually-written rows.
+        for (const row of insData ?? []) {
+          if (row.feed_id) {
+            insertedByFeed.set(row.feed_id, (insertedByFeed.get(row.feed_id) ?? 0) + 1);
+          }
+        }
         // M6 — visibility on race-window dedup. ignoreDuplicates silently
         // drops rows that another concurrent ingest (or a re-run within
         // the same minute) already inserted between our SELECT-dedup pass
@@ -346,7 +384,7 @@ export async function POST(req: Request) {
         }
       }
 
-      return { inserted, skipped, raceDeduped };
+      return { inserted, skipped, raceDeduped, insertedByFeed };
     }
 
     const {
@@ -518,6 +556,74 @@ export async function POST(req: Request) {
 
     const clusterRun = await clusterPool();
 
+    // 10b. Per-feed health writeback.
+    //
+    // Writes last_polled_at, error_count, last_error, and last_error_at back
+    // to each feeds row so the admin /feeds page shows live health status.
+    //
+    // lifetime articles_imported_count was removed 2026-05-04; per-feed 24h/7d
+    // counts come from discovery_items joins now (see /api/admin/feeds/list).
+    //
+    // Race note: error_count increments use values read from the feeds row
+    // fetched in step 6 above (read-modify-write). Two concurrent ingest runs
+    // could both read the same value and write the same incremented result,
+    // losing one increment. This is acceptable because runs are serialized
+    // via the pipeline_runs lock (one running row at a time per manual
+    // trigger); a true race requires two simultaneous HTTP calls to this
+    // endpoint by different admin users, which is operationally negligible
+    // pre-launch.
+    let feedWritebackSucceeded = 0;
+    let feedWritebackFailed = 0;
+    const nowIso = new Date().toISOString();
+
+    // Build a lookup of current feed error counts from the already-fetched rows.
+    const feedCounters = new Map<string, { errorCount: number }>();
+    for (const f of feeds) {
+      feedCounters.set(f.id, {
+        errorCount: f.error_count ?? 0,
+      });
+    }
+
+    const writebackPromises = Array.from(feedOutcomes.entries()).map(
+      async ([feedId, outcome]) => {
+        try {
+          const counters = feedCounters.get(feedId) ?? { errorCount: 0 };
+          if (outcome.ok) {
+            const { error: wErr } = await service
+              .from('feeds')
+              .update({
+                last_polled_at: nowIso,
+                error_count: 0,
+                last_error: null,
+                last_error_at: null,
+              })
+              .eq('id', feedId);
+            if (wErr) throw wErr;
+          } else {
+            const { error: wErr } = await service
+              .from('feeds')
+              .update({
+                last_polled_at: nowIso,
+                error_count: counters.errorCount + 1,
+                last_error: outcome.error ?? null,
+                last_error_at: nowIso,
+              })
+              .eq('id', feedId);
+            if (wErr) throw wErr;
+          }
+          feedWritebackSucceeded++;
+        } catch (wbErr) {
+          feedWritebackFailed++;
+          console.warn('[newsroom.ingest.feed_writeback_failed]', {
+            feed_id: feedId,
+            error: String(wbErr),
+          });
+        }
+      }
+    );
+
+    await Promise.all(writebackPromises);
+
     // 11. Mark run completed
     const completedAt = new Date();
     const durationMs = completedAt.getTime() - startedAtMs;
@@ -531,6 +637,7 @@ export async function POST(req: Request) {
       itemsSkipped,
       itemsRaceDeduped, // M6 — surface concurrent-ingest dedup count
       clustering: clusterRun.summary,
+      feedsWriteback: { succeeded: feedWritebackSucceeded, failed: feedWritebackFailed },
     } as unknown as Json;
 
     const stepTimings: Json = {

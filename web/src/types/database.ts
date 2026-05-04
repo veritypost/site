@@ -2871,6 +2871,7 @@ export type Database = {
       comments: {
         Row: {
           agree_count: number
+          ai_score_attempts: number
           ai_sentiment: string | null
           ai_tag: string | null
           ai_tag_confidence: number | null
@@ -2919,6 +2920,7 @@ export type Database = {
         }
         Insert: {
           agree_count?: number
+          ai_score_attempts?: number
           ai_sentiment?: string | null
           ai_tag?: string | null
           ai_tag_confidence?: number | null
@@ -2967,6 +2969,7 @@ export type Database = {
         }
         Update: {
           agree_count?: number
+          ai_score_attempts?: number
           ai_sentiment?: string | null
           ai_tag?: string | null
           ai_tag_confidence?: number | null
@@ -5263,6 +5266,117 @@ export type Database = {
         }
         Relationships: []
       }
+      events_20260505: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
       events_default: {
         Row: {
           article_id: string | null
@@ -6354,6 +6468,7 @@ export type Database = {
           last_etag: string | null
           last_modified: string | null
           last_polled_at: string | null
+          max_items_per_run: number | null
           metadata: Json
           name: string
           poll_interval_minutes: number
@@ -6384,6 +6499,7 @@ export type Database = {
           last_etag?: string | null
           last_modified?: string | null
           last_polled_at?: string | null
+          max_items_per_run?: number | null
           metadata?: Json
           name: string
           poll_interval_minutes?: number
@@ -6414,6 +6530,7 @@ export type Database = {
           last_etag?: string | null
           last_modified?: string | null
           last_polled_at?: string | null
+          max_items_per_run?: number | null
           metadata?: Json
           name?: string
           poll_interval_minutes?: number
@@ -9976,6 +10093,8 @@ export type Database = {
           id: string
           is_family_member: boolean
           kid_seats_paid: number
+          last_terminal_event_at: string | null
+          last_terminal_event_type: string | null
           metadata: Json
           next_renewal_at: string | null
           pause_end: string | null
@@ -10015,6 +10134,8 @@ export type Database = {
           id?: string
           is_family_member?: boolean
           kid_seats_paid?: number
+          last_terminal_event_at?: string | null
+          last_terminal_event_type?: string | null
           metadata?: Json
           next_renewal_at?: string | null
           pause_end?: string | null
@@ -10054,6 +10175,8 @@ export type Database = {
           id?: string
           is_family_member?: boolean
           kid_seats_paid?: number
+          last_terminal_event_at?: string | null
+          last_terminal_event_type?: string | null
           metadata?: Json
           next_renewal_at?: string | null
           pause_end?: string | null
@@ -12292,6 +12415,7 @@ export type Database = {
       is_family_owner: { Args: { p_user_id: string }; Returns: boolean }
       is_kid_delegated: { Args: never; Returns: boolean }
       is_mod_or_above: { Args: never; Returns: boolean }
+      is_owner_mode_user: { Args: { p_user_id: string }; Returns: boolean }
       is_paid_user: { Args: never; Returns: boolean }
       is_premium: { Args: never; Returns: boolean }
       is_user_expert: { Args: { p_user_id: string }; Returns: boolean }
@@ -12370,6 +12494,8 @@ export type Database = {
           story_id: string
         }[]
       }
+      pg_advisory_unlock: { Args: { key: number }; Returns: boolean }
+      pg_try_advisory_lock: { Args: { key: number }; Returns: boolean }
       pipeline_today_cost_usd: { Args: never; Returns: number }
       post_back_channel_message: {
         Args: {
