@@ -6456,7 +6456,9 @@ export type Database = {
           created_at: string
           created_by: string | null
           default_visibility: string
+          deleted_at: string | null
           error_count: number
+          extraction_config: Json
           feed_type: string
           id: string
           is_active: boolean
@@ -6468,7 +6470,6 @@ export type Database = {
           last_etag: string | null
           last_modified: string | null
           last_polled_at: string | null
-          max_items_per_run: number | null
           metadata: Json
           name: string
           poll_interval_minutes: number
@@ -6487,7 +6488,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           default_visibility?: string
+          deleted_at?: string | null
           error_count?: number
+          extraction_config?: Json
           feed_type?: string
           id?: string
           is_active?: boolean
@@ -6499,7 +6502,6 @@ export type Database = {
           last_etag?: string | null
           last_modified?: string | null
           last_polled_at?: string | null
-          max_items_per_run?: number | null
           metadata?: Json
           name: string
           poll_interval_minutes?: number
@@ -6518,7 +6520,9 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           default_visibility?: string
+          deleted_at?: string | null
           error_count?: number
+          extraction_config?: Json
           feed_type?: string
           id?: string
           is_active?: boolean
@@ -6530,7 +6534,6 @@ export type Database = {
           last_etag?: string | null
           last_modified?: string | null
           last_polled_at?: string | null
-          max_items_per_run?: number | null
           metadata?: Json
           name?: string
           poll_interval_minutes?: number

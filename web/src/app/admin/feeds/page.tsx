@@ -21,6 +21,7 @@ import Spinner from '@/components/admin/Spinner';
 import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
+import ExtractionConfigEditor from './_ExtractionConfigEditor';
 
 // Blueprint v2 uses `feeds` (not the legacy `rss_feeds`). Columns renamed:
 // outlet -> name/source_name, active -> is_active, fail_count -> error_count,
@@ -801,6 +802,24 @@ function FeedsAdminInner() {
             <KV label="Language" value={selected.language || '—'} />
             <KV label="Auto-publish" value={selected.is_auto_publish ? 'Yes' : 'No'} />
             <KV label="Wire rewrite" value={selected.is_ai_rewrite ? 'Yes' : 'No'} />
+            {selected.feed_type === 'scrape_json' && (
+              <ExtractionConfigEditor
+                key={selected.id}
+                feed={selected}
+                onSaved={(updated) => {
+                  setSelected((prev) =>
+                    prev ? ({ ...prev, extraction_config: updated } as DisplayFeed) : prev
+                  );
+                  setFeeds((prev) =>
+                    prev.map((f) =>
+                      f.id === selected.id
+                        ? ({ ...f, extraction_config: updated } as EnrichedFeed)
+                        : f
+                    )
+                  );
+                }}
+              />
+            )}
             {selected.last_error && (
               <div>
                 <div style={labelStyle}>Last error</div>

@@ -2,16 +2,19 @@
  * F7 Phase 2 Task 9 — /api/newsroom/ingest/run
  *
  * POST handler for the admin "Refresh feeds" button. Fetches all active
- * feeds across two consumer types in parallel, deduplicates against
+ * feeds across three consumer types in parallel, deduplicates against
  * discovery_items by raw_url, and inserts new pending rows for the
  * pipeline orchestrator (Task 10) to pick up.
  *
  * Consumer types fanned out in parallel:
  *   - 'feed' / 'rss'    — rss-parser path (fetchWithTimeout)
  *   - 'scrape_html'     — Jina+Cheerio discovery scrape (scrapeDiscovery)
- *   - 'scrape_json'     — Phase A: handler not implemented; rows are
- *                         polled-as-deferred to keep their last_polled_at
- *                         fresh without inflating error_count.
+ *   - 'scrape_json'     — Phase B: vendor JSON APIs (NewsAPI, GNews, etc).
+ *                         Per-feed extraction_config drives field mapping +
+ *                         optional env-var-allow-listed Authorization. Empty
+ *                         config = unconfigured (operator hasn't filled it
+ *                         in yet); row is polled-as-unconfigured. Validation
+ *                         failures recorded as failures.
  *
  * Ported from snapshot: verity-post-pipeline-snapshot/src/app/api/ingest/route.js
  * Differences from snapshot:
@@ -42,6 +45,8 @@ import {
   getStoryMatchOverlapPct,
 } from '@/lib/pipeline/story-match';
 import { scrapeDiscovery, type DiscoveredArticle } from '@/lib/pipeline/scrape-discovery';
+import { scrapeJson } from '@/lib/pipeline/scrape-json';
+import { validateExtractionConfig } from '@/lib/pipeline/extraction-config';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -60,6 +65,7 @@ type FeedRow = Pick<
   priority_weight?: number | null;
   allowed_category_slugs?: string[] | null;
   error_count?: number | null;
+  extraction_config?: unknown;
 };
 
 interface FlatItem {
@@ -69,7 +75,7 @@ interface FlatItem {
   excerpt: string;
   pubDate: string | null;
   outlet: string | null;
-  source_class: 'rss' | 'scrape_html';
+  source_class: 'rss' | 'scrape_html' | 'scrape_json';
 }
 
 // ----------------------------------------------------------------------------
@@ -207,7 +213,7 @@ export async function POST(req: Request) {
     const serviceAny = service as any;
     const { data: feedsData, error: feedsErr } = await serviceAny
       .from('feeds')
-      .select('id,url,source_name,feed_type,name,priority_weight,allowed_category_slugs,error_count')
+      .select('id,url,source_name,feed_type,name,priority_weight,allowed_category_slugs,error_count,extraction_config')
       .eq('is_active', true)
       .is('deleted_at', null)
       .in('feed_type', ['feed', 'rss', 'scrape_html', 'scrape_json']);
@@ -236,9 +242,10 @@ export async function POST(req: Request) {
     // Per-feed outcome map — populated during fanout, consumed after insert.
     // ok=true: fetch succeeded (regardless of item count);
     // ok=false: fetch rejected;
-    // deferred=true: scrape_json bucket — no handler this phase; row is
-    //   polled-as-deferred so last_polled_at advances without inflating
-    //   error_count.
+    // unconfigured=true: scrape_json bucket — handler exists, but
+    //   extraction_config is `{}`. Row is polled-as-unconfigured so
+    //   last_polled_at advances without inflating error_count. Operator fills
+    //   in the config via /admin/feeds drawer.
     // currentErrorCount is read from the already-fetched feeds row so we can
     // compute error_count + 1 without an extra round-trip.
     // Known race: if two ingest runs overlap, error_count increments can race.
@@ -247,7 +254,7 @@ export async function POST(req: Request) {
       ok: boolean;
       error?: string;
       currentErrorCount: number;
-      deferred?: boolean;
+      unconfigured?: boolean;
     }
     const feedOutcomes = new Map<string, FeedOutcome>();
     const allItems: FlatItem[] = [];
@@ -256,8 +263,12 @@ export async function POST(req: Request) {
     let rssFailed = 0;
     let scrapeHtmlSucceeded = 0;
     let scrapeHtmlFailed = 0;
+    let scrapeJsonSucceeded = 0;
+    let scrapeJsonFailed = 0;
+    let scrapeJsonUnconfigured = 0;
     let itemsFromRss = 0;
     let itemsFromScrapeHtml = 0;
+    let itemsFromScrapeJson = 0;
 
     // 7a. RSS fanout — full Promise.allSettled, 6s timeout per feed via
     // fetchWithTimeout. Promise.allSettled preserves input order so
@@ -388,33 +399,105 @@ export async function POST(req: Request) {
       }
     })();
 
-    // 7c. Run the two consumer fanouts concurrently.
-    await Promise.all([rssRun, scrapeHtmlRun]);
+    // 7c. scrape_json fanout — Phase B. Per-feed extraction_config drives the
+    // JSON consumer. Empty {} = unconfigured (operator hasn't filled it in
+    // yet); row is polled-as-unconfigured (last_polled_at advances,
+    // error_count untouched, no fetch). Non-empty configs that pass
+    // validateExtractionConfig are scraped via scrapeJson(). Non-empty
+    // configs that FAIL validation are recorded as failures (real
+    // configuration bug worth surfacing).
+    const scrapeJsonRun = (async () => {
+      const fetchResults = await Promise.allSettled(
+        scrapeJsonFeeds.map(async (f) => {
+          const cfg = f.extraction_config;
+          const isEmpty =
+            !cfg ||
+            (typeof cfg === 'object' &&
+              !Array.isArray(cfg) &&
+              Object.keys(cfg as object).length === 0);
+          if (isEmpty) {
+            return { feed: f, kind: 'unconfigured' as const };
+          }
+          if (!validateExtractionConfig(cfg)) {
+            return { feed: f, kind: 'invalid' as const };
+          }
+          const articles = await scrapeJson(f.url, cfg);
+          return { feed: f, kind: 'ok' as const, articles };
+        })
+      );
 
-    // Restore the priority contract: RSS-found URLs win over scrape-found URLs
-    // when the same raw_url appears in both. Within each bucket, items were
-    // pushed in priority_weight-DESC order, which the stable sort preserves.
-    allItems.sort((a, b) => {
-      if (a.source_class === b.source_class) return 0;
-      return a.source_class === 'rss' ? -1 : 1;
-    });
+      for (const result of fetchResults) {
+        if (result.status === 'rejected') {
+          // scrape-json is silent-fail; this branch is defense-in-depth.
+          continue;
+        }
+        const settled = result.value;
+        const f = settled.feed;
+        const currentErrorCount = (f.error_count ?? 0) as number;
 
-    // 7d. Phase A: handler not implemented; rows are polled-as-deferred to
-    // keep their last_polled_at fresh without inflating error_count.
-    let scrapeJsonDeferred = 0;
-    for (const feed of scrapeJsonFeeds) {
-      feedOutcomes.set(feed.id, {
-        ok: true,
-        currentErrorCount: feed.error_count ?? 0,
-        deferred: true,
-      });
-      scrapeJsonDeferred++;
-    }
+        if (settled.kind === 'unconfigured') {
+          feedOutcomes.set(f.id, { ok: true, currentErrorCount, unconfigured: true });
+          scrapeJsonUnconfigured++;
+          continue;
+        }
+        if (settled.kind === 'invalid') {
+          feedOutcomes.set(f.id, {
+            ok: false,
+            error: 'invalid extraction_config',
+            currentErrorCount,
+          });
+          scrapeJsonFailed++;
+          continue;
+        }
+        // kind === 'ok'
+        feedOutcomes.set(f.id, { ok: true, currentErrorCount });
+        scrapeJsonSucceeded++;
+        itemsFromScrapeJson += settled.articles.length;
+
+        const allowedSlugs = f.allowed_category_slugs ?? [];
+        const outlet = f.source_name || f.name || null;
+        for (const a of settled.articles) {
+          if (!a.url) continue;
+          if (allowedSlugs.length > 0) {
+            const text = `${a.title ?? ''} ${a.excerpt ?? ''}`.toLowerCase();
+            if (!allowedSlugs.some((slug) => text.includes(slug.toLowerCase()))) continue;
+          }
+          allItems.push({
+            feed_id: f.id,
+            raw_url: a.url,
+            raw_title: a.title?.trim() || null,
+            excerpt: (a.excerpt ?? '').slice(0, 500),
+            pubDate: a.pubDate ?? null,
+            outlet,
+            source_class: 'scrape_json',
+          });
+        }
+      }
+    })();
+
+    // 7d. Run all three consumer fanouts concurrently.
+    await Promise.all([rssRun, scrapeHtmlRun, scrapeJsonRun]);
+
+    // Restore the priority contract: RSS-found URLs win over scrape_html-found
+    // URLs win over scrape_json-found URLs when the same raw_url appears in
+    // multiple buckets. Within each bucket, items were pushed in
+    // priority_weight-DESC order, which the stable sort (V8/Node) preserves.
+    const SOURCE_CLASS_PRIORITY: Record<FlatItem['source_class'], number> = {
+      rss: 0,
+      scrape_html: 1,
+      scrape_json: 2,
+    };
+    allItems.sort(
+      (a, b) => SOURCE_CLASS_PRIORITY[a.source_class] - SOURCE_CLASS_PRIORITY[b.source_class]
+    );
 
     // Aggregate counters preserved for back-compat with existing consumers
-    // of the response/output_summary shape.
-    const feedsSucceeded = rssSucceeded + scrapeHtmlSucceeded + scrapeJsonDeferred;
-    const feedsFailed = rssFailed + scrapeHtmlFailed;
+    // of the response/output_summary shape. unconfigured rows count toward
+    // feedsSucceeded because they are intentionally polled-with-no-fetch
+    // (last_polled_at advances, error_count untouched).
+    const feedsSucceeded =
+      rssSucceeded + scrapeHtmlSucceeded + scrapeJsonSucceeded + scrapeJsonUnconfigured;
+    const feedsFailed = rssFailed + scrapeHtmlFailed + scrapeJsonFailed;
 
     // Deduplicate allItems by raw_url — keep first occurrence.
     // Feeds were sorted by priority_weight DESC above, so higher-weight feeds
@@ -730,10 +813,11 @@ export async function POST(req: Request) {
       async ([feedId, outcome]) => {
         try {
           const counters = feedCounters.get(feedId) ?? { errorCount: 0 };
-          if (outcome.deferred) {
-            // scrape_json: polled-as-deferred — advance last_polled_at only.
-            // Do not touch error_count / last_error / last_error_at since
-            // the row was deliberately not handed to a consumer this phase.
+          if (outcome.unconfigured) {
+            // scrape_json: polled-as-unconfigured — advance last_polled_at
+            // only. Do not touch error_count / last_error / last_error_at
+            // since the row was deliberately not fetched (extraction_config
+            // is empty; operator hasn't filled it in yet).
             const { error: wErr } = await service
               .from('feeds')
               .update({ last_polled_at: nowIso })
@@ -794,12 +878,15 @@ export async function POST(req: Request) {
       },
       scrape_json: {
         polled: scrapeJsonFeeds.length,
-        deferred: scrapeJsonDeferred,
+        succeeded: scrapeJsonSucceeded,
+        failed: scrapeJsonFailed,
+        unconfigured: scrapeJsonUnconfigured,
       },
     };
     const itemsBySource = {
       rss: itemsFromRss,
       scrape_html: itemsFromScrapeHtml,
+      scrape_json: itemsFromScrapeJson,
     };
 
     const output: Json = {
