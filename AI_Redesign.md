@@ -27,43 +27,49 @@ Implementing the design. Design is LOCKED through four trim sweeps
 listed in § Decisions the owner needs to make.
 
 ### Current status
-- **Last shipped wave:** Wave 2 — Stream B handler (commit `bd1dde2`,
-  2026-05-04). New `web/src/lib/pipeline/grab-plan.ts` (Haiku JSON-mode
-  call, one retry, `GrabPlanParseError`). `/api/newsroom/ingest/run/route.ts`
-  rewritten end-to-end: strict body parse for
-  `{lookbackMs, feedIds, query?: {text, saveAs}, queryId?}`; orphan
-  reaper extended to `research_jobs`; query resolution path inserts
-  `research_queries` rows (when `saveAs`) and snapshots
-  `name`/`query_text` for the audit; `research_jobs` insert + 409 on
-  the parallel singleflight; `reserve_cost_or_fail` before the grab-
-  plan call; `oneDayAgo` + `SIX_HOURS_MS` replaced with `lookbackMs`
-  driving both pubDate cutoff and clustering window; `applyGrabPlanFilter`
-  on dedupedItems before insert; `discovery_items.research_job_id`
-  stamped; phase writes at `planning → fetching → forming → finalizing`
-  with cancel checkpoints between each; story-match path replaced —
-  `loadStoryMatchCandidates` + `findBestMatch` removed in favor of
-  unbounded `stories.keywords` overlap via Wave 1 GIN index, then
-  `keywordOverlap` scoring above `storyMatchThresholdPct`; matched →
-  `last_observed_at` bump + `story_observations` rows; unmatched →
-  new `stories` row (`generation_state='forming'`, slug = slugified
-  title + 8-hex hash, `keywords = cluster.keywords`,
-  `research_query_id` snapshotted) + `story_observations` rows;
-  `feed_clusters` write retained as legacy primitive until Wave 5;
-  finalize tx flips `research_jobs.status='done'` + counters and
-  inserts `discovery_runs` audit with `query_*_snapshot` pair;
-  catch-block separates `CancelledError` (status preserved as
-  `cancelled`) from `failed` and always writes the `discovery_runs`
-  audit row. `tsc --noEmit` clean.
-- **Next wave to ship:** **Wave 3 — Stream C Wikipedia.** New
-  `web/src/lib/pipeline/wikipedia-search.ts` module (silent-fail);
-  one `feed_type='search_api'` row pointing at MediaWiki; polling-cron
-  `WHERE feed_type != 'search_api'` so Wikipedia rows aren't polled
-  on the normal feed schedule. Hooks into the grab plan's
-  `wikipedia_topics` list — fetched in parallel during the fetching
-  phase, results flow into `discovery_items` like any other source.
+- **Last shipped wave:** Wave 3 — Stream C Wikipedia (commit `897222a`,
+  2026-05-04). New `web/src/lib/pipeline/wikipedia-search.ts` —
+  silent-fail MediaWiki consumer (`action=query&prop=extracts|info`,
+  `exintro=1&explaintext=1&redirects=1`), per-topic 6 s timeout,
+  `Promise.allSettled` parallel fan-out, returns
+  `{ items, failed }`. Run handler `route.ts` extended: feeds query
+  now includes `feed_type='search_api'` (the polling-skip is enforced
+  by partition — `searchApiFeeds` bucket only fires inside
+  `wikipediaRun`); `FlatItem.source_class` widened to include
+  `'search_api'`; new `wikipediaRun` fanout fires only when grab plan
+  emits non-empty `wikipedia_topics` AND a configured
+  `provider='wikipedia'` row exists, items pushed with
+  `source_class='search_api'` and `pubDate=null` (encyclopedic;
+  lookback gate skips null-pubDate items); `Promise.all` extended to
+  four fanouts; `SOURCE_CLASS_PRIORITY.search_api=3` so news-feed
+  hits win dedup over Wikipedia hits on the same URL;
+  `feedSourceClass` + `FeedCounter.sourceClass` + response
+  `feedsByType.search_api` + `itemsBySource.search_api` extended;
+  aggregate `feedsSucceeded`/`feedsFailed` include search_api.
+  Migration `20260504240000_seed_wikipedia_search_api_feed.sql`
+  inserts the single MediaWiki row (`feed_type='search_api'`,
+  `extraction_config={provider,endpoint,default_params}`,
+  idempotent via `WHERE NOT EXISTS` on
+  `extraction_config->>'provider'='wikipedia'`). `tsc --noEmit` clean.
+- **Next wave to ship:** **Wave 4 — Stream D Run Feed UI.** Research
+  panel on `/admin/newsroom` Discovery tab: lookback dropdown
+  (7 options, URL `?lb=`), source-scope picker (All / Custom
+  multi-select feed picker, URL `?fid=`), mode toggle
+  (General / Topic, URL `?mode=`/`?q=`/`?qid=`) with saved-queries
+  dropdown and inline pencil/trash. Phase-label progress polling
+  (2s `research_jobs.phase`) with Cancel button writing
+  `status='cancelled'`. Result screen: counters
+  (items_fetched/kept, stories_formed/extended), flat sortable
+  table of `discovery_items` for the job (outlet / title / fetched
+  date / source class badge / match score) with Promote +
+  Discard per row, View Stories CTA. No keyboard shortcuts
+  (per memory). No audience toggle, no feed-group picker, no
+  match-mode picker, no recent-jobs tab.
 - **Branch:** main (direct commit per repo workflow — recent history
   is single-branch).
-- **Open blockers:** none.
+- **Open blockers:** none. Wave 3 migration file is committed; apply
+  via the standard local-CLI pipeline (this session's MCP was
+  read-only).
 
 ### Wave order (locked)
 1. **Wave 0 — `article_sources` only.** New table + RLS (blanket DENY
