@@ -48,6 +48,7 @@ export {
   ProviderAPIError,
   RetryExhaustedError,
   AbortedError,
+  PerRunCapExceededError,
 } from './errors';
 export type { Provider } from './errors';
 
@@ -169,6 +170,7 @@ function jitter(base_ms: number): number {
 
 function isRetryable(err: unknown): boolean {
   if (err instanceof AbortedError) return false;
+  if ((err as { name?: string }).name === 'PerRunCapExceededError') return false;
   const status = (err as { status?: number }).status;
   if (typeof status === 'number') {
     if (status === 429) return true;

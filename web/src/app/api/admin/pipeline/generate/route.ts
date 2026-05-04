@@ -46,6 +46,7 @@ import {
   ProviderAPIError,
   RetryExhaustedError,
   AbortedError,
+  PerRunCapExceededError,
 } from '@/lib/pipeline/errors';
 import { scrapeArticle } from '@/lib/pipeline/scrape-article';
 import { cleanText } from '@/lib/pipeline/clean-text';
@@ -200,14 +201,9 @@ const ALL_STEPS: readonly Step[] = [
 // primary provider to OpenAI, we keep using Anthropic for these small probes.
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 
-// Session A — per-run reservation envelope (Decision 14). Mirrors the
-// `pipeline.per_run_cost_usd_cap` setting (default $0.50). Reserved
-// atomically at run start via reserve_cost_or_fail; settled in the
-// finally block via reconcile_cost_reservation. Concurrent generates see
-// this amount in the cap-check sum until each run completes — eliminates
-// the check-then-spend race that 3 simultaneous Story-card clicks
-// trigger.
-const RUN_RESERVATION_USD = 0.5;
+// Session A / Slice 4 — per-run reservation envelope is now settings-driven.
+// `pipeline.per_run_cost_usd_cap` is read from the settings table at run start
+// (default 1.0). Hardcoded constant removed — see getPerRunCapUsd() below.
 
 // ----------------------------------------------------------------------------
 // Local error: audience safety mismatch (not in errors.ts because it's
@@ -321,6 +317,38 @@ async function getGenerateSettings(service: SupabaseClient<Database>): Promise<{
   };
   _settingsCache = resolved;
   return resolved;
+}
+
+// ----------------------------------------------------------------------------
+// Per-run cost cap — read fresh from settings at run start (not cached with
+// the batch above because this value drives reservation sizing and must be
+// current at the moment the reservation is created). Default 1.0.
+// ----------------------------------------------------------------------------
+
+async function getPerRunCapUsd(service: SupabaseClient<Database>): Promise<number> {
+  const { data, error } = await service
+    .from('settings')
+    .select('value')
+    .eq('key', 'pipeline.per_run_cost_usd_cap')
+    .maybeSingle();
+  if (error || !data) {
+    console.warn('[newsroom.generate.per_run_cap] settings read failed; defaulting to 1.0');
+    return 1.0;
+  }
+  const n = Number(data.value);
+  return Number.isFinite(n) && n > 0 ? n : 1.0;
+}
+
+// Throws PerRunCapExceededError if accumulated run cost has exceeded the cap.
+// Called after every callModel accumulation inside the main pipeline try block.
+function assertPerRunCap(totalCostUsd: number, perRunCapUsd: number): void {
+  if (totalCostUsd > perRunCapUsd) {
+    throw new PerRunCapExceededError(
+      `[newsroom.generate] per-run cap exceeded: total=$${totalCostUsd.toFixed(6)} > cap=$${perRunCapUsd.toFixed(2)}`,
+      totalCostUsd,
+      perRunCapUsd
+    );
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -477,6 +505,7 @@ function sha256Hex(input: string): string {
 
 function classifyError(err: unknown): string {
   if (err instanceof AbortedError) return 'abort';
+  if (err instanceof PerRunCapExceededError) return 'per_run_cap_exceeded';
   if (err instanceof CostCapExceededError) return 'cost_cap_exceeded';
   if (err instanceof ModelNotSupportedError) return 'provider_error';
   if (err instanceof ProviderAPIError) return 'provider_error';
@@ -849,14 +878,15 @@ export async function POST(req: Request) {
   }
   const runId = runRow.id as string;
 
-  // 6b. Session A — atomic cost reservation (Decision 14). Replaces the
-  // previous check-then-run pre-flight: reserve_cost_or_fail takes an
-  // advisory xact lock so concurrent generates can no longer each pass
-  // before any has spent. Distinct from the kill-switch above
-  // (different error_type so dashboards can split). The reservation is
-  // settled in the finally block via reconcile_cost_reservation.
+  // 6b. Session A / Slice 4 — atomic cost reservation (Decision 14). Amount is
+  // now read from `pipeline.per_run_cost_usd_cap` (default 1.0) instead of the
+  // removed hardcoded $0.50 constant. reserve_cost_or_fail also enforces the
+  // per-run cap server-side (Finding #10 migration). Distinct from the
+  // kill-switch above (different error_type). Settled in finally via
+  // reconcile_cost_reservation.
+  const perRunCapUsd = await getPerRunCapUsd(service);
   try {
-    const reservation = await reserveCostOrFail(runId, RUN_RESERVATION_USD);
+    const reservation = await reserveCostOrFail(runId, perRunCapUsd);
     if (!reservation.accepted) {
       pipelineLog.warn('newsroom.generate.cost_cap_check', {
         cluster_id,
@@ -1206,6 +1236,7 @@ export async function POST(req: Request) {
         signal: req.signal,
       });
       totalCostUsd += result.cost_usd;
+      assertPerRunCap(totalCostUsd, perRunCapUsd);
       const raw = extractJSON<unknown>(result.text);
       const parsed = AudienceCheckSchema.parse(raw);
       stepTimings[stepName] = Date.now() - t0;
@@ -1453,6 +1484,7 @@ ${catListText}`;
           }),
     ]);
     totalCostUsd += headlineRes.cost_usd + summaryRes.cost_usd + (catResOrNull?.cost_usd ?? 0);
+    assertPerRunCap(totalCostUsd, perRunCapUsd);
     const headlineParsed = HeadlineSummarySchema.parse(extractJSON(headlineRes.text));
     const summaryParsed = HeadlineSummarySchema.parse(extractJSON(summaryRes.text));
     const catParsed: z.infer<typeof CategorizationSchema> = hintCatRow
@@ -1525,6 +1557,7 @@ ${corpus}`;
       signal: req.signal,
     });
     totalCostUsd += bodyRes.cost_usd;
+    assertPerRunCap(totalCostUsd, perRunCapUsd);
     const bodyParsed = BodySchema.parse(extractJSON(bodyRes.text));
     let finalBodyMarkdown = bodyParsed.body;
     stepTimings[bodyStepName] = Date.now() - bodyStart;
@@ -1579,6 +1612,7 @@ Return JSON:
         signal: req.signal,
       });
       totalCostUsd += groundingRes.cost_usd;
+      assertPerRunCap(totalCostUsd, perRunCapUsd);
       const grounding = SourceGroundingSchema.parse(extractJSON(groundingRes.text));
       if ((grounding.unsupported_claims?.length ?? 0) > 3) {
         pipelineLog.warn(`newsroom.generate.${groundingStepName}`, {
@@ -1697,6 +1731,7 @@ Return JSON:
         additionalInstructions: plagAdditional ?? undefined,
       });
       totalCostUsd += rewriteRes.cost_usd;
+      assertPerRunCap(totalCostUsd, perRunCapUsd);
       if (rewriteRes.rewrite_status === 'failed') {
         plagiarismStatus = 'rewrite_failed';
       } else if (rewriteRes.rewritten) {
@@ -1774,6 +1809,7 @@ Return JSON:
       signal: req.signal,
     });
     totalCostUsd += timelineRes.cost_usd;
+    assertPerRunCap(totalCostUsd, perRunCapUsd);
     const timelineParsed = TimelineSchema.parse(extractJSON(timelineRes.text));
     stepTimings[timelineStepName] = Date.now() - timelineStart;
     pipelineLog.info(`newsroom.generate.${timelineStepName}`, {
@@ -1820,6 +1856,7 @@ Return JSON:
           signal: req.signal,
         });
         totalCostUsd += sanRes.cost_usd;
+        assertPerRunCap(totalCostUsd, perRunCapUsd);
         const sanitized = extractJSON<{ body: string }>(sanRes.text);
         if (sanitized && typeof sanitized.body === 'string' && sanitized.body.length > 50) {
           // Post-call deterministic checks before accepting the sanitized body.
@@ -1901,6 +1938,7 @@ Each option MUST be an object with a "text" field — never a bare string.${free
       signal: req.signal,
     });
     totalCostUsd += quizRes.cost_usd;
+    assertPerRunCap(totalCostUsd, perRunCapUsd);
     const quizParsedRaw = QuizSchema.parse(extractJSON(quizRes.text));
     const quizQuestionsRaw = Array.isArray(quizParsedRaw)
       ? quizParsedRaw
@@ -1961,6 +1999,7 @@ Empty array if all correct.`;
       signal: req.signal,
     });
     totalCostUsd += verifyRes.cost_usd;
+    assertPerRunCap(totalCostUsd, perRunCapUsd);
     const verifyParsed = QuizVerifySchema.parse(extractJSON(verifyRes.text));
     if (verifyParsed.fixes.length > 0) {
       // Per spec: throw on mismatch, do NOT regenerate. Operator can re-click

@@ -56,3 +56,14 @@ export class AbortedError extends Error {
     this.name = 'AbortedError';
   }
 }
+
+export class PerRunCapExceededError extends Error {
+  constructor(
+    msg: string,
+    public total_usd: number,
+    public cap_usd: number
+  ) {
+    super(msg);
+    this.name = 'PerRunCapExceededError';
+  }
+}
