@@ -58,8 +58,6 @@
 		<key>UIColorName</key>
 		<string>launchBackground</string>
 	</dict>
-	<key>UIUserInterfaceStyle</key>
-	<string>Light</string>
 	<key>VP_SITE_URL</key>
 	<string>$(VP_SITE_URL)</string>
 </dict>

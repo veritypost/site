@@ -48,13 +48,6 @@ struct VerityPostApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                // Theme.swift hardcodes light tokens (#111 / #f7f7f7 / #fff
-                // etc.) with no dynamic-color handling. Defense-in-depth
-                // alongside Info.plist UIUserInterfaceStyle = Light so iOS
-                // dark-mode users don't see system chrome flip dark while
-                // painted surfaces stay light. Editorial light-only is the
-                // intentional brand stance (REVIEW.md historical note).
-                .preferredColorScheme(.light)
                 .environmentObject(auth)
                 .environmentObject(articleRouter)
                 .onOpenURL { url in

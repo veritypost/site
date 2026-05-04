@@ -92,6 +92,7 @@ async function loadStories(): Promise<Story[]> {
       feed_cluster_articles(added_at, articles(id, title, subtitle, excerpt, published_at, status, stories(slug)))
     `)
     .eq('is_active', true)
+    .eq('audience', 'adult')
     .is('dismissed_at', null)
     .gte('updated_at', cutoff)
     .order('updated_at', { ascending: false })
