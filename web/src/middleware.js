@@ -319,8 +319,6 @@ export async function middleware(request) {
     pathname === '/welcome' ||
     pathname === '/terms' ||
     pathname === '/privacy' ||
-    pathname === '/redesign/preview' ||
-    pathname === '/redesign/leaderboard' ||
     pathname.startsWith('/r/') ||
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
