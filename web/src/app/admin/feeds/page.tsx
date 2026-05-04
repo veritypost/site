@@ -22,6 +22,7 @@ import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
 import ExtractionConfigEditor from './_ExtractionConfigEditor';
+import ReclassifyModal from './_ReclassifyModal';
 
 // Blueprint v2 uses `feeds` (not the legacy `rss_feeds`). Columns renamed:
 // outlet -> name/source_name, active -> is_active, fail_count -> error_count,
@@ -48,6 +49,7 @@ type DisplayFeed = EnrichedFeed & {
   failCount: number;
   priority_weight: number;
   allowed_category_slugs: string[];
+  zeroResultsStreak: number;
 };
 
 type ListResponse = {
@@ -118,6 +120,8 @@ function FeedsAdminInner() {
   // Typed delete confirmation state.
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  // Phase C — reclassify wizard state.
+  const [showReclassify, setShowReclassify] = useState(false);
 
   const loadFeeds = async () => {
     const res = await fetch('/api/admin/feeds/list');
@@ -198,6 +202,11 @@ function FeedsAdminInner() {
 
   const normFeed = (f: EnrichedFeed): DisplayFeed => {
     const r = f as EnrichedFeed & { priority_weight?: number | null; allowed_category_slugs?: string[] | null };
+    const meta = (f.metadata && typeof f.metadata === 'object' ? f.metadata : {}) as Record<
+      string,
+      unknown
+    >;
+    const streak = typeof meta.zero_results_streak === 'number' ? (meta.zero_results_streak as number) : 0;
     return {
       ...f,
       outlet: f.source_name || f.name || '',
@@ -207,6 +216,7 @@ function FeedsAdminInner() {
       failCount: f.error_count ?? 0,
       priority_weight: r.priority_weight ?? 5,
       allowed_category_slugs: r.allowed_category_slugs ?? [],
+      zeroResultsStreak: streak,
     };
   };
 
@@ -447,6 +457,7 @@ function FeedsAdminInner() {
           dotColor = row.status === 'ok' ? ADMIN_C.success : row.status === 'stale' ? ADMIN_C.warn : ADMIN_C.danger;
         }
         const showError = row.status === 'broken' && row.last_error;
+        const showStreak = row.zeroResultsStreak >= 3;
         return (
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: S[2], fontWeight: 600, color: row.active ? ADMIN_C.ink : ADMIN_C.muted }}>
@@ -456,6 +467,23 @@ function FeedsAdminInner() {
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {row.outlet}
               </span>
+              {showStreak && (
+                <span
+                  style={{
+                    fontSize: F.xs,
+                    color: ADMIN_C.dim,
+                    background: ADMIN_C.card,
+                    border: `1px solid ${ADMIN_C.divider}`,
+                    borderRadius: 10,
+                    padding: '1px 6px',
+                    fontWeight: 500,
+                    flexShrink: 0,
+                  }}
+                  title="This feed produced no unique items across the last few ingest runs (after cross-feed dedup)."
+                >
+                  no unique items {row.zeroResultsStreak}+ runs
+                </span>
+              )}
             </div>
             <div style={{ fontSize: F.xs, color: ADMIN_C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>
               {row.url}
@@ -568,6 +596,13 @@ function FeedsAdminInner() {
             <Badge variant="neutral">
               {displayFeeds.length} feeds
             </Badge>
+            <Button
+              variant="ghost"
+              onClick={() => setShowReclassify(true)}
+              disabled={bulkWorking}
+            >
+              Reclassify
+            </Button>
             <Button variant="primary" onClick={() => setShowAdd(true)} disabled={bulkWorking}>Add feed</Button>
           </>
         }
@@ -905,6 +940,13 @@ function FeedsAdminInner() {
           />
         </div>
       </Modal>
+
+      <ReclassifyModal
+        open={showReclassify}
+        onClose={() => setShowReclassify(false)}
+        feeds={feeds}
+        onApplied={loadFeeds}
+      />
 
       <ConfirmDialogHost />
     </Page>

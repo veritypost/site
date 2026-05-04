@@ -28,6 +28,20 @@
  *   - Admin-gated via admin.pipeline.run_ingest (not open)
  *   - Rate-limited via rate_limits.newsroom_ingest (5 per 600s)
  *   - Kill-switched via settings.ai.ingest_enabled
+ *   - Singleflight-enforced via partial unique index
+ *     `pipeline_runs_singleflight_ingest`. Concurrent POSTs return 409
+ *     with the running run's id; in-route orphan-reap unblocks the
+ *     index when a Vercel lambda was killed before completion.
+ *
+ * feeds.metadata.zero_results_streak (jsonb, integer):
+ *   Number of consecutive successful runs where this feed contributed
+ *   ZERO unique discovery_items after cross-feed dedup. Reset to 0 on
+ *   any non-zero contribution. Surfaced in /admin/feeds via the
+ *   "no unique items 3+ runs" badge and in the staleStreaks response
+ *   field. Distinct from error_count: a feed that publishes only
+ *   duplicates of higher-priority feeds looks "healthy" by error_count
+ *   alone (fetch succeeded) but contributes nothing — this metric
+ *   surfaces that case.
  */
 
 import { NextResponse } from 'next/server';
@@ -66,6 +80,7 @@ type FeedRow = Pick<
   allowed_category_slugs?: string[] | null;
   error_count?: number | null;
   extraction_config?: unknown;
+  metadata?: Record<string, unknown> | null;
 };
 
 interface FlatItem {
@@ -174,7 +189,43 @@ export async function POST(req: Request) {
     );
   }
 
-  // 4. Create pipeline_runs row (status=running)
+  // 4. Singleflight enforcement.
+  //
+  // Phase C added a partial unique index on
+  // pipeline_runs (pipeline_type) WHERE status='running' AND pipeline_type='ingest'.
+  // At most one running ingest row may exist at a time. The insert below
+  // raises postgres 23505 (unique_violation) if another ingest is already
+  // in flight; we catch that and return 409 with the running run's id.
+  //
+  // Pre-flight: reap orphan runs older than 10 minutes (longer than the
+  // 300s maxDuration plus a 5-minute grace buffer). A Vercel-killed
+  // lambda otherwise leaves a permanently-running row that blocks the
+  // singleflight index until /api/cron/pipeline-cleanup runs the next
+  // morning. Doing this in-route makes the next operator click recover
+  // immediately. The daily cron stays as a defense-in-depth safety net.
+  const orphanCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { data: reapedOrphans, error: reapErr } = await service
+    .from('pipeline_runs')
+    .update({
+      status: 'failed',
+      completed_at: new Date().toISOString(),
+      error_message: 'orphan run reaped — lambda likely killed',
+      error_type: 'abort',
+    })
+    .eq('status', 'running')
+    .eq('pipeline_type', 'ingest')
+    .lt('started_at', orphanCutoff)
+    .select('id');
+  if (reapErr) {
+    // Non-fatal — log and continue. Worst case the singleflight insert
+    // below collides and the operator gets a 409 they can retry once
+    // the daily cleanup cron runs.
+    console.warn('[newsroom.ingest.orphan_reap_failed]', reapErr.message);
+  } else if ((reapedOrphans?.length ?? 0) > 0) {
+    console.info('[newsroom.ingest.orphan_reap]', { count: reapedOrphans!.length });
+  }
+
+  // 5. Create pipeline_runs row (status=running). Singleflight-protected.
   const startedAtDate = new Date();
   const startedAtMs = startedAtDate.getTime();
   const { data: runRow, error: runErr } = await service
@@ -196,6 +247,28 @@ export async function POST(req: Request) {
     .select('id')
     .single();
   if (runErr || !runRow) {
+    // Postgres 23505 = unique_violation, surfaced by Supabase as code '23505'.
+    if (runErr && (runErr.code === '23505')) {
+      // Another ingest run is already in flight. Look up its id (best-effort)
+      // so the operator can see which run is blocking and decide whether
+      // to wait or escalate.
+      const { data: blocker } = await service
+        .from('pipeline_runs')
+        .select('id, started_at, triggered_by_user')
+        .eq('status', 'running')
+        .eq('pipeline_type', 'ingest')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return NextResponse.json(
+        {
+          error: 'Ingest run already in progress',
+          runningRunId: (blocker?.id as string | undefined) ?? null,
+          startedAt: (blocker?.started_at as string | undefined) ?? null,
+        },
+        { status: 409 }
+      );
+    }
     console.error('[newsroom.ingest.run] pipeline_runs insert failed:', runErr?.message);
     captureWithRedact(runErr ?? new Error('pipeline_runs insert returned no row'));
     return NextResponse.json({ error: 'Could not start ingest run' }, { status: 500 });
@@ -213,7 +286,7 @@ export async function POST(req: Request) {
     const serviceAny = service as any;
     const { data: feedsData, error: feedsErr } = await serviceAny
       .from('feeds')
-      .select('id,url,source_name,feed_type,name,priority_weight,allowed_category_slugs,error_count,extraction_config')
+      .select('id,url,source_name,feed_type,name,priority_weight,allowed_category_slugs,error_count,extraction_config,metadata')
       .eq('is_active', true)
       .is('deleted_at', null)
       .in('feed_type', ['feed', 'rss', 'scrape_html', 'scrape_json']);
@@ -616,6 +689,7 @@ export async function POST(req: Request) {
       inserted: itemsInserted,
       skipped: itemsSkipped,
       raceDeduped: itemsRaceDeduped,
+      insertedByFeed,
     } = await processItems(dedupedItems);
 
     // ----------------------------------------------------------------------
@@ -801,29 +875,72 @@ export async function POST(req: Request) {
     let feedWritebackFailed = 0;
     const nowIso = new Date().toISOString();
 
-    // Build a lookup of current feed error counts from the already-fetched rows.
-    const feedCounters = new Map<string, { errorCount: number }>();
+    // Build a lookup of current feed error counts + metadata + display name
+    // from the already-fetched rows. metadata.zero_results_streak is read
+    // pre-write so the increment branch can compute the next value without
+    // an extra round-trip; staleStreaks is built from the post-write value.
+    interface FeedCounter {
+      errorCount: number;
+      metadata: Record<string, unknown>;
+      name: string | null;
+      sourceClass: 'rss' | 'scrape_html' | 'scrape_json' | 'feed';
+    }
+    const feedCounters = new Map<string, FeedCounter>();
     for (const f of feeds) {
       feedCounters.set(f.id, {
         errorCount: f.error_count ?? 0,
+        metadata: (f.metadata && typeof f.metadata === 'object' ? f.metadata : {}) as Record<
+          string,
+          unknown
+        >,
+        name: f.source_name || f.name || null,
+        sourceClass: (f.feed_type as FeedCounter['sourceClass']) ?? 'feed',
       });
     }
+
+    // Cross-feed dedup attribution (Phase C Fix 1).
+    //
+    // After dedup, a feed may have FETCHED items but contributed ZERO
+    // unique discovery_items because every URL was already inserted by a
+    // higher-priority feed. error_count alone hides this — fetch
+    // succeeded so error_count resets to 0, last_polled_at advances, and
+    // the row looks healthy forever while contributing nothing.
+    //
+    // metadata.zero_results_streak (jsonb integer) tracks the consecutive
+    // count of ok-but-zero-unique runs. Reset on any non-zero contribution.
+    // Only counts FETCHED feeds — unconfigured scrape_json rows do not
+    // increment (the row was deliberately not fetched).
+    const nextStreaks = new Map<string, number>();
 
     const writebackPromises = Array.from(feedOutcomes.entries()).map(
       async ([feedId, outcome]) => {
         try {
-          const counters = feedCounters.get(feedId) ?? { errorCount: 0 };
+          const counters = feedCounters.get(feedId);
+          const errorCount = counters?.errorCount ?? 0;
+          const existingMetadata = counters?.metadata ?? {};
           if (outcome.unconfigured) {
             // scrape_json: polled-as-unconfigured — advance last_polled_at
             // only. Do not touch error_count / last_error / last_error_at
             // since the row was deliberately not fetched (extraction_config
-            // is empty; operator hasn't filled it in yet).
+            // is empty; operator hasn't filled it in yet). Streak counter
+            // is also untouched — unfetched rows can't have "stale results".
             const { error: wErr } = await service
               .from('feeds')
               .update({ last_polled_at: nowIso })
               .eq('id', feedId);
             if (wErr) throw wErr;
           } else if (outcome.ok) {
+            const uniqueContributed = insertedByFeed.get(feedId) ?? 0;
+            const prevStreak =
+              typeof existingMetadata.zero_results_streak === 'number'
+                ? (existingMetadata.zero_results_streak as number)
+                : 0;
+            const nextStreak = uniqueContributed === 0 ? prevStreak + 1 : 0;
+            nextStreaks.set(feedId, nextStreak);
+            const mergedMetadata: Record<string, unknown> = {
+              ...existingMetadata,
+              zero_results_streak: nextStreak,
+            };
             const { error: wErr } = await service
               .from('feeds')
               .update({
@@ -831,15 +948,20 @@ export async function POST(req: Request) {
                 error_count: 0,
                 last_error: null,
                 last_error_at: null,
+                metadata: mergedMetadata as Json,
               })
               .eq('id', feedId);
             if (wErr) throw wErr;
           } else {
+            // Failed fetch — leave streak counter untouched. error_count
+            // already surfaces this case; double-counting under a separate
+            // metric would conflate "broken parser" with "publishes only
+            // duplicates of higher-priority feeds".
             const { error: wErr } = await service
               .from('feeds')
               .update({
                 last_polled_at: nowIso,
-                error_count: counters.errorCount + 1,
+                error_count: errorCount + 1,
                 last_error: outcome.error ?? null,
                 last_error_at: nowIso,
               })
@@ -858,6 +980,29 @@ export async function POST(req: Request) {
     );
 
     await Promise.all(writebackPromises);
+
+    // Build staleStreaks for the response — feeds whose post-write streak
+    // is >= 3 (operator-actionable threshold). Sorted by streak DESC, capped
+    // at 25.
+    interface StaleStreak {
+      feed_id: string;
+      name: string | null;
+      source_class: FeedCounter['sourceClass'];
+      streak: number;
+    }
+    const staleStreaks: StaleStreak[] = [];
+    for (const [feedId, streak] of nextStreaks.entries()) {
+      if (streak < 3) continue;
+      const counter = feedCounters.get(feedId);
+      staleStreaks.push({
+        feed_id: feedId,
+        name: counter?.name ?? null,
+        source_class: counter?.sourceClass ?? 'feed',
+        streak,
+      });
+    }
+    staleStreaks.sort((a, b) => b.streak - a.streak);
+    if (staleStreaks.length > 25) staleStreaks.length = 25;
 
     // 11. Mark run completed
     const completedAt = new Date();
@@ -899,6 +1044,7 @@ export async function POST(req: Request) {
       itemsRaceDeduped, // M6 — surface concurrent-ingest dedup count
       clustering: clusterRun.summary,
       feedsWriteback: { succeeded: feedWritebackSucceeded, failed: feedWritebackFailed },
+      staleStreaks, // Phase C — feeds contributing 0 unique items 3+ runs
     } as unknown as Json;
 
     const stepTimings: Json = {
@@ -953,6 +1099,7 @@ export async function POST(req: Request) {
       raceDeduped: itemsRaceDeduped, // M6 — visibility on concurrent-ingest collisions
       durationMs,
       clustering: clusterRun.summary,
+      staleStreaks, // Phase C — feeds with zero_results_streak >= 3
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';

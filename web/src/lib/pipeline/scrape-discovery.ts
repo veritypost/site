@@ -276,13 +276,50 @@ function isArticleShaped(candidate: URL, homepage: URL): boolean {
   }
 }
 
+// VERIFY — heuristic test cases the verifier sub-agent must trace by hand.
+// Each row: [segment, expected_isArticleShaped_signal, why].
+// 6 should-accept + 6 should-reject. Trace looksLikeSlug + looksLikeNumericId
+// per segment; expected = true iff EITHER returns true.
+//
+// ACCEPT cases (signal=true):
+//   ['article-title-here',           true,  'slug, alternating, len 18, no digits'],
+//   ['team-wins-championship',       true,  'slug, alternating, len 22'],
+//   ['123456-some-story',            true,  'numeric-id, digits 6/17 = 35%, len>6'],
+//   ['story-12345',                  true,  'numeric-id, digits 5/11 = 45%, len>6'],
+//   ['politics-2025-election-update', true,  'slug, alternating, len 29 (14% digits)'],
+//   ['1234567890',                   true,  'numeric-id, all digits, len 10'],
+//
+// REJECT cases (signal=false — Phase C tightening fixes these):
+//   ['2024',                         false, 'bare 4-digit year — slug too short, numeric-id len<=6'],
+//   ['2025',                         false, 'bare 4-digit year — same'],
+//   ['news',                         false, 'no hyphen, no digits'],
+//   ['tag',                          false, 'too short, no signal'],
+//   ['12',                           false, 'too short'],
+//   ['categories',                   false, 'no hyphen → slug rejects, no 4-digit run → numeric-id rejects'],
+
 function looksLikeSlug(seg: string): boolean {
   if (seg.length <= 8) return false;
-  return /^[a-z0-9]+(?:-[a-z0-9]+)+$/i.test(seg);
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)+$/i.test(seg)) return false;
+  // Phase C tightening: reject segments where digits dominate (>50%).
+  const digitCount = (seg.match(/\d/g) ?? []).length;
+  if (digitCount * 2 > seg.length) return false;
+  // Phase C tightening: reject bare 4-digit years (already filtered by
+  // length<=8 above for /2024 alone, but a hyphenated bare-year-only
+  // pattern like "2024-2025" would otherwise sneak through).
+  if (/^\d{4}(?:-\d{4})*$/.test(seg)) return false;
+  return true;
 }
 
 function looksLikeNumericId(seg: string): boolean {
-  return /^\d{4,}$/.test(seg) || /\d{4,}/.test(seg);
+  // Phase C tightening: digit-run must be the dominant content of the
+  // segment. Old rule (`/\d{4,}/` anywhere) accepted bare /2024 and any
+  // path with a 4-digit substring as a numeric article id.
+  // New rule: alphanum + hyphen only, contains a 4+ digit run, segment
+  // length > 6, total digit count is at least 30% of segment length.
+  if (seg.length <= 6) return false;
+  if (!/^[a-z0-9-]*\d{4,}[a-z0-9-]*$/i.test(seg)) return false;
+  const digitCount = (seg.match(/\d/g) ?? []).length;
+  return digitCount * 10 >= seg.length * 3;
 }
 
 // Multi-part public suffixes the eTLD+1 heuristic must peel off.
