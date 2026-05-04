@@ -67,8 +67,12 @@ type ListResponse = {
 
 type FilterChip = 'all' | 'producing' | 'silent7d' | 'failing';
 
-// Default chip: producing today.
-const DEFAULT_FILTER: FilterChip = 'producing';
+// Default chip: all. The page must be a 1:1 mirror of the feeds table — newly
+// added feeds that haven't polled yet would otherwise be hidden under a
+// 'producing today' default and the operator would think the seed never
+// landed. Operator can click 'Producing today' / 'Silent 7d' / 'Failing'
+// chips to narrow.
+const DEFAULT_FILTER: FilterChip = 'all';
 
 // Human label for the `feeds.feed_type` column. RSS variants ('feed' / 'rss')
 // collapse to "RSS" since the operator distinction is irrelevant; scrape modes
@@ -134,12 +138,6 @@ function FeedsAdminInner() {
     setFeeds(data.feeds ?? []);
     setTotals(data.totals ?? null);
     setTopContributor(data.topContributor ?? null);
-    // Cold-start filter: if no items have been seen in the last 24h (fresh install
-    // or ingest never run), default to 'all' so the operator sees their feeds
-    // rather than an empty 'producing' view.
-    if ((data.totals?.items_24h ?? 0) === 0) {
-      setFilter((prev) => (prev === DEFAULT_FILTER ? 'all' : prev));
-    }
   };
 
   useEffect(() => {
