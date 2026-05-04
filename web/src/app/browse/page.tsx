@@ -160,7 +160,7 @@ function Sidebar({ collapsed, mobileOpen, onToggle, onMobileClose, activeCat, on
     <>
       {mobileOpen && (
         <div onClick={onMobileClose} className="vp-sidebar-backdrop" style={{
-          position: 'fixed', inset: 0, zIndex: 110, background: 'rgba(0,0,0,0.4)', display: 'none',
+          position: 'fixed', inset: 0, zIndex: 9400, background: 'rgba(0,0,0,0.4)', display: 'none',
         }}/>
       )}
       <aside className={`vp-sidebar ${mobileOpen ? 'vp-sidebar-open' : ''}`} style={baseAside}>
@@ -434,6 +434,15 @@ function BrowsePageInner() {
     router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false });
   }, [activeCat, query, dateFrom, dateTo, pathname, router]);
 
+  useEffect(() => {
+    if (mobileNavOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileNavOpen]);
+
   const allCats = useMemo(() => {
     const m = new Map<string, number>();
     stories.forEach(s => m.set(s.category, (m.get(s.category) ?? 0) + 1));
@@ -490,7 +499,7 @@ function BrowsePageInner() {
             position: fixed !important;
             top: var(--vp-top-bar-h, 0px) !important;
             left: 0; bottom: 0;
-            z-index: 120;
+            z-index: 9500;
             transform: translateX(-100%);
             transition: transform 220ms cubic-bezier(0.25,0,0,1);
             box-shadow: 12px 0 40px rgba(0,0,0,0.18);

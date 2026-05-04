@@ -7,6 +7,7 @@
 -- Idempotent on (name) so re-running this migration won't duplicate
 -- the seeded rows. Depends on 20260503000009 having seeded the
 -- canonical placements (article_header / article_in_body / article_end).
+-- is_active=false until owner uploads real creative via /admin/ad-units; flip to true per row after replacing placehold.co URL
 INSERT INTO ad_units (
   name,
   placement_id,
@@ -32,7 +33,7 @@ SELECT
   '/pricing',
   'Try Verity Pro',
   'approved',
-  true,
+  false,
   100
 FROM ad_placements p
 WHERE p.name = 'article_header'
@@ -65,7 +66,7 @@ SELECT
   '/pricing',
   'Set up Verity Family',
   'approved',
-  true,
+  false,
   100
 FROM ad_placements p
 WHERE p.name = 'article_in_body'
@@ -98,7 +99,7 @@ SELECT
   '/pricing',
   'Upgrade',
   'approved',
-  true,
+  false,
   100
 FROM ad_placements p
 WHERE p.name = 'article_end'

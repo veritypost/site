@@ -45,11 +45,7 @@ final class KidsAppState: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var loadError: String? = nil
 
-    private let client: SupabaseClient
-
-    init(client: SupabaseClient = SupabaseKidsClient.shared.client) {
-        self.client = client
-    }
+    private var client: SupabaseClient { SupabaseKidsClient.shared.client }
 
     // MARK: Derived
 
@@ -228,7 +224,7 @@ final class KidsAppState: ObservableObject {
                 )
             }
         } catch {
-            // non-fatal; progress stays at 0
+            self.loadError = "Couldn't update your home screen."
         }
     }
 

@@ -151,7 +151,10 @@ final actor PermissionService {
             await PermissionStore.shared.bump()
         } catch {
             Log.d("PermissionService: my_permission_keys failed: \(error)")
-            // Leave prior cache intact on error so stale reads keep working.
+            // Leave prior cache intact on error so stale reads keep working,
+            // but strip admin.owner_mode so a failed refresh cannot carry
+            // owner-level privilege into a subsequent non-owner session.
+            cache.remove("admin.owner_mode")
         }
     }
 

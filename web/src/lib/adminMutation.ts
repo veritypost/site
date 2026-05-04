@@ -99,19 +99,21 @@ type RecordAdminActionArgs = {
 };
 
 // Returns a NextResponse to short-circuit on error, or null on success.
-// Skips the RPC when target === actor (`require_outranks` treats self
-// as never strictly outranking, which is correct for penalty flows but
-// wrong for self-directed admin operations like editing your own row).
-//
-// S6-A26 (deferred): this self-edit short-circuit is a privilege-escalation
-// shape risk. Awaiting S1 verification of `caller_can_assign_role` RPC body
-// to confirm strict-greater hierarchy enforcement on self-edits before
-// removing the bypass. Do not relax this guard until S1 ships the verify.
+// Self-edits (target === actor) are REJECTED for permission-affecting
+// actions to prevent self-escalation (e.g. self-granting admin.owner_mode
+// via assign_set). The self-edit bypass was removed as part of the
+// Finding #11 privilege-escalation fix (2026-05-03).
 export async function requireAdminOutranks(
   targetUserId: string | null | undefined,
   actorId: string
 ): Promise<NextResponse | null> {
-  if (!targetUserId || targetUserId === actorId) return null;
+  if (!targetUserId) return null;
+  if (targetUserId === actorId) {
+    return NextResponse.json(
+      { error: 'cannot self-modify permissions' },
+      { status: 403 }
+    );
+  }
   const authed = createClient();
   // require_outranks isn't in the generated Database.Functions enum
   // (post-generation RPC). Cast to bypass the enum check; the RPC
