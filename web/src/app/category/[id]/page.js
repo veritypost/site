@@ -82,7 +82,7 @@ function CategoryPageInner() {
 
           const { data: subcatData, error: subcatErr } = await supabase
             .from('categories')
-            .select('id, name')
+            .select('id, name, slug')
             .eq('parent_id', categoryData.id)
             .eq('is_active', true)
             .is('deleted_at', null)
@@ -146,13 +146,18 @@ function CategoryPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // F35: validate and apply sub param once subcategories are loaded
+  // F35: validate and apply sub param once subcategories are loaded.
+  // Accepts either the sub's UUID (legacy callers) or its slug (home
+  // sidebar uses slugs because they're URL-friendly). Resolves to the
+  // sub's UUID, which is what setActiveSubcat / row filters expect.
   useEffect(() => {
     if (subcategories.length > 0) {
       const urlSub = searchParams.get('sub');
       if (urlSub) {
-        const match = subcategories.find((sc) => sc.id === urlSub);
-        setActiveSubcat(match ? urlSub : null);
+        const match = subcategories.find(
+          (sc) => sc.id === urlSub || sc.slug === urlSub,
+        );
+        setActiveSubcat(match ? match.id : null);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

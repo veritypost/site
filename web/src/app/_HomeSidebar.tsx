@@ -57,16 +57,19 @@ export default function HomeSidebar({
         @media (max-width: ${HOME_SIDEBAR_BREAKPOINT_PX - 1}px) {
           .vp-home-sidebar { display: none !important; }
         }
+        @media print {
+          .vp-home-sidebar { display: none !important; }
+        }
 
-        /* Floating-pill scrollbar: hidden until the rail is hovered, then
-           fades in as a rounded thumb with a 3px transparent inset so it
-           floats inside the gutter instead of hugging the edge. Track stays
-           invisible so the rail looks chrome-free at rest. */
+        /* Floating-pill scrollbar. Note: scrollbar-color and webkit-
+           scrollbar-thumb are not animatable, and macOS Safari with
+           overlay scrollbars (the OS default) ignores ::-webkit-scrollbar
+           rules entirely — those users see Apple's translucent thumb
+           instead. Treated as acceptable: browsers that render our rules
+           get a chrome-free idle rail with a soft thumb on hover. */
         .vp-home-sidebar {
           scrollbar-width: thin;
           scrollbar-color: transparent transparent;
-          scrollbar-gutter: stable;
-          transition: scrollbar-color 220ms ease-out;
         }
         .vp-home-sidebar:hover,
         .vp-home-sidebar:focus-within {
@@ -80,7 +83,6 @@ export default function HomeSidebar({
           border: 3px solid transparent;
           border-radius: 999px;
           min-height: 32px;
-          transition: background-color 220ms ease-out;
         }
         .vp-home-sidebar:hover::-webkit-scrollbar-thumb,
         .vp-home-sidebar:focus-within::-webkit-scrollbar-thumb {
@@ -96,12 +98,15 @@ export default function HomeSidebar({
         .vp-home-sidebar a { transition: color 160ms ease-out; outline: none; }
         .vp-home-sidebar a:hover { color: var(--p-ink) !important; }
         .vp-home-sidebar a:focus-visible {
-          outline: 2px solid var(--p-ring, var(--p-ink));
+          outline: 2px solid var(--p-ink);
           outline-offset: 2px;
           border-radius: 2px;
         }
+        @media (prefers-reduced-motion: reduce) {
+          .vp-home-sidebar a { transition: none; }
+        }
       `}</style>
-      <aside
+      <nav
         className="vp-home-sidebar"
         aria-label="Sections"
         style={{
@@ -128,7 +133,7 @@ export default function HomeSidebar({
             }))}
           />
         ))}
-      </aside>
+      </nav>
     </>
   );
 }
@@ -148,6 +153,7 @@ function SidebarSection({
     <div style={{ marginBottom: 18 }}>
       <Link
         href={href}
+        aria-current={active ? 'page' : undefined}
         style={{
           display: 'block',
           textDecoration: 'none',
@@ -156,6 +162,8 @@ function SidebarSection({
           fontWeight: active ? 700 : 600,
           color: active ? C.text : C.soft,
           letterSpacing: '-0.005em',
+          paddingTop: 4,
+          paddingBottom: 4,
         }}
       >
         {name}
@@ -169,7 +177,8 @@ function SidebarSection({
             textDecoration: 'none',
             fontSize: 12,
             color: C.muted,
-            marginTop: 6,
+            paddingTop: 5,
+            paddingBottom: 5,
           }}
         >
           {s.name}

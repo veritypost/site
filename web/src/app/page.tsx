@@ -300,7 +300,6 @@ export default async function HomePage() {
           alignItems: 'flex-start',
           maxWidth: 1280,
           margin: '0 auto',
-          padding: '0 20px',
         }}
       >
         <HomeSidebar categories={catRows} />
@@ -501,23 +500,20 @@ function Hero({
     <article style={{ marginBottom: 32 }}>
       {story.stories?.slug ? (
         <Link href={`/${story.stories.slug}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-          {/* Full-bleed band — escapes the 720px column using the standard
-              viewport-breakout technique for centered constrained layouts.
-              position:relative + left:50% + marginLeft:-50vw + width:100vw. */}
+          {/* Hero band fills the main column edge-to-edge by negating
+              <main>'s 20px paddingLeft/Right. On mobile (no sidebar) this
+              still reads as full-bleed because <main> spans the viewport;
+              on desktop it stays bounded to the main column so the inner
+              text aligns with the surrounding cards. */}
           <div
             style={{
               background: bg,
-              position: 'relative',
-              left: '50%',
-              right: '50%',
-              marginLeft: '-50vw',
-              marginRight: '-50vw',
-              width: '100vw',
-              padding: '48px 0 40px',
+              marginLeft: -20,
+              marginRight: -20,
+              padding: '48px 20px 40px',
             }}
           >
-            {/* Inner column mirrors the 720px reading column */}
-            <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 20px' }}>
+            <div style={{ maxWidth: 680, margin: '0 auto' }}>
               {(category || isNew || story.stories?.lifecycle_status) && (
                 <div
                   style={{
@@ -610,23 +606,17 @@ function Hero({
         </Link>
       ) : (
         <div style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-          {/* Full-bleed band — escapes the 720px column using the standard
-              viewport-breakout technique for centered constrained layouts.
-              position:relative + left:50% + marginLeft:-50vw + width:100vw. */}
+          {/* Hero band — bounded to <main>, see Hero (with-link) variant
+              above for the rationale. */}
           <div
             style={{
               background: bg,
-              position: 'relative',
-              left: '50%',
-              right: '50%',
-              marginLeft: '-50vw',
-              marginRight: '-50vw',
-              width: '100vw',
-              padding: '48px 0 40px',
+              marginLeft: -20,
+              marginRight: -20,
+              padding: '48px 20px 40px',
             }}
           >
-            {/* Inner column mirrors the 720px reading column */}
-            <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 20px' }}>
+            <div style={{ maxWidth: 680, margin: '0 auto' }}>
               {(category || isNew || story.stories?.lifecycle_status) && (
                 <div
                   style={{
