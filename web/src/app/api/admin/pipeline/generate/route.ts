@@ -125,8 +125,20 @@ const RequestSchema = z.object({
   // feed_clusters row in that case so cluster lock + audience-state +
   // Discovery filtering all behave consistently.
   cluster_id: z.string().uuid().optional(),
-  audience: z.enum(['adult', 'kid']),
-  age_band: z.enum(['kids', 'tweens']).optional(),
+  // Wave 7 Stream 2 — story_id is an alternative entry point to cluster_id.
+  // When story_id is present, the route aggregates sources from all active
+  // story_observations on the story and resolves a cluster_id from the most
+  // recent observation's discovery_item. Legacy cluster_id callers continue
+  // to work unchanged.
+  story_id: z.string().uuid().optional(),
+  audience: z.enum(['adult', 'kid']).optional(),
+  // age_band extended to include 'adult' for the story-mode callers.
+  // Mapping when story_id is used:
+  //   'adult'  → audience='adult', effectiveAgeBand='adult'
+  //   'tweens' → audience='kid',   effectiveAgeBand='tweens'
+  //   'kids'   → audience='kid',   effectiveAgeBand='kids'
+  // Legacy callers that pass audience directly continue to work.
+  age_band: z.enum(['adult', 'kids', 'tweens']).optional(),
   freeform_instructions: z.string().max(2000).optional(),
   provider: z.enum(['anthropic', 'openai']).default('anthropic'),
   model: z.string().min(3).max(100).default('claude-sonnet-4-6'),
@@ -503,9 +515,79 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 
-  const { audience, freeform_instructions, provider, model, source_urls, attach_as_source_urls, mode } = input;
+  const { freeform_instructions, provider, model, source_urls, attach_as_source_urls, mode } = input;
+
+  // Wave 7 Stream 2 — story-mode: derive audience + effectiveAgeBand + cluster_id
+  // from story_id + age_band when provided. Legacy cluster_id callers keep their
+  // existing audience field and are unaffected.
+  //
+  // age_band mapping for story-mode callers:
+  //   'adult'  → audience='adult',  effectiveAgeBand='adult'
+  //   'tweens' → audience='kid',    effectiveAgeBand='tweens'
+  //   'kids'   → audience='kid',    effectiveAgeBand='kids'
+  //
+  // Soft application-layer lock for story-mode: SELECT articles WHERE
+  // story_id=? AND age_band=? AND status IN ('draft','published') LIMIT 1.
+  // If a row exists, return 409 Conflict. This avoids generating duplicate
+  // articles for the same story+band without requiring a new DB lock RPC.
+  //
+  // TODO: replace this soft lock with a DB-level claim_story_lock_v2
+  // (p_story_id uuid, p_age_band text) RPC in a dedicated migration when
+  // the owner applies the Wave 7 migration. The soft lock is safe because
+  // the operator runs single-player; the only race is an accidental
+  // double-click which 409 already prevents at the UI layer.
+
+  let storyIdForArticle: string | null = null;
+
+  const service = createServiceClient();
+
+  // Determine audience for story-mode vs legacy mode.
+  let resolvedAudience: 'adult' | 'kid';
+  let resolvedAgeBandInput: 'adult' | 'kids' | 'tweens' | undefined;
+
+  if (input.story_id) {
+    // Story-mode path.
+    const ageBandInput = input.age_band ?? 'adult';
+    resolvedAgeBandInput = ageBandInput;
+    resolvedAudience = ageBandInput === 'adult' ? 'adult' : 'kid';
+    storyIdForArticle = input.story_id;
+
+    // Soft lock: check for an existing non-archived article for this story+band.
+    const { data: existingArticle, error: existingErr } = await service
+      .from('articles')
+      .select('id')
+      .eq('story_id', input.story_id)
+      .eq('age_band', ageBandInput)
+      .in('status', ['draft', 'published'])
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+    if (existingErr) {
+      console.error('[newsroom.generate.story_lock_check]', existingErr.message);
+      return NextResponse.json({ error: 'Lock check failed' }, { status: 500 });
+    }
+    if (existingArticle) {
+      return NextResponse.json(
+        { error: 'Already generating or generated for this band' },
+        { status: 409 }
+      );
+    }
+  } else {
+    // Legacy cluster-mode: audience is required.
+    if (!input.audience) {
+      return NextResponse.json(
+        { error: 'audience required when story_id is not provided' },
+        { status: 400 }
+      );
+    }
+    resolvedAudience = input.audience;
+    resolvedAgeBandInput = input.age_band as 'kids' | 'tweens' | undefined;
+  }
+
+  const audience = resolvedAudience;
   const effectiveAgeBand: 'kids' | 'tweens' | 'adult' =
-    audience === 'kid' ? (input.age_band ?? 'kids') : 'adult';
+    audience === 'kid' ? ((resolvedAgeBandInput === 'kids' || resolvedAgeBandInput === 'tweens' ? resolvedAgeBandInput : undefined) ?? 'kids') : 'adult';
+
   // De-dupe + drop empties; the schema already trimmed + validated each entry.
   // `sourceUrlsExplicit` tracks whether the client passed URLs in the body —
   // distinct from `sourceUrlsOverridden` (which may also be true after the
@@ -515,7 +597,6 @@ export async function POST(req: Request) {
   );
   const sourceUrlsExplicit = sourceUrlOverride.length > 0;
   let sourceUrlsOverridden = sourceUrlsExplicit;
-  const service = createServiceClient();
 
   // Session A — standalone-mode: synthesize a real feed_clusters row when
   // the caller didn't supply a cluster_id but is supplying source URLs
@@ -527,6 +608,91 @@ export async function POST(req: Request) {
   let cluster_id: string;
   if (input.cluster_id) {
     cluster_id = input.cluster_id;
+  } else if (input.story_id) {
+    // Story-mode: resolve cluster_id from the most recent observation's
+    // discovery_item. We use this for back-compat with the downstream
+    // editorial chain which still keys on cluster_id for locks and
+    // persistence. DO NOT rip out the cluster_id flow — extend it.
+    const { data: obsRows, error: obsErr } = await service
+      .from('story_observations')
+      .select('discovery_item_id')
+      .eq('story_id', input.story_id)
+      .is('detached_at', null)
+      .limit(200);
+    if (obsErr) {
+      console.error('[newsroom.generate.story_cluster_resolve]', obsErr.message);
+      return NextResponse.json({ error: 'Could not resolve story observations' }, { status: 500 });
+    }
+    const obsItemIds = (obsRows ?? [])
+      .map((r) => r.discovery_item_id as string | null)
+      .filter((id): id is string => !!id);
+
+    if (obsItemIds.length > 0) {
+      // Find the most-recent discovery_item to derive cluster_id.
+      const { data: diRows, error: diErr } = await service
+        .from('discovery_items')
+        .select('id, cluster_id, fetched_at')
+        .in('id', obsItemIds)
+        .not('cluster_id', 'is', null)
+        .order('fetched_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (diErr) {
+        console.error('[newsroom.generate.story_cluster_di]', diErr.message);
+        return NextResponse.json({ error: 'Could not resolve cluster from story' }, { status: 500 });
+      }
+      if (diRows?.cluster_id) {
+        cluster_id = diRows.cluster_id as string;
+      } else {
+        // No cluster found via discovery_items — synthesize a standalone cluster
+        // so the downstream pipeline can proceed. Source URLs will be pulled
+        // from the story's observations below.
+        const { data: synth, error: synthErr } = await service
+          .from('feed_clusters')
+          .insert({ title: 'Story draft', keywords: ['story-generate'], audience: 'adult' })
+          .select('id')
+          .single();
+        if (synthErr || !synth) {
+          return NextResponse.json({ error: 'Could not create story cluster' }, { status: 500 });
+        }
+        cluster_id = synth.id as string;
+      }
+    } else {
+      // Story has no observations with discovery_items — synthesize.
+      const { data: synth, error: synthErr } = await service
+        .from('feed_clusters')
+        .insert({ title: 'Story draft', keywords: ['story-generate'], audience: 'adult' })
+        .select('id')
+        .single();
+      if (synthErr || !synth) {
+        return NextResponse.json({ error: 'Could not create story cluster' }, { status: 500 });
+      }
+      cluster_id = synth.id as string;
+    }
+
+    // Aggregate all source URLs from the story's active observations.
+    // These override the normal discovery_items source-fetch path.
+    const { data: fullObs, error: fullObsErr } = await service
+      .from('story_observations')
+      .select('url_snapshot')
+      .eq('story_id', input.story_id)
+      .is('detached_at', null)
+      .limit(200);
+    if (fullObsErr) {
+      console.error('[newsroom.generate.story_source_urls]', fullObsErr.message);
+      return NextResponse.json({ error: 'Could not load story sources' }, { status: 500 });
+    }
+    const storySourceUrls = Array.from(
+      new Set(
+        (fullObs ?? [])
+          .map((r) => r.url_snapshot as string)
+          .filter((u) => u && u.length > 0)
+      )
+    ).slice(0, 20);
+    if (storySourceUrls.length > 0) {
+      sourceUrlOverride = storySourceUrls;
+      sourceUrlsOverridden = true;
+    }
   } else if (mode === 'standalone' && sourceUrlsExplicit) {
     const { data: synth, error: synthErr } = await service
       .from('feed_clusters')
@@ -547,7 +713,7 @@ export async function POST(req: Request) {
     cluster_id = synth.id as string;
   } else {
     return NextResponse.json(
-      { error: 'cluster_id required (or pass mode="standalone" with source_urls)' },
+      { error: 'cluster_id required (or pass story_id, or pass mode="standalone" with source_urls)' },
       { status: 400 }
     );
   }
@@ -1883,7 +2049,9 @@ Empty array if all correct.`;
       sources: sourcesPayload,
       timeline: timelinePayload,
       quizzes: quizzesPayload,
-      existing_story_id: input.existing_story_id ?? null,
+      // Wave 7 Stream 2: story-mode passes storyIdForArticle so the article
+      // attaches to the existing story rather than creating a new one.
+      existing_story_id: storyIdForArticle ?? input.existing_story_id ?? null,
     };
 
     // ────────────────────────────────────────────────────────────────────────

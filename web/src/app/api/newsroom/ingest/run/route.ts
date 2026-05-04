@@ -52,7 +52,13 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import { captureWithRedact } from '@/lib/pipeline/redact';
 import type { Database, Json } from '@/types/database';
-import { preCluster, getClusterOverlapPct, type ClusterInputArticle } from '@/lib/pipeline/cluster';
+import {
+  preCluster,
+  getClusterOverlapPct,
+  keywordOverlap,
+  extractKeywords,
+  type ClusterInputArticle,
+} from '@/lib/pipeline/cluster';
 import { getStoryMatchOverlapPct } from '@/lib/pipeline/story-match';
 import { scrapeDiscovery, type DiscoveredArticle } from '@/lib/pipeline/scrape-discovery';
 import { scrapeJson } from '@/lib/pipeline/scrape-json';
@@ -65,7 +71,7 @@ import {
   type GrabPlan,
 } from '@/lib/pipeline/grab-plan';
 import { searchWikipedia } from '@/lib/pipeline/wikipedia-search';
-import { keywordOverlap } from '@/lib/pipeline/cluster';
+import { pickStoryMetadata } from '@/lib/pipeline/story-metadata';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -1312,6 +1318,43 @@ export async function POST(req: Request) {
             }
             storyId = newStory.id as string;
             summary.storiesFormed += 1;
+
+            // Wave 7 — AI picks category + subcategory for newly-formed stories.
+            // Best-effort: if the pick fails or returns nulls, the story still
+            // ships uncategorized; operator can fill it in later.
+            const clusterSources = itemIds.flatMap((id) => {
+              const r = rowById.get(id);
+              if (!r) return [];
+              const md = r.metadata ?? {};
+              return [{ outlet: md.outlet ?? null, title: r.raw_title, excerpt: md.excerpt ?? null }];
+            });
+            try {
+              const clusterMeta = await pickStoryMetadata(
+                {
+                  title: cluster.title || 'Untitled',
+                  keywords: cluster.keywords,
+                  sources: clusterSources,
+                },
+                runId,
+              );
+              if (clusterMeta.category_id !== null || clusterMeta.subcategory_id !== null) {
+                await service
+                  .from('stories')
+                  .update({
+                    ai_category_id: clusterMeta.category_id,
+                    ai_subcategory_id: clusterMeta.subcategory_id,
+                  })
+                  .eq('id', storyId);
+              }
+            } catch (metaErr) {
+              const metaMsg = metaErr instanceof Error ? metaErr.message : 'unknown error';
+              console.warn('[newsroom.ingest.run] cluster story metadata pick failed:', metaMsg);
+              captureWithRedact(metaErr);
+              summary.clusterErrors.push({
+                title: cluster.title || '(untitled)',
+                error: `metadata pick failed: ${metaMsg}`,
+              });
+            }
           }
 
           // story_observations — one per cluster article. Snapshot the
@@ -1350,6 +1393,208 @@ export async function POST(req: Request) {
           captureWithRedact(err);
           summary.clusterErrors.push({
             title: cluster.title || '(untitled)',
+            error: message,
+          });
+        }
+      }
+
+      // Wave 7 — Singleton story-match + formation.
+      //
+      // Singletons are items that didn't cluster with any other item during
+      // the preCluster pass. Previously they were counted but never persisted
+      // to stories / story_observations, so a single-outlet item showed up
+      // "ungrouped" on the result screen with only a Promote button.
+      //
+      // For each singleton with extractable keywords:
+      //   - Run the same overlap-against-stories.keywords search used for
+      //     clusters (same storyMatchThresholdPct, same is_locked=false filter).
+      //   - Match found  → bump last_observed_at + attach via story_observations
+      //     + write a single-item feed_clusters row for back-compat (cluster_id).
+      //   - No match     → form a NEW story + write the singleton feed_clusters
+      //     row + observation.
+      //   - Empty keywords → skip (left as ungrouped discovery_item, as before).
+      //
+      // All of this uses the same try/catch + clusterErrors pattern the cluster
+      // loop above uses. The existing cluster-loop behavior is unchanged.
+      for (const singleton of singletons) {
+        const singletonItem = singleton.articles[0];
+        if (!singletonItem) continue;
+
+        const singletonRow = rowById.get(singletonItem.id);
+        if (!singletonRow) continue;
+
+        const singletonKeywords = extractKeywords(singletonRow.raw_title);
+        if (singletonKeywords.length === 0) continue;
+
+        try {
+          const nowIsoS = new Date().toISOString();
+
+          // Story-match pass — identical query to the cluster path.
+          let singletonMatchedStoryId: string | null = null;
+          let singletonMatchScore = 0;
+          const { data: sCandidates, error: sCandErr } = await service
+            .from('stories')
+            .select('id, keywords')
+            .overlaps('keywords', singletonKeywords)
+            .eq('is_locked', false);
+          if (sCandErr) {
+            throw new Error(`singleton stories overlap lookup failed: ${sCandErr.message}`);
+          }
+          for (const c of sCandidates ?? []) {
+            const ck = (c.keywords ?? []) as string[];
+            if (ck.length === 0) continue;
+            const score = keywordOverlap(singletonKeywords, ck);
+            if (score > singletonMatchScore && score >= storyMatchThresholdPct) {
+              singletonMatchScore = score;
+              singletonMatchedStoryId = c.id as string;
+            }
+          }
+
+          // Single-item feed_clusters row — keeps back-compat with Discovery
+          // tab generation paths that resolve cluster_id from discovery_items.
+          const singletonClusterPayload = {
+            title: singletonRow.raw_title ?? 'Untitled',
+            summary: '',
+            keywords: singletonKeywords,
+            is_active: true,
+            is_breaking: false,
+            generation_state: 'clustered',
+            primary_article_id: null,
+            category_id: null,
+            similarity_threshold: clusterThresholdPct,
+            audience: 'adult' as const,
+          };
+          const { data: sClusterRow, error: sClusterErr } = await service
+            .from('feed_clusters')
+            .insert(singletonClusterPayload)
+            .select('id')
+            .single();
+          if (sClusterErr || !sClusterRow) {
+            throw new Error(
+              `singleton feed_clusters insert failed: ${sClusterErr?.message ?? 'no row returned'}`,
+            );
+          }
+
+          // Link the discovery_item to the new cluster row.
+          const sLinkRes = await service
+            .from('discovery_items')
+            .update({
+              cluster_id: sClusterRow.id,
+              state: 'clustered',
+              updated_at: nowIsoS,
+            })
+            .eq('id', singletonItem.id);
+          if (sLinkRes.error) {
+            throw new Error(`singleton link-cluster failed: ${sLinkRes.error.message}`);
+          }
+          summary.clustersCreated += 1;
+
+          // Story side.
+          let singletonStoryId: string;
+          if (singletonMatchedStoryId) {
+            singletonStoryId = singletonMatchedStoryId;
+            const { error: sBumpErr } = await service
+              .from('stories')
+              .update({ last_observed_at: nowIsoS })
+              .eq('id', singletonStoryId);
+            if (sBumpErr) {
+              throw new Error(`singleton stories last_observed_at bump failed: ${sBumpErr.message}`);
+            }
+            summary.storiesExtended += 1;
+          } else {
+            // Net-new story from singleton.
+            const sBaseSlug = (singletonRow.raw_title || 'story')
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '')
+              .slice(0, 72);
+            const sHashSuffix = Math.random().toString(16).slice(2, 10);
+            const sSlug = `${sBaseSlug || 'story'}-${sHashSuffix}`;
+            const { data: sNewStory, error: sNewErr } = await service
+              .from('stories')
+              .insert({
+                slug: sSlug,
+                title: singletonRow.raw_title ?? 'Untitled',
+                keywords: singletonKeywords,
+                first_seen_at: nowIsoS,
+                last_observed_at: nowIsoS,
+                generation_state: 'forming',
+                research_query_id: researchQueryId,
+              })
+              .select('id')
+              .single();
+            if (sNewErr || !sNewStory) {
+              throw new Error(`singleton stories insert failed: ${sNewErr?.message ?? 'no row returned'}`);
+            }
+            singletonStoryId = sNewStory.id as string;
+            summary.storiesFormed += 1;
+
+            // Wave 7 — AI metadata pick for singleton-formed stories.
+            const singletonSources = [
+              {
+                outlet: (singletonRow.metadata ?? {}).outlet ?? null,
+                title: singletonRow.raw_title,
+                excerpt: (singletonRow.metadata ?? {}).excerpt ?? null,
+              },
+            ];
+            try {
+              const sMeta = await pickStoryMetadata(
+                {
+                  title: singletonRow.raw_title ?? 'Untitled',
+                  keywords: singletonKeywords,
+                  sources: singletonSources,
+                },
+                runId,
+              );
+              if (sMeta.category_id !== null || sMeta.subcategory_id !== null) {
+                await service
+                  .from('stories')
+                  .update({
+                    ai_category_id: sMeta.category_id,
+                    ai_subcategory_id: sMeta.subcategory_id,
+                  })
+                  .eq('id', singletonStoryId);
+              }
+            } catch (sMetaErr) {
+              const sMetaMsg = sMetaErr instanceof Error ? sMetaErr.message : 'unknown error';
+              console.warn('[newsroom.ingest.run] singleton story metadata pick failed:', sMetaMsg);
+              captureWithRedact(sMetaErr);
+              summary.clusterErrors.push({
+                title: singletonRow.raw_title ?? '(untitled)',
+                error: `singleton metadata pick failed: ${sMetaMsg}`,
+              });
+            }
+          }
+
+          // story_observations — one row for the singleton.
+          const sMd = singletonRow.metadata ?? {};
+          const sObs: StoryObservationInsert = {
+            story_id: singletonStoryId,
+            discovery_item_id: singletonItem.id,
+            observed_at: nowIsoS,
+            match_score: singletonMatchedStoryId ? singletonMatchScore : null,
+            url_snapshot: singletonRow.raw_url,
+            title_snapshot: singletonRow.raw_title,
+            excerpt_snapshot: sMd.excerpt ?? null,
+            outlet_snapshot: sMd.outlet ?? null,
+            source_class: singletonRow.feed_id
+              ? feedSourceClass.get(singletonRow.feed_id) ?? null
+              : null,
+            feed_id: singletonRow.feed_id,
+          };
+          const { error: sObsErr } = await service
+            .from('story_observations')
+            .insert(sObs);
+          if (sObsErr) {
+            throw new Error(`singleton story_observations insert failed: ${sObsErr.message}`);
+          }
+          summary.observationsWritten += 1;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'unknown error';
+          console.error('[newsroom.ingest.run] singleton persist failed:', message);
+          captureWithRedact(err);
+          summary.clusterErrors.push({
+            title: singletonRow.raw_title ?? '(untitled)',
             error: message,
           });
         }

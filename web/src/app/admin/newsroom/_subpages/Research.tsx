@@ -2,6 +2,7 @@
 
 /**
  * Wave 4 — Stream D Run Feed UI
+ * Wave 7 — Stream 2 result screen rebuild (StoryCardsList)
  *
  * Research panel mounted at the top of the /admin/newsroom Discovery tab.
  *
@@ -9,8 +10,8 @@
  *   idle    — controls visible (lookback, source scope, mode, run)
  *   running — inline progress view with phase label + cancel
  *             (?job=<id> set, polls every 2s)
- *   done    — result screen: counters + flat sortable table +
- *             Promote/Discard per row + View Stories CTA
+ *   done    — result screen: counters + StoryCardsList (one card per story
+ *             produced by the run, with per-band Generate buttons)
  *             (?job=<id> stays; surfaced jobId resolved status)
  *
  * URL params:
@@ -26,14 +27,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Button from '@/components/admin/Button';
+import Badge from '@/components/admin/Badge';
 import Select from '@/components/admin/Select';
 import TextInput from '@/components/admin/TextInput';
 import Spinner from '@/components/admin/Spinner';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
+import { MODEL_OPTIONS } from '@/lib/newsroomModels';
 
 type Mode = 'general' | 'topic';
 type LookbackKey = '15m' | '1h' | '6h' | '24h' | '3d' | '7d' | '30d';
+type AgeBand = 'adult' | 'tweens' | 'kids';
 
 const LOOKBACK_OPTIONS: Array<{ key: LookbackKey; label: string; ms: number }> = [
   { key: '15m', label: 'Last 15 minutes', ms: 15 * 60 * 1000 },
@@ -95,21 +99,45 @@ type JobRow = {
   error: string | null;
 };
 
-type ItemRow = {
-  id: string;
+type RunStorySource = {
+  observation_id: string;
   url: string;
   title: string | null;
-  fetched_at: string;
-  state: string;
+  excerpt: string | null;
   outlet: string | null;
   source_class: string | null;
-  match_score: number | null;
-  attached_story: { id: string; title: string | null; slug: string | null } | null;
+  observed_at: string;
 };
 
-type SortKey = 'fetched_desc' | 'fetched_asc' | 'outlet' | 'title' | 'score_desc';
+type RunStoryBand = {
+  band: AgeBand;
+  state: 'pending' | 'draft' | 'published' | 'archived';
+  article_id: string | null;
+  title: string | null;
+};
 
-export default function Research({ onJobComplete }: { onJobComplete?: () => void }) {
+type RunStory = {
+  id: string;
+  slug: string;
+  title: string;
+  keywords: string[];
+  first_seen_at: string | null;
+  last_observed_at: string | null;
+  is_locked: boolean;
+  formed_in_this_run: boolean;
+  ai_category: { id: string; slug: string; name: string } | null;
+  ai_subcategory: { id: string; slug: string; name: string } | null;
+  sources_in_run: RunStorySource[];
+  articles_by_band: RunStoryBand[];
+};
+
+export default function Research({
+  onJobComplete,
+  selectedModelIdx = 0,
+}: {
+  onJobComplete?: () => void;
+  selectedModelIdx?: number;
+}) {
   const router = useRouter();
   const sp = useSearchParams();
   const toast = useToast();
@@ -324,6 +352,7 @@ export default function Research({ onJobComplete }: { onJobComplete?: () => void
         jobId={jobId}
         onLeave={clearJob}
         onJobComplete={onJobComplete}
+        selectedModelIdx={selectedModelIdx}
       />
     );
   }
@@ -746,19 +775,21 @@ function ActiveJobView({
   jobId,
   onLeave,
   onJobComplete,
+  selectedModelIdx,
 }: {
   jobId: string;
   onLeave: () => void;
   onJobComplete?: () => void;
+  selectedModelIdx: number;
 }) {
   const toast = useToast();
   const [job, setJob] = useState<JobRow | null>(null);
   const [pollErr, setPollErr] = useState<string | null>(null);
-  const [items, setItems] = useState<ItemRow[]>([]);
-  const [itemsLoading, setItemsLoading] = useState(false);
-  const [sort, setSort] = useState<SortKey>('fetched_desc');
+  const [stories, setStories] = useState<RunStory[]>([]);
+  const [storiesLoading, setStoriesLoading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [pendingActions, setPendingActions] = useState<Set<string>>(new Set());
+  // Per-(story_id, band) loading tracker so parallel clicks don't disable each other.
+  const [generatingKeys, setGeneratingKeys] = useState<Set<string>>(new Set());
   const completionFiredRef = useRef(false);
 
   const isTerminal =
@@ -803,33 +834,32 @@ function ActiveJobView({
     };
   }, [jobId]);
 
-  // Once terminal, load items + fire onJobComplete (so the parent can
-  // refresh the cluster list). Re-run on sort change.
-  const loadItems = useCallback(async () => {
-    setItemsLoading(true);
+  // Once terminal, load the stories for this run. Fire onJobComplete once.
+  const loadStories = useCallback(async () => {
+    setStoriesLoading(true);
     try {
-      const res = await fetch(`/api/admin/newsroom/research/jobs/${jobId}/items?sort=${sort}`);
+      const res = await fetch(`/api/admin/newsroom/research/jobs/${jobId}/stories`);
       if (!res.ok) {
-        setItems([]);
+        setStories([]);
         return;
       }
-      const json = (await res.json()) as { items?: ItemRow[] };
-      setItems(json.items ?? []);
+      const json = (await res.json()) as { stories?: RunStory[] };
+      setStories(json.stories ?? []);
     } catch {
-      setItems([]);
+      setStories([]);
     } finally {
-      setItemsLoading(false);
+      setStoriesLoading(false);
     }
-  }, [jobId, sort]);
+  }, [jobId]);
 
   useEffect(() => {
     if (!isTerminal) return;
-    void loadItems();
+    void loadStories();
     if (!completionFiredRef.current) {
       completionFiredRef.current = true;
       onJobComplete?.();
     }
-  }, [isTerminal, loadItems, onJobComplete]);
+  }, [isTerminal, loadStories, onJobComplete]);
 
   async function cancel() {
     if (cancelling) return;
@@ -852,72 +882,31 @@ function ActiveJobView({
     }
   }
 
-  async function promote(itemId: string) {
-    setPendingActions((prev) => {
-      const s = new Set(prev);
-      s.add(itemId);
-      return s;
-    });
+  async function generateBand(storyId: string, band: AgeBand) {
+    const key = `${storyId}:${band}`;
+    if (generatingKeys.has(key)) return;
+    setGeneratingKeys((prev) => new Set([...prev, key]));
     try {
-      const res = await fetch(`/api/admin/newsroom/research/items/${itemId}/promote`, {
+      const { provider, model } = MODEL_OPTIONS[selectedModelIdx] ?? MODEL_OPTIONS[0];
+      const res = await fetch('/api/admin/pipeline/generate', {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ story_id: storyId, age_band: band, provider, model }),
       });
-      const json = (await res.json().catch(() => ({}))) as {
-        attached?: boolean;
-        formed?: boolean;
-        already?: boolean;
-        story?: { id: string; title: string | null; slug: string | null };
-        match_score?: number | null;
-        error?: string;
-      };
-      if (!res.ok || !json.attached) {
-        toast.push({ message: json.error ?? 'Could not promote.', variant: 'danger' });
+      const json = (await res.json().catch(() => ({}))) as { run_id?: string; error?: string };
+      if (!res.ok || !json.run_id) {
+        toast.push({ message: json.error ?? `Generate failed (${res.status})`, variant: 'danger' });
         return;
       }
-      const title = json.story?.title ?? 'story';
-      toast.push({
-        message: json.formed
-          ? `New story "${title}" formed.`
-          : json.already
-            ? `Already attached to "${title}".`
-            : `Attached to "${title}".`,
-        variant: 'success',
-      });
-      await loadItems();
+      toast.push({ message: `Generating ${band} article…`, variant: 'success' });
+      await loadStories();
     } catch (err) {
       toast.push({ message: err instanceof Error ? err.message : 'Network error', variant: 'danger' });
     } finally {
-      setPendingActions((prev) => {
-        const s = new Set(prev);
-        s.delete(itemId);
-        return s;
-      });
-    }
-  }
-
-  async function discard(itemId: string) {
-    if (!confirm('Discard this item? This is a hard delete.')) return;
-    setPendingActions((prev) => {
-      const s = new Set(prev);
-      s.add(itemId);
-      return s;
-    });
-    try {
-      const res = await fetch(`/api/admin/newsroom/research/items/${itemId}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        const json = (await res.json().catch(() => ({}))) as { error?: string };
-        toast.push({ message: json.error ?? 'Could not discard.', variant: 'danger' });
-        return;
-      }
-      toast.push({ message: 'Item discarded.', variant: 'success' });
-      setItems((prev) => prev.filter((i) => i.id !== itemId));
-    } finally {
-      setPendingActions((prev) => {
-        const s = new Set(prev);
-        s.delete(itemId);
-        return s;
+      setGeneratingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
       });
     }
   }
@@ -1002,13 +991,10 @@ function ActiveJobView({
       {isTerminal && job && (
         <ResultBody
           job={job}
-          items={items}
-          itemsLoading={itemsLoading}
-          sort={sort}
-          onSortChange={setSort}
-          onPromote={promote}
-          onDiscard={discard}
-          pendingActions={pendingActions}
+          stories={stories}
+          storiesLoading={storiesLoading}
+          generatingKeys={generatingKeys}
+          onGenerate={generateBand}
         />
       )}
     </div>
@@ -1017,38 +1003,17 @@ function ActiveJobView({
 
 function ResultBody({
   job,
-  items,
-  itemsLoading,
-  sort,
-  onSortChange,
-  onPromote,
-  onDiscard,
-  pendingActions,
+  stories,
+  storiesLoading,
+  generatingKeys,
+  onGenerate,
 }: {
   job: JobRow;
-  items: ItemRow[];
-  itemsLoading: boolean;
-  sort: SortKey;
-  onSortChange: (s: SortKey) => void;
-  onPromote: (itemId: string) => void;
-  onDiscard: (itemId: string) => void;
-  pendingActions: Set<string>;
+  stories: RunStory[];
+  storiesLoading: boolean;
+  generatingKeys: Set<string>;
+  onGenerate: (storyId: string, band: AgeBand) => void;
 }) {
-  const router = useRouter();
-  const sp = useSearchParams();
-
-  function viewStories() {
-    // Wave 5 — StoriesList honors ?job= to scope the stories list to
-    // this run. Drop legacy cluster-list filter params on the way out.
-    const params = new URLSearchParams(sp.toString());
-    params.delete('panel');
-    params.delete('view');
-    params.delete('cat');
-    params.delete('so');
-    params.delete('dq');
-    router.replace(`?${params.toString()}`, { scroll: false });
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[3] }}>
@@ -1073,38 +1038,11 @@ function ResultBody({
         </div>
       )}
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: S[2],
-        }}
-      >
-        <Button onClick={viewStories} variant="primary" size="sm">View stories</Button>
-        <div style={{ display: 'flex', gap: S[2], alignItems: 'center' }}>
-          <span style={{ fontSize: F.xs, color: C.dim }}>Sort</span>
-          <Select
-            value={sort}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onSortChange(e.target.value as SortKey)}
-            block={false}
-            style={{ minHeight: 36 }}
-          >
-            <option value="fetched_desc">Newest first</option>
-            <option value="fetched_asc">Oldest first</option>
-            <option value="outlet">Outlet</option>
-            <option value="title">Title</option>
-            <option value="score_desc">Match score</option>
-          </Select>
-        </div>
-      </div>
-
-      <ItemsTable
-        items={items}
-        loading={itemsLoading}
-        pendingActions={pendingActions}
-        onPromote={onPromote}
-        onDiscard={onDiscard}
+      <StoryCardsList
+        stories={stories}
+        loading={storiesLoading}
+        generatingKeys={generatingKeys}
+        onGenerate={onGenerate}
       />
     </div>
   );
@@ -1127,18 +1065,16 @@ function Counter({ label, value }: { label: string; value: number }) {
   );
 }
 
-function ItemsTable({
-  items,
+function StoryCardsList({
+  stories,
   loading,
-  pendingActions,
-  onPromote,
-  onDiscard,
+  generatingKeys,
+  onGenerate,
 }: {
-  items: ItemRow[];
+  stories: RunStory[];
   loading: boolean;
-  pendingActions: Set<string>;
-  onPromote: (itemId: string) => void;
-  onDiscard: (itemId: string) => void;
+  generatingKeys: Set<string>;
+  onGenerate: (storyId: string, band: AgeBand) => void;
 }) {
   if (loading) {
     return (
@@ -1147,154 +1083,166 @@ function ItemsTable({
       </div>
     );
   }
-  if (items.length === 0) {
+  if (stories.length === 0) {
     return (
       <div style={{ padding: S[4], color: C.dim, fontSize: F.sm, textAlign: 'center' }}>
-        No items produced by this run.
+        Run produced no stories.
       </div>
     );
   }
-
   return (
-    <div
-      style={{
-        border: `1px solid ${C.divider}`,
-        borderRadius: 6,
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '160px minmax(0, 2fr) 110px 90px 70px 200px',
-          background: C.bg,
-          padding: `${S[2]}px ${S[3]}px`,
-          fontSize: F.xs,
-          color: C.dim,
-          fontWeight: 500,
-          gap: S[2],
-        }}
-      >
-        <span>Outlet</span>
-        <span>Title</span>
-        <span>Fetched</span>
-        <span>Source</span>
-        <span>Score</span>
-        <span>Action</span>
-      </div>
-      {items.map((it) => (
-        <ItemRowView
-          key={it.id}
-          item={it}
-          pending={pendingActions.has(it.id)}
-          onPromote={onPromote}
-          onDiscard={onDiscard}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
+      {stories.map((story) => (
+        <StoryCard
+          key={story.id}
+          story={story}
+          generatingKeys={generatingKeys}
+          onGenerate={onGenerate}
         />
       ))}
     </div>
   );
 }
 
-function ItemRowView({
-  item,
-  pending,
-  onPromote,
-  onDiscard,
+function StoryCard({
+  story,
+  generatingKeys,
+  onGenerate,
 }: {
-  item: ItemRow;
-  pending: boolean;
-  onPromote: (itemId: string) => void;
-  onDiscard: (itemId: string) => void;
+  story: RunStory;
+  generatingKeys: Set<string>;
+  onGenerate: (storyId: string, band: AgeBand) => void;
 }) {
-  const fetchedDate = item.fetched_at ? item.fetched_at.slice(0, 10) : '';
-  const scorePct =
-    item.match_score !== null && item.match_score !== undefined
-      ? `${Math.round(item.match_score * 100)}%`
-      : '—';
+  const bandLabel = (b: AgeBand) =>
+    b === 'adult' ? 'Generate Adult' : b === 'tweens' ? 'Generate Tweens' : 'Generate Kids';
+
+  const editorHref = (band: AgeBand, articleId: string) =>
+    band === 'kids'
+      ? `/admin/kids-story-manager?article=${articleId}`
+      : `/admin/story-manager?article=${articleId}`;
+
   return (
     <div
       style={{
-        display: 'grid',
-        gridTemplateColumns: '160px minmax(0, 2fr) 110px 90px 70px 200px',
-        padding: `${S[2]}px ${S[3]}px`,
-        fontSize: F.sm,
-        color: C.ink,
-        borderTop: `1px solid ${C.divider}`,
+        background: C.bg,
+        border: `1px solid ${C.divider}`,
+        borderRadius: 8,
+        padding: S[4],
+        display: 'flex',
+        flexDirection: 'column',
         gap: S[2],
-        alignItems: 'center',
       }}
     >
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: C.dim }}>
-        {item.outlet ?? '—'}
-      </span>
-      <span style={{ overflow: 'hidden' }}>
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            color: C.ink,
-            textDecoration: 'none',
-            display: 'inline-block',
-            maxWidth: '100%',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {item.title ?? '(untitled)'}
-        </a>
-      </span>
-      <span style={{ color: C.dim }}>{fetchedDate}</span>
-      <span>
-        {item.source_class ? (
-          <span
-            style={{
-              display: 'inline-block',
-              padding: '2px 6px',
-              borderRadius: 10,
-              background: C.bg,
-              border: `1px solid ${C.divider}`,
-              fontSize: F.xs,
-              color: C.dim,
-            }}
-          >
-            {item.source_class}
-          </span>
-        ) : (
-          <span style={{ color: C.dim }}>—</span>
-        )}
-      </span>
-      <span style={{ color: C.dim }}>{scorePct}</span>
-      <span style={{ display: 'flex', gap: S[1], justifyContent: 'flex-end' }}>
-        {item.attached_story ? (
-          <span style={{ fontSize: F.xs, color: C.dim }}>
-            Attached to{' '}
-            <strong style={{ color: C.ink }}>
-              {item.attached_story.title ?? '(untitled)'}
-            </strong>
-          </span>
-        ) : (
+      {/* Header: category > subcategory chips */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: S[1], flexWrap: 'wrap' }}>
+        {story.ai_category ? (
           <>
+            <Badge variant="neutral" size="xs">{story.ai_category.name}</Badge>
+            {story.ai_subcategory && (
+              <>
+                <span style={{ fontSize: F.xs, color: C.dim }}>›</span>
+                <Badge variant="neutral" size="xs">{story.ai_subcategory.name}</Badge>
+              </>
+            )}
+          </>
+        ) : (
+          <Badge variant="neutral" size="xs">Uncategorized</Badge>
+        )}
+      </div>
+
+      {/* Story title */}
+      <div style={{ fontSize: F.md, fontWeight: 600, color: C.ink, lineHeight: 1.35 }}>
+        {story.title}
+      </div>
+
+      {/* Slug + badges row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: S[2], flexWrap: 'wrap' }}>
+        <code style={{ fontSize: F.xs, color: C.dim, fontFamily: 'monospace' }}>
+          /{story.slug}
+        </code>
+        {story.formed_in_this_run && (
+          <Badge variant="info" size="xs">New this run</Badge>
+        )}
+        {!story.formed_in_this_run && (
+          <Badge variant="neutral" size="xs">Extended</Badge>
+        )}
+        {story.is_locked && (
+          <Badge variant="warn" size="xs">Locked</Badge>
+        )}
+      </div>
+
+      {/* Sources from this run */}
+      <div>
+        <div style={{ fontSize: F.xs, color: C.dim, marginBottom: S[1] }}>
+          Sources from this run ({story.sources_in_run.length})
+        </div>
+        {story.sources_in_run.length === 0 ? (
+          <div style={{ fontSize: F.xs, color: C.dim, fontStyle: 'italic' }}>No sources.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: S[1] }}>
+            {story.sources_in_run.map((src) => (
+              <div key={src.observation_id}>
+                {src.outlet && (
+                  <span style={{ fontSize: F.xs, fontWeight: 600, color: C.ink, marginRight: 4 }}>
+                    {src.outlet}
+                  </span>
+                )}
+                <a
+                  href={src.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: F.xs, color: C.accent, textDecoration: 'none' }}
+                >
+                  {src.title ?? src.url}
+                </a>
+                {src.excerpt && (
+                  <div style={{ fontSize: F.xs, color: C.dim, marginTop: 2, lineHeight: 1.4 }}>
+                    {src.excerpt}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Generate row — three buttons, one per band */}
+      <div style={{ display: 'flex', gap: S[2], flexWrap: 'wrap', marginTop: S[1] }}>
+        {story.articles_by_band.map((b) => {
+          const key = `${story.id}:${b.band}`;
+          const isGenerating = generatingKeys.has(key);
+          if (b.state !== 'pending') {
+            return (
+              <a
+                key={b.band}
+                href={editorHref(b.band, b.article_id!)}
+                style={{
+                  fontSize: F.xs,
+                  color: C.accent,
+                  textDecoration: 'none',
+                  padding: `${S[1]}px ${S[2]}px`,
+                  border: `1px solid ${C.divider}`,
+                  borderRadius: 6,
+                  background: C.card,
+                }}
+              >
+                {b.band === 'adult' ? 'Adult' : b.band === 'tweens' ? 'Tweens' : 'Kids'} — Edit →
+              </a>
+            );
+          }
+          return (
             <Button
-              onClick={() => onPromote(item.id)}
-              disabled={pending}
+              key={b.band}
               variant="secondary"
               size="sm"
+              disabled={isGenerating}
+              onClick={() => onGenerate(story.id, b.band)}
             >
-              Promote
+              {isGenerating ? 'Generating…' : bandLabel(b.band)}
             </Button>
-            <Button
-              onClick={() => onDiscard(item.id)}
-              disabled={pending}
-              variant="ghost"
-              size="sm"
-            >
-              Discard
-            </Button>
-          </>
-        )}
-      </span>
+          );
+        })}
+      </div>
     </div>
   );
 }

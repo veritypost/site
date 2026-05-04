@@ -10109,6 +10109,8 @@ export type Database = {
       }
       stories: {
         Row: {
+          ai_category_id: string | null
+          ai_subcategory_id: string | null
           created_at: string
           first_seen_at: string | null
           generation_state: string | null
@@ -10124,6 +10126,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_category_id?: string | null
+          ai_subcategory_id?: string | null
           created_at?: string
           first_seen_at?: string | null
           generation_state?: string | null
@@ -10139,6 +10143,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_category_id?: string | null
+          ai_subcategory_id?: string | null
           created_at?: string
           first_seen_at?: string | null
           generation_state?: string | null
@@ -10154,6 +10160,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_stories_ai_category"
+            columns: ["ai_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_stories_ai_subcategory"
+            columns: ["ai_subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fk_stories_research_query"
             columns: ["research_query_id"]

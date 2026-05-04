@@ -185,24 +185,15 @@ export default function StoryDetailDrawer({
 
   async function generateBand(band: Band) {
     if (generatingBand || busy) return;
-    if (!data?.story.default_cluster_id) {
-      toast.push({
-        message: 'No cluster available — story has no observations to generate from.',
-        variant: 'warn',
-      });
-      return;
-    }
     setGeneratingBand(band);
     try {
-      const apiAudience: { audience: 'adult' | 'kid'; age_band?: 'kids' | 'tweens' } =
-        band === 'adult' ? { audience: 'adult' } : { audience: 'kid', age_band: band };
       const { provider, model } = MODEL_OPTIONS[selectedModelIdx] ?? MODEL_OPTIONS[0];
       const res = await fetch('/api/admin/pipeline/generate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          cluster_id: data.story.default_cluster_id,
-          ...apiAudience,
+          story_id: storyId,
+          age_band: band,
           provider,
           model,
         }),
@@ -412,7 +403,7 @@ export default function StoryDetailDrawer({
                         variant="secondary"
                         size="sm"
                         onClick={() => void generateBand(b.band)}
-                        disabled={generatingBand !== null || !story.default_cluster_id}
+                        disabled={generatingBand !== null}
                       >
                         {generatingBand === b.band ? 'Generating…' : 'Generate'}
                       </Button>
@@ -421,11 +412,6 @@ export default function StoryDetailDrawer({
                 </div>
               ))}
             </div>
-            {!story.default_cluster_id && (
-              <p style={{ margin: `${S[2]}px 0 0`, fontSize: F.xs, color: C.dim, lineHeight: 1.4 }}>
-                No cluster attached — Generate is unavailable until the next ingest run links observations to a cluster.
-              </p>
-            )}
           </section>
 
           {/* Observation timeline */}

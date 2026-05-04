@@ -58,16 +58,94 @@ listed in § Decisions the owner needs to make.
   trim sweep: no source-class filter, no feed-status filter,
   no view toggle, no free-text URL search. `tsc --noEmit`
   clean; `next lint` clean for the touched dirs.
-- **Next wave to ship:** **none — wave order complete.** All
-  seven waves (0 through 6) of AI_Redesign.md are shipped. Open
-  follow-ups now belong to v1.1 (per the Out of scope and
-  v1-deferred lists below): public-facing surfacing of
-  `article_sources` on the article reader, Detach + Lock UI
-  for `story_observations.detached_at` / `stories.is_locked`,
-  paid news-search vendor as a second `search_api` feed.
+- **Wave 7 — result-screen rebuild + grouping fix** (commit
+  `<pending>`, 2026-05-04). Closes three real gaps the owner
+  hit when first using the redesign end-to-end:
+  (1) Singletons (single-outlet items) didn't story-match —
+  the `for (const cluster of clusters)` loop in the ingest
+  handler never iterated `singletons`, so a one-source item
+  could never attach to or extend an existing story. Fix
+  added a parallel `for (const singleton of singletons)`
+  loop that runs the same `stories.keywords` overlap query
+  with the same threshold / `is_locked=false` filter and
+  either attaches an observation or forms a new 1-source
+  story. Singletons with empty extracted keywords are still
+  skipped (unchanged).
+  (2) Newly-formed stories had no AI-picked category /
+  subcategory. Migration `20260504250000_wave7_story_ai_metadata.sql`
+  adds `stories.ai_category_id` + `stories.ai_subcategory_id`
+  (both nullable FK to `categories` ON DELETE SET NULL —
+  subcategories share the same table via `parent_id` per
+  Wave 1 schema). New module `web/src/lib/pipeline/story-metadata.ts`
+  exports `pickStoryMetadata(input, pipelineRunId)` —
+  reserves $0.005 via `reserveCostOrFail`, calls Haiku
+  4.5 with category list + story title/keywords/sources,
+  parses + UUID-validates the JSON pick. The ingest handler
+  calls it after every `stories.insert` (cluster path AND
+  singleton path); failure is best-effort and never aborts
+  story formation.
+  (3) Result screen replaced the flat per-item table with
+  a story-card list. New endpoint `GET /api/admin/newsroom/research/jobs/[id]/stories`
+  returns ALL stories produced by the run (no cap; explicit
+  `.limit(10000)` so PostgREST default page size doesn't
+  silently cap a high-volume Run) joined to `categories`
+  twice for ai_category + ai_subcategory display. Per story:
+  observations whose `discovery_item.research_job_id` matches
+  this run go in `sources_in_run`, all three bands
+  (`adult`/`tweens`/`kids`) always present in `articles_by_band`
+  with a `pending`/`draft`/`published`/`archived` state, and
+  a `formed_in_this_run` flag computed by comparing
+  `first_seen_at` to `research_jobs.started_at`. UI in
+  `Research.tsx` deletes `ItemsTable` + `ItemRowView` +
+  Promote/Discard handlers + the per-item sort dropdown,
+  replaced with `StoryCardsList` + `StoryCard`. Each card
+  shows category › subcategory chips, slug, sources, three
+  per-band Generate buttons (or `Edit →` link when an
+  article exists). Per-(story_id, band) loading state means
+  parallel clicks across cards/bands don't disable each
+  other. No "Pending" / "Forming" copy anywhere in the
+  operator UI; lifecycle states stay in DB only.
+  (4) Generate handler at
+  `/api/admin/pipeline/generate` accepts new
+  `{story_id, age_band}` shape alongside the legacy
+  `{cluster_id, audience}`. When `story_id` is given, it
+  aggregates source URLs from every active observation on
+  the story (full source set, across runs if the story has
+  been extended), resolves a `cluster_id` from the most-recent
+  observation's discovery_item for downstream lock + persistence
+  back-compat, and applies a soft application-layer lock
+  (`SELECT articles WHERE story_id+age_band+status IN
+  (draft|published|generating)`) returning 409 if a band
+  already has a generating/generated article. TODO comment
+  in route.ts flags a future `claim_story_lock_v2` RPC.
+  StoryDetailDrawer + StoriesList both updated to call the
+  new shape (drawer no longer requires `default_cluster_id`
+  — story_id alone is enough).
+  Both ingest and generate emergency-stop 503 blocks lifted
+  in `764cbb7` before the wave landed; daily cost cap of
+  $10 (`pipeline.daily_cost_usd_cap`) plus per-run cap of
+  $0.50 (`pipeline.per_run_cost_usd_cap`) are the live
+  safety net. `tsc --noEmit` clean; `next lint` clean for
+  the touched dirs (one pre-existing ArticlesTable warning
+  is untouched).
+- **Next wave to ship:** **none — wave order complete.** Waves
+  0 through 7 of AI_Redesign.md are shipped. Open follow-ups
+  belong to v1.1: public-facing surfacing of `article_sources`
+  on the article reader, Detach + Lock UI for
+  `story_observations.detached_at` / `stories.is_locked`,
+  paid news-search vendor as a second `search_api` feed,
+  DB-level `claim_story_lock_v2` RPC to replace the soft
+  application-layer story+band lock added in Wave 7.
 - **Branch:** main (direct commit per repo workflow — recent history
   is single-branch).
-- **Open blockers:** none.
+- **Open blockers:** owner must apply migration
+  `supabase/migrations/20260504250000_wave7_story_ai_metadata.sql`
+  to remote DB before the new endpoint can populate
+  ai_category / ai_subcategory. Until then, every story card
+  renders an "Uncategorized" chip and the AI-pick code path
+  silently no-ops on null columns. Code is forward-compatible
+  with the migration absent; type defs already include the
+  new columns.
 
 ### Wave order (locked)
 1. **Wave 0 — `article_sources` only.** New table + RLS (blanket DENY
