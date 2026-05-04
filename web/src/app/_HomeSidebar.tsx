@@ -57,19 +57,49 @@ export default function HomeSidebar({
         @media (max-width: ${HOME_SIDEBAR_BREAKPOINT_PX - 1}px) {
           .vp-home-sidebar { display: none !important; }
         }
+
+        /* Floating-pill scrollbar: hidden until the rail is hovered, then
+           fades in as a rounded thumb with a 3px transparent inset so it
+           floats inside the gutter instead of hugging the edge. Track stays
+           invisible so the rail looks chrome-free at rest. */
         .vp-home-sidebar {
           scrollbar-width: thin;
-          scrollbar-color: var(--p-border, transparent) transparent;
+          scrollbar-color: transparent transparent;
+          scrollbar-gutter: stable;
+          transition: scrollbar-color 220ms ease-out;
         }
-        .vp-home-sidebar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .vp-home-sidebar:hover,
+        .vp-home-sidebar:focus-within {
+          scrollbar-color: var(--p-border-strong, rgba(0,0,0,0.18)) transparent;
+        }
+        .vp-home-sidebar::-webkit-scrollbar { width: 10px; height: 10px; }
         .vp-home-sidebar::-webkit-scrollbar-track { background: transparent; }
         .vp-home-sidebar::-webkit-scrollbar-thumb {
-          background: transparent;
-          border-radius: 3px;
-          transition: background 200ms ease-out;
+          background-color: transparent;
+          background-clip: content-box;
+          border: 3px solid transparent;
+          border-radius: 999px;
+          min-height: 32px;
+          transition: background-color 220ms ease-out;
         }
-        .vp-home-sidebar:hover::-webkit-scrollbar-thumb { background: var(--p-border, rgba(0,0,0,0.12)); }
-        .vp-home-sidebar::-webkit-scrollbar-thumb:hover { background: var(--p-border-strong, rgba(0,0,0,0.22)); }
+        .vp-home-sidebar:hover::-webkit-scrollbar-thumb,
+        .vp-home-sidebar:focus-within::-webkit-scrollbar-thumb {
+          background-color: var(--p-border-strong, rgba(0,0,0,0.18));
+        }
+        .vp-home-sidebar::-webkit-scrollbar-thumb:hover {
+          background-color: var(--p-ink-faint, rgba(0,0,0,0.32));
+        }
+        .vp-home-sidebar::-webkit-scrollbar-thumb:active {
+          background-color: var(--p-ink-dim, rgba(0,0,0,0.45));
+        }
+
+        .vp-home-sidebar a { transition: color 160ms ease-out; outline: none; }
+        .vp-home-sidebar a:hover { color: var(--p-ink) !important; }
+        .vp-home-sidebar a:focus-visible {
+          outline: 2px solid var(--p-ring, var(--p-ink));
+          outline-offset: 2px;
+          border-radius: 2px;
+        }
       `}</style>
       <aside
         className="vp-home-sidebar"
@@ -83,7 +113,7 @@ export default function HomeSidebar({
           maxHeight: 'calc(100vh - var(--vp-top-bar-h, 0px))',
           overflowY: 'auto',
           padding: '24px 18px 32px 0',
-          borderRight: `1px solid ${C.rule}`,
+          borderRight: '1px solid var(--p-divider, rgba(0,0,0,0.06))',
         }}
       >
         <SidebarSection name="Home" href="/" active />

@@ -311,12 +311,13 @@ export default async function HomePage() {
             minWidth: 0,
             maxWidth: 720,
             margin: '0 auto',
-            padding: '0 20px 64px',
+            paddingTop: 32,
+            paddingLeft: 20,
+            paddingRight: 20,
+            paddingBottom: 64,
           }}
         >
         {breaking && showBreaking && <HomeBreakingStrip story={breaking} />}
-
-        <div style={{ height: 32 }} />
 
         {fetchFailed && <HomeFetchFailed />}
 
