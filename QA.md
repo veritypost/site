@@ -21,11 +21,20 @@ NOTES:   <one line — anything the next turn needs to know>
 **Active:**
 
 ```
-CURRENT: QA /browse — UI/UX redesign pass. Owner reports the page "sucks"; this session brings it up to standard, makes it ready to QA across roles, and folds in Owner Change #2 (following merges into browse).
-SHAPE:   surface
-TARGET:  /browse · web/src/app/browse/page.tsx (BrowsePageInner, StoryCard, CoverageTimeline, SectionHeader, FilterSheet, ActiveFilters)
-STATUS:  picking-page
-NOTES:   Owner Change #2 says /following is removed and reading-history / followed-stories merge into /browse. Today /browse is a dense lifecycle-grouped story list with search, filter sheet, and a chip rail; following has not yet been merged in. Recent fixes already applied this conversation: header glass bg now theme-aware (orphan --bg-glass replaced with rgba(var(--bg-rgb), 0.97)), --text-secondary / --dim-more / --breaking-bg / --developing-bg seeded in dark blocks. Next: dispatch the §1.5 expert panel, walk the surface, log findings under §8, run §7 fix gate per finding.
+CURRENT: /admin/feeds rebuild — owner-facing smoke test on prod. Five-stream rebuild shipped (commit aee2701, Vercel dpl_5J8LAvy9bDrpApif9t7HyZ6BnnwC READY): soft-delete + restore-on-re-add, honest UI counters from discovery_items joins, per-feed health writeback (last_polled_at / error_count / last_error / last_error_at), articles_imported_count writeback removed (UI no longer reads it), max_items_per_run column dropped, editor revoked from admin.feeds.manage. Three migrations applied to prod via mcp_supabase__apply_migration.
+SHAPE:   fix-cluster (admin chrome — not on §8.4 lock list, free to edit)
+TARGET:  /admin/feeds · web/src/app/admin/feeds/page.tsx + web/src/app/api/admin/feeds/{route.ts,[id]/route.ts,bulk/route.ts,list/route.ts} + supabase/migrations/{20260504130000_drop_feeds_max_items_per_run.sql,20260504140000_add_feeds_deleted_at.sql,20260504150000_lock_feeds_to_admin.sql} + lib/pipeline/ingestRun
+STATUS:  pending-prod-confirm
+NOTES:   CLI-side checks done — Vercel READY, schema matches (deleted_at column + partial index, max_items_per_run gone, permission_set_perms editor row gone), POST route correctly restores soft-deleted rows on re-add (route.ts:144-181), 229 live feeds / 0 soft-deleted / 101 ever-polled / 0 polled-in-last-24h (next ingest will populate). Owner runs in-browser checklist below; once green, promote to LOCKED in §8.4 if owner wants the surface frozen. After smoke: option 2 = stage tier-1 anchor feeds (~20 rows), option 3 = bulk-deactivate the 108 dead non-RSS feeds via the new UI, option 5 = drop articles_imported_count column.
+
+Smoke checklist (owner runs on verityposts.com/admin/feeds while signed in as admin@veritypost.com):
+  1. Page loads as owner — no 403; table renders with Items/24h + Items/7d columns
+  2. Click "Refresh feeds" / trigger ingest — after run, refresh: at least some rows show non-zero error_count OR last_polled_at moves into the last 24h (proves writeback works on real data)
+  3. Add Feed with a JSON-API URL (e.g. https://catfact.ninja) — should reject 422 with helpful message
+  4. Add Feed with a real RSS URL (e.g. https://feeds.npr.org/1014/rss.xml) — should succeed; row appears in table
+  5. Bulk-select 5 rows + Pause — confirm only 5 rows flip is_active=false (no off-by-one)
+  6. Delete a feed — confirm articles + discovery_items survive (soft-delete)
+  7. Re-add the deleted feed's URL — should restore the existing row, not error on UNIQUE
 ```
 
 **Parking lot** (intent the owner mentioned but didn't switch to — pulled from here after CURRENT closes):
@@ -35,6 +44,7 @@ NOTES:   Owner Change #2 says /following is removed and reading-history / follow
 
 **Recently closed** (last ~5; trims as new ones land):
 
+- 2026-05-04 — /browse redesign + audit fixes (commits `5e4beee` redesign, `4120b89` strip-mock, `8bdb0b2` search subtitle/excerpt, `360a1e4` audience filter + iOS dark-mode, `9b10fff` AbortController, `db64f1c` inclusive UTC date filter)
 - 2026-05-03 — Finding #10 admin/owner backstage-pass for /profile (commit `ee9ea19`, locked in §8.4)
 
 ---
@@ -955,6 +965,20 @@ Keep ≤8 lines. If investigation grows, spin a finding doc under `UI_UX_REVIEW/
 - **Ready for fix:** no — owner call required. If owner says tappable: scope includes building a FollowersList view that doesn't exist yet, plus making FollowingView re-reachable from outside the dropped Tab.following surface (which is its OWN launch-hide).
 - **Notes for next agent:** if tappable wins, also do web parity sweep on `/profile` social row to keep platforms aligned.
 
+#### 19. /admin/feeds rebuild — shipped, awaiting owner prod smoke confirm
+
+- **Cluster:** chrome / pipeline-data
+- **What was seen:** Pre-rebuild, /admin/feeds had decorative status badges (no per-feed writeback from ingest), bulk-delete cascaded silently through ~25 child tables, no soft-delete, editor role had `admin.feeds.manage`. Five-stream rebuild closed all of it.
+- **Surface:** `web/src/app/admin/feeds/page.tsx`; `web/src/app/api/admin/feeds/route.ts:144-181` (un-delete-on-re-add); `web/src/app/api/admin/feeds/{[id],bulk,list}/route.ts`; ingest writeback in `lib/pipeline/ingestRun.ts`.
+- **Associated:** `supabase/migrations/20260504130000_drop_feeds_max_items_per_run.sql`, `…140000_add_feeds_deleted_at.sql`, `…150000_lock_feeds_to_admin.sql` (all applied to prod).
+- **Cross-platform parity:** web admin chrome only — N/A iOS / kids.
+- **Known context:** Vercel `dpl_5J8LAvy9bDrpApif9t7HyZ6BnnwC` for `aee2701` is `READY` on production. Schema verified via Supabase MCP: `feeds.deleted_at` + `feeds_deleted_at_idx` partial index exist; `feeds.max_items_per_run` gone; `permission_set_perms` for `admin.feeds.manage` is now `{owner, admin}` only. 229 live feeds / 0 soft-deleted / 101 ever-polled / 0 polled-in-last-24h (next ingest will populate writeback). `feeds.url` UNIQUE has no partial filter, so soft-delete-then-re-add relies on the POST route's restore branch — verified in place at route.ts:144-181.
+- **Confirmed:** yes (2026-05-04 — Vercel + Supabase MCP + file read).
+- **Owner decision needed:** no for the rebuild itself; yes once smoke passes — promote to `[LOCKED]` in §8.4? The chrome is non-trivial and worth freezing while the long-tail seed work (options 2/3/5 in CURRENT) runs.
+- **Status:** pending-prod-confirm (per §0 smoke checklist)
+- **Ready for fix:** n/a — shipped 2026-05-04 `aee2701`. Awaiting owner in-browser run.
+- **Notes for next agent:** do NOT re-edit /admin/feeds files until smoke passes or owner reports a failure. If smoke step 2 (writeback) reports zero movement after a real ingest, check `lib/pipeline/ingestRun.ts` — the writeback Map relies on the upsert RETURNING rows; if the ingest cron uses a different code path, writeback won't fire there.
+
 ### 8.3. Roll-up by cluster
 
 #### Ready for fix (decision-locked, fix session can pull these)
@@ -974,6 +998,10 @@ Keep ≤8 lines. If investigation grows, spin a finding doc under `UI_UX_REVIEW/
 #### Stale / likely already fixed
 
 - **article-reader / layout:** #1 (desktop timeline rail — needs prod re-check)
+
+#### Shipped — pending owner prod confirm
+
+- **chrome / pipeline-data:** #19 (/admin/feeds rebuild) — shipped 2026-05-04 `aee2701`. **Owner action pending:** in-browser smoke per §0 checklist; on green, owner writes a `[LOCKED]` line in §8.4 if freezing is desired.
 
 #### Shipped
 
