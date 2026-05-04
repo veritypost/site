@@ -28,7 +28,7 @@ listed in § Decisions the owner needs to make.
 
 ### Current status
 - **Last shipped wave:** Wave 4 — Stream D Run Feed UI (commit
-  `__WAVE4__`, 2026-05-04). New
+  `a18da71`, 2026-05-04). New
   `web/src/app/admin/newsroom/_subpages/Research.tsx` (Research
   panel — three-state machine: idle → running → done), mounted at
   the top of the Discovery tab in
