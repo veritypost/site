@@ -33,7 +33,7 @@ export default function AnonArticleCtaBanner() {
           style={{
             display: 'inline-block',
             background: 'var(--accent, #111)',
-            color: '#fff',
+            color: 'var(--bg, #fff)',
             fontSize: 13,
             fontWeight: 600,
             padding: '9px 18px',

@@ -454,10 +454,14 @@ struct TextTabBar: View {
     }
 
     private var items: [Item] {
+        // Following dropped from bottom-tab to mirror web's 3-slot nav
+        // (owner override of cross-platform panel — kept the original
+        // "remove for everyone" call). Following remains accessible
+        // inside Profile / from FollowingView push targets; only the
+        // dedicated tab slot is removed.
         [
             Item(id: .today, label: "Today"),
             Item(id: .browse, label: "Browse"),
-            Item(id: .following, label: "Following"),
             Item(id: .profile, label: isLoggedIn ? "Profile" : "Sign up"),
         ]
     }

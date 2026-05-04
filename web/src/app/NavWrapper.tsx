@@ -21,6 +21,7 @@ import { hasPermission, refreshAllPermissions, refreshIfStale } from '../lib/per
 import type { Tables } from '@/types/database-helpers';
 import { Z } from '@/lib/zIndex';
 import { BRAND_NAME, BRAND_LEGAL_ENTITY } from '../lib/brand';
+import ThemeToggle from '../components/ThemeToggle';
 
 type ProfileRow = Pick<
   Tables<'users'>,
@@ -377,13 +378,11 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     ? [
         { label: 'Home', href: '/' },
         { label: 'Browse', href: '/browse' },
-        { label: 'Active Stories', href: '/following' },
         { label: 'Profile', href: '/profile' },
       ]
     : [
         { label: 'Home', href: '/' },
         { label: 'Browse', href: '/browse' },
-        { label: 'Active Stories', href: '/following' },
         { label: 'Sign up', href: '/signup' },
       ];
 
@@ -393,7 +392,11 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     left: 0,
     right: 0,
     zIndex: Z.CRITICAL,
-    background: 'rgba(255,255,255,0.97)',
+    // Theme-aware glass — mirrors topBarStyle. --bg-rgb flips
+    // 255,255,255 (light) → 18,18,18 (dark) so the bar reads dark in
+    // dark mode instead of staying hardcoded white. Letter colors
+    // (C.accent / C.dim) are already var-driven and flip with theme.
+    background: 'rgba(var(--bg-rgb, 255, 255, 255), 0.97)',
     backdropFilter: 'blur(12px)',
     borderTop: `1px solid ${C.border}`,
     display: 'flex',
@@ -423,7 +426,10 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     left: 0,
     right: 0,
     zIndex: Z.CRITICAL,
-    background: 'rgba(255,255,255,0.97)',
+    // Theme-aware glass: --bg-rgb flips light → dark with the theme so
+    // the wordmark stays legible in both modes (text is C.text =
+    // var(--text), which already inverts).
+    background: 'rgba(var(--bg-rgb, 255, 255, 255), 0.97)',
     backdropFilter: 'blur(12px)',
     borderBottom: `1px solid ${C.border}`,
     display: 'flex',
@@ -574,20 +580,44 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
 
       {showTopBar && (
         <header style={topBarStyle}>
-          <a
-            href={topBarHomeHref}
-            aria-label={`Go to ${BRAND_NAME} home`}
-            aria-current={topBarActive ? 'page' : undefined}
-            style={{
-              fontSize: 15,
-              fontWeight: 800,
-              letterSpacing: '-0.01em',
-              color: C.text,
-              textDecoration: 'none',
-            }}
-          >
-            {BRAND_NAME.toLowerCase()}
-          </a>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            {!topBarActive && (
+              <a
+                href={topBarHomeHref}
+                aria-label={`Back to ${BRAND_NAME} home`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  color: C.text,
+                  textDecoration: 'none',
+                  marginLeft: -8,
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </a>
+            )}
+            <a
+              href={topBarHomeHref}
+              aria-label={topBarActive ? `${BRAND_NAME} home` : undefined}
+              aria-current={topBarActive ? 'page' : undefined}
+              style={{
+                fontSize: 15,
+                fontWeight: 800,
+                letterSpacing: '-0.01em',
+                color: C.text,
+                textDecoration: 'none',
+              }}
+            >
+              {BRAND_NAME.toLowerCase()}
+            </a>
+          </div>
+          <ThemeToggle />
         </header>
       )}
 

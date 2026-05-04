@@ -21,20 +21,21 @@ NOTES:   <one line — anything the next turn needs to know>
 **Active:**
 
 ```
-CURRENT: Admin/owner backstage-pass for /profile — LOCKED in §8.4 by owner direction 2026-05-03 (commit ee9ea19); browser-side prod-confirm still pending but lock secured per owner request
-SHAPE:   role
-TARGET:  /profile + iOS adult PermissionService + 1 supabase migration · iOS kids N/A
-STATUS:  locked (owner-directed)
-NOTES:   §8.4 LOCKED line added. Owner-mode = full edit, regardless of profile state, plan, expert flag, family membership. Contract spans web permissions.js + ProfileApp + AppShell, iOS PermissionService, DB is_owner_mode_user + claim_queue_item + post_expert_answer. Lock is binding on every future session/agent. Browser greyed-out diagnosis still open (likely tab cache); does not affect lock validity.
+CURRENT: QA /browse — UI/UX redesign pass. Owner reports the page "sucks"; this session brings it up to standard, makes it ready to QA across roles, and folds in Owner Change #2 (following merges into browse).
+SHAPE:   surface
+TARGET:  /browse · web/src/app/browse/page.tsx (BrowsePageInner, StoryCard, CoverageTimeline, SectionHeader, FilterSheet, ActiveFilters)
+STATUS:  picking-page
+NOTES:   Owner Change #2 says /following is removed and reading-history / followed-stories merge into /browse. Today /browse is a dense lifecycle-grouped story list with search, filter sheet, and a chip rail; following has not yet been merged in. Recent fixes already applied this conversation: header glass bg now theme-aware (orphan --bg-glass replaced with rgba(var(--bg-rgb), 0.97)), --text-secondary / --dim-more / --breaking-bg / --developing-bg seeded in dark blocks. Next: dispatch the §1.5 expert panel, walk the surface, log findings under §8, run §7 fix gate per finding.
 ```
 
 **Parking lot** (intent the owner mentioned but didn't switch to — pulled from here after CURRENT closes):
 
-*(empty)*
+- iOS path B parity slice for ads (decoder fix in `HomeFeedSlots.swift` + 3 article slots in `StoryDetailView.swift` + `home_feed` placement seed). Prereq: 3 ad-seed migrations applied. Plan owned by `project_verity_monthly_stripe_pending` memory adjacent.
+- Verity Monthly Stripe price minting — credential-gated, owner-action-only, tracked in memory `project_verity_monthly_stripe_pending`.
 
 **Recently closed** (last ~5; trims as new ones land):
 
-*(empty)*
+- 2026-05-03 — Finding #10 admin/owner backstage-pass for /profile (commit `ee9ea19`, locked in §8.4)
 
 ---
 
@@ -298,7 +299,7 @@ When testing a role-invariant surface, mark `[OK]` / `[BUG]` once for the surfac
 | Page | anon | free | pro | family | expert | mod | editor | admin | owner | Notes |
 |------|------|------|-----|--------|--------|-----|--------|-------|-------|-------|
 | `/` (home) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | |
-| `/browse` | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | merged-following surface |
+| `/browse` | [WIP] | [WIP] | [WIP] | [WIP] | [WIP] | [WIP] | [WIP] | [WIP] | [WIP] | merged-following surface · UX redesign in flight 2026-05-03 (Finding #11) |
 | `/[slug]` (article) | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | anon = no wall |
 | `/story/[slug]` | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | |
 | `/category/[id]` | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | |

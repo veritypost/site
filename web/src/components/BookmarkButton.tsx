@@ -108,7 +108,7 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
           gap: 6,
           fontSize: 13,
           fontWeight: 500,
-          color: bookmarked ? '#fff' : 'var(--text, #1a1a1a)',
+          color: bookmarked ? 'var(--bg, #fff)' : 'var(--text, #1a1a1a)',
           background: bookmarked ? 'var(--accent, #111)' : 'transparent',
           border: `1px solid ${bookmarked ? 'var(--accent, #111)' : 'var(--border, #e5e5e5)'}`,
           borderRadius: 8,
@@ -131,7 +131,7 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
         )}
         {busy ? '…' : bookmarked ? 'Saved' : 'Bookmark'}
       </button>
-      {error && <span style={{ fontSize: 11, color: '#b94040' }}>{error}</span>}
+      {error && <span style={{ fontSize: 11, color: 'var(--danger, #b94040)' }}>{error}</span>}
     </span>
   );
 }

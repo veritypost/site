@@ -70,6 +70,23 @@
   --tlLine: #e5e5e5;
   --tlDot: #d4d4d4;
 
+  /* Tokens that components reference via fallback (var(--name, literal))
+     and were previously orphaned in the cascade. Defined here so the
+     dark-mode blocks below can override them rather than letting the
+     hardcoded literal fallback fire in dark mode. */
+  --warn-text: #b45309;
+  --hover: #f5f5f5;
+  --accent-bg: #f0f0f0;
+  --foreground: #111111;
+  --muted-foreground: #555555;
+  /* Browse-page tokens previously orphaned (page-local C palette
+     references these via var() fallback, so dark mode silently kept
+     the light-hex literals). */
+  --text-secondary: #444444;
+  --dim-more: #999999;
+  --breaking-bg: rgba(239, 68, 68, 0.04);
+  --developing-bg: rgba(245, 158, 11, 0.025);
+
   --font-serif: var(--font-source-serif), Georgia, serif;
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
@@ -128,6 +145,47 @@
    correctly suppressed by the explicit overrides below. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
+    /* Legacy admin/site tokens — must mirror the --p-* palette so every
+       caller using `var(--text)` / `var(--bg)` / etc. flips correctly in
+       dark mode. Without this, body text stayed #111 on a dark page. */
+    --bg: #0a0a0a;
+    --card: #18181b;
+    --border: #27272a;
+    --rule: #27272a;
+    --text-primary: #fafafa;
+    --text: #fafafa;
+    --soft: #e4e4e7;
+    --dim: #a1a1aa;
+    --muted: #71717a;
+    --accent: #fafafa;
+    --srcCard: #18181b;
+    --vpCard: #18181b;
+    --tlLine: #27272a;
+    --tlDot: #3f3f46;
+    /* Semantic state tokens — pastel light-mode tints become deep tints
+       in dark; success/warn/danger inks become brighter so they read on
+       dark surfaces. */
+    --success-text: #4ade80;
+    --warn: #fbbf24;
+    --amber: #fbbf24;
+    --warn-text: #fbbf24;
+    --warn-bg: #2d1d02;
+    --warn-border: #78350f;
+    --danger: #f87171;
+    --wrong: #f87171;
+    --danger-bg: #2d0a0a;
+    --danger-border: #7f1d1d;
+    --breaking: #ef4444;
+    /* Orphan-fallback tokens now formally remapped */
+    --hover: #27272a;
+    --accent-bg: #1c1c1f;
+    --foreground: #fafafa;
+    --muted-foreground: #a1a1aa;
+    /* Browse-page tokens — see :root for the legacy fallback rationale. */
+    --text-secondary: #d4d4d8;
+    --dim-more: #71717a;
+    --breaking-bg: rgba(239, 68, 68, 0.12);
+    --developing-bg: rgba(245, 158, 11, 0.10);
     /* Surfaces */
     --p-bg: #0a0a0a;
     --p-surface: #111113;
@@ -177,6 +235,41 @@
    Specificity (0,1,1,0) beats base :root (0,1,0,0); source order
    after the media query block means it also wins when OS is dark. */
 :root[data-theme="dark"] {
+  /* Legacy admin/site tokens — see system-dark block above for rationale. */
+  --bg: #0a0a0a;
+  --card: #18181b;
+  --border: #27272a;
+  --rule: #27272a;
+  --text-primary: #fafafa;
+  --text: #fafafa;
+  --soft: #e4e4e7;
+  --dim: #a1a1aa;
+  --muted: #71717a;
+  --accent: #fafafa;
+  --srcCard: #18181b;
+  --vpCard: #18181b;
+  --tlLine: #27272a;
+  --tlDot: #3f3f46;
+  /* Semantic state tokens — see system-dark block above for rationale. */
+  --success-text: #4ade80;
+  --warn: #fbbf24;
+  --amber: #fbbf24;
+  --warn-text: #fbbf24;
+  --warn-bg: #2d1d02;
+  --warn-border: #78350f;
+  --danger: #f87171;
+  --wrong: #f87171;
+  --danger-bg: #2d0a0a;
+  --danger-border: #7f1d1d;
+  --breaking: #ef4444;
+  --hover: #27272a;
+  --accent-bg: #1c1c1f;
+  --foreground: #fafafa;
+  --muted-foreground: #a1a1aa;
+  --text-secondary: #d4d4d8;
+  --dim-more: #71717a;
+  --breaking-bg: rgba(239, 68, 68, 0.12);
+  --developing-bg: rgba(245, 158, 11, 0.10);
   /* Surfaces */
   --p-bg: #0a0a0a;
   --p-surface: #111113;
@@ -358,14 +451,14 @@
 input,
 textarea,
 select {
-  color: #111111;
+  color: var(--text);
 }
 input::placeholder,
 textarea::placeholder {
-  color: #999999;
+  color: var(--muted);
 }
 *:focus-visible {
-  outline: 2px solid #111111;
+  outline: 2px solid var(--text);
   outline-offset: 2px;
 }
 body {

@@ -207,7 +207,7 @@ export function RegistrationWallProvider({
               style={{
                 display: 'block',
                 background: 'var(--accent, #111)',
-                color: '#fff',
+                color: 'var(--bg, #fff)',
                 fontSize: 15,
                 fontWeight: 600,
                 textAlign: 'center',

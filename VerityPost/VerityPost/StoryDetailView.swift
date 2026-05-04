@@ -506,7 +506,13 @@ struct StoryDetailView: View {
             hasUnlimitedQuizAttempts = await PermissionService.shared.has("quiz.retake.after_fail")
             canMentionAutocomplete = await PermissionService.shared.has("comments.mention.autocomplete")
             hasUnlimitedBookmarks = await PermissionService.shared.has("bookmarks.unlimited")
-            canViewBody = await PermissionService.shared.has("article.view.body")
+            // Anon parity with web (web/src/app/[slug]/page.tsx:335). Anon
+            // visitors read article bodies unconditionally; the
+            // `article.view.body` permission is reserved for the
+            // signed-in paywall. Without this override anon iOS users
+            // landed on "Upgrade to read this article" and could read
+            // nothing.
+            canViewBody = !auth.isLoggedIn || (await PermissionService.shared.has("article.view.body"))
             canViewSources = await PermissionService.shared.has("article.view.sources")
             canViewTimeline = await PermissionService.shared.has("article.view.timeline")
             canEditOwnComment = await PermissionService.shared.has("comments.edit.own")

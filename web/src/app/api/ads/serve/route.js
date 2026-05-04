@@ -47,8 +47,12 @@ export async function GET(request) {
   // without a code change there.
   const isSafeAdUrl = (u) => {
     if (!u || typeof u !== 'string') return true; // nullable column — leave as-is
+    const trimmed = u.trim();
+    // Same-origin relative URL — house ads (e.g. /pricing) must pass.
+    // Must start with '/' but NOT '//' (protocol-relative).
+    if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return true;
     try {
-      const parsed = new URL(u);
+      const parsed = new URL(trimmed);
       return parsed.protocol === 'http:' || parsed.protocol === 'https:';
     } catch {
       return false;

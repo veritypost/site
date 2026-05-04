@@ -49,27 +49,10 @@ export default function NextStoryFooter({ category, nearbyStories }: NextStoryFo
           </ul>
         </section>
       )}
-      <Link
-        href="/"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          fontSize: 13,
-          fontWeight: 500,
-          color: 'var(--dim, #666)',
-          textDecoration: 'none',
-          padding: '8px 14px',
-          borderRadius: 8,
-          border: '1px solid var(--border, #e5e5e5)',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <path d="M9 11L5 7l4-4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Back to home
-      </Link>
+      {/* End-of-article "Back to home" pill removed — the global top-bar
+          chevron + wordmark already cover home navigation, and the bottom
+          nav's Home tab is a third path. Three home affordances on a
+          single page was noise. */}
     </div>
     </footer>
   );

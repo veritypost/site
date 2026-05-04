@@ -332,7 +332,7 @@ export default async function ArticleSlugPage({
               }}
               bodyHtml={bodyHtml}
               canEdit={canEdit}
-              canViewBody={canViewBody}
+              canViewBody={isAnon ? true : canViewBody}
               nearbyArticles={nearbyArticles}
               hasQuiz={hasQuiz}
               quizPassed={initialPassed}
@@ -344,13 +344,14 @@ export default async function ArticleSlugPage({
                 currentUserId={user?.id ?? null}
               />
             )}
-            {isAnon && <AnonArticleCtaBanner />}
+            {/* AnonArticleCtaBanner removed — the locked quiz card in the
+                engagement zone is the single signup nudge for anon. */}
           </>
         }
         timelineSlot={
           <>
-            <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} showTease={isAnon && timeline.length > 0} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
-            <SourcesSection sources={!isAnon ? sources : []} showTease={isAnon && sources.length > 0} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
+            <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} showTease={false} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
+            <SourcesSection sources={!isAnon ? sources : []} showTease={false} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
             {/* article_rail: sticky right-rail ad on desktop (non-COPPA articles only) */}
             {!isCoppa && <Ad placement="article_rail" page="article" position="rail" articleId={article.id} />}
           </>

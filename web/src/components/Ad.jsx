@@ -135,7 +135,12 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
   function isSafeAdUrl(url) {
     if (!url || typeof url !== 'string') return false;
     const normalized = url.trim().toLowerCase();
-    return normalized.startsWith('https://') || normalized.startsWith('http://');
+    if (normalized.startsWith('https://') || normalized.startsWith('http://')) return true;
+    // Same-origin relative URL — house ads (e.g. /pricing) should be
+    // allowed. Must start with '/' but NOT '//' (protocol-relative,
+    // which would escape to another origin).
+    if (normalized.startsWith('/') && !normalized.startsWith('//')) return true;
+    return false;
   }
 
   const safeClickUrl = isSafeAdUrl(ad.click_url) ? ad.click_url.trim() : null;
@@ -168,7 +173,7 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
       style={{
         fontSize: 9,
         fontWeight: 700,
-        color: '#999',
+        color: 'var(--dim, #999)',
         textTransform: 'uppercase',
         letterSpacing: 1,
         marginBottom: 4,
@@ -241,7 +246,7 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
         />
       )}
       {ad.cta_text && (
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginTop: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text, #111)', marginTop: 6 }}>
           {ad.cta_text}
         </div>
       )}
@@ -250,8 +255,8 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
 }
 
 const wrapStyle = {
-  background: '#f7f7f7',
-  border: '1px solid #e5e5e5',
+  background: 'var(--card, #f7f7f7)',
+  border: '1px solid var(--border, #e5e5e5)',
   borderRadius: 10,
   padding: '10px 12px',
   margin: '12px 0',

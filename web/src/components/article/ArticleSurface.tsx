@@ -122,7 +122,7 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
             style={{
               fontSize: 12,
               padding: '4px 10px',
-              border: '1px solid #ccc',
+              border: '1px solid var(--border, #ccc)',
               borderRadius: 4,
               color: 'var(--dim, #555)',
               textDecoration: 'none',
@@ -135,7 +135,7 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
       )}
       <h1 style={TITLE_STYLE}>{article.title}</h1>
       {article.subtitle && <p style={SUBTITLE_STYLE}>{article.subtitle}</p>}
-      <p style={{ fontSize: 12, color: 'var(--dim, #5a5a5a)', marginBottom: 16, letterSpacing: '0.03em' }}>verity post</p>
+      <p style={{ fontSize: 12, color: 'var(--text, #111)', marginBottom: 16, letterSpacing: '0.03em' }}>verity post</p>
       {/* article_header: between title/byline block and body (DECISION #048) */}
       <Ad placement="article_header" page="article" position="header" articleId={article.id} />
       {canViewBody ? (
@@ -151,11 +151,16 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
               articles are long enough that the reader has scrolled 30%+ by
               the time this slot is visible. */}
           <Ad placement="article_in_body" page="article" position="in_body" articleId={article.id} />
-          <MidBodyQuizTeaser
-            hasQuiz={hasQuiz}
-            quizPassed={quizPassed}
-            onScrollToQuiz={() => document.getElementById('article-quiz')?.scrollIntoView({ behavior: 'smooth' })}
-          />
+          {/* MidBodyQuizTeaser intentionally hidden for anon — the locked
+              quiz card at the bottom + the AnonArticleCtaBanner at the top
+              already cover signup, and a third inline CTA piles up. */}
+          {isSignedIn && (
+            <MidBodyQuizTeaser
+              hasQuiz={hasQuiz}
+              quizPassed={quizPassed}
+              onScrollToQuiz={() => document.getElementById('article-quiz')?.scrollIntoView({ behavior: 'smooth' })}
+            />
+          )}
         </>
       ) : (
         <div
@@ -174,7 +179,7 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
               padding: '8px 20px',
               borderRadius: 8,
               background: 'var(--accent, #0070f3)',
-              color: '#fff',
+              color: 'var(--bg, #fff)',
               fontWeight: 600,
               textDecoration: 'none',
               fontSize: 13,

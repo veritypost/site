@@ -22,7 +22,7 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { Fragment, type CSSProperties } from 'react';
-import { createClient } from '../lib/supabase/server';
+import { createClient, createServiceClient } from '../lib/supabase/server';
 import type { Tables } from '@/types/database-helpers';
 import {
   HOME_COLORS as C,
@@ -96,6 +96,12 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const supabase = createClient();
+  // Public catalog reads (top_stories, published articles, categories) bypass
+  // RLS via the service client so anon visitors see the same curated feed as
+  // signed-in users — same pattern as `web/src/app/[slug]/page.tsx`. The
+  // cookie-aware `supabase` client is still used for `auth.getUser()` and the
+  // signed-in user's metadata row below.
+  const service = createServiceClient();
 
   // T91 — last-visit cookie. Stories published after this timestamp get
   // a "New" pill on the next render. Cookie is written by the
@@ -144,7 +150,7 @@ export default async function HomePage() {
     })();
 
     [storiesRes, breakingRes, catsRes, topStoriesRes, userMetaRes] = await Promise.all([
-      supabase
+      service
         .from('articles')
         .select(SELECT_COLS)
         .eq('status', 'published')
@@ -152,7 +158,7 @@ export default async function HomePage() {
         .not('stories.slug', 'is', null)
         .order('published_at', { ascending: false })
         .limit(12),
-      supabase
+      service
         .from('articles')
         .select(SELECT_COLS)
         .eq('status', 'published')
@@ -161,7 +167,7 @@ export default async function HomePage() {
         .not('stories.slug', 'is', null)
         .order('published_at', { ascending: false })
         .limit(1),
-      supabase
+      service
         .from('categories')
         .select('id, name, slug, color_hex')
         .eq('is_active', true)
@@ -169,7 +175,7 @@ export default async function HomePage() {
           ascending: true,
           nullsFirst: false,
         }),
-      supabase
+      service
         .from('top_stories')
         .select('position, articles!top_stories_article_id_fkey(id, title, stories(slug, lifecycle_status), excerpt, category_id, is_breaking, is_developing, published_at)')
         .order('position'),
@@ -221,7 +227,7 @@ export default async function HomePage() {
   // Only fall back to recentFallback when both top_stories AND date-sort empty.
   let recentFallback: HomeStory[] = [];
   if (!hasPins && dateSorted.length === 0 && !fetchThrew) {
-    const recentRes = await supabase
+    const recentRes = await service
       .from('articles')
       .select(SELECT_COLS)
       .eq('status', 'published')

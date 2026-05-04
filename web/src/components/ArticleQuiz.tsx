@@ -244,7 +244,7 @@ export default function ArticleQuiz({
         {interstitialNode}
         <div
           style={{
-            background: '#ecfdf5',
+            background: 'var(--p-success-soft, #ecfdf5)',
             border: `1px solid ${C.success}`,
             borderRadius: 12,
             padding: '14px 18px',
@@ -313,7 +313,7 @@ export default function ArticleQuiz({
             borderRadius: 10,
             border: 'none',
             background: C.accent,
-            color: '#fff',
+            color: 'var(--bg)',
             fontSize: 15,
             fontWeight: 700,
             cursor: stage === 'loading-start' ? 'default' : 'pointer',
@@ -372,7 +372,7 @@ export default function ArticleQuiz({
                 borderRadius: 4,
                 background:
                   i < currentIndex
-                    ? 'rgba(17,17,17,0.60)'
+                    ? C.dim
                     : i === currentIndex
                       ? C.accent
                       : C.border,
@@ -414,7 +414,7 @@ export default function ArticleQuiz({
                     borderRadius: 10,
                     border: `2px solid ${selected ? C.accent : C.border}`,
                     background: selected ? C.accent : C.card,
-                    color: selected ? '#fff' : C.text,
+                    color: selected ? 'var(--bg)' : C.text,
                     marginBottom: 8,
                     cursor: grading || anySelected ? 'default' : 'pointer',
                     fontSize: 14,
@@ -540,7 +540,7 @@ export default function ArticleQuiz({
                   fontSize: 12,
                   fontWeight: 500,
                   color: C.dim,
-                  background: 'rgba(0,0,0,0.04)',
+                  background: 'var(--tab-active-bg, rgba(0,0,0,0.04))',
                   padding: '5px 12px',
                   borderRadius: 99,
                 }}
@@ -585,7 +585,7 @@ export default function ArticleQuiz({
                 fontSize: 12,
                 fontWeight: 500,
                 color: C.dim,
-                background: 'rgba(0,0,0,0.04)',
+                background: 'var(--tab-active-bg, rgba(0,0,0,0.04))',
                 padding: '5px 12px',
                 borderRadius: 99,
                 marginTop: 12,
@@ -654,7 +654,7 @@ export default function ArticleQuiz({
                 borderRadius: 10,
                 border: 'none',
                 background: C.accent,
-                color: '#fff',
+                color: 'var(--bg)',
                 fontSize: 15,
                 fontWeight: 700,
                 cursor: 'pointer',

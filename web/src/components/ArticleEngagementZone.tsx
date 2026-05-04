@@ -62,13 +62,53 @@ export default function ArticleEngagementZone({
           />
         </div>
       )}
-      <CommentThread
-        articleId={articleId}
-        articleCategoryId={articleCategoryId}
-        currentUserId={currentUserId ?? null}
-        quizPassed={hasQuiz ? hasPassed : true}
-        justRevealed={justPassedThisSession}
-      />
+      {/* Anon "earn the discussion" prompt — mirrors iOS
+          (StoryDetailView.swift:532 anonDiscussionPrompt). Surfaces the
+          quiz-gated comments mechanic to first-time visitors instead of
+          hiding it. The CommentThread itself stays signed-in only since
+          anon can't post. */}
+      {!currentUserId ? (
+        <div
+          style={{
+            marginTop: 32,
+            padding: '24px 20px',
+            borderRadius: 12,
+            background: 'var(--card)',
+            border: '1px solid var(--border)',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
+            Earn the discussion
+          </div>
+          <p style={{ fontSize: 14, color: 'var(--dim)', margin: '0 0 16px', lineHeight: 1.55 }}>
+            Pass the comprehension quiz to join the conversation. Comments are open to readers who&rsquo;ve shown they&rsquo;ve read the piece.
+          </p>
+          <a
+            href="/signup"
+            style={{
+              display: 'inline-block',
+              padding: '10px 22px',
+              borderRadius: 9,
+              background: 'var(--accent)',
+              color: 'var(--bg)',
+              fontSize: 14,
+              fontWeight: 700,
+              textDecoration: 'none',
+            }}
+          >
+            Create free account
+          </a>
+        </div>
+      ) : (
+        <CommentThread
+          articleId={articleId}
+          articleCategoryId={articleCategoryId}
+          currentUserId={currentUserId}
+          quizPassed={hasQuiz ? hasPassed : true}
+          justRevealed={justPassedThisSession}
+        />
+      )}
     </section>
   );
 }

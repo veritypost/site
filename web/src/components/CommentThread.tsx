@@ -1273,22 +1273,6 @@ export default function CommentThread({
           <div style={{ fontSize: 14, color: 'var(--dim, #666)' }}>
             No one has joined this discussion yet.
           </div>
-          {!currentUserId && (
-            <a
-              href={`/login?next=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/')}`}
-              style={{
-                display: 'inline-block',
-                marginTop: 12,
-                fontSize: 13,
-                fontWeight: 500,
-                color: 'var(--accent, #111)',
-                textDecoration: 'underline',
-                textUnderlineOffset: 3,
-              }}
-            >
-              Sign in to start the discussion
-            </a>
-          )}
           {emptyStateExtra && <div style={{ marginTop: 24, textAlign: 'left' }}>{emptyStateExtra}</div>}
         </div>
       ) : (

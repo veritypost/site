@@ -99,18 +99,13 @@ export default function TimelineSection({ events, storySlug, showTease = false, 
       <section style={SECTION_STYLE}>
         <h2 style={{ ...HEADING_STYLE, margin: '0 0 6px' }}>Timeline</h2>
         <p style={{ fontSize: 14, color: 'var(--dim, #777)', margin: '0 0 8px', lineHeight: 1.5 }}>
-          The story timeline is a Verity Plus perk.{' '}
-          {articleCountReached ? (
-            <button
-              onClick={openWall}
-              style={{ background: 'none', border: 0, padding: 0, color: 'var(--text-primary, #111)', fontWeight: 500, cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline' }}
-            >
-              Sign up free →
-            </button>
-          ) : (
-            <a href="/pricing" style={{ color: 'var(--text-primary, #111)', fontWeight: 500 }}>
-              See plans
-            </a>
+          {articleCountReached ? 'Available with an account.' : (
+            <>
+              The story timeline is a Verity Plus perk.{' '}
+              <a href="/pricing" style={{ color: 'var(--text-primary, #111)', fontWeight: 500 }}>
+                See plans
+              </a>
+            </>
           )}
         </p>
       </section>
