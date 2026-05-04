@@ -27,49 +27,60 @@ Implementing the design. Design is LOCKED through four trim sweeps
 listed in § Decisions the owner needs to make.
 
 ### Current status
-- **Last shipped wave:** Wave 3 — Stream C Wikipedia (commit `897222a`,
-  2026-05-04). New `web/src/lib/pipeline/wikipedia-search.ts` —
-  silent-fail MediaWiki consumer (`action=query&prop=extracts|info`,
-  `exintro=1&explaintext=1&redirects=1`), per-topic 6 s timeout,
-  `Promise.allSettled` parallel fan-out, returns
-  `{ items, failed }`. Run handler `route.ts` extended: feeds query
-  now includes `feed_type='search_api'` (the polling-skip is enforced
-  by partition — `searchApiFeeds` bucket only fires inside
-  `wikipediaRun`); `FlatItem.source_class` widened to include
-  `'search_api'`; new `wikipediaRun` fanout fires only when grab plan
-  emits non-empty `wikipedia_topics` AND a configured
-  `provider='wikipedia'` row exists, items pushed with
-  `source_class='search_api'` and `pubDate=null` (encyclopedic;
-  lookback gate skips null-pubDate items); `Promise.all` extended to
-  four fanouts; `SOURCE_CLASS_PRIORITY.search_api=3` so news-feed
-  hits win dedup over Wikipedia hits on the same URL;
-  `feedSourceClass` + `FeedCounter.sourceClass` + response
-  `feedsByType.search_api` + `itemsBySource.search_api` extended;
-  aggregate `feedsSucceeded`/`feedsFailed` include search_api.
-  Migration `20260504240000_seed_wikipedia_search_api_feed.sql`
-  inserts the single MediaWiki row (`feed_type='search_api'`,
-  `extraction_config={provider,endpoint,default_params}`,
-  idempotent via `WHERE NOT EXISTS` on
-  `extraction_config->>'provider'='wikipedia'`). `tsc --noEmit` clean.
-- **Next wave to ship:** **Wave 4 — Stream D Run Feed UI.** Research
-  panel on `/admin/newsroom` Discovery tab: lookback dropdown
-  (7 options, URL `?lb=`), source-scope picker (All / Custom
-  multi-select feed picker, URL `?fid=`), mode toggle
-  (General / Topic, URL `?mode=`/`?q=`/`?qid=`) with saved-queries
-  dropdown and inline pencil/trash. Phase-label progress polling
-  (2s `research_jobs.phase`) with Cancel button writing
-  `status='cancelled'`. Result screen: counters
-  (items_fetched/kept, stories_formed/extended), flat sortable
-  table of `discovery_items` for the job (outlet / title / fetched
-  date / source class badge / match score) with Promote +
-  Discard per row, View Stories CTA. No keyboard shortcuts
-  (per memory). No audience toggle, no feed-group picker, no
-  match-mode picker, no recent-jobs tab.
+- **Last shipped wave:** Wave 4 — Stream D Run Feed UI (commit
+  `__WAVE4__`, 2026-05-04). New
+  `web/src/app/admin/newsroom/_subpages/Research.tsx` (Research
+  panel — three-state machine: idle → running → done), mounted at
+  the top of the Discovery tab in
+  `web/src/app/admin/newsroom/page.tsx` (replaces the legacy Run
+  Feed button + health pill). URL state: `?lb=` (7 lookback
+  options), `?fid=` (comma-sep feed ids — multi-select picker with
+  in-place filter / select-filtered / clear), `?mode=`,
+  `?q=` (free text), `?qid=` (saved query id), `?job=` (active
+  job id; presence drives the running/done screens). Saved-queries
+  dropdown with inline edit (pencil) + hard-delete (trash); a
+  "Save as query" affordance promotes a new free-text topic to a
+  persistent row. Running state: 2 s polling on
+  `research_jobs.phase` with phase labels (Planning… / Fetching
+  feeds… / Forming stories… / Finalizing…) plus a Cancel button
+  that flips `status='cancelled'`. Done state: counters
+  (items_fetched / items_kept / stories_formed / stories_extended),
+  flat sortable table of the job's `discovery_items` (outlet /
+  title / fetched date / source class badge / match score), per-row
+  Promote (idempotent — re-attaches to existing story or forms a
+  new one via `getStoryMatchOverlapPct` / `extractKeywords`) +
+  Discard (hard delete with confirm, with story_observations.
+  discovery_item_id explicitly nulled first), View stories CTA.
+  Backing API endpoints (all gated by
+  `admin.pipeline.run_ingest`):
+  `/api/admin/newsroom/research/queries` GET+POST,
+  `/api/admin/newsroom/research/queries/[id]` PATCH+DELETE,
+  `/api/admin/newsroom/research/feeds` GET (lightweight feed list),
+  `/api/admin/newsroom/research/jobs/[id]` GET (status / phase /
+  counters), `/api/admin/newsroom/research/jobs/[id]/cancel` POST,
+  `/api/admin/newsroom/research/jobs/[id]/items` GET (item table
+  with feed/observation/story joins + sort),
+  `/api/admin/newsroom/research/items/[id]/promote` POST,
+  `/api/admin/newsroom/research/items/[id]` DELETE. No audience
+  toggle, no feed-group picker, no match-mode picker, no
+  recent-jobs tab, no keyboard shortcuts. `tsc --noEmit` clean;
+  `next lint` clean for the touched dirs (one pre-existing
+  ArticlesTable warning untouched).
+- **Next wave to ship:** **Wave 5 — Stream E Stories list rebuild.**
+  Replaces the current Discovery cluster list at `/admin/newsroom`
+  with a paginated stories list. Filters: research_query, date
+  range (first-seen), generation_state. Source count + observation
+  count rendered via `COUNT(*)` over `story_observations` (no
+  denormalized counters). Story detail drawer with read-only
+  observation timeline. Generate / Reject / Archive controls per
+  story; manual attach via a Promote button on any result screen
+  (already shipped in Wave 4 — wire the post-promote inline state
+  to the new story drawer). The result-screen "View stories" CTA
+  in Research.tsx already navigates with `?job=…` retained — Wave
+  5 should honor that param to scope the list to the job.
 - **Branch:** main (direct commit per repo workflow — recent history
   is single-branch).
-- **Open blockers:** none. Wave 3 migration file is committed; apply
-  via the standard local-CLI pipeline (this session's MCP was
-  read-only).
+- **Open blockers:** none.
 
 ### Wave order (locked)
 1. **Wave 0 — `article_sources` only.** New table + RLS (blanket DENY

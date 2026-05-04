@@ -44,6 +44,7 @@ import ArticlesTable from './_components/ArticlesTable';
 import RunsSubpage from './_subpages/Runs';
 import CostsSubpage from './_subpages/Costs';
 import CleanupSubpage from './_subpages/Cleanup';
+import Research from './_subpages/Research';
 import { MODEL_OPTIONS } from '@/lib/newsroomModels';
 
 type TabId = 'discovery' | 'articles';
@@ -248,7 +249,6 @@ function DiscoveryTab({
   const [data, setData] = useState<ListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busyIngest, setBusyIngest] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
 
   // Merge state
@@ -262,55 +262,6 @@ function DiscoveryTab({
 
   // Global model picker — drives every per-card generate in this Discovery tab
   const [selectedModelIdx, setSelectedModelIdx] = useState(0);
-
-  // Phase C — pipeline health pill. Reads /api/admin/pipeline/health on
-  // mount and after every Run Feed completion. Renders next to the Run
-  // Feed button as "Last run: <duration>s ago, <itemsCreated> items".
-  type HealthSummary = {
-    durationSec: number | null;
-    itemsCreated: number | null;
-    status: string | null;
-    minutesAgo: number | null;
-  };
-  const [pipelineHealth, setPipelineHealth] = useState<HealthSummary | null>(null);
-
-  const loadPipelineHealth = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/pipeline/health');
-      if (!res.ok) return;
-      const json = (await res.json()) as {
-        recentRuns: Array<{
-          status: string;
-          started_at: string | null;
-          duration_ms: number | null;
-          items_created: number | null;
-        }>;
-      };
-      const lastIngest = json.recentRuns?.[0] ?? null;
-      if (!lastIngest) {
-        setPipelineHealth(null);
-        return;
-      }
-      const startedAt = lastIngest.started_at ? new Date(lastIngest.started_at).getTime() : null;
-      const minutesAgo = startedAt ? Math.max(0, Math.round((Date.now() - startedAt) / 60_000)) : null;
-      setPipelineHealth({
-        durationSec:
-          typeof lastIngest.duration_ms === 'number'
-            ? Math.round(lastIngest.duration_ms / 1000)
-            : null,
-        itemsCreated:
-          typeof lastIngest.items_created === 'number' ? lastIngest.items_created : null,
-        status: lastIngest.status ?? null,
-        minutesAgo,
-      });
-    } catch {
-      // Best-effort surface — don't toast on health load failures.
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadPipelineHealth();
-  }, [loadPipelineHealth]);
 
   // Debounce dqInput → URL (only fires when dqInput differs from current URL param)
   useEffect(() => {
@@ -359,47 +310,6 @@ function DiscoveryTab({
   }, [view, dq, cat, so]);
 
   useEffect(() => { void reload(); }, [reload]);
-
-  async function runFeed() {
-    setBusyIngest(true);
-    try {
-      const res = await fetch('/api/newsroom/ingest/run', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      if (res.status === 429) {
-        toast.push({ message: 'Refreshing too fast. Try again in a moment.', variant: 'warn' });
-        return;
-      }
-      if (res.status === 503) {
-        toast.push({
-          message: 'Feed ingestion is disabled. Flip ai.ingest_enabled in Pipeline Settings to re-enable.',
-          variant: 'warn',
-        });
-        return;
-      }
-      if (res.status === 409) {
-        // Phase C — singleflight: another ingest run is already running.
-        toast.push({
-          message: 'Another ingest run is already in progress. Wait for it to finish, then try again.',
-          variant: 'warn',
-        });
-        await loadPipelineHealth();
-        return;
-      }
-      await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.push({ message: 'Could not run feeds.', variant: 'danger' });
-        return;
-      }
-      toast.push({ message: 'Feeds refreshed.', variant: 'success' });
-      await reload();
-      await loadPipelineHealth();
-    } finally {
-      setBusyIngest(false);
-    }
-  }
 
   function handleMergeToggle(clusterId: string) {
     setMergeSelected((prev) => {
@@ -480,6 +390,12 @@ function DiscoveryTab({
 
   return (
     <div>
+      {/* Wave 4 — Stream D Run Feed UI: Research panel replaces the
+          legacy Run Feed button + health pill. The panel handles all
+          run triggers (general / topic, lookback, source scope) plus
+          inline progress + result screen. */}
+      <Research onJobComplete={() => { void reload(); }} />
+
       {/* Toolbar */}
       <div
         style={{
@@ -498,43 +414,6 @@ function DiscoveryTab({
         }}
       >
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[2], alignItems: 'center' }}>
-          <Button onClick={runFeed} disabled={busyIngest} variant="primary" size="sm">
-            {busyIngest ? 'Running…' : 'Run Feed'}
-          </Button>
-          {pipelineHealth && (
-            <span
-              style={{
-                fontSize: 12,
-                color: C.dim,
-                background: C.card,
-                border: `1px solid ${C.divider}`,
-                borderRadius: 12,
-                padding: '2px 8px',
-                whiteSpace: 'nowrap',
-              }}
-              title={
-                pipelineHealth.status
-                  ? `Most recent ingest run — status ${pipelineHealth.status}`
-                  : undefined
-              }
-            >
-              {(() => {
-                const parts: string[] = [];
-                if (pipelineHealth.minutesAgo !== null) {
-                  parts.push(
-                    pipelineHealth.minutesAgo === 0 ? 'just now' : `${pipelineHealth.minutesAgo}m ago`
-                  );
-                }
-                if (pipelineHealth.durationSec !== null) {
-                  parts.push(`${pipelineHealth.durationSec}s`);
-                }
-                if (pipelineHealth.itemsCreated !== null) {
-                  parts.push(`${pipelineHealth.itemsCreated} items`);
-                }
-                return `Last run: ${parts.join(', ')}`;
-              })()}
-            </span>
-          )}
           <Button onClick={() => setNewOpen(true)} variant="secondary" size="sm">
             + New article
           </Button>
