@@ -153,6 +153,12 @@ export async function getTodayCumulativeUsd(): Promise<number> {
 // Pre-call char-heuristic estimate (unchanged from Task 2 stub)
 // ----------------------------------------------------------------------------
 
+// Output-token expectation. Actual generation typically uses 25–35% of
+// max_tokens (max_tokens is a ceiling, not a target). Using max_tokens
+// directly inflated the estimate ~3x and caused the per-call cap to
+// fail-close calls whose real invoiced cost was a fraction of the cap.
+const EXPECTED_OUTPUT_TOKEN_RATIO = 0.35;
+
 export async function estimateCostUsd(
   _provider: Provider,
   _model: string,
@@ -162,7 +168,7 @@ export async function estimateCostUsd(
   pricing: PricingRow
 ): Promise<number> {
   const input_est = Math.ceil((system.length + prompt.length) / 4);
-  const output_est = max_tokens;
+  const output_est = Math.ceil(max_tokens * EXPECTED_OUTPUT_TOKEN_RATIO);
   return (
     (input_est * pricing.input_price_per_1m_tokens +
       output_est * pricing.output_price_per_1m_tokens) /
