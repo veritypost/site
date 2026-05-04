@@ -416,7 +416,12 @@ export default function StoryDetailDrawer({
                         variant="secondary"
                         size="sm"
                         onClick={() => void generateBand(b.band)}
-                        disabled={generatingBand !== null}
+                        disabled={generatingBand !== null || data.observations.length === 0}
+                        title={
+                          data.observations.length === 0
+                            ? 'No sources to generate from'
+                            : undefined
+                        }
                       >
                         {generatingBand === b.band ? 'Generating…' : 'Generate'}
                       </Button>

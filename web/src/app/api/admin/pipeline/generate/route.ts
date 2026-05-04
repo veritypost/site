@@ -1053,18 +1053,14 @@ export async function POST(req: Request) {
     }
     items = (itemsData ?? []) as unknown as DiscoveryItem[];
     if (items.length === 0) {
-      await failRun(
-        service,
-        runId,
-        startedAtMs,
-        'schema_validation',
-        'No discovery items available in cluster',
-        0
-      );
-      return NextResponse.json(
-        { error: 'No discovery items available in cluster' },
-        { status: 400 }
-      );
+      // Story-mode callers most often hit this when the story is an
+      // orphan (zero observations or no source URLs ever attached).
+      // Surface a story-friendly message so the operator can act.
+      const friendly = input.story_id
+        ? 'This story has no sources to generate from. Run Feed again or pick a story with sources.'
+        : 'No discovery items available in cluster';
+      await failRun(service, runId, startedAtMs, 'schema_validation', friendly, 0);
+      return NextResponse.json({ error: friendly }, { status: 400 });
     }
   }
 

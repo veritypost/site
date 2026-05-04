@@ -1206,11 +1206,14 @@ function StoryCard({
         )}
       </div>
 
-      {/* Generate row — three buttons, one per band */}
+      {/* Generate row — three buttons, one per band. Disabled when the
+          story has zero sources in this run (orphan story) since the
+          generate handler has nothing to feed into the editorial chain. */}
       <div style={{ display: 'flex', gap: S[2], flexWrap: 'wrap', marginTop: S[1] }}>
         {story.articles_by_band.map((b) => {
           const key = `${story.id}:${b.band}`;
           const isGenerating = generatingKeys.has(key);
+          const noSources = story.sources_in_run.length === 0;
           if (b.state !== 'pending') {
             return (
               <a
@@ -1235,7 +1238,8 @@ function StoryCard({
               key={b.band}
               variant="secondary"
               size="sm"
-              disabled={isGenerating}
+              disabled={isGenerating || noSources}
+              title={noSources ? 'No sources to generate from' : undefined}
               onClick={() => onGenerate(story.id, b.band)}
             >
               {isGenerating ? 'Generating…' : bandLabel(b.band)}
