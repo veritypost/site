@@ -59,7 +59,7 @@ listed in § Decisions the owner needs to make.
   no view toggle, no free-text URL search. `tsc --noEmit`
   clean; `next lint` clean for the touched dirs.
 - **Wave 7 — result-screen rebuild + grouping fix** (commit
-  `<pending>`, 2026-05-04). Closes three real gaps the owner
+  `791141c`, 2026-05-04). Closes three real gaps the owner
   hit when first using the redesign end-to-end:
   (1) Singletons (single-outlet items) didn't story-match —
   the `for (const cluster of clusters)` loop in the ingest
