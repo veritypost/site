@@ -27,7 +27,7 @@ Implementing the design. Design is LOCKED through four trim sweeps
 listed in § Decisions the owner needs to make.
 
 ### Current status
-- **Last shipped wave:** Wave 2 — Stream B handler (commit `__PENDING__`,
+- **Last shipped wave:** Wave 2 — Stream B handler (commit `bd1dde2`,
   2026-05-04). New `web/src/lib/pipeline/grab-plan.ts` (Haiku JSON-mode
   call, one retry, `GrabPlanParseError`). `/api/newsroom/ingest/run/route.ts`
   rewritten end-to-end: strict body parse for
