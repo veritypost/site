@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { formatDate } from '@/lib/dates';
 import { Z } from '@/lib/zIndex';
 
 import {
@@ -15,6 +16,15 @@ import { HOME_SIDEBAR_BREAKPOINT_PX, type SidebarCategory } from './_HomeSidebar
 
 const OVERLAY_ID = 'vp-home-sections-overlay';
 const MONO_STACK = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+
+type ArticleHit = {
+  id: string;
+  title: string | null;
+  excerpt: string | null;
+  published_at: string | null;
+  stories: { slug: string | null } | null;
+  categories: { name: string | null } | null;
+};
 
 const sortByOrder = (a: SidebarCategory, b: SidebarCategory) => {
   const ao = a.sort_order ?? Number.MAX_SAFE_INTEGER;
@@ -34,6 +44,10 @@ export default function HomeSectionsMenu() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [categories, setCategories] = useState<SidebarCategory[] | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [results, setResults] = useState<ArticleHit[]>([]);
+  const [resultsForQuery, setResultsForQuery] = useState<string>('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -89,12 +103,21 @@ export default function HomeSectionsMenu() {
     if (!open) {
       setQuery('');
       setExpanded(new Set());
+      setResults([]);
+      setResultsForQuery('');
+      abortRef.current?.abort();
+      abortRef.current = null;
       return;
     }
     if (activeCatSlug) {
       const match = parents.find((p) => p.slug === activeCatSlug);
       if (match) setExpanded(new Set([match.id]));
     }
+    // Auto-focus the search input on overlay open. RAF gives the portal a
+    // tick to mount before we try to grab focus.
+    const focusFrame = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
     };
@@ -102,6 +125,7 @@ export default function HomeSectionsMenu() {
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
+      cancelAnimationFrame(focusFrame);
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
     };
@@ -109,6 +133,48 @@ export default function HomeSectionsMenu() {
     // re-snap expansion.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, close]);
+
+  // Debounced article search against /api/search. AbortController cancels
+  // any in-flight request when the user keeps typing, matching the pattern
+  // on /search (web/src/app/search/page.tsx).
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      // Empty query → drop back to categories tree; cancel any pending fetch.
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setResults([]);
+      setResultsForQuery('');
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      void fetch(`/api/search?q=${encodeURIComponent(trimmed)}`, {
+        signal: controller.signal,
+      })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+        .then((body: { articles?: ArticleHit[] }) => {
+          if (controller.signal.aborted) return;
+          const list = Array.isArray(body.articles) ? body.articles : [];
+          // Skip articles missing a slug — they can't be navigated to.
+          setResults(list.filter((a) => a.stories?.slug));
+          setResultsForQuery(trimmed);
+        })
+        .catch((err: unknown) => {
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+          if (controller.signal.aborted) return;
+          // Surface zero results on hard error so the empty-state copy renders
+          // instead of stale results from an earlier query.
+          setResults([]);
+          setResultsForQuery(trimmed);
+        });
+    }, 300);
+    return () => {
+      window.clearTimeout(handle);
+    };
+  }, [query]);
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
@@ -228,6 +294,7 @@ export default function HomeSectionsMenu() {
 
             <div style={{ flexShrink: 0, padding: '20px 22px 0' }}>
               <input
+                ref={inputRef}
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -251,17 +318,12 @@ export default function HomeSectionsMenu() {
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px 60px' }}>
               {searching ? (
-                <p
-                  style={{
-                    fontFamily: serifStack,
-                    fontStyle: 'italic',
-                    fontSize: 15,
-                    color: C.muted,
-                    margin: '8px 0 0',
-                  }}
-                >
-                  Search lands in the next pass.
-                </p>
+                <SearchResults
+                  query={query}
+                  results={results}
+                  resultsForQuery={resultsForQuery}
+                  onNavigate={close}
+                />
               ) : (
                 <>
                   {categories === null && (
@@ -310,6 +372,109 @@ export default function HomeSectionsMenu() {
         document.body,
       )}
     </>
+  );
+}
+
+function SearchResults({
+  query,
+  results,
+  resultsForQuery,
+  onNavigate,
+}: {
+  query: string;
+  results: ArticleHit[];
+  resultsForQuery: string;
+  onNavigate: () => void;
+}) {
+  // Only show the "no matches" copy once a fetch for the current trimmed
+  // query has actually settled — otherwise the empty state would flash
+  // during the 300ms debounce window or while the request is in flight.
+  const trimmed = query.trim();
+  const settledForCurrent = resultsForQuery === trimmed;
+  if (!settledForCurrent) {
+    return null;
+  }
+  if (results.length === 0) {
+    return (
+      <p
+        style={{
+          fontFamily: serifStack,
+          fontStyle: 'italic',
+          fontSize: 15,
+          color: C.muted,
+          margin: '8px 0 0',
+        }}
+      >
+        Nothing in the record matches that.
+      </p>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, paddingTop: 4 }}>
+      {results.map((a) => {
+        const slug = a.stories?.slug;
+        if (!slug) return null;
+        const categoryName = a.categories?.name ?? '';
+        const dateStr = a.published_at ? formatDate(a.published_at) : '';
+        const sep = categoryName && dateStr ? ' · ' : '';
+        return (
+          <Link
+            key={a.id}
+            href={`/${slug}`}
+            prefetch={false}
+            onClick={onNavigate}
+            style={{
+              display: 'block',
+              textDecoration: 'none',
+              color: 'inherit',
+            }}
+          >
+            <h3
+              style={{
+                fontFamily: serifStack,
+                fontSize: 17,
+                fontWeight: 500,
+                color: C.text,
+                lineHeight: 1.25,
+                letterSpacing: '-0.01em',
+                margin: 0,
+              }}
+            >
+              {a.title}
+            </h3>
+            {a.excerpt && (
+              <p
+                style={{
+                  fontSize: 13,
+                  color: 'var(--stone-700, #44403c)',
+                  lineHeight: 1.5,
+                  marginTop: 5,
+                  marginBottom: 0,
+                }}
+              >
+                {a.excerpt}
+              </p>
+            )}
+            {(categoryName || dateStr) && (
+              <div
+                style={{
+                  fontFamily: MONO_STACK,
+                  fontSize: 10,
+                  color: 'var(--stone-500, #78716c)',
+                  marginTop: 8,
+                  letterSpacing: '0.01em',
+                  lineHeight: 1.5,
+                }}
+              >
+                {categoryName}
+                {sep}
+                {dateStr}
+              </div>
+            )}
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 
