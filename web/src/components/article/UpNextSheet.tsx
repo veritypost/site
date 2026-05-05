@@ -48,17 +48,20 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Body scroll lock
+  // No body scroll lock: this sheet auto-fires at 90% scroll, so locking
+  // body scroll right after the user scrolled themselves into it traps
+  // them at the bottom of the article. The bottom sheet stays dismissable
+  // via × / backdrop / ESC; the article underneath stays scrollable.
+  //
+  // Defensive one-shot reset on mount: a previous build of this component
+  // (or another modal that crashed mid-cleanup) may have left
+  // body.overflow='hidden' before this build deployed. Clearing it on
+  // first mount restores scroll for users who hit the older bug.
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
+    if (document.body.style.overflow === 'hidden') {
       document.body.style.overflow = '';
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [open]);
+  }, []);
 
   function dismiss() {
     setOpen(false);
