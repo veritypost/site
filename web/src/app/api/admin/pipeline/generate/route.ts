@@ -408,7 +408,11 @@ const CategorizationSchema = z.object({
 const BodySchema = z.object({
   title: z.string().min(1).max(200),
   body: z.string().min(50),
-  word_count: z.number().int().min(250).max(400).optional(),
+  // The model self-reports word_count, but we ground-truth it server-side
+  // from `body` after parse (see countWords below). We accept any non-negative
+  // integer here so a low or absent self-report doesn't fail the run; the
+  // actual count gets recomputed before persist.
+  word_count: z.number().int().min(0).optional(),
   reading_time_minutes: z.number().positive().optional(),
 });
 
@@ -1638,6 +1642,13 @@ ${corpus}`;
     assertPerRunCap(totalCostUsd, perRunCapUsd);
     const bodyParsed = BodySchema.parse(extractJSON(bodyRes.text));
     let finalBodyMarkdown = bodyParsed.body;
+    // Ground-truth word_count from the actual body string. Strip markdown
+    // marks so **bold** / _italic_ don't pollute the count, then split on
+    // whitespace. The model's self-report is treated as advisory only.
+    const computedWordCount = finalBodyMarkdown
+      .replace(/[*_`#>]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 0).length;
     stepTimings[bodyStepName] = Date.now() - bodyStart;
     pipelineLog.info(`newsroom.generate.${bodyStepName}`, {
       run_id: runId,
@@ -2169,7 +2180,7 @@ Empty array if all correct.`;
       ai_model: model,
       prompt_fingerprint: fingerprint,
       source_feed_id: null,
-      word_count: bodyParsed.word_count,
+      word_count: computedWordCount,
       reading_time_minutes: bodyParsed.reading_time_minutes,
       sources: sourcesPayload,
       timeline: timelinePayload,

@@ -11,6 +11,7 @@
 
 import Script from 'next/script';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { type ConsentRecord, readConsent } from '@/lib/consent';
 
 interface ConsentedScriptsProps {
@@ -42,8 +43,16 @@ export default function ConsentedScripts({
     };
   }, []);
 
+  const pathname = usePathname();
   const analytics = consent?.categories.analytics === true;
-  const advertising = consent?.categories.advertising === true;
+  // AdSense auto-ads inject anchor / vignette iframes that our CSP blocks
+  // (frame-src is locked to Stripe). Chrome falls back to a chrome-error
+  // iframe that overlays the viewport and intercepts wheel/touch, locking
+  // scroll on admin pages. AdSense isn't shown on /admin or /reader anyway,
+  // so don't load the script there. Mirrors MobileStickyAd's path gate.
+  const adsenseAllowedHere =
+    !pathname?.startsWith('/admin') && !pathname?.startsWith('/reader');
+  const advertising = consent?.categories.advertising === true && adsenseAllowedHere;
 
   return (
     <>

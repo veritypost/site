@@ -43,18 +43,18 @@ repeat what the other covers.
 WORD COUNT
 ═══════════════════════════════════════════════════════════
 
-Target: 300 words. Range: 250–400 words.
+Target: 350 words. Range: 250–450 words.
 250 is the floor — a body shorter than this is almost always
-under-reported. 400 is the ceiling — if you're past 400,
+under-reported. 450 is the ceiling — if you're past 450,
 you're carrying context that belongs in the timeline.
 
 The rule: as short as it can be while the reader fully
 understands today's development. Don't pad a story to reach
-300 if 260 covers it. Don't amputate the story to stay under
-400 if the complexity genuinely needs more.
+350 if 280 covers it. Don't amputate the story to stay under
+450 if the complexity genuinely needs more.
 
 COUNT YOUR WORDS BEFORE RETURNING. If under 250, you probably
-left out something important. If over 400, cut.
+left out something important. If over 450, cut.
 
 The reason this works short: the timeline carries everything
 else. You do not need to explain backstory. You do not need to
@@ -310,8 +310,8 @@ The route wraps your output in a JSON object. Caller passes
 explicit JSON shape in the user turn. Follow that shape.
 Body field carries paragraphs separated by \\n\\n. **Bold**
 allowed sparingly. No headers, no bullets, no horizontal rules.
-After writing, count your words. Target 250–400 words. If under
-250, you probably left out something important. Never exceed 400.`;
+After writing, count your words. Target 250–450 words. If under
+250, you probably left out something important. Never exceed 450.`;
 
 // Category-specific append blocks — keys MUST match categories.name.toLowerCase() from DB
 export const CATEGORY_PROMPTS: Record<string, string> = {
@@ -618,7 +618,9 @@ HEADLINE RULES:
 - Cut every unnecessary word. "The" is almost always unnecessary. "Of" can often be cut.
 
 SUMMARY RULES:
-- 2 sentences maximum.
+- Up to 70 words (about 3–5 sentences). 50 words is a good target;
+  go longer when the story has more than one secondary fact worth
+  carrying for a headline + summary skimmer.
 - The summary must NOT restate the headline or the article's first paragraph.
 - The summary must contain DIFFERENT FACTS from the headline.
   If the headline says the score and the winner, the summary
@@ -626,8 +628,8 @@ SUMMARY RULES:
   key stat, the streak, the historical context, or the secondary
   development that a reader skimming only headline + summary
   would want to know.
-- First sentence: one additional fact NOT in the headline.
-- Second sentence: the most important secondary detail.
+- Open with one additional fact NOT in the headline; layer in
+  the most important secondary details after that.
 - Same language rules as headlines — no editorial language.
 
 ANTI-REPETITION CHECK — THIS IS CRITICAL:
@@ -866,7 +868,10 @@ HEADLINE RULES:
 - Present tense.
 
 SUMMARY RULES:
-- 1-2 short sentences.
+- Up to 70 words (about 4–6 short sentences). Around 50 words is a good
+  target — go longer when there's a second concrete connection worth
+  carrying for a kid skimming headline + summary.
+- Short sentences in 7–9 voice. One idea per sentence.
 - Connect to the kid's world. "That's like every school in your state closing at once."
 - Different facts than the headline.
 - No editorial language.
@@ -892,9 +897,12 @@ HEADLINE RULES:
 - Present tense for current events.
 
 SUMMARY RULES:
-- 2 sentences.
+- Up to 70 words (about 3–5 sentences). Around 50 words is a good target;
+  go longer when there's a second tween-relatable connection worth carrying.
 - Different facts than the headline.
-- One sentence on what happened beyond the headline; one on why it matters in tween-relatable terms (school, family, money, gaming, sports, etc.) without forcing it.
+- Open with what happened beyond the headline, then layer in why it matters
+  in tween-relatable terms (school, family, money, gaming, sports, etc.)
+  without forcing it.
 
 OUTPUT FORMAT:
 {
@@ -916,7 +924,7 @@ VOICE:
 - No graphic violence, no political opinion, no fear-mongering. State facts gently.
 - "Whoa" moments first — start with the most interesting fact.
 
-LENGTH: 250-400 words. Every sentence earns its place, but cover the full story.
+LENGTH: 250-450 words. Every sentence earns its place, but cover the full story.
 
 STRUCTURE:
 - Paragraph 1 (1-3 sentences): What happened. The most surprising fact first.
@@ -928,8 +936,8 @@ EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy phrasing from any source. Read the
 OUTPUT JSON (matches BodySchema; route persists into articles with is_kids_safe=true and age_band='kids'):
 {
   "title": "kid-friendly headline, max 8 words",
-  "body": "the article body in 7-9 voice, 250-400 words, paragraphs separated by \\n\\n. Markdown paragraph breaks allowed; **bold** sparingly.",
-  "word_count": 300,
+  "body": "the article body in 7-9 voice, 250-450 words, paragraphs separated by \\n\\n. Markdown paragraph breaks allowed; **bold** sparingly.",
+  "word_count": 350,
   "reading_time_minutes": 2
 }`;
 
@@ -945,7 +953,7 @@ VOICE:
 - Active voice. Direct attribution ("according to [source]") for any contested claim.
 - No graphic violence, no political opinion. Tween-appropriate handling of disturbing topics: state facts, skip lurid detail.
 
-LENGTH: 250-400 words. Tight news writing.
+LENGTH: 250-450 words. Tight news writing.
 
 STRUCTURE:
 - Paragraph 1 (1-3 sentences): What happened. The lede.
@@ -958,8 +966,8 @@ EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy phrasing from any source.
 OUTPUT JSON (matches BodySchema; route persists into articles with is_kids_safe=true and age_band='tweens'):
 {
   "title": "tween headline, max 9 words",
-  "body": "the article body in 10-12 voice, 250-400 words, paragraphs separated by \\n\\n. Markdown paragraph breaks allowed; **bold** sparingly.",
-  "word_count": 300,
+  "body": "the article body in 10-12 voice, 250-450 words, paragraphs separated by \\n\\n. Markdown paragraph breaks allowed; **bold** sparingly.",
+  "word_count": 350,
   "reading_time_minutes": 2
 }`;
 
