@@ -7,18 +7,18 @@
  *
  *   - Top-level rows in `sort_order` order
  *   - Subcategories indented under their parent, also `sort_order`
- *   - Per row: name, slug, badges (Active/Inactive, Kids-safe, Premium),
+ *   - Per row: name, slug, badges (Kids-safe, Premium, Archived),
  *     article_count, buttons (Edit, Add child only on top-level, Move,
  *     Archive)
  *   - "Add top-level category" inline at the bottom
  *   - "Show archived" toggle in the header — flips the deleted_at filter
  *   - Edit modal: name, slug, description, color_hex, icon_name, sort_order,
- *     is_active, is_kids_safe, is_premium
+ *     is_kids_safe, is_premium
  *   - Move modal: dropdown to set parent_id (null = top-level). Self,
  *     descendants, and second-level rows are filtered out client-side
  *     (server enforces too).
  *   - Archive: soft-delete via DELETE; restore button on archived rows
- *     issues a PATCH that sets deleted_at = null + is_active = true.
+ *     issues a PATCH that sets deleted_at = null.
  *
  * Page-level access: client gate reads `admin.pipeline.categories.manage`
  * from the resolver — same key the API enforces on every mutation — so denial
@@ -61,7 +61,6 @@ type FormState = {
   color_hex: string;
   icon_name: string;
   sort_order: number;
-  is_active: boolean;
   is_kids_safe: boolean;
   is_premium: boolean;
 };
@@ -85,7 +84,6 @@ function emptyForm(seed?: Partial<FormState>): FormState {
     color_hex: '',
     icon_name: '',
     sort_order: 0,
-    is_active: true,
     is_kids_safe: false,
     is_premium: false,
     ...seed,
@@ -100,7 +98,6 @@ function rowToForm(row: CategoryRow): FormState {
     color_hex: row.color_hex ?? '',
     icon_name: row.icon_name ?? '',
     sort_order: row.sort_order ?? 0,
-    is_active: row.is_active !== false,
     is_kids_safe: row.is_kids_safe === true,
     is_premium: row.is_premium === true,
   };
@@ -259,7 +256,6 @@ function CategoriesAdminInner() {
       color_hex: f.color_hex.trim() || null,
       icon_name: f.icon_name.trim() || null,
       sort_order: Math.max(0, Math.floor(f.sort_order || 0)),
-      is_active: f.is_active,
       is_kids_safe: f.is_kids_safe,
       is_premium: f.is_premium,
     };
@@ -315,7 +311,6 @@ function CategoriesAdminInner() {
       color_hex: f.color_hex.trim() || null,
       icon_name: f.icon_name.trim() || null,
       sort_order: Math.max(0, Math.floor(f.sort_order || 0)),
-      is_active: f.is_active,
       is_kids_safe: f.is_kids_safe,
       is_premium: f.is_premium,
     };
@@ -405,7 +400,7 @@ function CategoriesAdminInner() {
       const res = await fetch(`/api/admin/categories/${row.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deleted_at: null, is_active: true }),
+        body: JSON.stringify({ deleted_at: null }),
       });
       const json = (await res.json().catch(() => ({}))) as { error?: string };
       if (res.status === 429) {
@@ -439,7 +434,7 @@ function CategoriesAdminInner() {
   }
   if (!authorized) return null;
 
-  const totalActive = rows.filter((r) => !r.deleted_at && r.is_active).length;
+  const totalActive = rows.filter((r) => !r.deleted_at).length;
   const totalArchived = rows.filter((r) => !!r.deleted_at).length;
 
   const headerActions = (
@@ -808,16 +803,6 @@ function CategoryRowView({
           </span>
           <span style={{ fontSize: F.xs, color: C.muted }}>/{row.slug}</span>
 
-          {!row.is_active && (
-            <Badge variant="warn" size="xs">
-              Hidden
-            </Badge>
-          )}
-          {row.is_active && (
-            <Badge variant="success" size="xs">
-              Active
-            </Badge>
-          )}
           {row.is_kids_safe && (
             <Badge variant="info" size="xs">
               Kids-safe
@@ -987,12 +972,6 @@ function CategoryForm({
       </Field>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: S[2], marginTop: S[2] }}>
-        <Switch
-          checked={form.is_active}
-          onChange={(next: boolean) => onChange({ is_active: next })}
-          label="Active"
-          hint="Visible to readers when on."
-        />
         <Switch
           checked={form.is_kids_safe}
           onChange={(next: boolean) => onChange({ is_kids_safe: next })}

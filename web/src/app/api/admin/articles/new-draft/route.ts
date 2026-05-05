@@ -126,7 +126,6 @@ export async function POST(req: Request) {
       const { data: firstCat } = await service
         .from('categories')
         .select('id')
-        .eq('is_active', true)
         .order('sort_order', { ascending: true })
         .order('name', { ascending: true })
         .limit(1)
@@ -174,6 +173,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Could not create story' }, { status: 500 });
     }
 
+    // Wave D — manual drafts intentionally leave subcategory_id NULL. The
+    // editor (StoryEditor / KidsStoryEditor) renders a Subcategory dropdown
+    // populated from the chosen category's children and the operator picks
+    // before publish. Picking a default sub here would be wrong: the
+    // operator hasn't yet typed a headline/body, so we have nothing to pick
+    // from. The articles/save PATCH and PUT paths both accept subcategory_id
+    // updates so the value lands before the article goes public.
     const { data: row, error: insertErr } = await service
       .from('articles')
       .insert({

@@ -224,7 +224,6 @@ export async function pickStoryMetadata(
   const { data: allCats, error: catErr } = await service
     .from('categories')
     .select('id, slug, name, parent_id')
-    .eq('is_active', true)
     .is('deleted_at', null)
     .order('sort_order', { ascending: true });
 

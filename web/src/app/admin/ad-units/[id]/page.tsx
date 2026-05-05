@@ -78,7 +78,7 @@ function AdUnitTargetingInner() {
 
       const [unitRes, catsRes] = await Promise.all([
         supabase.from('ad_units').select('*').eq('id', params.id).single(),
-        supabase.from('categories').select('id, name, slug, parent_id').eq('is_active', true).order('name'),
+        supabase.from('categories').select('id, name, slug, parent_id').order('name'),
       ]);
 
       if (unitRes.error || !unitRes.data) {

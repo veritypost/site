@@ -211,7 +211,6 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
         .from('categories')
         .select('id, name, slug, parent_id, sort_order')
         .eq('is_kids_safe', true)
-        .eq('is_active', true)
         .order('sort_order', { ascending: true });
       if (cancelled) return;
       const parents = ((cats as KidsCategory[] | null) || []).filter((c) => !c.parent_id);
@@ -791,7 +790,15 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
             <label style={labelStyle}>Category</label>
             <Select
               value={story.category}
-              onChange={(e) => updateStory('category', e.target.value)}
+              onChange={(e) => {
+                // Wave E follow-up — clearing the now-stale subcategory
+                // selection prevents saving an inconsistent (cat A, sub-of-
+                // cat-B) pair. Only fires on user interaction, never on
+                // initial load (which uses setStory directly above).
+                const next = e.target.value;
+                setStory((prev) => ({ ...prev, category: next, subcategory: '' }));
+                setIsDirty(true);
+              }}
               options={[
                 { value: '', label: 'Select...' },
                 ...categories.map((c) => ({ value: c.name, label: c.name })),

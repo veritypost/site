@@ -1684,7 +1684,7 @@ struct ProfileView: View {
             // sub (parent_id != nil) instead of issuing two queries.
             async let allCats: [VPCategory] = client.from("categories")
                 .select()
-                .eq("is_kids_safe", value: false).eq("is_active", value: true)
+                .eq("is_kids_safe", value: false)
                 .order("sort_order").execute().value
             async let reads: [ReadingLogItem] = client.from("reading_log")
                 .select("article_id, articles(category_id, subcategory_id)")

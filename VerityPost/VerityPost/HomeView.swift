@@ -536,7 +536,6 @@ struct HomeView: View {
 
             async let catsReq: [VPCategory] = client.from("categories")
                 .select()
-                .eq("is_active", value: true)
                 .order("sort_order")
                 .execute()
                 .value
@@ -835,7 +834,6 @@ struct BrowseLanding: View {
         do {
             let cats: [VPCategory] = try await client.from("categories")
                 .select()
-                .eq("is_active", value: true)
                 .not("slug", operator: .like, value: "kids-%")
                 .order("sort_order")
                 .execute()

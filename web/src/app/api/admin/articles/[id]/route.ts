@@ -252,6 +252,14 @@ const PatchSchema = z
     // Session C — manual URL edits (Decision 3). Editable anytime,
     // including post-publish; collisions return 409 below.
     slug: z.string().trim().min(1).max(120).optional(),
+    // Wave D — re-categorize support. Both fields optional; editor sends them
+    // when the operator changes the category/subcategory dropdown. Validation
+    // of parent-child consistency happens at the DB layer (FK on category_id
+    // is NOT NULL; subcategory_id is nullable). Re-categorizing through
+    // articles/save also works; this PATCH path is for the inline editor
+    // metadata-only flow.
+    category_id: z.string().uuid().optional(),
+    subcategory_id: z.string().uuid().nullish(),
     sources: z.array(SourceSchema).optional(),
     timeline: z.array(TimelineSchema).optional(),
     quizzes: z.array(QuizSchema).optional(),
@@ -276,6 +284,8 @@ function requiredPerms(body: PatchBody, currentStatus: string): string[] {
     body.body !== undefined ||
     body.moderation_notes !== undefined ||
     body.slug !== undefined ||
+    body.category_id !== undefined ||
+    body.subcategory_id !== undefined ||
     body.sources !== undefined ||
     body.timeline !== undefined ||
     body.quizzes !== undefined;
@@ -426,6 +436,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (body.excerpt !== undefined) update.excerpt = body.excerpt;
   if (body.moderation_notes !== undefined) update.moderation_notes = body.moderation_notes;
   if (body.browse_only !== undefined) update.browse_only = body.browse_only;
+  // Wave D — re-categorize via PATCH. Both fields are passthrough column
+  // updates; database FK + NULL constraints catch unknown ids. The editor
+  // also clears subcategory_id when the category changes (parent-child
+  // pairing isn't enforced server-side here; it's the editor's job to keep
+  // the dropdown filtered).
+  if (body.category_id !== undefined) update.category_id = body.category_id;
+  if (body.subcategory_id !== undefined) update.subcategory_id = body.subcategory_id;
   if (body.body !== undefined) {
     update.body = body.body;
     // Server-side sanitization — the client never sends HTML.

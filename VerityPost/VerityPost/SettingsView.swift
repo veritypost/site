@@ -2529,7 +2529,6 @@ struct VerificationRequestView: View {
         do {
             let cats: [VPCategory] = try await client.from("categories")
                 .select("id,name,slug,sort_order,parent_id,is_kids_safe")
-                .eq("is_active", value: true)
                 .is("parent_id", value: nil)
                 .not("slug", operator: .like, value: "kids-%")
                 .order("sort_order", ascending: true)

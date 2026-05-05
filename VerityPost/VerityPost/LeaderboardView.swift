@@ -30,14 +30,15 @@ import PostgREST
 //     is_verified_public_figure, quizzes_completed_count, comment_count,
 //     created_at. Any future GRANT tightening must re-audit this file.
 //
-// Subcategory pills: the web page renders the pills and then silently drops
-// `activeSub` before issuing the query (drift, not intentional) because the
-// `category_scores` table carries only `category_id` — there is no
-// `subcategory_id` column to filter on. Until a follow-up either (a) adds
-// the column + backfills or (b) changes category leaderboards to aggregate
-// `reading_log`→`articles.subcategory_id` live, this file hides the
-// subcategory pill row rather than render an affordance that does nothing.
-// Tracked for Wave 2 pickup.
+// Subcategory pills: Wave F (2026-05-05) — `category_scores.subcategory_id`
+// landed in Wave C, the dual-write (rollup row with `subcategory_id IS NULL`
+// + sub-keyed row) is live, and Wave D backfills `articles.subcategory_id`
+// on every new article. Subcategory pills render here under the parent
+// category row when a category is selected. Default ("All") issues the
+// rollup query (`.is("subcategory_id", value: nil)`); selecting a sub
+// switches the query to `.eq("subcategory_id", value: subId)`. Non-admin
+// viewers see only subs that have at least one published article (mirrors
+// the Wave E home + categories-API rule); admins see every sub regardless.
 
 // T-025 — cached ISO8601 formatter; promoted from per-call inline init.
 // ISO8601DateFormatter is expensive; two call sites in this file share it.
@@ -64,6 +65,16 @@ struct LeaderboardView: View {
     // Category filter
     @State private var categories: [VPCategory] = []
     @State private var activeCategory: String? = nil // category id
+    // Wave F — subcategory drilldown. `subcategories` holds the full
+    // sub-of-parent set; `activeSubcategory` is the selected sub id (nil =
+    // rollup view across all subs of the active parent). `populatedSubIds`
+    // is the set of subs with at least one published, non-deleted article;
+    // non-admin viewers only see pills for subs in this set. `viewerIsAdmin`
+    // resolves from `admin.owner_mode` and grants the all-subs view.
+    @State private var subcategories: [VPCategory] = []
+    @State private var activeSubcategory: String? = nil
+    @State private var populatedSubIds: Set<String> = []
+    @State private var viewerIsAdmin = false
 
     // Expansion (tap chevron to toggle stats panel; tap row navigates to profile).
     @State private var expanded: String? = nil
@@ -125,6 +136,7 @@ struct LeaderboardView: View {
                                 Button {
                                     activeTab = tab
                                     activeCategory = nil
+                                    activeSubcategory = nil
                                     loading = true
                                 } label: {
                                     Text(tab.label)
@@ -186,6 +198,32 @@ struct LeaderboardView: View {
                     .padding(.bottom, 12)
                 }
 
+                // Wave F — subcategory pill row. Renders only when a
+                // parent is selected and there's at least one visible sub
+                // for the viewer (admin sees all subs of the parent;
+                // non-admin sees only subs in `populatedSubIds`). Visual
+                // matches the parent pill row above. Default ("All")
+                // returns the rollup view; selecting a sub re-runs the
+                // query with `subcategory_id = subId`.
+                if canViewCategories, let parentId = activeCategory {
+                    let parentSubs = subcategories.filter { $0.categoryId == parentId }
+                    let visibleSubs = viewerIsAdmin
+                        ? parentSubs
+                        : parentSubs.filter { populatedSubIds.contains($0.id) }
+                    if !visibleSubs.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                subPill(id: nil, label: "All")
+                                ForEach(visibleSubs, id: \.id) { sub in
+                                    subPill(id: sub.id, label: sub.displayName)
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                        }
+                        .padding(.bottom, 12)
+                    }
+                }
+
                 // List
                 if loading {
                     ProgressView().padding(.top, 60)
@@ -216,6 +254,7 @@ struct LeaderboardView: View {
                         if activeCategory != nil {
                             Button {
                                 activeCategory = nil
+                                activeSubcategory = nil
                                 loading = true
                             } label: {
                                 Text("Clear filters")
@@ -320,7 +359,7 @@ struct LeaderboardView: View {
                 await loadBlockList(userId: uid)
             }
         }
-        .task(id: "\(activeTab.rawValue)|\(activePeriod.rawValue)|\(activeCategory ?? "")|\(permStore.changeToken)|\(reloadToken)") {
+        .task(id: "\(activeTab.rawValue)|\(activePeriod.rawValue)|\(activeCategory ?? "")|\(activeSubcategory ?? "")|\(permStore.changeToken)|\(reloadToken)") {
             await loadLeaderboard()
         }
     }
@@ -364,6 +403,30 @@ struct LeaderboardView: View {
         let active = activeCategory == id
         return Button {
             activeCategory = id
+            // Wave F — switching parent clears any active sub: subs only
+            // belong to one parent, so the previous sub doesn't apply.
+            activeSubcategory = nil
+            loading = true
+        } label: {
+            Text(label)
+                .font(.system(.caption, design: .default, weight: .medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(active ? VP.accent.opacity(0.1) : .clear)
+                .foregroundColor(active ? VP.accent : VP.dim)
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(active ? VP.accent : VP.border))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Wave F — sub-pill row visual matches `catPill` exactly (no new
+    /// design tokens). Tap toggles `activeSubcategory`; tapping the
+    /// active pill is a no-op (use the "All" pill to clear).
+    private func subPill(id: String?, label: String) -> some View {
+        let active = activeSubcategory == id
+        return Button {
+            activeSubcategory = id
             loading = true
         } label: {
             Text(label)
@@ -467,6 +530,12 @@ struct LeaderboardView: View {
         await PermissionService.shared.refreshIfStale()
         canViewFull = await PermissionService.shared.has("leaderboard.view")
         canViewCategories = await PermissionService.shared.has("leaderboard.category.view")
+        // Wave F — admin-aware sub-pill filter. PermissionService applies
+        // the owner_mode short-circuit (PermissionService.swift:71-73)
+        // identically to the web `permissions.js:179` short-circuit, so a
+        // single `has` call resolves the same predicate the web home +
+        // /api/categories use server-side.
+        viewerIsAdmin = await PermissionService.shared.has("admin.owner_mode")
     }
 
     // MARK: - Data loading
@@ -475,16 +544,37 @@ struct LeaderboardView: View {
         do {
             let all: [VPCategory] = try await client.from("categories")
                 .select()
-                .eq("is_active", value: true)
                 .eq("is_kids_safe", value: false)
                 .is("deleted_at", value: nil)
                 .order("sort_order", ascending: true)
                 .execute().value
-            // Only top-level categories render as pills. Subcategory filtering
-            // is disabled — see header note.
+            // Wave F — split parents + subs. Parents render as the
+            // top pill row; subs of the active parent render as the
+            // second pill row (admin-aware filter applied client-side
+            // against `populatedSubIds`).
             categories = all.filter { $0.categoryId == nil }
+            subcategories = all.filter { $0.categoryId != nil }
         } catch {
             Log.d("Load categories error:", error)
+        }
+
+        // Wave F — populated-sub aggregation. Mirrors the home page +
+        // /api/categories rule: non-admins only see subs that have at
+        // least one published, non-deleted article. One small SELECT,
+        // results are cached for the session.
+        struct ArticleSubRow: Decodable { let subcategory_id: String? }
+        do {
+            let rows: [ArticleSubRow] = try await client.from("articles")
+                .select("subcategory_id")
+                .not("subcategory_id", operator: .is, value: "null")
+                .is("deleted_at", value: nil)
+                .eq("status", value: "published")
+                .execute().value
+            populatedSubIds = Set(rows.compactMap { $0.subcategory_id })
+        } catch {
+            // Non-fatal: empty populated set means non-admins see no
+            // sub-pills; admins still see all. No render breakage.
+            Log.d("Load populated subs error:", error)
         }
     }
 
@@ -514,7 +604,7 @@ struct LeaderboardView: View {
         let limit = isLoggedIn ? fullLimit : anonLimit
 
         if let catId = activeCategory, canViewCategories {
-            await loadByCategory(catId: catId, limit: limit)
+            await loadByCategory(catId: catId, subId: activeSubcategory, limit: limit)
         } else {
             switch activeTab {
             case .topVerifiers:
@@ -541,12 +631,23 @@ struct LeaderboardView: View {
             .is("frozen_at", value: nil)
     }
 
-    private func loadByCategory(catId: String, limit: Int) async {
+    private func loadByCategory(catId: String, subId: String?, limit: Int) async {
         do {
             struct CS: Decodable { let user_id: String; let score: Int }
-            let rows: [CS] = try await client.from("category_scores")
+            // Wave F — branch on `subId`:
+            //   • nil  → rollup view: pin to `subcategory_id IS NULL` so we
+            //            read the parent-level aggregate and don't
+            //            double-count the sub-keyed rows that
+            //            `score_on_reading_complete` writes alongside.
+            //   • set  → drilldown: filter `subcategory_id = subId` to read
+            //            only the chosen sub's score row, the same shape
+            //            the web leaderboard uses.
+            let baseQuery = client.from("category_scores")
                 .select("user_id, score")
                 .eq("category_id", value: catId)
+            let scopedQuery = subId.map { baseQuery.eq("subcategory_id", value: $0) }
+                ?? baseQuery.is("subcategory_id", value: nil)
+            let rows: [CS] = try await scopedQuery
                 .order("score", ascending: false)
                 .limit(limit)
                 .execute().value

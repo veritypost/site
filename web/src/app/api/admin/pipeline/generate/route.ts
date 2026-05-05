@@ -400,9 +400,16 @@ const HeadlineSummarySchema = z.object({
   slug: z.string().optional(),
 });
 
+// Wave D — categorization picks BOTH category and subcategory. The model
+// returns category_id (required UUID) and subcategory_id (optional UUID or
+// null). The route validates parent_id == category_id before accepting the
+// subcategory; on validation failure it falls back to category-only (NULL
+// sub) rather than crashing the run.
 const CategorizationSchema = z.object({
   category_id: z.string().uuid(),
   category_name: z.string().optional(),
+  subcategory_id: z.string().uuid().nullable().optional(),
+  subcategory_name: z.string().optional(),
 });
 
 const BodySchema = z.object({
@@ -1468,13 +1475,49 @@ export async function POST(req: Request) {
     // 9e. Parallel batch: headline, summary, categorization
     // ────────────────────────────────────────────────────────────────────────
     // Categorization prompt: inline (no editorial-guide export). Pulls all
-    // categories from DB so the LLM can only return a valid UUID.
-    const { data: cats, error: catsErr } = await service.from('categories').select('id, name');
+    // categories + subcategories from DB so the LLM can only return valid
+    // UUIDs. Wave D — the LLM picks BOTH category and (optional) subcategory
+    // in one call. Subcategories are categories rows with parent_id != null.
+    const { data: cats, error: catsErr } = await service
+      .from('categories')
+      .select('id, name, parent_id')
+      .is('deleted_at', null);
     if (catsErr) throw new Error(`categories lookup failed: ${catsErr.message}`);
-    const catRows = (cats ?? []) as Array<{ id: string; name: string }>;
-    const hintCatRow = input.category_id ? catRows.find((c) => c.id === input.category_id) : undefined;
-    const catListText = catRows.map((c) => `- ${c.id}: ${c.name}`).join('\n');
-    const CATEGORIZATION_PROMPT = `You are a news editor. Assign this story to EXACTLY ONE category from the list below. Return JSON: {"category_id": "<uuid>", "category_name": "<name>"}.
+    const catRows = (cats ?? []) as Array<{ id: string; name: string; parent_id: string | null }>;
+    // Top-level categories (parent_id NULL) — the only valid `category_id`
+    // values. Subcategories live in the same table with parent_id pointing at
+    // a top-level row.
+    const topLevelCats = catRows.filter((c) => c.parent_id === null);
+    const subcatsByParent = new Map<string, Array<{ id: string; name: string }>>();
+    for (const c of catRows) {
+      if (c.parent_id === null) continue;
+      const list = subcatsByParent.get(c.parent_id) ?? [];
+      list.push({ id: c.id, name: c.name });
+      subcatsByParent.set(c.parent_id, list);
+    }
+    // hintCatRow short-circuits the categorization LLM call when the caller
+    // already passed an input.category_id (e.g. from /admin/articles/new-draft
+    // standalone runs). Subcategory still needs the LLM, so we don't skip the
+    // call when hintCatRow is set unless the parent has no subs.
+    const hintCatRow = input.category_id ? topLevelCats.find((c) => c.id === input.category_id) : undefined;
+    const hintHasSubs = hintCatRow ? (subcatsByParent.get(hintCatRow.id)?.length ?? 0) > 0 : false;
+    // Render the category list as a hierarchy: parents first, subs indented
+    // under each parent. The LLM uses the parent UUID for category_id and
+    // (optionally) a sub UUID for subcategory_id, or null if no sub fits.
+    const catListText = topLevelCats
+      .map((c) => {
+        const subs = subcatsByParent.get(c.id) ?? [];
+        const header = `- ${c.id}: ${c.name}`;
+        if (subs.length === 0) return header;
+        const subLines = subs.map((s) => `    - ${s.id}: ${s.name}`).join('\n');
+        return `${header}\n${subLines}`;
+      })
+      .join('\n');
+    const CATEGORIZATION_PROMPT = `You are a news editor. Assign this story to EXACTLY ONE category from the list below, and pick the closest subcategory under that category if one fits. If no subcategory fits (or the category has none), return null for subcategory_id.
+
+Return JSON: {"category_id": "<uuid>", "category_name": "<name>", "subcategory_id": "<uuid|null>", "subcategory_name": "<name|null>"}.
+
+The subcategory_id MUST be a child of the chosen category_id (i.e. its parent in the list below). Subcategories are indented under their parent category.
 
 CATEGORIES:
 ${catListText}`;
@@ -1499,7 +1542,12 @@ ${catListText}`;
       { step: 'headline', system: headlineSystem, user: headlineUser },
       { step: 'summary', system: headlineSystem, user: summaryUser },
     );
-    if (!hintCatRow) {
+    // Wave D — call the LLM for categorization unless BOTH category_id is
+    // hinted AND the hinted parent has no subcategories (nothing for the LLM
+    // to pick). When the hint covers a parent with subs, we still need the
+    // LLM to pick the subcategory.
+    const skipCategorizationCall = hintCatRow !== undefined && !hintHasSubs;
+    if (!skipCategorizationCall) {
       promptParts.push({ step: 'categorization', system: CATEGORIZATION_PROMPT, user: categorizationUser });
     }
 
@@ -1515,7 +1563,7 @@ ${catListText}`;
       audience,
       step: 'summary',
     });
-    if (!hintCatRow) {
+    if (!skipCategorizationCall) {
       pipelineLog.info('newsroom.generate.categorization', {
         run_id: runId,
         cluster_id,
@@ -1550,7 +1598,7 @@ ${catListText}`;
         audience,
         signal: req.signal,
       }),
-      hintCatRow
+      skipCategorizationCall
         ? Promise.resolve<CallModelResult | null>(null)
         : callModel({
             provider,
@@ -1569,15 +1617,17 @@ ${catListText}`;
     assertPerRunCap(totalCostUsd, perRunCapUsd);
     const headlineParsed = HeadlineSummarySchema.parse(extractJSON(headlineRes.text));
     const summaryParsed = HeadlineSummarySchema.parse(extractJSON(summaryRes.text));
-    const catParsed: z.infer<typeof CategorizationSchema> = hintCatRow
-      ? { category_id: hintCatRow.id, category_name: hintCatRow.name }
+    // Wave D — when categorization is skipped (hinted category with no subs),
+    // catParsed defaults to the hint with subcategory_id=null.
+    const catParsed: z.infer<typeof CategorizationSchema> = skipCategorizationCall
+      ? { category_id: hintCatRow!.id, category_name: hintCatRow!.name, subcategory_id: null }
       : CategorizationSchema.parse(extractJSON(catResOrNull!.text));
     const headline = cleanText(headlineParsed.headline);
     const summary = cleanText(summaryParsed.summary || headlineParsed.summary || '');
     const batchDur = Date.now() - batchStart;
     stepTimings['headline'] = batchDur;
     stepTimings['summary'] = batchDur;
-    stepTimings['categorization'] = hintCatRow ? 0 : batchDur;
+    stepTimings['categorization'] = skipCategorizationCall ? 0 : batchDur;
     pipelineLog.info('newsroom.generate.headline', {
       run_id: runId,
       cluster_id,
@@ -1599,7 +1649,9 @@ ${catListText}`;
       step: bodyStepName,
     });
     // Resolve category name for CATEGORY_PROMPTS lookup (lowercased).
-    const catRow = catRows.find((c) => c.id === catParsed.category_id);
+    // Look up against topLevelCats — subcategories have their own ids and
+    // shouldn't satisfy the parent name lookup.
+    const catRow = topLevelCats.find((c) => c.id === catParsed.category_id);
     const catNameLower = (catParsed.category_name ?? catRow?.name ?? '').toLowerCase();
     const categoryAppend = CATEGORY_PROMPTS[catNameLower]
       ? `\n\n${CATEGORY_PROMPTS[catNameLower]}`
@@ -2103,8 +2155,10 @@ Empty array if all correct.`;
     // 9m. Category fallback chain
     // ────────────────────────────────────────────────────────────────────────
     let resolvedCategoryId: string | null = null;
-    const catExists = catRows.some((c) => c.id === catParsed.category_id);
-    if (input.category_id && catRows.some((c) => c.id === input.category_id)) {
+    // Match against top-level categories only — subcategory ids are not
+    // valid `category_id` values on articles.
+    const catExists = topLevelCats.some((c) => c.id === catParsed.category_id);
+    if (input.category_id && topLevelCats.some((c) => c.id === input.category_id)) {
       resolvedCategoryId = input.category_id;
     } else if (catExists) {
       resolvedCategoryId = catParsed.category_id;
@@ -2116,6 +2170,41 @@ Empty array if all correct.`;
       throw new Error(
         'schema_validation: category could not be resolved (writer returned unknown id, cluster has no category, no default)'
       );
+    }
+
+    // Wave D — resolve subcategory_id. The LLM may return a sub UUID, null,
+    // or an id that doesn't belong to the resolved category. Validate the
+    // parent-child relationship; on mismatch fall back to NULL (category-only)
+    // rather than silently writing an unrelated sub or crashing the run.
+    let resolvedSubcategoryId: string | null = null;
+    const llmSubId = catParsed.subcategory_id ?? null;
+    if (llmSubId !== null) {
+      const subRow = catRows.find((c) => c.id === llmSubId);
+      if (!subRow) {
+        pipelineLog.warn('newsroom.generate.categorization', {
+          run_id: runId,
+          cluster_id,
+          audience,
+          step: 'categorization',
+          warn: 'subcategory_id_unknown',
+          returned: llmSubId,
+        });
+      } else if (subRow.parent_id !== resolvedCategoryId) {
+        // Sub exists but belongs to a different parent than the resolved
+        // category — discard rather than write an inconsistent pair.
+        pipelineLog.warn('newsroom.generate.categorization', {
+          run_id: runId,
+          cluster_id,
+          audience,
+          step: 'categorization',
+          warn: 'subcategory_parent_mismatch',
+          returned_sub: llmSubId,
+          returned_parent: subRow.parent_id,
+          resolved_category: resolvedCategoryId,
+        });
+      } else {
+        resolvedSubcategoryId = subRow.id;
+      }
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -2176,6 +2265,9 @@ Empty array if all correct.`;
       body_html: bodyHtml,
       excerpt: summary || null,
       category_id: resolvedCategoryId,
+      // Wave D — pair every article with a subcategory when one fits. NULL
+      // when the chosen category has no subs or none matched the article.
+      subcategory_id: resolvedSubcategoryId,
       ai_provider: provider,
       ai_model: model,
       prompt_fingerprint: fingerprint,

@@ -2490,7 +2490,6 @@ export type Database = {
           icon_name: string | null
           icon_url: string | null
           id: string
-          is_active: boolean
           is_kids_safe: boolean
           is_premium: boolean
           metadata: Json
@@ -2510,7 +2509,6 @@ export type Database = {
           icon_name?: string | null
           icon_url?: string | null
           id?: string
-          is_active?: boolean
           is_kids_safe?: boolean
           is_premium?: boolean
           metadata?: Json
@@ -2530,7 +2528,6 @@ export type Database = {
           icon_name?: string | null
           icon_url?: string | null
           id?: string
-          is_active?: boolean
           is_kids_safe?: boolean
           is_premium?: boolean
           metadata?: Json
@@ -2560,6 +2557,7 @@ export type Database = {
           last_activity_at: string | null
           quizzes_correct: number
           score: number
+          subcategory_id: string | null
           updated_at: string
           user_id: string
         }
@@ -2572,6 +2570,7 @@ export type Database = {
           last_activity_at?: string | null
           quizzes_correct?: number
           score?: number
+          subcategory_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -2584,6 +2583,7 @@ export type Database = {
           last_activity_at?: string | null
           quizzes_correct?: number
           score?: number
+          subcategory_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -2600,6 +2600,13 @@ export type Database = {
             columns: ["kid_profile_id"]
             isOneToOne: false
             referencedRelation: "kid_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_category_scores_subcategory_id"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
             referencedColumns: ["id"]
           },
           {
@@ -5385,6 +5392,117 @@ export type Database = {
         Relationships: []
       }
       events_20260505: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
+      events_20260506: {
         Row: {
           article_id: string | null
           article_slug: string | null
@@ -10161,14 +10279,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fk_stories_ai_category"
+            foreignKeyName: "fk_stories_ai_category_id"
             columns: ["ai_category_id"]
             isOneToOne: false
             referencedRelation: "categories"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fk_stories_ai_subcategory"
+            foreignKeyName: "fk_stories_ai_subcategory_id"
             columns: ["ai_subcategory_id"]
             isOneToOne: false
             referencedRelation: "categories"
@@ -12310,19 +12428,34 @@ export type Database = {
         }
         Returns: Json
       }
-      award_points: {
-        Args: {
-          p_action: string
-          p_article_id?: string
-          p_category_id?: string
-          p_kid_profile_id?: string
-          p_source_id?: string
-          p_source_type?: string
-          p_synthetic_key?: string
-          p_user_id?: string
-        }
-        Returns: Json
-      }
+      award_points:
+        | {
+            Args: {
+              p_action: string
+              p_article_id?: string
+              p_category_id?: string
+              p_kid_profile_id?: string
+              p_source_id?: string
+              p_source_type?: string
+              p_synthetic_key?: string
+              p_user_id?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_action: string
+              p_article_id?: string
+              p_category_id?: string
+              p_kid_profile_id?: string
+              p_source_id?: string
+              p_source_type?: string
+              p_subcategory_id?: string
+              p_synthetic_key?: string
+              p_user_id?: string
+            }
+            Returns: Json
+          }
       award_reading_points: { Args: { p_article_id: string }; Returns: Json }
       billing_cancel_subscription: {
         Args: { p_reason?: string; p_user_id: string }
@@ -13370,4 +13503,3 @@ export const Constants = {
     },
   },
 } as const
-

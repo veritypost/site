@@ -396,7 +396,6 @@ export function CategoriesSectionConnected({ authUserId }: CategoriesSectionConn
         supabase
           .from('categories')
           .select('id, name, slug, parent_id, sort_order')
-          .eq('is_active', true)
           .is('deleted_at', null)
           .eq('is_kids_safe', false)
           .order('sort_order'),

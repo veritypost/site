@@ -1,8 +1,9 @@
 // Server-rendered category sidebar for the desktop home. Reads the same
 // `categories` rows the rest of the page already fetches; groups them
-// into parent + subs and renders a sticky 208px rail. Hidden below the
-// 1024px breakpoint via the inline <style> rule so mobile keeps the
-// existing single-column layout untouched.
+// into parent + subs and renders a fixed 208px rail pinned to the
+// viewport's left edge so the feed below stays viewport-centered.
+// Hidden below 1280px so the centered 880px feed never collides with
+// the rail.
 
 import Link from 'next/link';
 import {
@@ -18,7 +19,7 @@ export type SidebarCategory = {
   sort_order: number | null;
 };
 
-export const HOME_SIDEBAR_BREAKPOINT_PX = 1024;
+export const HOME_SIDEBAR_BREAKPOINT_PX = 1280;
 
 const sortByOrder = (a: SidebarCategory, b: SidebarCategory) => {
   const ao = a.sort_order ?? Number.MAX_SAFE_INTEGER;
@@ -29,13 +30,22 @@ const sortByOrder = (a: SidebarCategory, b: SidebarCategory) => {
 
 export default function HomeSidebar({
   categories,
+  activeCatSlug = null,
+  activeSubSlug = null,
+  viewerIsAdmin = false,
+  populatedSubIds = [],
 }: {
   categories: SidebarCategory[];
+  activeCatSlug?: string | null;
+  activeSubSlug?: string | null;
+  // Wave E — admin viewers see every subcategory (including empty ones);
+  // non-admin viewers see only subs whose id is in `populatedSubIds`.
+  // Parents (top-level categories) always render either way.
+  viewerIsAdmin?: boolean;
+  populatedSubIds?: string[];
 }) {
-  // Filter out kids-only rows + the e2e seed. Kids parents that are
-  // dual-use (is_kids_safe=true with a `kids-…` slug) get filtered by the
-  // slug prefix; adult-eligible parents like World/Science/Technology/
-  // Health/Climate stay in.
+  const isHomeActive = !activeCatSlug && !activeSubSlug;
+  const populatedSet = new Set(populatedSubIds);
   const visible = categories.filter(
     (c) => !c.slug.startsWith('kids-') && c.slug !== 'vp-e2e-cat-test',
   );
@@ -44,6 +54,8 @@ export default function HomeSidebar({
   const subsByParent = new Map<string, SidebarCategory[]>();
   visible
     .filter((c) => c.parent_id !== null)
+    // Wave E — hide empty subs from non-admin viewers. Admin sees all.
+    .filter((c) => viewerIsAdmin || populatedSet.has(c.id))
     .forEach((c) => {
       const list = subsByParent.get(c.parent_id as string) ?? [];
       list.push(c);
@@ -61,12 +73,6 @@ export default function HomeSidebar({
           .vp-home-sidebar { display: none !important; }
         }
 
-        /* Floating-pill scrollbar. Note: scrollbar-color and webkit-
-           scrollbar-thumb are not animatable, and macOS Safari with
-           overlay scrollbars (the OS default) ignores ::-webkit-scrollbar
-           rules entirely — those users see Apple's translucent thumb
-           instead. Treated as acceptable: browsers that render our rules
-           get a chrome-free idle rail with a soft thumb on hover. */
         .vp-home-sidebar {
           scrollbar-width: thin;
           scrollbar-color: transparent transparent;
@@ -111,25 +117,26 @@ export default function HomeSidebar({
         aria-label="Sections"
         style={{
           width: 208,
-          flexShrink: 0,
-          position: 'sticky',
+          position: 'fixed',
+          left: 16,
           top: 'var(--vp-top-bar-h, 0px)',
-          alignSelf: 'flex-start',
           maxHeight: 'calc(100vh - var(--vp-top-bar-h, 0px))',
           overflowY: 'auto',
           padding: '24px 18px 32px 0',
-          borderRight: '1px solid var(--p-divider, rgba(0,0,0,0.06))',
         }}
       >
-        <SidebarSection name="Home" href="/" active />
+        <SidebarSection name="Home" href="/" active={isHomeActive} />
         {parents.map((p) => (
           <SidebarSection
             key={p.id}
             name={p.name}
-            href={`/category/${p.slug}`}
+            href={`/?cat=${p.slug}`}
+            active={activeCatSlug === p.slug && !activeSubSlug}
+            activeSubSlug={activeCatSlug === p.slug ? activeSubSlug : null}
             subs={(subsByParent.get(p.id) ?? []).map((s) => ({
               name: s.name,
-              href: `/category/${p.slug}?sub=${s.slug}`,
+              href: `/?cat=${p.slug}&sub=${s.slug}`,
+              slug: s.slug,
             }))}
           />
         ))}
@@ -143,11 +150,13 @@ function SidebarSection({
   href,
   subs = [],
   active = false,
+  activeSubSlug = null,
 }: {
   name: string;
   href: string;
-  subs?: { name: string; href: string }[];
+  subs?: { name: string; href: string; slug?: string }[];
   active?: boolean;
+  activeSubSlug?: string | null;
 }) {
   return (
     <div style={{ marginBottom: 18 }}>
@@ -168,22 +177,27 @@ function SidebarSection({
       >
         {name}
       </Link>
-      {subs.map((s) => (
-        <Link
-          key={s.href}
-          href={s.href}
-          style={{
-            display: 'block',
-            textDecoration: 'none',
-            fontSize: 12,
-            color: C.muted,
-            paddingTop: 5,
-            paddingBottom: 5,
-          }}
-        >
-          {s.name}
-        </Link>
-      ))}
+      {subs.map((s) => {
+        const subActive = !!s.slug && s.slug === activeSubSlug;
+        return (
+          <Link
+            key={s.href}
+            href={s.href}
+            aria-current={subActive ? 'page' : undefined}
+            style={{
+              display: 'block',
+              textDecoration: 'none',
+              fontSize: 12,
+              fontWeight: subActive ? 700 : 400,
+              color: subActive ? C.text : C.muted,
+              paddingTop: 5,
+              paddingBottom: 5,
+            }}
+          >
+            {s.name}
+          </Link>
+        );
+      })}
     </div>
   );
 }

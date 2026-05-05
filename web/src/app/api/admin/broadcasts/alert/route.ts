@@ -137,6 +137,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Could not create breaking alert' }, { status: 500 });
   }
 
+  // Wave D — breaking alerts intentionally leave subcategory_id NULL.
+  // Picking the right sub mid-flow would add an LLM-pick latency hit on a
+  // time-sensitive path, and operators can edit the article post-publish
+  // via /api/admin/articles/[id] PATCH (which accepts subcategory_id since
+  // Wave D widened the schema). For an alert headline that fits a
+  // sub-category, an editor can refine after the push fan-out lands.
   const { data: article, error: insErr } = await service
     .from('articles')
     .insert({

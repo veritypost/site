@@ -23,6 +23,7 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { Fragment, type CSSProperties } from 'react';
 import { createClient, createServiceClient } from '../lib/supabase/server';
+import { hasPermissionServer } from '@/lib/auth';
 import type { Tables } from '@/types/database-helpers';
 import {
   HOME_COLORS as C,
@@ -95,7 +96,11 @@ function heroBg(category: CategoryRow | undefined): string {
 // detection heuristic. Curated feed data is live.
 export const dynamic = 'force-dynamic';
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: { cat?: string; sub?: string };
+}) {
   const supabase = createClient();
   // Public catalog reads (top_stories, published articles, categories) bypass
   // RLS via the service client so anon visitors see the same curated feed as
@@ -123,8 +128,32 @@ export default async function HomePage() {
   let topStoriesRes: { data: any; error: any } = { data: null, error: null };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let userMetaRes: { data: any; error: any } = { data: null, error: null };
+  // Wave E — populated subcategory ids (subs with at least one published,
+  // non-deleted article directly assigned). Anonymous + non-admin viewers
+  // see ONLY these subs in the sidebar; admins always see every sub.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let populatedSubsRes: { data: any; error: any } = { data: null, error: null };
+  let viewerIsAdmin = false;
   let lastVisitMs: number | null = null;
   let fetchThrew = false;
+
+  // Fetch categories first so we can resolve the ?cat=/&sub= slugs to IDs
+  // before issuing the filtered articles fetch. The categories list is
+  // small and already cached in practice.
+  const earlyCatsRes = await service
+    .from('categories')
+    .select('id, name, slug, color_hex, parent_id, sort_order')
+    .is('deleted_at', null)
+    .order('sort_order', { ascending: true, nullsFirst: false });
+  const earlyCatRows = (earlyCatsRes.data as CategoryRow[] | null) || [];
+  const activeCat =
+    searchParams?.cat
+      ? earlyCatRows.find((c) => c.slug === searchParams.cat && c.parent_id === null) ?? null
+      : null;
+  const activeSub =
+    activeCat && searchParams?.sub
+      ? earlyCatRows.find((c) => c.slug === searchParams.sub && c.parent_id === activeCat.id) ?? null
+      : null;
 
   try {
     const lastVisitRaw = cookies().get('vp_last_home_visit_at')?.value;
@@ -150,15 +179,35 @@ export default async function HomePage() {
       }
     })();
 
-    [storiesRes, breakingRes, catsRes, topStoriesRes, userMetaRes] = await Promise.all([
-      service
-        .from('articles')
-        .select(SELECT_COLS)
-        .eq('status', 'published')
-        .eq('browse_only', false)
-        .not('stories.slug', 'is', null)
-        .order('published_at', { ascending: false })
-        .limit(12),
+    // Build the stories query, layering category filters on when present.
+    let storiesQuery = service
+      .from('articles')
+      .select(SELECT_COLS)
+      .eq('status', 'published')
+      .eq('browse_only', false)
+      .not('stories.slug', 'is', null);
+    if (activeCat) storiesQuery = storiesQuery.eq('category_id', activeCat.id);
+    if (activeSub) storiesQuery = storiesQuery.eq('subcategory_id', activeSub.id);
+    storiesQuery = storiesQuery.order('published_at', { ascending: false }).limit(12);
+
+    // Wave E — admin-aware sidebar. `hasPermissionServer` resolves its own
+    // cookie-scoped client and returns false fast for anonymous (no DB hit
+    // for null user). Run in parallel with the rest of the home fetch.
+    const adminPromise = hasPermissionServer('admin.owner_mode').catch(() => false);
+
+    // Wave E — article-count aggregation (Option A). Live count, not a
+    // maintained column; trigger-free per owner direction (article_count on
+    // categories is dead). One extra round trip, milliseconds.
+    const populatedSubsPromise = service
+      .from('articles')
+      .select('subcategory_id')
+      .not('subcategory_id', 'is', null)
+      .is('deleted_at', null)
+      .eq('status', 'published');
+
+    let viewerIsAdminTmp: boolean;
+    [storiesRes, breakingRes, catsRes, topStoriesRes, userMetaRes, viewerIsAdminTmp, populatedSubsRes] = await Promise.all([
+      storiesQuery,
       service
         .from('articles')
         .select(SELECT_COLS)
@@ -168,21 +217,16 @@ export default async function HomePage() {
         .not('stories.slug', 'is', null)
         .order('published_at', { ascending: false })
         .limit(1),
-      service
-        .from('categories')
-        .select('id, name, slug, color_hex, parent_id, sort_order')
-        .eq('is_active', true)
-        .is('deleted_at', null)
-        .order('sort_order', {
-          ascending: true,
-          nullsFirst: false,
-        }),
+      Promise.resolve(earlyCatsRes),
       service
         .from('top_stories')
         .select('position, articles!top_stories_article_id_fkey(id, title, stories(slug, lifecycle_status), excerpt, category_id, is_breaking, is_developing, published_at)')
         .order('position'),
       userMetaPromise,
+      adminPromise,
+      populatedSubsPromise,
     ]);
+    viewerIsAdmin = !!viewerIsAdminTmp;
   } catch (e) {
     console.error('[home.fetch]', e);
     fetchThrew = true;
@@ -227,8 +271,11 @@ export default async function HomePage() {
   // DECISION #028: when pins exist, render whatever resolved (N-1 on broken pins).
   // Only fall back to date-sort when NO pins are set (empty top_stories).
   // Only fall back to recentFallback when both top_stories AND date-sort empty.
+  // When filtered (?cat / ?sub), the empty state is the correct answer — do
+  // NOT bleed unfiltered recents into a filtered view.
+  const isFilteredView = !!activeCat || !!activeSub;
   let recentFallback: HomeStory[] = [];
-  if (!hasPins && dateSorted.length === 0 && !fetchThrew) {
+  if (!isFilteredView && !hasPins && dateSorted.length === 0 && !fetchThrew) {
     const recentRes = await service
       .from('articles')
       .select(SELECT_COLS)
@@ -244,7 +291,7 @@ export default async function HomePage() {
     }
   }
 
-  const displayedStories = hasPins
+  const displayedStories = !isFilteredView && hasPins
     ? topArticles
     : (dateSorted.length > 0 ? dateSorted : recentFallback);
 
@@ -255,6 +302,18 @@ export default async function HomePage() {
   catRows.forEach((c) => {
     categoryById[c.id] = c;
   });
+
+  // Wave E — collapse the article rows into a populated-sub set. Sidebar
+  // filters out subs whose id is not in this set when the viewer is not
+  // admin. Parents always render regardless.
+  const populatedSubIds = new Set<string>();
+  const populatedRows = (populatedSubsRes.data as Array<{ subcategory_id: string | null }> | null) || [];
+  for (const row of populatedRows) {
+    if (row.subcategory_id) populatedSubIds.add(row.subcategory_id);
+  }
+  if (populatedSubsRes.error) {
+    console.error('[home.fetch.populated_subs]', populatedSubsRes.error.message);
+  }
 
   // Deduplicate by story id to prevent React key collisions if top_stories has duplicate positions
   const seenIds = new Set<string>();
@@ -294,21 +353,18 @@ export default async function HomePage() {
           the permission. The permission check is client-only (the perms
           cache lives in the browser), so the strip is rendered through a
           small client island that hydrates the perms before showing. */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          maxWidth: 1280,
-          margin: '0 auto',
-        }}
-      >
-        <HomeSidebar categories={catRows} />
+      <HomeSidebar
+        categories={catRows}
+        activeCatSlug={activeCat?.slug ?? null}
+        activeSubSlug={activeSub?.slug ?? null}
+        viewerIsAdmin={viewerIsAdmin}
+        populatedSubIds={Array.from(populatedSubIds)}
+      />
 
+      <div>
         <main
           style={{
-            flex: 1,
-            minWidth: 0,
-            maxWidth: 720,
+            maxWidth: 880,
             margin: '0 auto',
             paddingTop: 32,
             paddingLeft: 20,
@@ -316,6 +372,55 @@ export default async function HomePage() {
             paddingBottom: 64,
           }}
         >
+        {activeCat && (
+          <header
+            style={{
+              marginBottom: 24,
+              paddingBottom: 16,
+              borderBottom: `1px solid ${C.rule}`,
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color: C.dim,
+              }}
+            >
+              Section
+            </p>
+            <h2
+              style={{
+                fontFamily: serifStack,
+                fontSize: 28,
+                fontWeight: 700,
+                lineHeight: 1.15,
+                letterSpacing: '-0.015em',
+                margin: '6px 0 0',
+                color: C.text,
+              }}
+            >
+              {activeCat.name}
+            </h2>
+            {activeSub && (
+              <p
+                style={{
+                  fontFamily: serifStack,
+                  fontSize: 16,
+                  fontWeight: 500,
+                  color: C.soft,
+                  margin: '4px 0 0',
+                }}
+              >
+                {activeSub.name}
+              </p>
+            )}
+          </header>
+        )}
+
         {breaking && showBreaking && <HomeBreakingStrip story={breaking} />}
 
         {fetchFailed && <HomeFetchFailed />}

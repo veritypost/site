@@ -14,7 +14,6 @@
  *     parent_id?: uuid | null   (null = make top-level)
  *     color_hex?: string | null
  *     icon_name?: string | null
- *     is_active?: boolean
  *     is_kids_safe?: boolean
  *     is_premium?: boolean
  *     sort_order?: integer >= 0
@@ -55,7 +54,6 @@ type CategoryRow = {
   parent_id: string | null;
   color_hex: string | null;
   icon_name: string | null;
-  is_active: boolean;
   is_kids_safe: boolean;
   is_premium: boolean;
   sort_order: number;
@@ -64,7 +62,7 @@ type CategoryRow = {
 };
 
 const COL_LIST =
-  'id, name, slug, description, parent_id, color_hex, icon_name, is_active, is_kids_safe, is_premium, sort_order, deleted_at, article_count';
+  'id, name, slug, description, parent_id, color_hex, icon_name, is_kids_safe, is_premium, sort_order, deleted_at, article_count';
 
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
@@ -179,10 +177,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
-  if ('is_active' in body) {
-    if (typeof body.is_active !== 'boolean') return badRequest('is_active must be boolean');
-    update.is_active = body.is_active;
-  }
   if ('is_kids_safe' in body) {
     if (typeof body.is_kids_safe !== 'boolean') return badRequest('is_kids_safe must be boolean');
     update.is_kids_safe = body.is_kids_safe;
@@ -201,10 +195,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   // Restore (un-archive). The only legal value for `deleted_at` over PATCH
-  // is `null` — clears the soft-delete marker. The admin can pair this
-  // with `is_active: true` (the editor does) to make the row visible
-  // again in one round trip. Setting any non-null value here is
-  // rejected; archive uses DELETE, not PATCH.
+  // is `null` — clears the soft-delete marker. Setting any non-null value
+  // here is rejected; archive uses DELETE, not PATCH.
   if ('deleted_at' in body) {
     if (body.deleted_at !== null) {
       return badRequest('Only deleted_at: null is accepted (restore)');
@@ -353,11 +345,11 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     return NextResponse.json({ ok: true, archived: true });
   }
 
-  // 4. Soft delete + deactivate. Article references stay intact.
+  // 4. Soft delete. Article references stay intact.
   const nowIso = new Date().toISOString();
   const { error: upErr } = await service
     .from('categories')
-    .update({ deleted_at: nowIso, is_active: false })
+    .update({ deleted_at: nowIso })
     .eq('id', id);
   if (upErr) {
     console.error('[admin.categories.delete]', upErr.message);
@@ -370,7 +362,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     targetTable: 'categories',
     targetId: id,
     oldValue: existing,
-    newValue: { deleted_at: nowIso, is_active: false },
+    newValue: { deleted_at: nowIso },
   });
 
   return NextResponse.json({ ok: true });

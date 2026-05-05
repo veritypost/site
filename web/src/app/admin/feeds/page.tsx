@@ -164,7 +164,7 @@ function FeedsAdminInner() {
 
       await loadFeeds();
 
-      const { data: catRows } = await supabase.from('categories').select('id, name, slug').eq('is_active', true).order('name');
+      const { data: catRows } = await supabase.from('categories').select('id, name, slug').order('name');
       if (catRows) setCategories(catRows as Array<{ id: string; name: string; slug: string }>);
 
       setLoading(false);

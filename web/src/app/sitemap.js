@@ -85,7 +85,6 @@ export default async function sitemap({ id }) {
       const { data: cats } = await supabase
         .from('categories')
         .select('slug, updated_at, created_at')
-        .eq('is_active', true)
         .not('slug', 'like', 'kids-%')
         .order('slug', { ascending: true });
       categoryRoutes = (cats || []).map((c) => ({

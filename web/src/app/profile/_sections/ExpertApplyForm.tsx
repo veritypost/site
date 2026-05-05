@@ -61,7 +61,6 @@ export function ExpertApplyForm({ preview, onSubmitted }: Props) {
       const { data } = await supabase
         .from('categories')
         .select('id, name')
-        .eq('is_active', true)
         .is('parent_id', null)
         .not('slug', 'like', 'kids-%')
         .order('sort_order');

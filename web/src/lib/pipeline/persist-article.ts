@@ -80,6 +80,10 @@ export interface PersistArticlePayload {
   body_html: string; // sanitized HTML — non-empty invariant (RPC validates)
   excerpt?: string | null; // short summary; there is no `summary` column
   category_id: string;
+  // Wave D — optional subcategory paired with category_id. NULL when the
+  // chosen category has no subcategories or none matched the article. The
+  // RPC validates parent-child consistency on its end too.
+  subcategory_id?: string | null;
   ai_provider: 'anthropic' | 'openai';
   ai_model: string;
   prompt_fingerprint: string;

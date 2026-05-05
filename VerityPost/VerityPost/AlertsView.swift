@@ -772,7 +772,6 @@ struct AlertsView: View {
             allCategories = try await client.from("categories")
                 .select()
                 .eq("is_kids_safe", value: false)
-                .eq("is_active", value: true)
                 .order("sort_order", ascending: true)
                 .execute().value
 

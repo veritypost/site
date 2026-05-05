@@ -154,7 +154,7 @@ function PromptPresetsAdminInner() {
     const { data, error } = await supabase
       .from('categories')
       .select('*')
-      .eq('is_active', true)
+      .is('deleted_at', null)
       .order('name', { ascending: true });
     if (error) {
       // Non-fatal: dropdown just shows blank. Page still works.

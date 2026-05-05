@@ -53,7 +53,6 @@ function CategoryPageInner() {
           .from('categories')
           .select('*')
           .eq('id', id)
-          .eq('is_active', true)
           .is('deleted_at', null)
           .single();
 
@@ -62,7 +61,6 @@ function CategoryPageInner() {
             .from('categories')
             .select('*')
             .eq('slug', id)
-            .eq('is_active', true)
             .is('deleted_at', null)
             .single();
           categoryData = categoryBySlug;
@@ -84,7 +82,6 @@ function CategoryPageInner() {
             .from('categories')
             .select('id, name, slug')
             .eq('parent_id', categoryData.id)
-            .eq('is_active', true)
             .is('deleted_at', null)
             .order('name', { ascending: true });
           if (subcatErr) console.error('Subcategory fetch error:', subcatErr);

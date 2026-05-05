@@ -214,7 +214,6 @@ struct FindView: View {
         do {
             let cats: [VPCategory] = try await client.from("categories")
                 .select()
-                .eq("is_active", value: true)
                 .execute()
                 .value
             var map: [String: String] = [:]

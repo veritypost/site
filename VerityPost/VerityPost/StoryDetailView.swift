@@ -512,7 +512,12 @@ struct StoryDetailView: View {
             // signed-in paywall. Without this override anon iOS users
             // landed on "Upgrade to read this article" and could read
             // nothing.
-            canViewBody = !auth.isLoggedIn || (await PermissionService.shared.has("article.view.body"))
+            // `||` takes its RHS as a synchronous @autoclosure, so the
+            // permission lookup must be hoisted out before the boolean
+            // composition (Swift 6 concurrency: no `await` inside a sync
+            // autoclosure).
+            let hasBodyPerm = await PermissionService.shared.has("article.view.body")
+            canViewBody = !auth.isLoggedIn || hasBodyPerm
             canViewSources = await PermissionService.shared.has("article.view.sources")
             canViewTimeline = await PermissionService.shared.has("article.view.timeline")
             canEditOwnComment = await PermissionService.shared.has("comments.edit.own")

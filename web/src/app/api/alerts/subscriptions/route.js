@@ -158,12 +158,12 @@ export async function POST(request) {
     );
   }
 
-  // Validate the category exists + is_active. Avoids piping garbage
-  // into subscription_topics; an FK on the table would catch it but
-  // the explicit 400 + 'invalid_category' is a cleaner client signal.
+  // Validate the category exists and is not soft-deleted. Avoids piping
+  // garbage into subscription_topics; an FK on the table would catch it
+  // but the explicit 400 + 'invalid_category' is a cleaner client signal.
   const { data: cat, error: catErr } = await service
     .from('categories')
-    .select('id, is_active, deleted_at')
+    .select('id, deleted_at')
     .eq('id', category_id)
     .maybeSingle();
   if (catErr) {
@@ -173,7 +173,7 @@ export async function POST(request) {
       { status: 500, headers: NO_STORE }
     );
   }
-  if (!cat || !cat.is_active || cat.deleted_at) {
+  if (!cat || cat.deleted_at) {
     return NextResponse.json(
       { error: 'invalid_category' },
       { status: 400, headers: NO_STORE }

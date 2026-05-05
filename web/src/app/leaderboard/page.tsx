@@ -115,7 +115,12 @@ function LeaderboardPageContent() {
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [subcats, setSubcats] = useState<SubcatRow[]>([]);
   const [activeCat, setActiveCatState] = useState<string | null>(() => searchParams.get('cat'));
-  const [, setActiveSub] = useState<string | null>(null);
+  const [activeSub, setActiveSubState] = useState<string | null>(() => searchParams.get('sub'));
+  // Wave F — admin-aware empty-sub filter. Mirrors the home + categories
+  // API rule: non-admins only see subcategories that have at least one
+  // published, non-deleted article assigned to them. Admins see all.
+  const [populatedSubIds, setPopulatedSubIds] = useState<Set<string>>(new Set());
+  const [viewerIsAdmin, setViewerIsAdmin] = useState<boolean>(false);
 
   const [users, setUsers] = useState<LeaderUser[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -152,8 +157,18 @@ function LeaderboardPageContent() {
   };
   const setActiveCat = (cat: string | null) => {
     setActiveCatState(cat);
+    // Switching category clears any active sub — the previous sub belongs
+    // to a different parent and won't match.
+    setActiveSubState(null);
     const params = new URLSearchParams(searchParams.toString());
     if (cat) params.set('cat', cat); else params.delete('cat');
+    params.delete('sub');
+    router.replace(`?${params.toString()}`, { scroll: false });
+  };
+  const setActiveSub = (sub: string | null) => {
+    setActiveSubState(sub);
+    const params = new URLSearchParams(searchParams.toString());
+    if (sub) params.set('sub', sub); else params.delete('sub');
     router.replace(`?${params.toString()}`, { scroll: false });
   };
 
@@ -163,13 +178,25 @@ function LeaderboardPageContent() {
 
       // Load real categories from DB — no fake fallback (Bug 91: fake IDs
       // made category clicks silently empty the list).
-      const { data: dbCats } = await supabase
-        .from('categories')
-        .select('id, name, slug, parent_id')
-        .eq('is_active', true)
-        .is('deleted_at', null)
-        .eq('is_kids_safe', false)
-        .order('sort_order');
+      // Wave F — also load the set of subcategory ids that have at least
+      // one published, non-deleted article. Non-admin viewers get
+      // sub-pills filtered to this set so they don't drill into empty
+      // subs. Mirrors the rule established in Wave E for the home page +
+      // /api/categories.
+      const [{ data: dbCats }, { data: populatedRows }] = await Promise.all([
+        supabase
+          .from('categories')
+          .select('id, name, slug, parent_id')
+          .is('deleted_at', null)
+          .eq('is_kids_safe', false)
+          .order('sort_order'),
+        supabase
+          .from('articles')
+          .select('subcategory_id')
+          .not('subcategory_id', 'is', null)
+          .is('deleted_at', null)
+          .eq('status', 'published'),
+      ]);
       const rows = (dbCats as CategoryRow[] | null) || [];
       const parents = rows.filter((c) => !c.parent_id);
       const subs: SubcatRow[] = rows
@@ -177,6 +204,11 @@ function LeaderboardPageContent() {
         .map((c) => ({ id: c.id, category_id: c.parent_id as string, name: c.name, slug: c.slug }));
       setCategories(parents);
       setSubcats(subs);
+      const popSet = new Set<string>();
+      for (const row of (populatedRows as Array<{ subcategory_id: string | null }> | null) || []) {
+        if (row.subcategory_id) popSet.add(row.subcategory_id);
+      }
+      setPopulatedSubIds(popSet);
 
       // Hydrate the permission cache once up front. This replaces the
       // former `email_verified === true` read and the `plans.tier` join.
@@ -187,6 +219,11 @@ function LeaderboardPageContent() {
       }
       setFullAccess(hasPermission('leaderboard.view'));
       setCanCategories(hasPermission('leaderboard.category.view'));
+      // Wave F — admin viewers see every subcategory pill regardless of
+      // population. Owner-mode short-circuit lives in
+      // permissions.js:179, so this is the same predicate the home + API
+      // route use server-side, just resolved client-side here.
+      setViewerIsAdmin(hasPermission('admin.owner_mode'));
 
       if (authRes.data?.user) {
         const { data: meRow } = await supabase
@@ -224,10 +261,12 @@ function LeaderboardPageContent() {
         setMyRank(null);
         setFullAccess(false);
         setCanCategories(false);
+        setViewerIsAdmin(false);
         setUsers([]);
         setActiveTabState('Top Verifiers');
         setPeriodState('All time');
         setActiveCatState(null);
+        setActiveSubState(null);
       }
     });
     return () => { subscription.unsubscribe(); };
@@ -244,13 +283,20 @@ function LeaderboardPageContent() {
       const pageLimit = fullAccess ? 50 : 3;
 
       // Category score path: rank by category_scores.score for the selected category.
+      // Wave F — if a subcategory is selected, filter to the sub-keyed
+      // rows (`subcategory_id = activeSub`) instead of the rollup. The
+      // rollup row has `subcategory_id IS NULL` and aggregates ALL subs
+      // under the parent; sub-keyed rows are written alongside the
+      // rollup by `score_on_reading_complete` (Wave C migration), so
+      // filtering by one or the other gives the right slice without
+      // double-counting.
       if (activeCat) {
         if (!canCategories) {
           setUsers([]);
           setLoading(false);
           return;
         }
-        const { data: csRows, error: csErr } = await supabase
+        let csQuery = supabase
           .from('category_scores')
           .select(
             'user_id, score, users!inner ( id, username, avatar_url, avatar_color, verity_score, quizzes_completed_count, comment_count, email_verified, is_banned, show_on_leaderboard, frozen_at )'
@@ -260,7 +306,11 @@ function LeaderboardPageContent() {
           .eq('users.is_banned', false)
           .eq('users.show_on_leaderboard', true)
           .is('users.frozen_at', null)
-          .is('users.deletion_scheduled_for', null)
+          .is('users.deletion_scheduled_for', null);
+        csQuery = activeSub
+          ? csQuery.eq('subcategory_id', activeSub)
+          : csQuery.is('subcategory_id', null);
+        const { data: csRows, error: csErr } = await csQuery
           .order('score', { ascending: false })
           .limit(pageLimit);
         if (controller.signal.aborted) return;
@@ -409,7 +459,7 @@ function LeaderboardPageContent() {
     load();
     return () => { controller.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, period, activeCat, me, reloadKey, meLoaded]);
+  }, [activeTab, period, activeCat, activeSub, me, reloadKey, meLoaded]);
 
   // T282 — bidirectional block filter applied post-fetch. The viewer's
   // own row is NEVER filtered (self can't appear in their own block set,
@@ -430,6 +480,12 @@ function LeaderboardPageContent() {
   }, [me, users]);
 
   const activeSubs = activeCat ? subcats.filter((s) => s.category_id === activeCat) : [];
+  // Wave F — admin-aware visible-sub set, used by both the parent-pill row
+  // (to tighten its trailing padding when subs render below) and the
+  // sub-pill row itself.
+  const visibleActiveSubs = viewerIsAdmin
+    ? activeSubs
+    : activeSubs.filter((s) => populatedSubIds.has(s.id));
   // Permission-driven: replaces the former `plan_status === 'active' &&
   // plans.tier in (verity, verity_pro, verity_family)` derivation for
   // category drill-down. (Pre-T319 also included verity_family_xl,
@@ -589,8 +645,8 @@ function LeaderboardPageContent() {
               display: 'flex',
               gap: 6,
               flexWrap: 'wrap',
-              paddingBottom: activeSubs.length > 0 ? 8 : 16,
-              marginBottom: activeSubs.length > 0 ? 0 : 4,
+              paddingBottom: visibleActiveSubs.length > 0 ? 8 : 16,
+              marginBottom: visibleActiveSubs.length > 0 ? 0 : 4,
             }}
           >
             <button
@@ -640,9 +696,62 @@ function LeaderboardPageContent() {
           </div>
         )}
 
-        {/* Subcategory pills removed — activeSub state was never applied to
-            the query (category_scores has no subcategory_id yet). Hiding
-            the false affordance until Section C lands the data backbone. */}
+        {/* Subcategory pills — Wave F. Render under the parent category
+            row when a category is selected. Default ("All") returns the
+            rollup query; selecting a sub re-runs the query with
+            `subcategory_id = <sub>`. Non-admin viewers see only subs that
+            have at least one published article (Wave E rule); admins see
+            every sub regardless. */}
+        {canCategories && activeTab === 'Top Verifiers' && activeCat && visibleActiveSubs.length > 0 && (
+          <div
+              style={{
+                display: 'flex',
+                gap: 6,
+                flexWrap: 'wrap',
+                paddingBottom: 16,
+                marginBottom: 4,
+              }}
+            >
+              <button
+                onClick={() => setActiveSub(null)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 14,
+                  border: !activeSub ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  background: !activeSub ? 'rgba(0,0,0,0.06)' : 'transparent',
+                  color: !activeSub ? 'var(--accent)' : 'var(--dim)',
+                  fontSize: 11,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                All
+              </button>
+              {visibleActiveSubs.map((sub) => (
+                <button
+                  key={sub.id}
+                  onClick={() => setActiveSub(sub.id)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 14,
+                    border:
+                      activeSub === sub.id ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    background: activeSub === sub.id ? 'rgba(0,0,0,0.06)' : 'transparent',
+                    color: activeSub === sub.id ? 'var(--accent)' : 'var(--dim)',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-sans)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {stripKidsTag(sub.name)}
+                </button>
+              ))}
+            </div>
+        )}
 
         <h2 style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
           {activeTab === 'Rising Stars' ? 'Rising Stars' : 'Top Verifiers'}

@@ -108,7 +108,6 @@ function SearchPageContent() {
       const { data: cats } = await supabase
         .from('categories')
         .select('id, name')
-        .eq('is_active', true)
         .eq('is_kids_safe', false)
         .is('parent_id', null)
         .order('name');

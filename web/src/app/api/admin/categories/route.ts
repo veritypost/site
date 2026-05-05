@@ -24,7 +24,6 @@
  *     parent_id?: uuid | null   (omitted/null = top-level)
  *     color_hex?: string | null (#RRGGBB)
  *     icon_name?: string | null
- *     is_active?: boolean (default true)
  *     is_kids_safe?: boolean (default false)
  *     is_premium?: boolean (default false)
  *     sort_order?: number (default 0, integer >= 0)
@@ -53,7 +52,6 @@ type CreateBody = {
   parent_id?: unknown;
   color_hex?: unknown;
   icon_name?: unknown;
-  is_active?: unknown;
   is_kids_safe?: unknown;
   is_premium?: unknown;
   sort_order?: unknown;
@@ -125,7 +123,6 @@ export async function POST(request: Request) {
   const iconName =
     typeof body.icon_name === 'string' && body.icon_name.trim() ? body.icon_name.trim() : null;
 
-  const isActive = body.is_active === undefined ? true : body.is_active === true;
   const isKidsSafe = body.is_kids_safe === true;
   const isPremium = body.is_premium === true;
 
@@ -169,7 +166,6 @@ export async function POST(request: Request) {
       parent_id: parentId,
       color_hex: colorHex,
       icon_name: iconName,
-      is_active: isActive,
       is_kids_safe: isKidsSafe,
       is_premium: isPremium,
       sort_order: sortOrder,
