@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { searchUsers } from '@/lib/search/searchUsers';
 
 // T170/T209 — authenticated search results are user-scoped (the query
 // strips out the caller's own id and respects role filters tied to the
@@ -15,6 +16,10 @@ const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 // role-filtered searches return up to 20 real matches instead of filtering
 // 20 random username matches in JS (which can paginate every role row off).
 // Paid-only per D11; the page gate already blocks free users, this is belt.
+//
+// Privacy: results exclude users who have blocked the searcher (including
+// in the role-filtered branch — "search experts who blocked me" hides
+// them). Search core lives in @/lib/search/searchUsers.
 export async function GET(request) {
   let user;
   try {
@@ -45,36 +50,21 @@ export async function GET(request) {
   const safeQ = q.replace(/[,.%*()"\\_]/g, ' ').trim();
   if (!safeQ) return NextResponse.json({ users: [] }, { headers: NO_STORE });
 
-  let builder = service
-    .from('users')
-    .select(
-      'id, username, avatar_color, verity_score, is_expert, user_roles!inner(roles!inner(name))'
-    )
-    .ilike('username', `%${safeQ}%`)
-    .neq('id', user.id)
-    .limit(20);
-  if (roleFilter !== 'all') {
-    builder = builder.eq('user_roles.roles.name', roleFilter);
-  }
-
-  const { data, error } = await builder;
-  if (error)
+  try {
+    const { users } = await searchUsers({
+      q: safeQ,
+      scope: 'dm',
+      viewerId: user.id,
+      roleFilter,
+      limit: 20,
+      supabase: service,
+    });
+    return NextResponse.json({ users }, { headers: NO_STORE });
+  } catch (error) {
     return safeErrorResponse(NextResponse, error, {
       route: 'messages.search',
       fallbackStatus: 400,
       headers: NO_STORE,
     });
-
-  return NextResponse.json(
-    {
-      users: (data || []).map((u) => ({
-        id: u.id,
-        username: u.username,
-        avatar_color: u.avatar_color,
-        verity_score: u.verity_score,
-        is_expert: u.is_expert,
-      })),
-    },
-    { headers: NO_STORE }
-  );
+  }
 }
