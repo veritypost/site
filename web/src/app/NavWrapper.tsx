@@ -22,6 +22,7 @@ import type { Tables } from '@/types/database-helpers';
 import { Z } from '@/lib/zIndex';
 import { BRAND_NAME, BRAND_LEGAL_ENTITY } from '../lib/brand';
 import ThemeToggle from '../components/ThemeToggle';
+import HomeSectionsMenu from './_HomeSectionsMenu';
 
 type ProfileRow = Pick<
   Tables<'users'>,
@@ -488,7 +489,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         {showFooter && (
           <footer
             style={{
-              maxWidth: 680,
+              maxWidth: 1280,
               margin: '0 auto',
               padding: '32px 16px 24px',
               borderTop: '1px solid var(--border)',
@@ -615,7 +616,10 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               {BRAND_NAME.toLowerCase()}
             </a>
           </div>
-          <ThemeToggle />
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            {topBarActive && <HomeSectionsMenu />}
+            <ThemeToggle />
+          </div>
         </header>
       )}
 
