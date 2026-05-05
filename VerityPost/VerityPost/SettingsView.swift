@@ -2643,43 +2643,494 @@ struct VerificationRequestView: View {
 // both call sites. Caller at line ~2320 passes spacing explicitly.
 
 // MARK: - Expert settings (role=expert)
+//
+// EXPERT_THREADS Wave 5 — full mirror of web's ExpertProfileSection.tsx
+// (Wave 4a). Section order per spec §2:
+//   1. Pause my queue       (radio: Off / Indefinite / Until a date + chips)
+//   2. Quiet hours          (master toggle + start/end + 7-day chips, default
+//                            21:00 → 07:00 across all 7 days)
+//   3. Mention caps         (per-article + per-day numbers + "Today: X of Y")
+//   4. Push alerts (iOS)    (mention + category-arrival toggles, both off
+//                            by default; iOS-EXCLUSIVE — web shows them
+//                            read-only when at least one is true)
+//   5. Verified areas       (existing)
+//   6. Credentials          (existing)
+//   7. Application status   (existing)
+//
+// Settings persist regardless of `features.expert_threads_enabled`. When
+// the kill switch is OFF, an inline banner above the Pause section reads:
+// "Mention threads are not yet active for users — these settings will take
+// effect when launched."
+//
+// On first render of the Quiet hours editor, calls /api/expert/timezone with
+// `TimeZone.current.identifier` so the cron's TZ-aware quiet-hours filter
+// has a non-NULL `users.timezone` to work with (spec adversary mitigation
+// #2 — 14/14 users have NULL today).
+//
+// API contract:
+//   POST /api/expert/availability — Pause + Quiet hours + iOS push toggles
+//   POST /api/expert/quotas       — Mention caps
+//   POST /api/expert/timezone     — Quiet-hours TZ auto-populate
+//   GET  /api/expert/quota-status — "Today: X of Y" counter
+//   GET  /api/expert/threads-config — kill-switch banner
 
 private struct ExpertProfileView: View {
     @EnvironmentObject var auth: AuthViewModel
 
+    enum PauseMode: String {
+        case off, indefinite, date
+    }
+
+    private static let defaultQHStart = "21:00"
+    private static let defaultQHEnd = "07:00"
+    private static let defaultQHDays: [Int] = [0, 1, 2, 3, 4, 5, 6]
+    private static let dayLabels: [String] = ["S", "M", "T", "W", "T", "F", "S"]
+    private static let dayNamesLong: [String] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+    // Existing fields (Application status / Verified areas / Credentials)
     @State private var status: String = ""
     @State private var rejectionReason: String? = nil
     @State private var credentialsText: String = ""
-    @State private var vacationUntil: Date? = nil
-    @State private var isOnVacation: Bool = false
     @State private var verifiedAreas: [String] = []
     @State private var applicationId: String? = nil
     @State private var isLoading = true
     @State private var isSavingCredentials = false
     @State private var credentialsSaved = false
     @State private var credentialsError: String? = nil
-    @State private var vacationError: String? = nil
+
+    // Wave 5 settings state — persisted via /api/expert/availability +
+    // /api/expert/quotas. Mirrors ExpertProfileSection.tsx state shape.
+    @State private var vacationUntil: Date? = nil
+    @State private var pauseUntilIndefinite: Bool = false
+    @State private var pauseSaving: Bool = false
+    @State private var pauseError: String? = nil
+    @State private var datePickerSelection: Date = Date().addingTimeInterval(86400)
+
+    @State private var qhEnabled: Bool = false
+    @State private var qhStart: String = ExpertProfileView.defaultQHStart
+    @State private var qhEnd: String = ExpertProfileView.defaultQHEnd
+    @State private var qhDays: [Int] = ExpertProfileView.defaultQHDays
+    @State private var qhSaving: Bool = false
+    @State private var qhError: String? = nil
+
+    @State private var perPost: Int = 3
+    @State private var perDay: Int = 25
+    @State private var savedPerPost: Int = 3
+    @State private var savedPerDay: Int = 25
+    @State private var quotasSaving: Bool = false
+    @State private var quotasError: String? = nil
+    @State private var quotaTodayMentions: Int? = nil
+    @State private var quotaPerDay: Int? = nil
+
+    @State private var notifyPushOnMention: Bool = false
+    @State private var notifyPushOnCategoryArrival: Bool = false
+    @State private var pushSaving: Bool = false
+
+    @State private var killSwitchOff: Bool? = nil
+    @State private var tzPopulated: Bool = false
 
     var body: some View {
-        List {
-            Section("Queue") {
-                SettingsToggleRow(title: "On vacation",
-                                  subtitle: vacationUntil != nil
-                                      ? "Returns \(formatted(vacationUntil!))"
-                                      : "Pauses your assignment queue for 14 days",
-                                  isOn: $isOnVacation,
-                                  showDivider: false)
-                    .onChange(of: isOnVacation) { _, newVal in
-                        Task { await toggleVacation(newVal) }
+        ScrollView {
+            VStack(spacing: 16) {
+                if killSwitchOff == true {
+                    killSwitchBanner
+                }
+                pauseCard
+                quietHoursCard
+                mentionCapsCard
+                if notifyPushOnMention || notifyPushOnCategoryArrival || true {
+                    // iOS owns these toggles — always render here regardless
+                    // of saved state (web hides when both false; iOS shows so
+                    // the user can flip them on in the first place).
+                    pushCard
+                }
+                applicationStatusCard
+                if !verifiedAreas.isEmpty {
+                    verifiedAreasCard
+                }
+                credentialsCard
+            }
+            .padding(.vertical, 12)
+        }
+        .background(VP.bg)
+        .navigationTitle("Expert profile")
+        .task { await load() }
+        .overlay {
+            if isLoading { ProgressView() }
+        }
+    }
+
+    // MARK: kill-switch banner
+
+    private var killSwitchBanner: some View {
+        Text("Mention threads are not yet active for users — these settings will take effect when launched.")
+            .font(.system(size: VP.Size.sm))
+            .foregroundColor(VP.brand)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(VP.brandSoft)
+            .overlay(
+                RoundedRectangle(cornerRadius: VP.radiusMD)
+                    .stroke(VP.brand.opacity(0.4), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+            .padding(.horizontal, 16)
+    }
+
+    // MARK: 1. Pause my queue
+
+    private var pauseMode: PauseMode {
+        if pauseUntilIndefinite { return .indefinite }
+        if let until = vacationUntil, until > Date() { return .date }
+        return .off
+    }
+
+    private var pauseCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            cardHeader(title: "Pause my queue",
+                       subtitle: "Stop receiving new mentions. Existing questions in the shared queue still appear.")
+            VStack(alignment: .leading, spacing: 12) {
+                pauseRadio(label: "Off", checked: pauseMode == .off) {
+                    Task { await savePause(indefinite: false, until: nil) }
+                }
+                pauseRadio(label: "Until I turn it back on", checked: pauseMode == .indefinite) {
+                    Task { await savePause(indefinite: true, until: nil) }
+                }
+                pauseRadio(label: "Until a date", checked: pauseMode == .date) {
+                    let target = datePickerSelection > Date()
+                        ? endOfDay(datePickerSelection)
+                        : endOfDay(Date().addingTimeInterval(86400))
+                    Task { await savePause(indefinite: false, until: target) }
+                }
+                if pauseMode == .date {
+                    DatePicker(
+                        "End date",
+                        selection: $datePickerSelection,
+                        in: Date().addingTimeInterval(86400)...,
+                        displayedComponents: .date
+                    )
+                    .labelsHidden()
+                    .onChange(of: datePickerSelection) { _, newVal in
+                        Task { await savePause(indefinite: false, until: endOfDay(newVal)) }
                     }
-                if let err = vacationError {
+                    HStack(spacing: 8) {
+                        quickPickChip(label: "1 day", days: 1)
+                        quickPickChip(label: "3 days", days: 3)
+                        quickPickChip(label: "1 week", days: 7)
+                    }
+                    if let until = vacationUntil {
+                        Text("Returns \(formatted(until)).")
+                            .font(.caption)
+                            .foregroundColor(VP.dim)
+                    }
+                }
+                if pauseSaving {
+                    ProgressView().scaleEffect(0.8)
+                }
+                if let err = pauseError {
                     Text(err).font(.caption).foregroundColor(VP.danger)
                 }
             }
+            .padding(16)
+        }
+        .background(VP.surfaceRaised)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.borderSoft))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .padding(.horizontal, 16)
+    }
 
-            Section("Credentials") {
+    @ViewBuilder
+    private func pauseRadio(label: String, checked: Bool, onTap: @escaping () -> Void) -> some View {
+        Button(action: onTap) {
+            HStack(spacing: 10) {
+                Image(systemName: checked ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundColor(checked ? VP.accent : VP.dim)
+                Text(label)
+                    .font(.system(size: VP.Size.base))
+                    .foregroundColor(VP.text)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(pauseSaving)
+    }
+
+    private func quickPickChip(label: String, days: Int) -> some View {
+        Button {
+            let target = endOfDay(Date().addingTimeInterval(TimeInterval(days * 86400)))
+            datePickerSelection = target
+            Task { await savePause(indefinite: false, until: target) }
+        } label: {
+            Text(label)
+                .font(.system(size: VP.Size.xs, weight: .semibold))
+                .foregroundColor(VP.text)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusFull).stroke(VP.border))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusFull))
+        }
+        .buttonStyle(.plain)
+        .disabled(pauseSaving)
+    }
+
+    // MARK: 2. Quiet hours
+
+    private var quietHoursCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            cardHeader(title: "Quiet hours",
+                       subtitle: "Hide your name from the @-picker during a recurring window. Mentions you receive in this window are bundled into one summary push when it ends.")
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle(isOn: $qhEnabled) {
+                    Text("Quiet hours on")
+                        .font(.system(size: VP.Size.base, weight: .semibold))
+                        .foregroundColor(VP.text)
+                }
+                .tint(VP.accent)
+                .disabled(qhSaving)
+                .onChange(of: qhEnabled) { _, newVal in
+                    Task { await saveQuietHours(enabled: newVal) }
+                }
+                if qhEnabled {
+                    HStack(spacing: 12) {
+                        timePickerField(label: "Start", binding: $qhStart)
+                        Text("→").foregroundColor(VP.dim)
+                        timePickerField(label: "End", binding: $qhEnd)
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("DAYS")
+                            .font(.system(size: VP.Size.xs, weight: .heavy))
+                            .tracking(0.8)
+                            .foregroundColor(VP.dim)
+                        HStack(spacing: 6) {
+                            ForEach(0..<7, id: \.self) { i in
+                                dayChip(index: i)
+                            }
+                        }
+                    }
+                    Text("Times interpreted in \(TimeZone.current.identifier).")
+                        .font(.caption)
+                        .foregroundColor(VP.dim)
+                }
+                if qhSaving { ProgressView().scaleEffect(0.8) }
+                if let err = qhError {
+                    Text(err).font(.caption).foregroundColor(VP.danger)
+                }
+            }
+            .padding(16)
+        }
+        .background(VP.surfaceRaised)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.borderSoft))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .padding(.horizontal, 16)
+    }
+
+    private func timePickerField(label: String, binding: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased())
+                .font(.system(size: VP.Size.xs, weight: .heavy))
+                .tracking(0.8)
+                .foregroundColor(VP.dim)
+            DatePicker(
+                "",
+                selection: Binding<Date>(
+                    get: { dateFromHHMM(binding.wrappedValue) ?? Date() },
+                    set: { newDate in
+                        binding.wrappedValue = hhmmFromDate(newDate)
+                        Task { await saveQuietHours(enabled: qhEnabled) }
+                    }
+                ),
+                displayedComponents: .hourAndMinute
+            )
+            .labelsHidden()
+            .disabled(qhSaving)
+        }
+    }
+
+    private func dayChip(index i: Int) -> some View {
+        let active = qhDays.contains(i)
+        return Button {
+            if active {
+                qhDays.removeAll { $0 == i }
+            } else {
+                qhDays.append(i)
+                qhDays.sort()
+            }
+            Task { await saveQuietHours(enabled: qhEnabled) }
+        } label: {
+            Text(ExpertProfileView.dayLabels[i])
+                .font(.system(size: VP.Size.sm, weight: .semibold))
+                .foregroundColor(active ? VP.bg : VP.text)
+                .frame(width: 36, height: 36)
+                .background(
+                    Circle().fill(active ? VP.text : VP.bg)
+                )
+                .overlay(Circle().stroke(active ? VP.text : VP.border))
+        }
+        .buttonStyle(.plain)
+        .disabled(qhSaving)
+        .accessibilityLabel("Toggle \(ExpertProfileView.dayNamesLong[i])")
+    }
+
+    // MARK: 3. Mention caps
+
+    private var mentionCapsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            cardHeader(title: "Mention caps",
+                       subtitle: "Limit how many times anyone can @-mention you.")
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 16) {
+                    capStepper(label: "Per article", value: $perPost, range: 1...10)
+                    capStepper(label: "Per day", value: $perDay, range: 1...200)
+                }
+                if let today = quotaTodayMentions, let cap = quotaPerDay {
+                    Text("Today: ")
+                        .font(.system(size: VP.Size.sm))
+                        .foregroundColor(VP.dim)
+                    + Text("\(today)").font(.system(size: VP.Size.sm, weight: .semibold)).foregroundColor(VP.text)
+                    + Text(" of ").font(.system(size: VP.Size.sm)).foregroundColor(VP.dim)
+                    + Text("\(cap)").font(.system(size: VP.Size.sm, weight: .semibold)).foregroundColor(VP.text)
+                    + Text(".").font(.system(size: VP.Size.sm)).foregroundColor(VP.dim)
+                } else {
+                    Text("Today: — of \(perDay).")
+                        .font(.system(size: VP.Size.sm))
+                        .foregroundColor(VP.dim)
+                }
+                HStack {
+                    if quotasSaving { ProgressView().scaleEffect(0.8) }
+                    Spacer()
+                    Button {
+                        Task { await saveQuotas() }
+                    } label: {
+                        Text(quotasSaving ? "Saving…" : "Save caps")
+                            .font(.system(size: VP.Size.sm, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                (perPost == savedPerPost && perDay == savedPerDay) || quotasSaving
+                                ? VP.muted : VP.accent
+                            )
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(quotasSaving || (perPost == savedPerPost && perDay == savedPerDay))
+                }
+                if let err = quotasError {
+                    Text(err).font(.caption).foregroundColor(VP.danger)
+                }
+            }
+            .padding(16)
+        }
+        .background(VP.surfaceRaised)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.borderSoft))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .padding(.horizontal, 16)
+    }
+
+    private func capStepper(label: String, value: Binding<Int>, range: ClosedRange<Int>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased())
+                .font(.system(size: VP.Size.xs, weight: .heavy))
+                .tracking(0.8)
+                .foregroundColor(VP.dim)
+            Stepper("\(value.wrappedValue)", value: value, in: range)
+                .labelsHidden()
+                .overlay(alignment: .leading) {
+                    Text("\(value.wrappedValue)")
+                        .font(.system(size: VP.Size.base, weight: .semibold))
+                        .foregroundColor(VP.text)
+                        .padding(.leading, 4)
+                }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: 4. Push alerts (iOS-only)
+
+    private var pushCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            cardHeader(title: "Push alerts",
+                       subtitle: "Get a push when someone mentions you or asks a question in your category. Quiet-hours mentions are bundled into one summary push when the window ends.")
+            VStack(spacing: 0) {
+                SettingsToggleRow(
+                    title: "Push when I'm @-mentioned",
+                    subtitle: nil,
+                    isOn: $notifyPushOnMention,
+                    isDisabled: pushSaving,
+                    showDivider: true
+                )
+                .onChange(of: notifyPushOnMention) { _, _ in
+                    Task { await savePush() }
+                }
+                SettingsToggleRow(
+                    title: "Push when a question lands in my category",
+                    subtitle: nil,
+                    isOn: $notifyPushOnCategoryArrival,
+                    isDisabled: pushSaving,
+                    showDivider: false
+                )
+                .onChange(of: notifyPushOnCategoryArrival) { _, _ in
+                    Task { await savePush() }
+                }
+            }
+        }
+        .background(VP.surfaceRaised)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.borderSoft))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: 5-7. Existing — Application status / Verified areas / Credentials
+
+    private var applicationStatusCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            cardHeader(title: "Application status", subtitle: nil)
+            HStack {
+                Text(statusLabel())
+                    .font(.system(size: VP.Size.base, weight: .semibold))
+                    .foregroundColor(statusColor())
+                Spacer()
+            }
+            .padding(16)
+            if status == "rejected", let reason = rejectionReason {
+                Text(reason)
+                    .font(.caption)
+                    .foregroundColor(VP.dim)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+            }
+        }
+        .background(VP.surfaceRaised)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.borderSoft))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .padding(.horizontal, 16)
+    }
+
+    private var verifiedAreasCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            cardHeader(title: "Verified areas",
+                       subtitle: "The categories your badge applies to.")
+            ExpertAreaPills(items: verifiedAreas)
+                .padding(16)
+        }
+        .background(VP.surfaceRaised)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.borderSoft))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .padding(.horizontal, 16)
+    }
+
+    private var credentialsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            cardHeader(title: "Credentials",
+                       subtitle: "Public bio shown next to your expert badge.")
+            VStack(alignment: .leading, spacing: 8) {
                 TextEditor(text: $credentialsText)
                     .frame(minHeight: 100)
+                    .padding(8)
+                    .background(VP.card)
+                    .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border))
                     .onChange(of: credentialsText) { _, val in
                         if val.count > 600 { credentialsText = String(val.prefix(600)) }
                     }
@@ -2700,31 +3151,33 @@ private struct ExpertProfileView: View {
                     Text(err).font(.caption).foregroundColor(VP.danger)
                 }
             }
-
-            Section("Application status") {
-                HStack {
-                    Text(statusLabel())
-                        .font(.subheadline)
-                        .foregroundColor(statusColor())
-                    Spacer()
-                }
-                if status == "rejected", let reason = rejectionReason {
-                    Text(reason).font(.caption).foregroundColor(VP.dim)
-                }
-            }
-
-            if !verifiedAreas.isEmpty {
-                Section("Verified areas") {
-                    ExpertAreaPills(items: verifiedAreas)
-                }
-            }
+            .padding(16)
         }
-        .navigationTitle("Expert profile")
-        .task { await load() }
-        .overlay {
-            if isLoading { ProgressView() }
-        }
+        .background(VP.surfaceRaised)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.borderSoft))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .padding(.horizontal, 16)
     }
+
+    private func cardHeader(title: String, subtitle: String?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: VP.Size.lg, weight: .bold))
+                .foregroundColor(VP.text)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.system(size: VP.Size.sm))
+                    .foregroundColor(VP.dim)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, subtitle == nil ? 0 : 4)
+    }
+
+    // MARK: - Data loading
 
     private func load() async {
         guard let userId = auth.currentUser?.id else { isLoading = false; return }
@@ -2735,12 +3188,28 @@ private struct ExpertProfileView: View {
             let status: String
             let vacationUntil: String?
             let rejectionReason: String?
+            let pauseUntilIndefinite: Bool?
+            let mentionQuietHoursStart: String?
+            let mentionQuietHoursEnd: String?
+            let mentionQuietHoursDays: [Int]?
+            let mentionQuotaPerPost: Int?
+            let mentionQuotaPerDay: Int?
+            let notifyPushOnMention: Bool?
+            let notifyPushOnCategoryArrival: Bool?
             var credentialsText: String = ""
 
             enum CodingKeys: String, CodingKey {
                 case id, status, credentials
                 case vacationUntil = "vacation_until"
                 case rejectionReason = "rejection_reason"
+                case pauseUntilIndefinite = "pause_until_indefinite"
+                case mentionQuietHoursStart = "mention_quiet_hours_start"
+                case mentionQuietHoursEnd = "mention_quiet_hours_end"
+                case mentionQuietHoursDays = "mention_quiet_hours_days"
+                case mentionQuotaPerPost = "mention_quota_per_post"
+                case mentionQuotaPerDay = "mention_quota_per_day"
+                case notifyPushOnMention = "notify_push_on_mention"
+                case notifyPushOnCategoryArrival = "notify_push_on_category_arrival"
             }
 
             init(from decoder: Decoder) throws {
@@ -2749,8 +3218,15 @@ private struct ExpertProfileView: View {
                 status = try c.decode(String.self, forKey: .status)
                 vacationUntil = try? c.decodeIfPresent(String.self, forKey: .vacationUntil)
                 rejectionReason = try? c.decodeIfPresent(String.self, forKey: .rejectionReason)
+                pauseUntilIndefinite = try? c.decodeIfPresent(Bool.self, forKey: .pauseUntilIndefinite)
+                mentionQuietHoursStart = try? c.decodeIfPresent(String.self, forKey: .mentionQuietHoursStart)
+                mentionQuietHoursEnd = try? c.decodeIfPresent(String.self, forKey: .mentionQuietHoursEnd)
+                mentionQuietHoursDays = try? c.decodeIfPresent([Int].self, forKey: .mentionQuietHoursDays)
+                mentionQuotaPerPost = try? c.decodeIfPresent(Int.self, forKey: .mentionQuotaPerPost)
+                mentionQuotaPerDay = try? c.decodeIfPresent(Int.self, forKey: .mentionQuotaPerDay)
+                notifyPushOnMention = try? c.decodeIfPresent(Bool.self, forKey: .notifyPushOnMention)
+                notifyPushOnCategoryArrival = try? c.decodeIfPresent(Bool.self, forKey: .notifyPushOnCategoryArrival)
                 credentialsText = ""
-                // credentials is stored as json — may be String or [String]
                 if let arr = try? c.decodeIfPresent([String].self, forKey: .credentials) {
                     credentialsText = arr.joined(separator: "\n")
                 } else if let str = try? c.decodeIfPresent(String.self, forKey: .credentials) {
@@ -2766,7 +3242,7 @@ private struct ExpertProfileView: View {
 
         let apps: [AppRow] = (try? await client
             .from("expert_applications")
-            .select("id, status, credentials, vacation_until, rejection_reason")
+            .select("id, status, credentials, vacation_until, rejection_reason, pause_until_indefinite, mention_quiet_hours_start, mention_quiet_hours_end, mention_quiet_hours_days, mention_quota_per_post, mention_quota_per_day, notify_push_on_mention, notify_push_on_category_arrival")
             .eq("user_id", value: userId)
             .order("created_at", ascending: false)
             .limit(1)
@@ -2780,8 +3256,32 @@ private struct ExpertProfileView: View {
             if let vacStr = app.vacationUntil,
                let vacDate = ISO8601DateFormatter().date(from: vacStr) {
                 vacationUntil = vacDate
-                isOnVacation = vacDate > Date()
+                if vacDate > Date() {
+                    datePickerSelection = vacDate
+                }
             }
+            pauseUntilIndefinite = app.pauseUntilIndefinite ?? false
+
+            // Hydrate quiet hours — master toggle goes ON only when all
+            // three fields are present, mirroring web's qhAllSet rule.
+            let qhAllSet = app.mentionQuietHoursStart != nil
+                && app.mentionQuietHoursEnd != nil
+                && (app.mentionQuietHoursDays?.isEmpty == false)
+            qhEnabled = qhAllSet
+            qhStart = toHHMM(app.mentionQuietHoursStart) ?? ExpertProfileView.defaultQHStart
+            qhEnd = toHHMM(app.mentionQuietHoursEnd) ?? ExpertProfileView.defaultQHEnd
+            qhDays = (app.mentionQuietHoursDays?.isEmpty == false)
+                ? app.mentionQuietHoursDays!
+                : ExpertProfileView.defaultQHDays
+
+            perPost = app.mentionQuotaPerPost ?? 3
+            perDay = app.mentionQuotaPerDay ?? 25
+            savedPerPost = perPost
+            savedPerDay = perDay
+
+            notifyPushOnMention = app.notifyPushOnMention ?? false
+            notifyPushOnCategoryArrival = app.notifyPushOnCategoryArrival ?? false
+
             let areas: [AreaJoin] = (try? await client
                 .from("expert_application_categories")
                 .select("categories(name)")
@@ -2790,38 +3290,231 @@ private struct ExpertProfileView: View {
             verifiedAreas = areas.map(\.categories.name)
         }
         isLoading = false
+
+        // Fire-and-forget reads for the kill-switch banner + quota usage.
+        async let _: () = loadKillSwitch()
+        async let _: () = loadQuotaStatus()
+        async let _: () = ensureTimezone()
     }
 
-    private func toggleVacation(_ on: Bool) async {
+    private func loadKillSwitch() async {
         guard let session = try? await SupabaseManager.shared.client.auth.session else { return }
-        let untilStr: String? = on
-            ? ISO8601DateFormatter().string(from: Date().addingTimeInterval(14 * 24 * 3600))
-            : nil
         let site = SupabaseManager.shared.siteURL
-        guard let url = URL(string: "/api/expert/vacation", relativeTo: site) else { return }
+        guard let url = URL(string: "/api/expert/threads-config", relativeTo: site) else { return }
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else { return }
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let enabled = json["expert_threads_enabled"] as? Bool {
+                await MainActor.run { killSwitchOff = (enabled == false) }
+            }
+        } catch {
+            // Silent — no banner is the conservative default.
+        }
+    }
+
+    private func loadQuotaStatus() async {
+        guard let session = try? await SupabaseManager.shared.client.auth.session else { return }
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/expert/quota-status", relativeTo: site) else { return }
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else { return }
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let today = (json["today_mentions"] as? Int) ?? 0
+                let cap = (json["per_day_quota"] as? Int) ?? 0
+                await MainActor.run {
+                    quotaTodayMentions = today
+                    quotaPerDay = cap
+                }
+            }
+        } catch {
+            // Silent — falls through to em-dash display.
+        }
+    }
+
+    /// Auto-populate `users.timezone` so the cron's TZ-aware quiet-hours
+    /// filter has a real IANA identifier to work with. The RPC is a no-op
+    /// when the column is non-null, so calling on every load is safe.
+    private func ensureTimezone() async {
+        if tzPopulated { return }
+        guard let session = try? await SupabaseManager.shared.client.auth.session else { return }
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/expert/timezone", relativeTo: site) else { return }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
-        let bodyObj: [String: Any] = ["vacation_until": untilStr as Any? ?? NSNull()]
-        req.httpBody = try? JSONSerialization.data(withJSONObject: bodyObj)
-        do {
-            _ = try await URLSession.shared.data(for: req)
-            vacationUntil = on ? Date().addingTimeInterval(14 * 24 * 3600) : nil
-            vacationError = nil
-        } catch {
-            vacationError = "Could not update vacation."
+        let body: [String: Any] = ["tz": TimeZone.current.identifier]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        _ = try? await URLSession.shared.data(for: req)
+        await MainActor.run { tzPopulated = true }
+    }
+
+    // MARK: - Save paths
+
+    private func savePause(indefinite: Bool, until: Date?) async {
+        await MainActor.run {
+            pauseSaving = true
+            pauseError = nil
         }
+        defer { Task { @MainActor in pauseSaving = false } }
+        guard let session = try? await SupabaseManager.shared.client.auth.session else { return }
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/expert/availability", relativeTo: site) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        // Echo current quiet-hours state so the single-RPC UPDATE doesn't
+        // clobber the other block's values (mirrors web Wave 4a pattern).
+        var body: [String: Any] = [
+            "pause_until_indefinite": indefinite,
+            "vacation_until": until.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull() as Any,
+            "quiet_hours_start": qhEnabled ? qhStart : NSNull() as Any,
+            "quiet_hours_end": qhEnabled ? qhEnd : NSNull() as Any,
+            "quiet_hours_days": qhEnabled ? qhDays : NSNull() as Any,
+        ]
+        // Push prefs ride along on the same endpoint so iOS-EXCLUSIVE
+        // toggles persist alongside availability without a separate route.
+        body["notify_push_on_mention"] = notifyPushOnMention
+        body["notify_push_on_category_arrival"] = notifyPushOnCategoryArrival
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else { return }
+            if !(200...299).contains(http.statusCode) {
+                let msg = decodeError(data) ?? "Could not save."
+                await MainActor.run { pauseError = msg }
+                return
+            }
+            await MainActor.run {
+                pauseUntilIndefinite = indefinite
+                vacationUntil = until
+            }
+        } catch {
+            await MainActor.run { pauseError = "Could not save." }
+        }
+    }
+
+    private func saveQuietHours(enabled: Bool) async {
+        await MainActor.run {
+            qhSaving = true
+            qhError = nil
+        }
+        defer { Task { @MainActor in qhSaving = false } }
+        guard let session = try? await SupabaseManager.shared.client.auth.session else { return }
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/expert/availability", relativeTo: site) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        var body: [String: Any] = [
+            "pause_until_indefinite": pauseUntilIndefinite,
+            "vacation_until": vacationUntil.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull() as Any,
+            "quiet_hours_start": enabled ? qhStart : NSNull() as Any,
+            "quiet_hours_end": enabled ? qhEnd : NSNull() as Any,
+            "quiet_hours_days": enabled ? qhDays : NSNull() as Any,
+        ]
+        body["notify_push_on_mention"] = notifyPushOnMention
+        body["notify_push_on_category_arrival"] = notifyPushOnCategoryArrival
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else { return }
+            if !(200...299).contains(http.statusCode) {
+                let msg = decodeError(data) ?? "Could not save."
+                await MainActor.run { qhError = msg }
+            }
+        } catch {
+            await MainActor.run { qhError = "Could not save." }
+        }
+    }
+
+    private func saveQuotas() async {
+        guard perPost >= 1 && perPost <= 10 else {
+            await MainActor.run { quotasError = "Per article must be 1–10." }
+            return
+        }
+        guard perDay >= 1 && perDay <= 200 else {
+            await MainActor.run { quotasError = "Per day must be 1–200." }
+            return
+        }
+        await MainActor.run {
+            quotasSaving = true
+            quotasError = nil
+        }
+        defer { Task { @MainActor in quotasSaving = false } }
+        guard let session = try? await SupabaseManager.shared.client.auth.session else { return }
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/expert/quotas", relativeTo: site) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(
+            withJSONObject: ["per_post": perPost, "per_day": perDay]
+        )
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else { return }
+            if !(200...299).contains(http.statusCode) {
+                let msg = decodeError(data) ?? "Could not save."
+                await MainActor.run { quotasError = msg }
+                return
+            }
+            await MainActor.run {
+                savedPerPost = perPost
+                savedPerDay = perDay
+            }
+            await loadQuotaStatus()
+        } catch {
+            await MainActor.run { quotasError = "Could not save." }
+        }
+    }
+
+    /// Push toggles share the availability endpoint so iOS owns the
+    /// whole expert_applications row without a third route. Web reads
+    /// the same columns and renders read-only when at least one is true.
+    private func savePush() async {
+        await MainActor.run { pushSaving = true }
+        defer { Task { @MainActor in pushSaving = false } }
+        guard let session = try? await SupabaseManager.shared.client.auth.session else { return }
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/expert/availability", relativeTo: site) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        var body: [String: Any] = [
+            "pause_until_indefinite": pauseUntilIndefinite,
+            "vacation_until": vacationUntil.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull() as Any,
+            "quiet_hours_start": qhEnabled ? qhStart : NSNull() as Any,
+            "quiet_hours_end": qhEnabled ? qhEnd : NSNull() as Any,
+            "quiet_hours_days": qhEnabled ? qhDays : NSNull() as Any,
+        ]
+        body["notify_push_on_mention"] = notifyPushOnMention
+        body["notify_push_on_category_arrival"] = notifyPushOnCategoryArrival
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        _ = try? await URLSession.shared.data(for: req)
     }
 
     private func saveCredentials() async {
         guard let session = try? await SupabaseManager.shared.client.auth.session else { return }
-        isSavingCredentials = true
-        credentialsSaved = false
-        credentialsError = nil
+        await MainActor.run {
+            isSavingCredentials = true
+            credentialsSaved = false
+            credentialsError = nil
+        }
         let site = SupabaseManager.shared.siteURL
         guard let url = URL(string: "/api/expert/apply", relativeTo: site) else {
-            isSavingCredentials = false; return
+            await MainActor.run { isSavingCredentials = false }
+            return
         }
         var req = URLRequest(url: url)
         req.httpMethod = "PATCH"
@@ -2832,14 +3525,62 @@ private struct ExpertProfileView: View {
             let (data, _) = try await URLSession.shared.data(for: req)
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let err = json["error"] as? String {
-                credentialsError = friendlyApiError(err, fallback: "Couldn\u{2019}t save credentials. Try again.")
+                await MainActor.run {
+                    credentialsError = friendlyApiError(err, fallback: "Couldn\u{2019}t save credentials. Try again.")
+                }
             } else {
-                credentialsSaved = true
+                await MainActor.run { credentialsSaved = true }
             }
         } catch {
-            credentialsError = "Couldn\u{2019}t save credentials. Try again."
+            await MainActor.run { credentialsError = "Couldn\u{2019}t save credentials. Try again." }
         }
-        isSavingCredentials = false
+        await MainActor.run { isSavingCredentials = false }
+    }
+
+    // MARK: - Helpers
+
+    private func decodeError(_ data: Data) -> String? {
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let err = json["error"] as? String {
+            return err
+        }
+        return nil
+    }
+
+    /// "HH:MM" or "HH:MM:SS" → "HH:MM" (the format DatePicker can produce
+    /// + the RPC accepts).
+    private func toHHMM(_ raw: String?) -> String? {
+        guard let raw = raw else { return nil }
+        let parts = raw.split(separator: ":")
+        guard parts.count >= 2,
+              let h = Int(parts[0]), let m = Int(parts[1]) else { return nil }
+        return String(format: "%02d:%02d", h, m)
+    }
+
+    private func dateFromHHMM(_ s: String) -> Date? {
+        let parts = s.split(separator: ":")
+        guard parts.count >= 2,
+              let h = Int(parts[0]), let m = Int(parts[1]) else { return nil }
+        var c = DateComponents()
+        c.hour = h
+        c.minute = m
+        return Calendar.current.date(from: c)
+    }
+
+    private func hhmmFromDate(_ d: Date) -> String {
+        let c = Calendar.current.dateComponents([.hour, .minute], from: d)
+        return String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
+    }
+
+    /// Set to 23:59:59 UTC on the picked date — paused through end of that day.
+    private func endOfDay(_ d: Date) -> Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        var comps = cal.dateComponents([.year, .month, .day], from: d)
+        comps.hour = 23
+        comps.minute = 59
+        comps.second = 59
+        return cal.date(from: comps) ?? d
     }
 
     private func statusLabel() -> String {

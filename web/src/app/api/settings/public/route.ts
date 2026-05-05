@@ -11,7 +11,7 @@
 
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { getSettings, getNumber } from '@/lib/settings';
+import { getSettings, getNumber, isEnabled } from '@/lib/settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,6 +19,10 @@ export const dynamic = 'force-dynamic';
 const DEFAULTS = {
   comment_max_depth: 2,
   comment_max_length: 4000,
+  // EXPERT_THREADS Wave 4b — inert mentions render normally by default.
+  // When true, render inert `@expert_<name>` tokens grayed/struck so the
+  // asker sees that the @ won't notify (spec §2 "Inert mentions").
+  expert_inert_mention_visual_giveaway: false,
 };
 
 export async function GET() {
@@ -32,11 +36,17 @@ export async function GET() {
       'comment_max_length',
       DEFAULTS.comment_max_length
     );
+    const inertVisualGiveaway = isEnabled(
+      settings,
+      'expert.inert_mention.visual_giveaway',
+      DEFAULTS.expert_inert_mention_visual_giveaway
+    );
 
     return NextResponse.json(
       {
         comment_max_depth: commentMaxDepth,
         comment_max_length: commentMaxLength,
+        expert_inert_mention_visual_giveaway: inertVisualGiveaway,
       },
       {
         headers: {

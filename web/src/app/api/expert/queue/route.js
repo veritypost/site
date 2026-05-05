@@ -1,7 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified expert_queue 2026-04-18
 import { NextResponse } from 'next/server';
-import { requirePermission } from '@/lib/auth';
+import { requirePermission, hasPermissionServer } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
@@ -31,7 +31,25 @@ export async function GET(request) {
     .select('category_id, expert_applications!inner(user_id, status)')
     .eq('expert_applications.user_id', user.id)
     .eq('expert_applications.status', 'approved');
-  const categoryIds = (catRows || []).map((r) => r.category_id);
+  let categoryIds = (catRows || []).map((r) => r.category_id);
+
+  // Oversight scope (admins/mods with expert.queue.oversight_all_categories):
+  // widen the visible queue to every category that has at least one approved
+  // expert — same scope already used by the back-channel category dropdown.
+  // Claim/answer guards still live in the RPC layer; oversight users can see
+  // pending items without being able to claim outside their own areas.
+  const hasOversight = await hasPermissionServer('expert.queue.oversight_all_categories');
+  if (hasOversight) {
+    const { data: allRows } = await service
+      .from('expert_application_categories')
+      .select('category_id, expert_applications!inner(status)')
+      .eq('expert_applications.status', 'approved');
+    const seen = new Set(categoryIds);
+    for (const r of allRows || []) {
+      if (r.category_id) seen.add(r.category_id);
+    }
+    categoryIds = Array.from(seen);
+  }
 
   const url = new URL(request.url);
   const status = url.searchParams.get('status') || 'pending';

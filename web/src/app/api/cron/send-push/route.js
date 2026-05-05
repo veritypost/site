@@ -2,13 +2,22 @@
 // @feature-verified system_auth 2026-04-18
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { withApnsSession, resolveApnsEnv } from '@/lib/apns';
+import { withApnsSession, resolveApnsEnv, sendPushToUser } from '@/lib/apns';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
 import { logCronHeartbeat } from '@/lib/cronHeartbeat';
 import { getPlanLimitValue } from '@/lib/plans';
+import { isExpertThreadsEnabled } from '@/lib/expertConfig';
 
 const CRON_NAME = 'send-push';
+
+// EXPERT_THREADS Wave 3 — alert types added to the cron's recognised-push set.
+// Existing types (breaking_news, replies, etc.) keep their default-on behaviour.
+// These two are default-OFF per spec §2 "Mentionability vs push" and §10 Wave 3:
+// absence of an alert_preferences row drops the push (no implicit opt-in).
+// Quiet-hours-deferred mentions are silently dropped for now; Wave 3.5 adds the
+// digest bundler. Both gated on the master kill switch via expertConfig.
+const EXPERT_THREADS_ALERT_TYPES = new Set(['mention', 'category_arrival']);
 
 // Auth: CRON_SECRET via verifyCronAuth. Fail-closed 403.
 // Push delivery worker. Mirrors /api/cron/send-emails in shape: picks
@@ -74,6 +83,31 @@ async function run(request) {
     return NextResponse.json({ error: 'APNS_AUTH_KEY not configured', sent: 0 }, { status: 503 });
   }
 
+  // EXPERT_THREADS Wave 3 — read the kill switch ONCE per cron tick (mitigation
+  // §2 #12, read-once-per-TXN). Threaded into every drainOneBatch call so an
+  // admin flipping the switch mid-drain can't produce inconsistent dispatch.
+  // When false, mention + category_arrival rows are dropped as unrecognised
+  // AND the Wave 3.5 quiet-hours-end digest pass is skipped entirely.
+  const expertThreadsEnabled = await isExpertThreadsEnabled().catch((err) => {
+    console.error('[cron.send-push] isExpertThreadsEnabled lookup failed', err);
+    return false;
+  });
+
+  // EXPERT_THREADS Wave 3.5 — quiet-hours-end digest. Runs once per tick,
+  // before the regular drain loop, so digest sends don't compete with the
+  // 25 s wall-clock budget for ordinary push delivery. Failures here log + skip
+  // and never fail the cron tick (other notifications must still drain).
+  const digestSummary = { candidates: 0, dispatched: 0, empty: 0, failed: 0 };
+  if (expertThreadsEnabled) {
+    try {
+      const r = await runQuietHoursDigest();
+      Object.assign(digestSummary, r);
+    } catch (err) {
+      console.error('[cron.send-push] quiet-hours digest pass failed', err);
+      digestSummary.failed += 1;
+    }
+  }
+
   // Drain loop — keep claiming + dispatching until the queue is empty
   // (drained=true), the wall-clock budget is exhausted, or we hit the
   // hard iteration ceiling. Per OWNER-ANSWERS Q4.2 (drain-until-empty,
@@ -86,7 +120,7 @@ async function run(request) {
     while (totals.iterations < MAX_ITERATIONS) {
       if (Date.now() - t0 > WALL_CLOCK_BUDGET_MS) break;
 
-      const result = await drainOneBatch();
+      const result = await drainOneBatch({ expertThreadsEnabled });
       totals.iterations += 1;
       totals.batch += result.batch;
       totals.sent += result.sent;
@@ -117,8 +151,14 @@ async function run(request) {
     ...totals,
     drained,
     duration_ms: Date.now() - t0,
+    digest: digestSummary,
   });
-  return NextResponse.json({ ...totals, drained, duration_ms: Date.now() - t0 });
+  return NextResponse.json({
+    ...totals,
+    drained,
+    duration_ms: Date.now() - t0,
+    digest: digestSummary,
+  });
 }
 
 // drainOneBatch — claim one BATCH_SIZE-sized window, dispatch via APNs,
@@ -126,7 +166,11 @@ async function run(request) {
 // `fatal` indicates a structural failure that should abort the whole
 // drain loop (e.g., RPC missing, claim error). A 0-batch result means
 // the queue is empty for this tick.
-async function drainOneBatch() {
+//
+// `expertThreadsEnabled` is the snapshot read once at run() entry (EXPERT_THREADS
+// Wave 3). When false, notifications with type ∈ EXPERT_THREADS_ALERT_TYPES are
+// dropped as unrecognised so pre-launch surfaces never fire push.
+async function drainOneBatch({ expertThreadsEnabled = false } = {}) {
   const service = createServiceClient();
 
   // L19: atomic claim via claim_push_batch RPC (FOR UPDATE SKIP LOCKED so
@@ -268,6 +312,49 @@ async function drainOneBatch() {
   const needsDispatch = [];
   for (const n of queued) {
     const pref = prefsMap[prefKey(n.user_id, n.type)];
+
+    // EXPERT_THREADS Wave 3 — `mention` and `category_arrival` are gated on
+    // the master kill switch AND default-OFF opt-in (spec §2 Mentionability vs
+    // push, §10 Wave 3). Existing alert types keep their default-on behaviour
+    // below; this branch only runs for the new types.
+    if (EXPERT_THREADS_ALERT_TYPES.has(n.type)) {
+      if (!expertThreadsEnabled) {
+        await service
+          .from('notifications')
+          .update({
+            push_sent: true,
+            push_sent_at: new Date().toISOString(),
+            metadata: {
+              ...(n.metadata || {}),
+              push_skip_reason: 'expert_threads_disabled',
+            },
+          })
+          .eq('id', n.id);
+        skipped++;
+        continue;
+      }
+      // Default-off semantics: absence of an alert_preferences row drops the
+      // push. (Existing types fall through to dispatch in the same case.)
+      if (!pref) {
+        await service
+          .from('notifications')
+          .update({
+            push_sent: true,
+            push_sent_at: new Date().toISOString(),
+            metadata: {
+              ...(n.metadata || {}),
+              push_skip_reason: 'opted_out_default',
+            },
+          })
+          .eq('id', n.id);
+        skipped++;
+        continue;
+      }
+      // pref present — fall through to the existing opted_out + quiet_hours
+      // checks below. Wave 3 leaves quiet-hours mentions silently dropped;
+      // Wave 3.5 adds the digest bundler.
+    }
+
     if (pref && (pref.is_enabled === false || pref.channel_push === false)) {
       await service
         .from('notifications')
@@ -409,6 +496,101 @@ async function drainOneBatch() {
   }
 
   return { batch: queued.length, sent, skipped, failed, invalidated };
+}
+
+// EXPERT_THREADS Wave 3.5 — quiet-hours-end digest dispatcher.
+//
+// Spec: EXPERT_THREADS.md §2 "Mentionability vs push" → "Quiet-hours-end
+// digest"; §2 adversary mitigation #11 (multi-region cron dedup); §10 Wave 3.5.
+//
+// Flow per tick:
+//   1. Call claim_quiet_hours_digest_candidates(p_limit) — the RPC takes
+//      FOR UPDATE SKIP LOCKED on candidate expert_applications rows, bumps
+//      last_quiet_hours_digest_at = now() inside the same TXN (so a racing
+//      multi-region instance reading next sees the fresh timestamp and skips
+//      this user), and returns (user_id, deferred_count).
+//   2. For each candidate with deferred_count > 0, dispatch ONE summary push.
+//      deferred_count = 0 candidates: no push, but the RPC already bumped
+//      last_quiet_hours_digest_at so they don't re-scan next tick.
+//   3. Per spec §2 line 103, the digest covers MENTIONS only — not
+//      category-arrival broadcasts. The RPC already filters notifications.type
+//      to 'mention' so the count returned here is mentions-only.
+//
+// Push body composition: we pluralize ("1 new mention from quiet hours."
+// vs "N new mentions from quiet hours.") and deep-link to /notifications, the
+// existing inbox surface (Wave 4b lays in a richer mentions surface; until
+// then /notifications is the right destination). Title kept short for APNs
+// notification-shade legibility.
+//
+// Note on receipt/notifications-row plumbing: this digest does NOT write a new
+// notifications row — the underlying mention notifications already exist in
+// the user's inbox (channel='in_app'). This is a transient summary push only.
+// sendPushToUser writes push_receipts rows for delivery telemetry.
+//
+// Failure semantics: per-user dispatch errors are caught + logged + counted;
+// they don't roll back the RPC's last_quiet_hours_digest_at bump. A failed
+// dispatch means that user misses this digest, but the next quiet-hours window
+// will produce a fresh one. This matches the claim_push_batch tradeoff: dedup
+// safety > at-least-once delivery for digests.
+async function runQuietHoursDigest() {
+  const service = createServiceClient();
+  const summary = { candidates: 0, dispatched: 0, empty: 0, failed: 0 };
+
+  // 100 is generous — live expert count is in the single digits today; bump if
+  // expert population grows past a few hundred per cron tick. RPC caps p_limit
+  // at 1000.
+  const { data: candidates, error } = await service.rpc(
+    'claim_quiet_hours_digest_candidates',
+    { p_limit: 100 }
+  );
+  if (error) {
+    console.error('[cron.send-push] claim_quiet_hours_digest_candidates failed', error);
+    summary.failed += 1;
+    return summary;
+  }
+  if (!candidates?.length) return summary;
+
+  summary.candidates = candidates.length;
+
+  for (const c of candidates) {
+    const count = Number(c.deferred_count ?? 0);
+    if (!Number.isFinite(count) || count <= 0) {
+      // Candidate's quiet hours ended but nothing accumulated. The RPC already
+      // bumped their last_quiet_hours_digest_at so we won't re-scan them next
+      // tick.
+      summary.empty += 1;
+      continue;
+    }
+
+    const noun = count === 1 ? 'mention' : 'mentions';
+    const notification = {
+      title: 'Quiet hours ended',
+      body: `You have ${count} new ${noun} from quiet hours.`,
+      url: '/notifications',
+      metadata: {
+        kind: 'quiet_hours_digest',
+        deferred_count: count,
+      },
+    };
+
+    try {
+      await sendPushToUser(service, c.user_id, notification, {
+        // notificationId is intentionally null — this digest doesn't have a
+        // backing notifications row (see header note); push_receipts will store
+        // the delivery telemetry without an FK back to notifications.
+        notificationId: null,
+      });
+      summary.dispatched += 1;
+    } catch (err) {
+      console.error('[cron.send-push] digest dispatch failed', {
+        user_id: c.user_id,
+        message: err?.message || String(err),
+      });
+      summary.failed += 1;
+    }
+  }
+
+  return summary;
 }
 
 export const GET = withCronLog('send-push', run);

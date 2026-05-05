@@ -55,6 +55,45 @@ const INITIAL_PLAN_FORM: PlanFormState = {
 // migration.
 const BILLING_PERIODS = ['', 'monthly', 'annual'] as const;
 
+// EXPERT_THREADS Wave 1 — 4 plan_features rows surfaced in a dedicated editor
+// block (rendered for every plan even when the DB row doesn't exist yet, so
+// owner can configure pre-seed). Save path uses the existing upsert with
+// onConflict: plan_id,feature_key — so editing a "missing" row creates it.
+// Limit values are integers (the column is integer NOT NULL-able-to-null).
+// Spec: EXPERT_THREADS.md §2.5 + §10 Wave 1.
+const EXPERT_THREAD_FEATURES: ReadonlyArray<{
+  feature_key: string;
+  feature_name: string;
+  limit_type: string;
+  hint: string;
+}> = [
+  {
+    feature_key: 'comments.expert_mention.per_hour',
+    feature_name: 'Expert mentions per hour',
+    limit_type: 'per_hour',
+    hint: 'Asker rolling-hour cap on @expert mentions.',
+  },
+  {
+    feature_key: 'comments.expert_mention.per_day',
+    feature_name: 'Expert mentions per day',
+    limit_type: 'per_day',
+    hint: 'Asker rolling-day cap on @expert mentions.',
+  },
+  {
+    feature_key: 'comments.expert_mention.broadcast_cost',
+    feature_name: 'Broadcast cost (in mentions)',
+    limit_type: 'count',
+    hint: 'How many mention units a single @expert broadcast consumes.',
+  },
+  {
+    feature_key: 'comments.expert_thread.asker_replies_per_chain',
+    feature_name: 'Asker replies per expert chain',
+    limit_type: 'count',
+    hint: 'Asker reply cap per (asker, expert) chain inside an expert thread.',
+  },
+];
+const EXPERT_THREAD_FEATURE_KEYS = new Set(EXPERT_THREAD_FEATURES.map((f) => f.feature_key));
+
 function centsToDollars(c: number | null | undefined): number {
   return (Number(c) || 0) / 100;
 }
@@ -134,7 +173,13 @@ export default function PlansAdmin() {
   const selected = plans.find((p) => p.id === selectedPlanId) || null;
   const planFeatures = features
     .filter((f) => f.plan_id === selectedPlanId)
+    .filter((f) => !EXPERT_THREAD_FEATURE_KEYS.has(f.feature_key))
     .sort((a, b) => a.feature_key.localeCompare(b.feature_key));
+
+  // EXPERT_THREADS Wave 1 — find DB row for a given expert-thread feature_key
+  // on the selected plan, or null when the row hasn't been seeded yet.
+  const getExpertThreadFeature = (key: string): PlanFeature | null =>
+    features.find((f) => f.plan_id === selectedPlanId && f.feature_key === key) || null;
 
   const selectPlan = async (id: string) => {
     if (planDirty) {
@@ -259,6 +304,56 @@ export default function PlansAdmin() {
     }
     if ((feature.limit_value ?? null) === parsed) return;
     upsertFeature(feature, { limit_value: parsed });
+  };
+
+  // EXPERT_THREADS Wave 1 — save handler for the dedicated expert-thread block.
+  // Handles both update-existing and insert-when-missing cases, since the
+  // dedicated block renders a row even when no DB seed exists yet. limit_value
+  // is integer; empty input clears to NULL (the column is nullable). DB
+  // trigger plan_features_bump_expert_version auto-bumps expert.config.version
+  // so cache invalidation works without an explicit RPC call here.
+  const saveExpertThreadLimit = async (
+    spec: typeof EXPERT_THREAD_FEATURES[number],
+    rawValue: string,
+  ) => {
+    if (!selected) return;
+    const trimmed = rawValue.trim();
+    const parsed = trimmed === '' ? null : Math.trunc(Number(trimmed));
+    if (parsed !== null && (Number.isNaN(parsed) || parsed < 0)) {
+      toast.push({ message: 'Limit must be a non-negative integer or empty', variant: 'danger' });
+      return;
+    }
+    const existing = getExpertThreadFeature(spec.feature_key);
+    if (existing && (existing.limit_value ?? null) === parsed) return;
+    setSavingFeatureKey(spec.feature_key);
+    const row = {
+      plan_id: selected.id,
+      feature_key: spec.feature_key,
+      feature_name: spec.feature_name,
+      is_enabled: existing?.is_enabled ?? true,
+      limit_value: parsed,
+      limit_type: spec.limit_type,
+    };
+    const { data, error } = await supabase
+      .from('plan_features')
+      .upsert(row, { onConflict: 'plan_id,feature_key' })
+      .select()
+      .single();
+    setSavingFeatureKey(null);
+    if (error || !data) {
+      toast.push({ message: 'Save failed. Try again.', variant: 'danger' });
+      return;
+    }
+    setFeatures((prev) => {
+      const idx = prev.findIndex(
+        (f) => f.plan_id === row.plan_id && f.feature_key === row.feature_key,
+      );
+      if (idx === -1) return [...prev, data as PlanFeature];
+      const next = prev.slice();
+      next[idx] = data as PlanFeature;
+      return next;
+    });
+    toast.push({ message: `Saved ${spec.feature_name}`, variant: 'success' });
   };
 
   const addFeature = async () => {
@@ -575,6 +670,44 @@ export default function PlansAdmin() {
                   >
                     {planDirty ? 'Save pricing' : 'No changes'}
                   </Button>
+                </div>
+              </PageSection>
+
+              <PageSection
+                title="Expert thread caps"
+                description="Asker mention rate caps + expert thread reply cap for this plan. Edits persist on blur and auto-bump the expert config cache version."
+                boxed
+              >
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                    gap: S[3],
+                  }}
+                >
+                  {EXPERT_THREAD_FEATURES.map((spec) => {
+                    const existing = getExpertThreadFeature(spec.feature_key);
+                    const value = existing?.limit_value ?? '';
+                    const fieldKey = `${selected.id}:${spec.feature_key}:${value}`;
+                    return (
+                      <Field
+                        key={spec.feature_key}
+                        label={spec.feature_name}
+                        hint={`${spec.hint} · feature_key: ${spec.feature_key}`}
+                      >
+                        <NumberInput
+                          size="sm"
+                          step={1}
+                          min={0}
+                          key={fieldKey}
+                          defaultValue={value}
+                          disabled={savingFeatureKey === spec.feature_key}
+                          onBlur={(e) => saveExpertThreadLimit(spec, e.target.value)}
+                          placeholder="—"
+                        />
+                      </Field>
+                    );
+                  })}
                 </div>
               </PageSection>
 

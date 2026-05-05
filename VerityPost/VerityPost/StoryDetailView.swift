@@ -118,6 +118,31 @@ struct StoryDetailView: View {
     @State private var mentionSuggestions: [VPUser] = []
     @State private var mentionSearchTask: Task<Void, Never>?
 
+    // EXPERT_THREADS Wave 5 — `@expert` picker + thread-mode state.
+    // Picker fires when the user types `@expert` (broadcast trigger) or
+    // `@expert_<partial>`. Mirrors web CommentComposer.tsx Wave 4b.
+    @State private var expertPicker: ExpertPickerData? = nil
+    @State private var expertPickerLoading: Bool = false
+    /// Transient inline notice — picker rate-limit, duplicate-@, mention-cap.
+    @State private var expertPickerNotice: String? = nil
+    /// 60-sec composer-instance cache so legitimate open-close-reopen
+    /// browsing of the picker doesn't false-positive the server's 10/min
+    /// rate limit (spec §2 "Picker rate-limit composer UX").
+    @State private var expertPickerCache: (at: Date, data: ExpertPickerData)? = nil
+
+    // Thread-mode permissions cached on appear.
+    @State private var canCloseOwnThread: Bool = false
+    @State private var canModerateComments: Bool = false
+    @State private var canAllowFollowup: Bool = false
+    /// Per-thread asker reply counts and free-pass status for cap affordance.
+    /// Keyed by `<rootId>:<askerId>:<expertId>`. Populated lazily from
+    /// expert_thread_chains on first render.
+    @State private var threadChainsByKey: [String: ThreadChainState] = [:]
+    /// Server-rejected close attempts surface a countdown; this maps a
+    /// root comment id to seconds remaining, decremented by a Task.
+    @State private var closeCooldownByRoot: [String: Int] = [:]
+    @State private var closeCooldownTasks: [String: Task<Void, Never>] = [:]
+
     // Pre-submit mute/ban state. Parity with web CommentComposer.jsx —
     // fetched on mount; when set, replaces the composer with an inline
     // banner pointing at the appeal page.
@@ -526,6 +551,11 @@ struct StoryDetailView: View {
             // C3 — moderator actions
             canHideComments = await PermissionService.shared.has("comments.moderate")
             canFlagComments = await PermissionService.shared.has("comments.flag")
+            // EXPERT_THREADS Wave 5 — thread-mode permission keys (spec §2.5).
+            // owner-mode short-circuits all of these per QA.md §8.4 Lock #10.
+            canCloseOwnThread = await PermissionService.shared.has("comments.thread.close.own")
+            canModerateComments = await PermissionService.shared.has("comments.moderate")
+            canAllowFollowup = await PermissionService.shared.has("comments.expert_thread.allow_followup")
         }
         .onDisappear { tts.stop() }
         .overlay(alignment: .top) { toastOverlay }
@@ -1632,6 +1662,27 @@ struct StoryDetailView: View {
                 .padding(.bottom, 8)
             }
 
+            // EXPERT_THREADS Wave 5 — `@expert` picker. Broadcast button at
+            // top + directed list of currently-active experts in the
+            // article's category. Server-side filtering already excludes
+            // paused / quiet-hours / at-quota experts.
+            if let picker = expertPicker {
+                expertPickerOverlay(picker)
+            }
+            // Transient inline notice (rate-limit, duplicate, cap-hit).
+            if let notice = expertPickerNotice {
+                Text(notice)
+                    .font(.caption)
+                    .foregroundColor(VP.warn)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(VP.warnSoft)
+                    .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.warn.opacity(0.4)))
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
+                    .padding(.bottom, 8)
+            }
+
             HStack(alignment: .top, spacing: 10) {
                 AvatarView(user: auth.currentUser, size: 32)
                 VStack(alignment: .leading, spacing: 8) {
@@ -1694,13 +1745,44 @@ struct StoryDetailView: View {
     /// Extracts the trailing @token (if any) and queries the users table
     /// for prefix matches. Users without the permission can still type
     /// @username as plain text.
+    ///
+    /// EXPERT_THREADS Wave 5 — extended to detect `@expert` (broadcast) and
+    /// `@expert_<partial>` (directed) triggers. Both route to the expert
+    /// picker via /api/expert/picker. The bare-mention picker only fires
+    /// for non-expert tokens. Spec §2 "Mention syntax + autocomplete".
     private func handleMentionChange(_ text: String) {
-        guard canMentionAutocomplete else {
+        // Any keystroke clears the transient picker notice — toasts attach
+        // to the previous attempt, not the next one.
+        if expertPickerNotice != nil { expertPickerNotice = nil }
+
+        guard let token = currentMentionToken(text) else {
             mentionSuggestions = []
+            expertPicker = nil
+            mentionSearchTask?.cancel()
             return
         }
-        guard let token = currentMentionToken(text), !token.isEmpty else {
+
+        // Expert trigger: bare `@expert` (token == "expert", no underscore)
+        // OR `@expert_<partial>`. Anything else routes to the bare picker.
+        if token == "expert" || token.hasPrefix("expert_") {
             mentionSuggestions = []
+            mentionSearchTask?.cancel()
+            mentionSearchTask = Task {
+                try? await Task.sleep(nanoseconds: 180_000_000)
+                if Task.isCancelled { return }
+                await fetchExpertPicker()
+            }
+            return
+        }
+
+        guard canMentionAutocomplete else {
+            mentionSuggestions = []
+            expertPicker = nil
+            return
+        }
+        guard !token.isEmpty else {
+            mentionSuggestions = []
+            expertPicker = nil
             mentionSearchTask?.cancel()
             return
         }
@@ -1724,11 +1806,105 @@ struct StoryDetailView: View {
                     .execute().value
                 await MainActor.run {
                     mentionSuggestions = matches
+                    expertPicker = nil
                 }
             } catch {
                 await MainActor.run { mentionSuggestions = [] }
             }
         }
+    }
+
+    /// EXPERT_THREADS Wave 5 — fetch the expert picker payload from
+    /// /api/expert/picker?article_id=<uuid>. Honors the 60-sec composer-
+    /// instance cache; on rate-limit (429) shows the spec-mandated toast.
+    private func fetchExpertPicker() async {
+        // Cache hit: serve and skip the network round-trip.
+        if let cached = expertPickerCache, Date().timeIntervalSince(cached.at) < 60 {
+            await MainActor.run { expertPicker = cached.data }
+            return
+        }
+        guard let session = try? await client.auth.session else { return }
+        let site = SupabaseManager.shared.siteURL
+        guard var components = URLComponents(url: site.appendingPathComponent("api/expert/picker"), resolvingAgainstBaseURL: false) else { return }
+        components.queryItems = [URLQueryItem(name: "article_id", value: story.id)]
+        guard let url = components.url else { return }
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        await MainActor.run { expertPickerLoading = true }
+        defer { Task { @MainActor in expertPickerLoading = false } }
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else { return }
+            if http.statusCode == 404 {
+                // Kill switch off — silent fall-through (no expert picker
+                // surface visible). Spec §2 "Empty active list = broadcast
+                // button only" doesn't apply here; 404 means the feature
+                // hasn't shipped to users yet.
+                await MainActor.run { expertPicker = nil }
+                return
+            }
+            if http.statusCode == 429 {
+                await MainActor.run {
+                    expertPicker = nil
+                    expertPickerNotice = "easy on the search — try again in a sec"
+                }
+                return
+            }
+            if http.statusCode != 200 {
+                await MainActor.run { expertPicker = nil }
+                return
+            }
+            let decoded = try JSONDecoder().decode(ExpertPickerData.self, from: data)
+            await MainActor.run {
+                expertPicker = decoded
+                expertPickerCache = (Date(), decoded)
+            }
+        } catch {
+            await MainActor.run { expertPicker = nil }
+        }
+    }
+
+    /// Insert `@expert ` (sentinel) at the cursor. Spec §2 "Token in body:
+    /// sentinel `@expert` for broadcast."
+    private func applyExpertBroadcast() {
+        guard let atIdx = commentText.lastIndex(of: "@") else { return }
+        let prefix = String(commentText[..<atIdx])
+        commentText = prefix + "@expert "
+        expertPicker = nil
+    }
+
+    /// Insert `@expert_<username> ` for directed mentions. Spec §2 "Token
+    /// in body: `@expert_<username>` for directed." Duplicate-@-same-expert
+    /// rejected with the spec-mandated lowercase copy (composer-side guard;
+    /// server enforces the same in post_comment).
+    private func applyExpertDirected(_ username: String) {
+        // Case-insensitive exact-token match — the server guards on the
+        // same shape and surfaces the same lowercase rejection.
+        let token = "@expert_\(username)"
+        let body = commentText.lowercased()
+        let target = token.lowercased()
+        // Word-boundary check: token preceded by start/whitespace and
+        // followed by whitespace/end. A trailing partial like
+        // "@expert_mariana" should NOT match "@expert_maria".
+        if let range = body.range(of: target, options: [.caseInsensitive]) {
+            let before = range.lowerBound > body.startIndex
+                ? body[body.index(before: range.lowerBound)]
+                : Character(" ")
+            let after = range.upperBound < body.endIndex
+                ? body[range.upperBound]
+                : Character(" ")
+            let bIsBoundary = before.isWhitespace || before == "\n"
+            let aIsBoundary = after.isWhitespace || after == "\n"
+            if bIsBoundary && aIsBoundary {
+                expertPickerNotice = "you've already @'d this expert in this comment."
+                expertPicker = nil
+                return
+            }
+        }
+        guard let atIdx = commentText.lastIndex(of: "@") else { return }
+        let prefix = String(commentText[..<atIdx])
+        commentText = prefix + token + " "
+        expertPicker = nil
     }
 
     private func currentMentionToken(_ text: String) -> String? {
@@ -1749,6 +1925,79 @@ struct StoryDetailView: View {
         let prefix = String(commentText[..<atIdx])
         commentText = prefix + "@\(uname) "
         mentionSuggestions = []
+    }
+
+    /// EXPERT_THREADS Wave 5 — picker dropdown UI. Broadcast button
+    /// (always shown) + directed experts list (may be empty).
+    @ViewBuilder
+    private func expertPickerOverlay(_ picker: ExpertPickerData) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Broadcast button — always visible. Inserts `@expert` sentinel.
+            Button {
+                applyExpertBroadcast()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "megaphone.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(VP.expertColor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Ask all experts in \(picker.categoryName)")
+                            .font(.system(.footnote, design: .default, weight: .semibold))
+                            .foregroundColor(VP.text)
+                        Text("Broadcast — counts as 3 mentions")
+                            .font(.caption2)
+                            .foregroundColor(VP.dim)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            Divider().background(VP.border)
+            if picker.experts.isEmpty {
+                Text("No active experts in \(picker.categoryName) right now.")
+                    .font(.caption)
+                    .foregroundColor(VP.dim)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+            } else {
+                ForEach(picker.experts) { expert in
+                    Button {
+                        applyExpertDirected(expert.username)
+                    } label: {
+                        HStack(spacing: 8) {
+                            AvatarView(
+                                outerHex: expert.avatarColor,
+                                innerHex: nil,
+                                initials: String(expert.username.prefix(1)).uppercased(),
+                                size: 22
+                            )
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("@expert_\(expert.username)")
+                                    .font(.system(.footnote, design: .default, weight: .semibold))
+                                    .foregroundColor(VP.text)
+                                if let title = expert.expertTitle, !title.isEmpty {
+                                    Text(title)
+                                        .font(.caption2)
+                                        .foregroundColor(VP.dim)
+                                }
+                            }
+                            Spacer()
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.plain)
+                    Divider().background(VP.border)
+                }
+            }
+        }
+        .background(VP.bg)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .padding(.bottom, 8)
     }
 
     private func commentRow(_ comment: VPComment, depth: Int = 0) -> some View {
@@ -1774,14 +2023,27 @@ struct StoryDetailView: View {
                         .font(.system(.caption2, design: .default, weight: .bold))
                         .foregroundColor(VP.accent)
                 }
-                if comment.isExpertReply == true {
-                    Text("Expert")
-                        .font(.system(.caption2, design: .default, weight: .bold))
-                        .tracking(0.3)
-                        .foregroundColor(Color.green)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(RoundedRectangle(cornerRadius: VP.radiusXS).fill(Color.green.opacity(0.12)))
+                // EXPERT_THREADS Wave 5 — distinctive chrome attaches to
+                // author.is_expert AND article.category ∈
+                // author.verified_categories (NOT thread mode). The legacy
+                // `is_expert_reply` column is left in place for now since
+                // server-side triggers populate it; iOS just stops reading
+                // it for the chrome decision.
+                if showsExpertChrome(comment) {
+                    HStack(spacing: 6) {
+                        Text("Verified Expert")
+                            .font(.system(.caption2, design: .default, weight: .bold))
+                            .tracking(0.3)
+                            .foregroundColor(VP.expertColor)
+                        if let cat = categoryName, !cat.isEmpty {
+                            Text("· \(cat)")
+                                .font(.system(.caption2, design: .default, weight: .semibold))
+                                .foregroundColor(VP.expertColor.opacity(0.85))
+                        }
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(RoundedRectangle(cornerRadius: VP.radiusXS).fill(VP.expertColor.opacity(0.12)))
                 }
                 HStack(spacing: 6) {
                     if let uname = u?.username {
@@ -1884,17 +2146,42 @@ struct StoryDetailView: View {
                         commentTagChipsRow(for: comment)
                             .padding(.top, 6)
                     }
+                    // EXPERT_THREADS Wave 5 — thread-mode action row.
+                    // Adds: Close / Reopen on root, Allow another reply on
+                    // expert's own replies in a thread, "N replies left"
+                    // affordance for the asker.
+                    expertThreadActionRow(for: comment)
+
+                    let isThreadClosed = (threadRoot(for: comment)?.expertThreadClosedAt) != nil
+
                     // Action row: Reply · Edit · Agree · Disagree
                     HStack(spacing: 4) {
                         if auth.isLoggedIn && muteState == nil {
+                            // Disable Reply when:
+                            //   - the thread is closed (no new replies)
+                            //   - the asker has hit the per-expert chain cap
+                            //     (chain row exists, repliesLeft == 0, no
+                            //     free pass)
+                            let replyState = askerReplyState(for: comment)
                             Button {
                                 startReply(to: comment)
                             } label: {
-                                Text("Reply")
+                                Text(replyState.disabled ? "Reply" : "Reply")
                                     .font(.system(.caption, design: .default, weight: .semibold))
-                                    .foregroundColor(VP.accent)
+                                    .foregroundColor(replyState.disabled ? VP.muted : VP.accent)
                             }
                             .buttonStyle(.plain)
+                            .disabled(replyState.disabled || isThreadClosed)
+                            if let copy = replyState.copy {
+                                Text(copy)
+                                    .font(.system(size: VP.Size.xs))
+                                    .foregroundColor(replyState.disabled ? VP.warn : VP.dim)
+                            }
+                            if isThreadClosed {
+                                Text("Thread closed.")
+                                    .font(.system(size: VP.Size.xs))
+                                    .foregroundColor(VP.dim)
+                            }
                         }
                         if isOwnComment && canEditOwnComment && muteState == nil {
                             Button {
@@ -1950,13 +2237,16 @@ struct StoryDetailView: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(VP.rule).frame(height: 1)
         }
-        .padding(comment.isExpertReply == true ? 10 : 0)
-        .background(comment.isExpertReply == true ? Color.green.opacity(0.06) : Color.clear)
+        // EXPERT_THREADS Wave 5 — author-attribute-driven accent border.
+        // Whether or not the thread itself is in expert mode, an expert's
+        // reply in their verified category gets the chip + accent border.
+        .padding(showsExpertChrome(comment) ? 10 : 0)
+        .background(showsExpertChrome(comment) ? VP.expertColor.opacity(0.06) : Color.clear)
         .overlay(
             RoundedRectangle(cornerRadius: VP.radiusMD)
-                .stroke(comment.isExpertReply == true ? Color.green.opacity(0.18) : Color.clear, lineWidth: 1)
+                .stroke(showsExpertChrome(comment) ? VP.expertColor.opacity(0.22) : Color.clear, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: comment.isExpertReply == true ? VP.radiusMD : 0))
+        .clipShape(RoundedRectangle(cornerRadius: showsExpertChrome(comment) ? VP.radiusMD : 0))
         // Apple Guideline 1.2 — long-press affords Report + Block on every
         // comment. Author-self check skips blocking yourself; the API also
         // rejects it but we suppress the option entirely to avoid a dead-end.
@@ -2160,6 +2450,133 @@ struct StoryDetailView: View {
     private func startReply(to parent: VPComment) {
         replyingTo = parent
         composerFocused = true
+    }
+
+    /// EXPERT_THREADS Wave 5 — per-row thread-mode action row.
+    /// Surfaces:
+    ///   - "Close thread" / cooldown countdown for the thread originator
+    ///     on the root comment.
+    ///   - "Reopen" for moderators when the thread is closed.
+    ///   - "Allow another reply" for the current expert on each of their
+    ///     own replies in a thread, when the chain has hit the cap.
+    @ViewBuilder
+    private func expertThreadActionRow(for comment: VPComment) -> some View {
+        let myId = auth.currentUser?.id
+        let isRoot = comment.isExpertThreadRoot == true
+        let isClosed = comment.expertThreadClosedAt != nil
+        let isMyComment = comment.userId != nil && comment.userId == myId
+
+        // Close / Reopen on the root comment.
+        if isRoot {
+            HStack(spacing: 8) {
+                // Originator can close (or sees a cooldown countdown).
+                if isMyComment && !isClosed && canCloseOwnThread {
+                    if let secs = closeCooldownByRoot[comment.id], secs > 0 {
+                        Text("Wait \(secs)s to close")
+                            .font(.system(size: VP.Size.xs, weight: .semibold))
+                            .foregroundColor(VP.warn)
+                    } else {
+                        Button {
+                            Task { await closeThread(rootId: comment.id) }
+                        } label: {
+                            Text("Close thread")
+                                .font(.system(size: VP.Size.xs, weight: .semibold))
+                                .foregroundColor(VP.danger)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                // Moderator can reopen a closed thread.
+                if isClosed && canModerateComments {
+                    Button {
+                        Task { await reopenThread(rootId: comment.id) }
+                    } label: {
+                        Text("Reopen")
+                            .font(.system(size: VP.Size.xs, weight: .semibold))
+                            .foregroundColor(VP.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
+                if isClosed {
+                    Text("· Closed")
+                        .font(.system(size: VP.Size.xs))
+                        .foregroundColor(VP.dim)
+                }
+                Spacer()
+            }
+            .padding(.top, 4)
+        }
+
+        // "Allow another reply" — shown on the expert's own replies inside
+        // an expert thread, when the asker chain has hit the cap and no
+        // free pass has been granted yet. The expert must have posted in
+        // the thread (this is, by construction, their own reply, so the
+        // server-side check trivially passes).
+        if isMyComment && canAllowFollowup,
+           let myExpertId = myId,
+           let root = threadRoot(for: comment),
+           root.isExpertThreadRoot == true,
+           let askerId = root.userId,
+           askerId != myExpertId {
+            // Pull all chain rows for this root where the expert is me.
+            // Surface a button per asker that's at cap with no free pass.
+            let cappedAskers = threadChainsByKey.values
+                .filter { $0.rootId == root.id && $0.expertId == myExpertId
+                    && $0.askerReplyCount >= 2 && $0.freePassGrantedAt == nil }
+            ForEach(cappedAskers, id: \.askerId) { chain in
+                Button {
+                    Task { await grantFreePass(rootId: root.id, askerUserId: chain.askerId) }
+                } label: {
+                    Text("Allow another reply")
+                        .font(.system(size: VP.Size.xs, weight: .semibold))
+                        .foregroundColor(VP.accent)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
+            }
+        }
+    }
+
+    /// Compute "N replies left" / "Conversation complete with @maria"
+    /// affordance copy + disabled state for the Reply button. Returns
+    /// nil copy when the affordance shouldn't render (not in a thread, or
+    /// viewer is the expert, or no chain row yet).
+    private func askerReplyState(for comment: VPComment) -> (disabled: Bool, copy: String?) {
+        guard let myId = auth.currentUser?.id else { return (false, nil) }
+        guard let root = threadRoot(for: comment),
+              root.isExpertThreadRoot == true,
+              let askerId = root.userId else {
+            return (false, nil)
+        }
+        // Affordance only applies when the viewer IS the asker — the
+        // expert side has unlimited replies.
+        guard askerId == myId else { return (false, nil) }
+        // The expert in this chain is the comment's author when viewing
+        // an expert reply, OR the deepest expert who posted in the thread
+        // when viewing a non-expert reply. iOS keeps it simple: anchor to
+        // the verified-expert comment in the root's reply tree.
+        let expertReplies = comments.filter {
+            ($0.id == root.id || $0.expertThreadRootId == root.id)
+                && $0.userId != askerId
+                && $0.users?.isExpert == true
+        }
+        guard let expertReply = expertReplies.last,
+              let expertId = expertReply.userId else {
+            return (false, nil)
+        }
+        let key = chainKey(root: root.id, asker: askerId, expert: expertId)
+        guard let chain = threadChainsByKey[key] else {
+            return (false, nil)
+        }
+        if chain.freePassGrantedAt != nil {
+            return (false, "free pass — keep going")
+        }
+        let left = max(0, 2 - chain.askerReplyCount)
+        if left == 0 {
+            let uname = expertReply.users?.username ?? "expert"
+            return (true, "Conversation complete with @\(uname) — they can grant another reply if you have a follow-up.")
+        }
+        return (false, "\(left) repl\(left == 1 ? "y" : "ies") left")
     }
 
     // MARK: - Toast overlay
@@ -2499,7 +2916,11 @@ struct StoryDetailView: View {
                 // A126 — pull the soft-delete + edit + mentions fields so
                 // [deleted] tombstones, (edited) labels, and tap-to-profile
                 // mention runs render at parity with web.
-                .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions")
+                // EXPERT_THREADS Wave 5 — pull thread-mode columns
+                // (is_expert_thread_root, expert_thread_root_id,
+                // expert_thread_closed_at, expert_thread_closed_by,
+                // last_reopen_at) so close/reopen + cap affordances render.
+                .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, is_expert_thread_root, expert_thread_root_id, expert_thread_closed_at, expert_thread_closed_by, last_reopen_at, upvote_count, downvote_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions")
                 .eq("article_id", value: story.id)
                 .eq("status", value: "visible")
                 .is("deleted_at", value: nil)
@@ -2521,6 +2942,51 @@ struct StoryDetailView: View {
                     if let aid = author.id { authorById[aid] = author }
                 }
             }
+            // EXPERT_THREADS Wave 5 — verified-categories map for distinctive
+            // expert chrome. The Verified Expert chip + accent border attach
+            // when `author.is_expert == true AND article.category ∈
+            // verifiedCategoryIds` — author-attribute-driven, not
+            // thread-mode-driven (spec §2). Fetched here so commentRow can
+            // read it off the AuthorRef without per-row queries.
+            if !authorIds.isEmpty {
+                struct CatJoinRow: Decodable {
+                    let categoryId: String?
+                    let expertApplications: AppRef?
+
+                    enum CodingKeys: String, CodingKey {
+                        case categoryId = "category_id"
+                        case expertApplications = "expert_applications"
+                    }
+
+                    struct AppRef: Decodable {
+                        let userId: String?
+                        let status: String?
+
+                        enum CodingKeys: String, CodingKey {
+                            case userId = "user_id"
+                            case status
+                        }
+                    }
+                }
+                let catRows: [CatJoinRow] = (try? await client
+                    .from("expert_application_categories")
+                    .select("category_id, expert_applications!inner(user_id, status)")
+                    .eq("expert_applications.status", value: "approved")
+                    .in("expert_applications.user_id", values: authorIds)
+                    .execute().value) ?? []
+                var byUser: [String: [String]] = [:]
+                for row in catRows {
+                    guard let uid = row.expertApplications?.userId,
+                          let cid = row.categoryId else { continue }
+                    byUser[uid, default: []].append(cid)
+                }
+                for (uid, cats) in byUser {
+                    if var existing = authorById[uid] {
+                        existing.verifiedCategoryIds = cats
+                        authorById[uid] = existing
+                    }
+                }
+            }
             timeline = t
             sources = s
             comments = c.map { row in
@@ -2529,6 +2995,11 @@ struct StoryDetailView: View {
                 return mutable
             }
             loadError = nil
+
+            // EXPERT_THREADS Wave 5 — load chain rows for any expert thread
+            // root in the visible page. Drives the asker "1 reply left"
+            // affordance + cap-hit disable on Reply.
+            await loadExpertThreadChains(comments: c)
 
             // Bug 32: article category label (was hardcoded "NEWS").
             if let catId = story.categoryId {
@@ -3047,6 +3518,228 @@ struct StoryDetailView: View {
         }
     }
 
+    // MARK: - EXPERT_THREADS Wave 5 — thread-mode helpers
+
+    /// Build the `<rootId>:<askerId>:<expertId>` chain key that maps a
+    /// (root, asker, expert) tuple to its row in `expert_thread_chains`.
+    private func chainKey(root: String, asker: String, expert: String) -> String {
+        "\(root):\(asker):\(expert)"
+    }
+
+    /// Load expert_thread_chains rows for all visible thread roots so
+    /// commentRow can render "N replies left" / "cap reached" affordances
+    /// without a per-render query. Mirrors web CommentThread.tsx behaviour.
+    private func loadExpertThreadChains(comments: [VPComment]) async {
+        let rootIds = comments
+            .filter { $0.isExpertThreadRoot == true }
+            .map(\.id)
+        guard !rootIds.isEmpty else {
+            await MainActor.run { threadChainsByKey = [:] }
+            return
+        }
+        struct ChainRow: Decodable {
+            let threadRootId: String
+            let askerUserId: String
+            let expertUserId: String
+            let askerReplyCount: Int
+            let freePassGrantedAt: String?
+
+            enum CodingKeys: String, CodingKey {
+                case threadRootId = "thread_root_id"
+                case askerUserId = "asker_user_id"
+                case expertUserId = "expert_user_id"
+                case askerReplyCount = "asker_reply_count"
+                case freePassGrantedAt = "free_pass_granted_at"
+            }
+        }
+        let rows: [ChainRow] = (try? await client.from("expert_thread_chains")
+            .select("thread_root_id, asker_user_id, expert_user_id, asker_reply_count, free_pass_granted_at")
+            .in("thread_root_id", values: rootIds)
+            .execute().value) ?? []
+        var map: [String: ThreadChainState] = [:]
+        let iso = ISO8601DateFormatter()
+        for row in rows {
+            let granted = row.freePassGrantedAt.flatMap { iso.date(from: $0) }
+            map[chainKey(root: row.threadRootId, asker: row.askerUserId, expert: row.expertUserId)] =
+                ThreadChainState(
+                    rootId: row.threadRootId,
+                    askerId: row.askerUserId,
+                    expertId: row.expertUserId,
+                    askerReplyCount: row.askerReplyCount,
+                    freePassGrantedAt: granted
+                )
+        }
+        await MainActor.run { threadChainsByKey = map }
+    }
+
+    /// Returns the comment that's the thread-root for the given comment
+    /// (itself if `isExpertThreadRoot`, else the parent referenced by
+    /// `expertThreadRootId`, else nil).
+    private func threadRoot(for comment: VPComment) -> VPComment? {
+        if comment.isExpertThreadRoot == true { return comment }
+        if let rid = comment.expertThreadRootId {
+            return comments.first { $0.id == rid }
+        }
+        return nil
+    }
+
+    /// Spec §2 "Asker reply cap: ≤ 2 per expert chain in that thread."
+    /// Returns nil when no chain row exists yet (e.g. asker hasn't posted
+    /// a reply since the @expert root).
+    private func askerRepliesLeft(rootId: String, askerId: String, expertId: String) -> Int? {
+        guard let chain = threadChainsByKey[chainKey(root: rootId, asker: askerId, expert: expertId)] else {
+            return nil
+        }
+        if chain.freePassGrantedAt != nil { return nil }   // unlimited
+        // Default cap is 2 (spec §2.5 default).
+        return max(0, 2 - chain.askerReplyCount)
+    }
+
+    /// Asker close-thread. Server enforces the 60-sec cooldown computed as
+    /// `GREATEST(last_expert_reply_at, last_reopen_at) + close_cooldown`.
+    /// 429 with `wait_for_cooldown` surfaces as a countdown.
+    private func closeThread(rootId: String) async {
+        guard let session = try? await client.auth.session else { return }
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/comments/\(rootId)/close", relativeTo: site) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse else { return }
+            if http.statusCode == 429 {
+                struct CooldownResp: Decodable {
+                    let ok: Bool?
+                    let reason: String?
+                    let secondsRemaining: Int?
+                    enum CodingKeys: String, CodingKey {
+                        case ok, reason
+                        case secondsRemaining = "seconds_remaining"
+                    }
+                }
+                if let parsed = try? JSONDecoder().decode(CooldownResp.self, from: data),
+                   parsed.reason == "wait_for_cooldown",
+                   let secs = parsed.secondsRemaining {
+                    await MainActor.run {
+                        closeCooldownByRoot[rootId] = secs
+                        startCloseCooldownTask(rootId: rootId)
+                        flashModerationToast("Wait \(secs)s before closing.")
+                    }
+                    return
+                }
+            }
+            if !(200...299).contains(http.statusCode) {
+                await MainActor.run { flashModerationToast("Couldn\u{2019}t close thread.") }
+                return
+            }
+            await MainActor.run {
+                if let idx = comments.firstIndex(where: { $0.id == rootId }) {
+                    comments[idx].expertThreadClosedAt = Date()
+                }
+                flashModerationToast("Thread closed.")
+            }
+        } catch {
+            await MainActor.run { flashModerationToast("Couldn\u{2019}t close thread.") }
+        }
+    }
+
+    /// Mod reopen — clears `expert_thread_closed_at`, sets `last_reopen_at`.
+    /// Permission gate: `comments.moderate`.
+    private func reopenThread(rootId: String) async {
+        guard let session = try? await client.auth.session else { return }
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/comments/\(rootId)/close?action=reopen", relativeTo: site) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                await MainActor.run { flashModerationToast("Couldn\u{2019}t reopen thread.") }
+                return
+            }
+            await MainActor.run {
+                if let idx = comments.firstIndex(where: { $0.id == rootId }) {
+                    comments[idx].expertThreadClosedAt = nil
+                    comments[idx].lastReopenAt = Date()
+                }
+                flashModerationToast("Thread reopened.")
+            }
+        } catch {
+            await MainActor.run { flashModerationToast("Couldn\u{2019}t reopen thread.") }
+        }
+    }
+
+    /// Lift the asker's reply cap for a single (asker, expert) chain.
+    /// Permission: `comments.expert_thread.allow_followup`. The expert must
+    /// also have posted in the thread (RPC enforces).
+    private func grantFreePass(rootId: String, askerUserId: String) async {
+        guard let session = try? await client.auth.session else { return }
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/expert/threads/\(rootId)/grant", relativeTo: site) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["asker_user_id": askerUserId])
+        do {
+            let (_, resp) = try await URLSession.shared.data(for: req)
+            guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                await MainActor.run { flashModerationToast("Couldn\u{2019}t grant another reply.") }
+                return
+            }
+            await MainActor.run {
+                guard let myId = auth.currentUser?.id else { return }
+                let key = chainKey(root: rootId, asker: askerUserId, expert: myId)
+                if var chain = threadChainsByKey[key] {
+                    chain.freePassGrantedAt = Date()
+                    threadChainsByKey[key] = chain
+                } else {
+                    // No row yet — synthesize so UI flips immediately.
+                    threadChainsByKey[key] = ThreadChainState(
+                        rootId: rootId,
+                        askerId: askerUserId,
+                        expertId: myId,
+                        askerReplyCount: 0,
+                        freePassGrantedAt: Date()
+                    )
+                }
+                flashModerationToast("Asker can reply again.")
+            }
+        } catch {
+            await MainActor.run { flashModerationToast("Couldn\u{2019}t grant another reply.") }
+        }
+    }
+
+    @MainActor
+    private func startCloseCooldownTask(rootId: String) {
+        closeCooldownTasks[rootId]?.cancel()
+        closeCooldownTasks[rootId] = Task { @MainActor in
+            while let s = closeCooldownByRoot[rootId], s > 0 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { return }
+                if let cur = closeCooldownByRoot[rootId] {
+                    closeCooldownByRoot[rootId] = max(0, cur - 1)
+                }
+            }
+            closeCooldownByRoot.removeValue(forKey: rootId)
+            closeCooldownTasks.removeValue(forKey: rootId)
+        }
+    }
+
+    /// Spec §2 "Distinctive expert reply chrome — attaches to
+    /// `author.is_expert AND article.category ∈ author.verified_categories`,
+    /// NOT to thread mode."
+    private func showsExpertChrome(_ comment: VPComment) -> Bool {
+        guard comment.users?.isExpert == true else { return false }
+        guard let articleCat = story.categoryId else { return false }
+        let cats = comment.users?.verifiedCategoryIds ?? []
+        return cats.contains(articleCat)
+    }
+
     // MARK: - Comment post + upvote
     private func postComment() async {
         let body = commentText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -3115,12 +3808,41 @@ struct StoryDetailView: View {
                     await MainActor.run { flashModerationToast(err) }
                 }
             } else {
-                struct Err: Decodable { let error: String? }
-                let rawErr = (try? JSONDecoder().decode(Err.self, from: data))?.error
-                let err = friendlyApiError(rawErr, fallback: "Couldn\u{2019}t post your comment. Try again.")
+                struct Err: Decodable {
+                    let error: String?
+                    let composer_message: String?
+                    let detail: String?
+                }
+                let parsed = try? JSONDecoder().decode(Err.self, from: data)
+                let rawErr = parsed?.error
+                // EXPERT_THREADS Wave 5 — surface the spec-mandated lowercase
+                // composer messages verbatim for mention_cap_hit (asker-cap)
+                // and the duplicate-@-same-expert reject. Both come back from
+                // /api/comments/can-mention or post_comment with the exact
+                // copy already lowercase; pass through unchanged.
+                let isCapHit = http.statusCode == 429 && rawErr == "mention_cap_hit"
+                let isDuplicate = (parsed?.detail == "duplicate_expert_mention")
+                    || (rawErr ?? "").lowercased().contains("you've already @'d this expert")
+                let err: String = {
+                    if let msg = parsed?.composer_message, isCapHit { return msg }
+                    if isDuplicate {
+                        return "you've already @'d this expert in this comment."
+                    }
+                    return friendlyApiError(rawErr, fallback: "Couldn\u{2019}t post your comment. Try again.")
+                }()
                 await MainActor.run {
-                    flashModerationToast(err)
-                    if http.statusCode == 429 {
+                    if isCapHit || isDuplicate {
+                        // Inline composer notice — same surface as the
+                        // picker-rate-limit / duplicate-@-from-picker copy.
+                        expertPickerNotice = err
+                    } else {
+                        flashModerationToast(err)
+                    }
+                    // Generic 429 (route rate-limit, not mention cap) still
+                    // burns the 30-sec submit cooldown; mention_cap_hit is
+                    // a daily cap, not a per-second cap, so don't double-
+                    // muzzle the composer.
+                    if http.statusCode == 429 && !isCapHit {
                         startCommentRateLimit(seconds: 30)
                     }
                 }
@@ -3515,6 +4237,54 @@ private func friendlyApiError(_ raw: String?, fallback: String) -> String {
         }
         return raw
     }
+}
+
+// MARK: - Expert picker data shapes (Wave 5)
+//
+// Mirrors the JSON shape returned by GET /api/expert/picker (Wave 4b on
+// web). The picker filters server-side: NOT paused, NOT in quiet hours,
+// NOT at per-day quota, NOT at per-post quota for this article. Empty
+// `experts` is a valid response — the broadcast button still renders.
+
+struct ExpertPickerData: Codable, Equatable {
+    let categoryId: String
+    let categoryName: String
+    let experts: [ExpertPickerEntry]
+
+    enum CodingKeys: String, CodingKey {
+        case categoryId = "category_id"
+        case categoryName = "category_name"
+        case experts
+    }
+}
+
+struct ExpertPickerEntry: Codable, Identifiable, Equatable {
+    let id: String
+    let username: String
+    let displayName: String?
+    let avatarUrl: String?
+    let avatarColor: String?
+    let expertTitle: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, username
+        case displayName = "display_name"
+        case avatarUrl = "avatar_url"
+        case avatarColor = "avatar_color"
+        case expertTitle = "expert_title"
+    }
+}
+
+/// Per-(root, asker, expert) chain state for the asker reply-cap affordance.
+/// Replies-left = max(0, asker_replies_per_chain - asker_reply_count) when
+/// `freePassGrantedAt` is nil; unlimited when set. Spec §2 "Asker reply cap"
+/// + §2 "Asker-side reply count affordance."
+struct ThreadChainState: Equatable {
+    let rootId: String
+    let askerId: String
+    let expertId: String
+    var askerReplyCount: Int
+    var freePassGrantedAt: Date?
 }
 
 // MARK: - Registration wall sheet (Slice 6)

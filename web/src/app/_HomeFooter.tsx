@@ -107,16 +107,9 @@ export default function HomeFooter() {
       );
     }
 
-    // Normal logged-in state: just Browse link (DECISION #021 — no "That's today's edition.")
-    return (
-      <footer style={footerStyle}>
-        <p style={{ margin: '12px 0 0' }}>
-          <Link href="/" style={linkStyle}>
-            Browse all categories &rarr;
-          </Link>
-        </p>
-      </footer>
-    );
+    // Normal logged-in state renders nothing — categories are reachable
+    // from the top-bar HomeSectionsMenu, so a closer link is redundant.
+    return null;
   }
 
   // Anon: sign-up pitch (DECISION #027 — Browse link and read access are NEVER restricted)

@@ -8,6 +8,8 @@ import { v2LiveGuard } from '@/lib/featureFlags';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getSettings, getNumber } from '@/lib/settings';
 import { trackServer } from '@/lib/trackServer';
+import { parseMentions } from '@/lib/mentions';
+import { getExpertConfigSnapshot } from '@/lib/expertConfig';
 
 // T173 — defense-in-depth body length cap. The post_comment RPC has its
 // own enforcement, but capping at the API layer fast-fails hostile or
@@ -134,9 +136,11 @@ export async function POST(request) {
 
   // Preview intercept (DECISION #033): when the target article is non-published
   // and the actor is an editor/owner, return a preview signal without writing.
+  // Also pull category_id while we're here — needed for the expert-thread
+  // broadcast fan-out below (kill-switch ON path).
   const { data: targetArticle } = await service
     .from('articles')
-    .select('status')
+    .select('status, category_id')
     .eq('id', article_id)
     .maybeSingle();
   if (targetArticle && targetArticle.status !== 'published') {
@@ -146,6 +150,128 @@ export async function POST(request) {
       (await hasPermissionServer('admin.articles.edit.any'));
     if (isEditor) {
       return NextResponse.json({ preview: true }, { headers: NO_STORE });
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // EXPERT_THREADS.md Wave 3 — kill-switch read-once-per-TXN (mitigation
+  // §2 #12). The snapshot pinned here is threaded through the expert
+  // enforcement block below; an admin flipping the switch mid-request can
+  // no longer produce orphan `is_expert_thread_root=true` rows.
+  // ──────────────────────────────────────────────────────────────────────
+  const expertConfig = await getExpertConfigSnapshot();
+  let expertParts = { bare: [], expertDirected: [], expertBroadcast: false };
+  let expertDirectedRows = []; // [{ user_id, username }] resolved + DEDUPED
+  let expertAvailableIds = []; // user_ids NOT at-quota (eligible for notifications + counter ticks)
+
+  if (expertConfig.killSwitch) {
+    expertParts = parseMentions(body);
+
+    // Server defense for "no duplicate @ of the same expert" (spec §2). The
+    // composer prevents this client-side; here we re-detect by raw scan
+    // (parser dedupes silently). Walk the body's expert tokens with a
+    // count map; reject on first duplicate.
+    if (expertParts.expertDirected.length > 0) {
+      const counts = new Map();
+      const EXPERT_TOKEN_RE_LOCAL =
+        /(?<![a-zA-Z0-9_])@expert(?:_([a-zA-Z0-9_]{2,30}))?(?![a-zA-Z0-9_])/g;
+      for (const m of body.matchAll(EXPERT_TOKEN_RE_LOCAL)) {
+        const u = m[1];
+        if (!u) continue;
+        const lc = u.toLowerCase();
+        counts.set(lc, (counts.get(lc) || 0) + 1);
+        if (counts.get(lc) > 1) {
+          return NextResponse.json(
+            {
+              error: 'duplicate_expert_mention',
+              composer_message: "you've already @'d this expert in this comment.",
+            },
+            { status: 400, headers: NO_STORE }
+          );
+        }
+      }
+    }
+
+    const directedUsernames = expertParts.expertDirected; // already lowercased + deduped
+    const isBroadcast = expertParts.expertBroadcast;
+    const hasAnyExpertMention = directedUsernames.length > 0 || isBroadcast;
+
+    if (hasAnyExpertMention) {
+      // Resolve directed usernames → user_ids in one query.
+      if (directedUsernames.length > 0) {
+        const { data: rows, error: resolveErr } = await service
+          .from('users')
+          .select('id, username')
+          .in('username', directedUsernames);
+        if (resolveErr) {
+          console.error('[comments.POST.expert.resolve]', resolveErr);
+          return NextResponse.json(
+            { error: 'Could not post comment. Try again in a moment.' },
+            { status: 500, headers: NO_STORE }
+          );
+        }
+        expertDirectedRows = (rows || []).filter(
+          (r) => typeof r.id === 'string' && typeof r.username === 'string'
+        );
+      }
+
+      // Defense-in-depth: re-call the asker cap RPC to commit the
+      // reservation made at compose time. A concurrent post on another
+      // tab can race the cap between `can-mention` and here; the RPC
+      // re-evaluates atomically and returns 429 on rejection.
+      const nTargets = expertDirectedRows.length + (isBroadcast ? 1 : 0);
+      if (nTargets > 0) {
+        const { data: capData, error: capErr } = await service.rpc(
+          'check_and_reserve_asker_mention_cap',
+          {
+            p_user_id: user.id,
+            p_n_targets: nTargets,
+            p_is_broadcast: isBroadcast,
+          }
+        );
+        if (capErr) {
+          console.error('[comments.POST.expert.cap]', capErr);
+          return NextResponse.json(
+            { error: 'Could not post comment. Try again in a moment.' },
+            { status: 500, headers: NO_STORE }
+          );
+        }
+        if (capData && capData.allowed === false) {
+          return NextResponse.json(
+            {
+              error: 'mention_cap_hit',
+              composer_message: 'you reached your mentions for today.',
+              detail: capData,
+            },
+            { status: 429, headers: NO_STORE }
+          );
+        }
+      }
+
+      // Filter directed targets to those NOT at quota — only those receive
+      // notifications and tick the per-(expert, article) + per-day
+      // counters. At-quota mentions are inert (spec §2 Inert mentions).
+      if (expertDirectedRows.length > 0) {
+        const directedIds = expertDirectedRows.map((r) => r.id);
+        const { data: quotaData, error: quotaErr } = await service.rpc(
+          'check_expert_mention_quota',
+          {
+            p_target_user_ids: directedIds,
+            p_article_id: article_id,
+          }
+        );
+        if (quotaErr) {
+          console.error('[comments.POST.expert.quota]', quotaErr);
+          // Non-fatal — fall through with empty available; the cap was
+          // already reserved so the asker isn't double-charged.
+          expertAvailableIds = [];
+        } else {
+          const available = Array.isArray(quotaData?.available)
+            ? quotaData.available
+            : [];
+          expertAvailableIds = available;
+        }
+      }
     }
   }
 
@@ -203,6 +329,159 @@ export async function POST(request) {
       has_mentions: Array.isArray(mentions) && mentions.length > 0,
     },
   });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // EXPERT_THREADS.md Wave 3 — post-insert expert work (kill-switch ON).
+  // - Stamp `is_expert_thread_root` / `expert_thread_root_id`.
+  // - Tick per-(expert,article) + per-day counters via commit_expert_mentions.
+  // - Fan out notifications: one per available directed mention; one per
+  //   opted-in in-category expert for broadcast.
+  // None of this is in the post_comment RPC body (Wave 2 didn't touch it),
+  // so we layer it here. Failures are logged but do not roll back the
+  // comment row — the cap reservation already committed and the asker's
+  // reservation was real.
+  // ──────────────────────────────────────────────────────────────────────
+  if (expertConfig.killSwitch) {
+    const isBroadcast = expertParts.expertBroadcast;
+    const hasAnyExpertMention = expertDirectedRows.length > 0 || isBroadcast;
+
+    if (hasAnyExpertMention) {
+      // 1. Compute thread root.
+      //   - depth-0 (parent_id IS NULL): this row IS the root.
+      //   - depth-1 (parent has is_expert_thread_root=true): inherit
+      //     parent_id as the root.
+      //   - deeper: inherit parent.expert_thread_root_id (the root walk
+      //     up the chain is already encoded in that column on the parent).
+      // The single-SELECT app-level walk is sufficient because the
+      // invariant is maintained on every insert.
+      let isExpertThreadRoot = false;
+      let expertThreadRootId = null;
+      if (!parent_id) {
+        isExpertThreadRoot = true;
+        expertThreadRootId = data.id;
+      } else {
+        const { data: parentRow, error: parentErr } = await service
+          .from('comments')
+          .select('id, is_expert_thread_root, expert_thread_root_id')
+          .eq('id', parent_id)
+          .maybeSingle();
+        if (parentErr) {
+          console.error('[comments.POST.expert.parent_lookup]', parentErr);
+        } else if (parentRow) {
+          if (parentRow.is_expert_thread_root) {
+            expertThreadRootId = parentRow.id;
+          } else if (parentRow.expert_thread_root_id) {
+            expertThreadRootId = parentRow.expert_thread_root_id;
+          }
+          // else: this @expert sits in a non-expert thread — directed
+          // mention still counts (counters tick, picker shows, asker cap
+          // fires) but no chain row / 2-cap / grant button. Spec §2
+          // "Expert thread mode" paragraph 1.
+        }
+      }
+
+      if (isExpertThreadRoot || expertThreadRootId !== null) {
+        const { error: stampErr } = await service
+          .from('comments')
+          .update({
+            is_expert_thread_root: isExpertThreadRoot,
+            expert_thread_root_id: expertThreadRootId,
+          })
+          .eq('id', data.id);
+        if (stampErr) {
+          console.error('[comments.POST.expert.stamp]', stampErr);
+        }
+      }
+
+      // 2. Tick counters for the available (NOT at-quota) directed
+      //    targets. At-quota targets were filtered out above; they are
+      //    inert per spec §2 (no counter tick, no notification row).
+      if (expertAvailableIds.length > 0) {
+        const { error: commitErr } = await service.rpc('commit_expert_mentions', {
+          p_asker_id: user.id,
+          p_target_user_ids: expertAvailableIds,
+          p_article_id: article_id,
+        });
+        if (commitErr) {
+          console.error('[comments.POST.expert.commit]', commitErr);
+        }
+      }
+
+      // 3. Fan out notifications.
+      //    - Directed: one row per available target with type='mention'.
+      //      Push delivery + alert_preferences filter happens in send-push
+      //      cron at dispatch time (existing pattern).
+      //    - Broadcast: one row per opted-in in-category expert with
+      //      type='category_arrival'. Opt-in source: expert_applications
+      //      .notify_push_on_category_arrival = true on the most-recent
+      //      approved application. The cron applies the alert_preferences
+      //      filter on top at dispatch.
+      const notifRows = [];
+      const actorUsername = user?.username || user?.user_metadata?.username || null;
+      const baseMetadata = {
+        comment_id: data.id,
+        article_id,
+        actor_user_id: user.id,
+        actor_username: actorUsername,
+        kill_switch_version: expertConfig.version,
+      };
+
+      // Directed.
+      const availableSet = new Set(expertAvailableIds);
+      for (const row of expertDirectedRows) {
+        if (!availableSet.has(row.id)) continue; // inert
+        if (row.id === user.id) continue; // self-mention
+        notifRows.push({
+          user_id: row.id,
+          type: 'mention',
+          title: actorUsername
+            ? `@${actorUsername} mentioned you as an expert`
+            : 'You were mentioned as an expert',
+          body: typeof body === 'string' ? body.slice(0, 280) : null,
+          metadata: { ...baseMetadata, mention_kind: 'expert_directed' },
+        });
+      }
+
+      // Broadcast — fan out to opted-in in-category experts.
+      if (isBroadcast && targetArticle?.category_id) {
+        const { data: optedIn, error: optInErr } = await service
+          .from('expert_applications')
+          .select('user_id, expert_application_categories!inner(category_id)')
+          .eq('status', 'approved')
+          .eq('notify_push_on_category_arrival', true)
+          .eq('expert_application_categories.category_id', targetArticle.category_id);
+        if (optInErr) {
+          console.error('[comments.POST.expert.broadcast_lookup]', optInErr);
+        } else {
+          const broadcastUserIds = Array.from(
+            new Set(
+              (optedIn || [])
+                .map((r) => r.user_id)
+                .filter((id) => typeof id === 'string' && id !== user.id)
+            )
+          );
+          for (const uid of broadcastUserIds) {
+            notifRows.push({
+              user_id: uid,
+              type: 'category_arrival',
+              title: actorUsername
+                ? `@${actorUsername} asked the experts in this category`
+                : 'A reader asked the experts in this category',
+              body: typeof body === 'string' ? body.slice(0, 280) : null,
+              metadata: { ...baseMetadata, mention_kind: 'expert_broadcast' },
+            });
+          }
+        }
+      }
+
+      if (notifRows.length > 0) {
+        const { error: notifErr } = await service.from('notifications').insert(notifRows);
+        if (notifErr) {
+          console.error('[comments.POST.expert.notif_insert]', notifErr);
+        }
+      }
+    }
+  }
 
   // Re-fetch the row so the client gets the full shape (counts etc.).
   const { data: full } = await service

@@ -38,12 +38,31 @@ type SuggestUser = {
   avatar_color?: string | null;
   is_verified_public_figure?: boolean;
   is_expert?: boolean;
+  expert_title?: string | null;
 };
 
-type MentionSuggest = {
-  results: SuggestUser[];
-  activeIndex: number;
-} | null;
+// EXPERT_THREADS Wave 4b — picker payload from /api/expert/picker.
+type ExpertPickerData = {
+  category_id: string;
+  category_name: string;
+  experts: SuggestUser[];
+};
+
+// MentionSuggest is now a discriminated union — bare-mention picker keeps
+// the legacy shape; the @expert picker carries the broadcast button +
+// directed list. The activeIndex walks across [broadcast, ...experts]
+// in expert mode.
+type MentionSuggest =
+  | { kind: 'bare'; results: SuggestUser[]; activeIndex: number }
+  | { kind: 'expert'; data: ExpertPickerData; activeIndex: number }
+  | null;
+
+// 60-sec client cache for picker results — per composer instance. Spec
+// §2 "Picker rate-limit composer UX": the server caps at 10/min via
+// check_rate_limit; legitimate open-close-reopen browsing of the picker
+// shouldn't false-positive that rate-limit, so we serve the cached
+// payload until it expires.
+const PICKER_CACHE_TTL_MS = 60_000;
 
 export default function CommentComposer({
   articleId,
@@ -62,9 +81,19 @@ export default function CommentComposer({
   const [canMention, setCanMention] = useState<boolean>(false);
   const [permsLoaded, setPermsLoaded] = useState<boolean>(false);
   const [mentionSuggest, setMentionSuggest] = useState<MentionSuggest>(null);
+  // Transient toast — set on picker rate-limit hit (429 from /api/expert/picker)
+  // OR on cap-hit / duplicate / generic mention rejection from POST. Cleared
+  // on next keystroke. Kept separate from `error` so the post-submit error
+  // surface stays specific to the submit path.
+  const [pickerNotice, setPickerNotice] = useState<string>('');
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const mentionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Picker cache: keyed implicitly by the composer instance + the
+  // article it's mounted on. We don't cache by article_id because each
+  // composer instance is mounted on a single article — TTL alone is
+  // sufficient.
+  const pickerCacheRef = useRef<{ at: number; data: ExpertPickerData } | null>(null);
 
   useEffect(() => {
     return () => {
@@ -103,15 +132,63 @@ export default function CommentComposer({
     })();
   }, [parentId]);
 
-  function getMentionQueryAtCursor(text: string, cursor: number): string | null {
+  // Returns either a bare-mention partial ({kind:'bare', q}) or an
+  // expert-picker partial ({kind:'expert', q}) at the cursor, or null
+  // when no mention token is being typed.
+  // Expert trigger: `@expert` exactly, OR `@expert_<partial>`. Anything
+  // else (`@expertise`, `@maria`, `@_`) routes to the bare picker.
+  function getMentionQueryAtCursor(
+    text: string,
+    cursor: number
+  ): { kind: 'bare'; q: string } | { kind: 'expert'; q: string } | null {
     const before = text.slice(0, cursor);
-    const match = before.match(/@(\w{1,30})$/);
-    return match ? match[1] : null;
+    const match = before.match(/@(\w{0,30})$/);
+    if (!match) return null;
+    const partial = match[1] || '';
+    // Expert picker: bare `@expert` (no underscore/letters yet) OR
+    // `@expert_<partial>`. Both open the picker; partial after the
+    // underscore is a directed-list filter applied client-side.
+    if (partial === 'expert' || partial.startsWith('expert_')) {
+      const q = partial === 'expert' ? '' : partial.slice('expert_'.length);
+      return { kind: 'expert', q };
+    }
+    if (partial.length === 0) return null;
+    return { kind: 'bare', q: partial };
+  }
+
+  async function fetchExpertPicker(): Promise<
+    | { ok: true; data: ExpertPickerData }
+    | { ok: false; reason: 'rate_limited' | 'kill_switch_off' | 'unknown' }
+  > {
+    const cached = pickerCacheRef.current;
+    if (cached && Date.now() - cached.at < PICKER_CACHE_TTL_MS) {
+      return { ok: true, data: cached.data };
+    }
+    let res: Response | null;
+    try {
+      res = await fetch(`/api/expert/picker?article_id=${encodeURIComponent(articleId)}`);
+    } catch {
+      return { ok: false, reason: 'unknown' };
+    }
+    if (!res) return { ok: false, reason: 'unknown' };
+    // 404 = kill switch off; silently fall back to bare picker.
+    if (res.status === 404) return { ok: false, reason: 'kill_switch_off' };
+    if (res.status === 429) return { ok: false, reason: 'rate_limited' };
+    if (!res.ok) return { ok: false, reason: 'unknown' };
+    const data = await res.json().catch(() => null) as ExpertPickerData | null;
+    if (!data || !Array.isArray(data.experts)) {
+      return { ok: false, reason: 'unknown' };
+    }
+    pickerCacheRef.current = { at: Date.now(), data };
+    return { ok: true, data };
   }
 
   function handleBodyChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const val = e.target.value;
     setBody(val);
+    // Any keystroke clears the transient picker notice — ratelimit /
+    // 4xx toasts are tied to the previous attempt, not the next one.
+    if (pickerNotice) setPickerNotice('');
 
     if (!canMention) return;
 
@@ -125,46 +202,91 @@ export default function CommentComposer({
       return;
     }
 
+    if (q.kind === 'expert') {
+      mentionTimerRef.current = setTimeout(async () => {
+        const result = await fetchExpertPicker();
+        if (!result.ok) {
+          setMentionSuggest(null);
+          if (result.reason === 'rate_limited') {
+            setPickerNotice('easy on the search — try again in a sec');
+          }
+          // kill_switch_off → silent fall-through (bare-only world)
+          return;
+        }
+        setMentionSuggest({ kind: 'expert', data: result.data, activeIndex: 0 });
+      }, 180);
+      return;
+    }
+
     mentionTimerRef.current = setTimeout(async () => {
-      const res = await fetch(`/api/comments/mention-search?q=${encodeURIComponent(q)}`).catch(() => null);
+      const res = await fetch(`/api/comments/mention-search?q=${encodeURIComponent(q.q)}`).catch(() => null);
       if (!res?.ok) return;
       const data = await res.json().catch(() => ({}));
       const users: SuggestUser[] = Array.isArray(data.users) ? data.users : [];
       if (users.length > 0) {
-        setMentionSuggest({ results: users, activeIndex: 0 });
+        setMentionSuggest({ kind: 'bare', results: users, activeIndex: 0 });
       } else {
         setMentionSuggest(null);
       }
     }, 180);
   }
 
+  // For the expert picker, walks across [broadcast, ...directedExperts].
+  // For the bare picker, walks across results[].
+  function suggestRowCount(s: NonNullable<MentionSuggest>): number {
+    if (s.kind === 'bare') return s.results.length;
+    return 1 + s.data.experts.length; // broadcast + directed
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (!mentionSuggest) return;
+    const total = suggestRowCount(mentionSuggest);
+    if (total === 0) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setMentionSuggest((s) => s ? { ...s, activeIndex: Math.min(s.activeIndex + 1, s.results.length - 1) } : s);
+      setMentionSuggest((s) =>
+        s ? { ...s, activeIndex: Math.min(s.activeIndex + 1, total - 1) } : s
+      );
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setMentionSuggest((s) => s ? { ...s, activeIndex: Math.max(s.activeIndex - 1, 0) } : s);
+      setMentionSuggest((s) =>
+        s ? { ...s, activeIndex: Math.max(s.activeIndex - 1, 0) } : s
+      );
     } else if (e.key === 'Enter' || e.key === 'Tab') {
-      if (mentionSuggest.results.length > 0) {
-        e.preventDefault();
-        insertMention(mentionSuggest.results[mentionSuggest.activeIndex].username);
-      }
+      e.preventDefault();
+      pickActive();
     } else if (e.key === 'Escape') {
       setMentionSuggest(null);
     }
   }
 
-  function insertMention(username: string) {
+  function pickActive() {
+    if (!mentionSuggest) return;
+    if (mentionSuggest.kind === 'bare') {
+      const item = mentionSuggest.results[mentionSuggest.activeIndex];
+      if (item) insertBareMention(item.username);
+      return;
+    }
+    // expert picker — index 0 is broadcast, 1+ is directed list
+    if (mentionSuggest.activeIndex === 0) {
+      insertExpertBroadcast();
+    } else {
+      const expert = mentionSuggest.data.experts[mentionSuggest.activeIndex - 1];
+      if (expert) insertExpertDirected(expert.username);
+    }
+  }
+
+  function replacePartialAtCursor(token: string) {
     const ta = textareaRef.current;
     if (!ta) return;
     const cursor = ta.selectionStart ?? body.length;
     const before = body.slice(0, cursor);
     const after = body.slice(cursor);
+    // Match the same pattern getMentionQueryAtCursor uses so we replace
+    // exactly the partial token the user is typing.
     const match = before.match(/@\w{0,30}$/);
     if (!match || match.index === undefined) return;
-    const newBefore = before.slice(0, match.index) + '@' + username + ' ';
+    const newBefore = before.slice(0, match.index) + token + ' ';
     const newBody = newBefore + after;
     setBody(newBody);
     setMentionSuggest(null);
@@ -174,6 +296,28 @@ export default function CommentComposer({
         ta.focus();
       }
     }, 0);
+  }
+
+  function insertBareMention(username: string) {
+    replacePartialAtCursor('@' + username);
+  }
+
+  function insertExpertBroadcast() {
+    replacePartialAtCursor('@expert');
+  }
+
+  function insertExpertDirected(username: string) {
+    // Spec §2: "no duplicate @ of the same expert in one comment."
+    // Composer prevents — guard before inserting and surface the same
+    // lowercase copy the server uses.
+    const token = `@expert_${username}`;
+    const re = new RegExp(`(?<![a-zA-Z0-9_])${escapeRe(token)}(?![a-zA-Z0-9_])`, 'i');
+    if (re.test(body)) {
+      setPickerNotice("you've already @'d this expert in this comment.");
+      setMentionSuggest(null);
+      return;
+    }
+    replacePartialAtCursor(token);
   }
 
   async function resolveMentions(text: string): Promise<Mention[]> {
@@ -199,25 +343,48 @@ export default function CommentComposer({
   // The fix is to ask the server "can I mention these?" before submit and
   // block on a no-go reason. The post_comment RPC re-validates plan +
   // blocks server-side as defense-in-depth (S1 ships that change).
-  async function checkCanMention(
-    usernames: string[]
-  ): Promise<
+  // Wave 4b — switched payload from `{usernames}` to `{body, article_id}`
+  // so the server route extracts both bare and expert tokens itself and
+  // runs the asker mention-cap RPC when the kill switch is on. The route
+  // still supports the legacy `{usernames}` shape for any other caller.
+  // New error reasons:
+  //   - 429 mention_cap_hit       → cap-hit composer copy (lowercase)
+  //   - 400 duplicate_expert_mention (only fires from POST /api/comments,
+  //     not /can-mention; documented here for reference)
+  async function checkCanMention(): Promise<
     | { ok: true; unresolved?: string[] }
-    | { ok: false; reason: 'free_tier_mention_disabled' | 'mentioned_user_blocks_you' | 'unknown'; usernames?: string[] }
+    | {
+        ok: false;
+        reason:
+          | 'free_tier_mention_disabled'
+          | 'mentioned_user_blocks_you'
+          | 'mention_cap_hit'
+          | 'unknown';
+        usernames?: string[];
+        composer_message?: string;
+      }
   > {
-    if (usernames.length === 0) return { ok: true };
     try {
       const res = await fetch('/api/comments/can-mention', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernames }),
+        body: JSON.stringify({ body, article_id: articleId }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         allowed?: boolean;
         reason?: string;
         usernames?: string[];
         unresolved?: string[];
+        error?: string;
+        composer_message?: string;
       };
+      if (res.status === 429 && data?.error === 'mention_cap_hit') {
+        return {
+          ok: false,
+          reason: 'mention_cap_hit',
+          composer_message: data.composer_message,
+        };
+      }
       if (!res.ok) return { ok: false, reason: 'unknown' };
       if (data.allowed === false) {
         const reason =
@@ -245,14 +412,21 @@ export default function CommentComposer({
 
     // Extract @-tokens once. MENTION_RE is `/g`-flagged so we deliberately
     // re-iterate rather than call .test() (which carries lastIndex).
+    // Note: under kill-switch ON the server parses both bare + expert
+    // tokens itself; we only use this list to gate the legacy free-tier
+    // mention check (no expert tokens → still fires). Expert presence
+    // is detected by a separate regex below.
     const mentionNames = Array.from(
       new Set([...trimmed.matchAll(MENTION_RE)].map((m) => m[1]))
     );
+    const hasExpertToken =
+      /(?<![a-zA-Z0-9_])@expert(?:_[a-zA-Z0-9_]{2,30})?(?![a-zA-Z0-9_])/.test(trimmed);
 
-    // Pre-submit lock — only fires when the draft has @-tokens. No
-    // tokens → straight to the post path with zero extra latency.
-    if (mentionNames.length > 0) {
-      const verdict = await checkCanMention(mentionNames);
+    // Pre-submit lock — fires when the draft has any @-token (bare or
+    // expert). The server route's own snapshot decides which gates apply
+    // based on kill-switch state. No tokens → skip the round-trip.
+    if (mentionNames.length > 0 || hasExpertToken) {
+      const verdict = await checkCanMention();
       if (!verdict.ok) {
         setBusy(false);
         if (verdict.reason === 'free_tier_mention_disabled') {
@@ -265,6 +439,12 @@ export default function CommentComposer({
             blocked
               ? `You can't mention @${blocked} — they've blocked you.`
               : "You can't mention that user — they've blocked you."
+          );
+        } else if (verdict.reason === 'mention_cap_hit') {
+          // Spec §2 mandates the literal lowercase copy from the server.
+          setError(
+            verdict.composer_message ||
+              'you reached your mentions for today.'
           );
         } else {
           setError(COPY.comments.postFailed);
@@ -289,6 +469,23 @@ export default function CommentComposer({
       if (data.preview) {
         setBusy(false);
         setError('Preview mode — comment not saved.');
+        return;
+      }
+      // Wave 4b — server-side rejections that need lowercase composer copy
+      // surfaced verbatim per spec §2.
+      if (res.status === 400 && data?.error === 'duplicate_expert_mention') {
+        setBusy(false);
+        setError(
+          data.composer_message ||
+            "you've already @'d this expert in this comment."
+        );
+        return;
+      }
+      if (res.status === 429 && data?.error === 'mention_cap_hit') {
+        setBusy(false);
+        setError(
+          data.composer_message || 'you reached your mentions for today.'
+        );
         return;
       }
       if (!res.ok) throw new Error(friendlyError(data?.error, 'Could not post'));
@@ -368,12 +565,17 @@ export default function CommentComposer({
         rows={isReply ? 2 : 3}
         style={textareaStyle}
       />
-      {mentionSuggest && mentionSuggest.results.length > 0 && (
+      {pickerNotice && (
+        <div role="status" style={pickerNoticeStyle}>
+          {pickerNotice}
+        </div>
+      )}
+      {mentionSuggest?.kind === 'bare' && mentionSuggest.results.length > 0 && (
         <div style={mentionDropdownStyle}>
           {mentionSuggest.results.map((u, i) => (
             <button
               key={u.id}
-              onMouseDown={(e) => { e.preventDefault(); insertMention(u.username); }}
+              onMouseDown={(e) => { e.preventDefault(); insertBareMention(u.username); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -424,6 +626,141 @@ export default function CommentComposer({
           ))}
         </div>
       )}
+      {mentionSuggest?.kind === 'expert' && (() => {
+        const sugg = mentionSuggest;
+        const data = sugg.data;
+        // Apply the post-`expert_` partial as a starts-with filter so
+        // typing `@expert_m` narrows the directed list to usernames
+        // beginning with "m". Empty partial → full list.
+        const cursor = textareaRef.current?.selectionStart ?? body.length;
+        const before = body.slice(0, cursor);
+        const partialMatch = before.match(/@expert_([a-zA-Z0-9_]{0,30})$/);
+        const partial = (partialMatch?.[1] ?? '').toLowerCase();
+        const filtered = partial
+          ? data.experts.filter((e) => e.username.toLowerCase().startsWith(partial))
+          : data.experts;
+        const broadcastLabel = data.category_name
+          ? `Ask all experts in ${data.category_name}`
+          : 'Ask all experts in this category';
+        // Active index walks across [broadcast, ...filtered]. The
+        // up-front `data.experts` list drives keyboard nav; filtering
+        // resets the visible window — clamp the displayed active index
+        // to the filtered length so we don't visually overshoot.
+        const visibleActive = Math.min(sugg.activeIndex, filtered.length);
+        return (
+          <div style={mentionDropdownStyle}>
+            <button
+              onMouseDown={(e) => { e.preventDefault(); insertExpertBroadcast(); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: '100%',
+                padding: '7px 10px',
+                border: 'none',
+                background: visibleActive === 0 ? 'rgba(22,163,74,0.10)' : 'rgba(22,163,74,0.04)',
+                cursor: 'pointer',
+                borderRadius: 6,
+                textAlign: 'left',
+                borderBottom: filtered.length > 0 ? '1px solid var(--border, #e5e5e5)' : 'none',
+                marginBottom: filtered.length > 0 ? 4 : 0,
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  background: 'var(--success-text)',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#fff',
+                }}
+              >
+                ★
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--success-text)' }}>
+                {broadcastLabel}
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: 'var(--dim, #888)',
+                  marginLeft: 'auto',
+                }}
+              >
+                Broadcast
+              </span>
+            </button>
+            {filtered.length === 0 && partial.length === 0 && (
+              <div style={{ fontSize: 12, color: 'var(--dim, #666)', padding: '6px 10px' }}>
+                No experts in this category are available right now.
+              </div>
+            )}
+            {filtered.map((u, i) => {
+              const idx = i + 1; // 0 is broadcast
+              return (
+                <button
+                  key={u.id}
+                  onMouseDown={(e) => { e.preventDefault(); insertExpertDirected(u.username); }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    padding: '6px 10px',
+                    border: 'none',
+                    background: idx === sugg.activeIndex ? 'rgba(17,17,17,0.06)' : 'transparent',
+                    cursor: 'pointer',
+                    borderRadius: 6,
+                    textAlign: 'left',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      background: u.avatar_color || '#ccc',
+                      backgroundImage: u.avatar_url ? `url(${u.avatar_url})` : undefined,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#fff',
+                    }}
+                  >
+                    {!u.avatar_url && u.username ? u.username[0].toUpperCase() : ''}
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text, #1a1a1a)' }}>
+                    @expert_{u.username}
+                  </span>
+                  {u.expert_title && (
+                    <span style={{ fontSize: 12, color: 'var(--dim, #666)', marginLeft: 2 }}>
+                      {u.expert_title}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--success-text)', marginLeft: 'auto' }}>
+                    Expert
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
       {!isReply && (
         <div style={{ fontSize: 12, color: 'var(--dim, #666)', marginBottom: 10, lineHeight: 1.5 }}>
           Others passed a quiz to read this. Make it worth their time.
@@ -533,6 +870,20 @@ const mentionHintStyle: CSSProperties = {
   marginBottom: 8,
   lineHeight: 1.4,
 };
+const pickerNoticeStyle: CSSProperties = {
+  fontSize: 12,
+  color: 'var(--dim, #666)',
+  background: 'var(--card, #f7f7f7)',
+  border: '1px solid var(--border, #e5e5e5)',
+  borderRadius: 8,
+  padding: '6px 10px',
+  marginBottom: 8,
+};
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const muteBannerStyle: CSSProperties = {
   border: '1px solid var(--danger-border)',
   borderRadius: 12,

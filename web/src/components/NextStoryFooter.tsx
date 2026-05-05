@@ -23,7 +23,7 @@ export default function NextStoryFooter({ category, nearbyStories }: NextStoryFo
           >
             More in{' '}
             <Link
-              href={`/category/${category.slug}`}
+              href={`/?cat=${category.slug}`}
               style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
             >
               {category.name}

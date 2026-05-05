@@ -8,6 +8,11 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { getSettings, getNumber } from '@/lib/settings';
 import { COPY } from '@/lib/copy';
 import { renderBodyHtml } from '@/lib/pipeline/render-body';
+import { parseMentions } from '@/lib/mentions';
+import {
+  getExpertConfigSnapshot,
+  getSettingBoolean,
+} from '@/lib/expertConfig';
 
 // T173 — defense-in-depth body length cap mirroring POST /api/comments. The
 // edit_comment RPC enforces internally; this fast-fails hostile or runaway
@@ -139,15 +144,21 @@ export async function PATCH(request, { params }) {
     );
   }
 
+  // EXPERT_THREADS.md Wave 3 — kill-switch read-once-per-TXN (mitigation
+  // §2 #12). Snapshot pinned for the rest of the request.
+  const expertConfig = await getExpertConfigSnapshot();
+
   // T280 — cap the self-edit window to 10 minutes so authors can fix typos
   // but can't silently rewrite a comment after it has been replied to,
   // quoted, or reported. Mods/admins use the moderation surface, which
   // gates on a different permission and isn't affected. The RPC is
   // SECURITY DEFINER so we read the row through the service client first.
+  // Wave 3: extend the SELECT to pull `body` (for OLD-expert-mention
+  // re-extraction) and `article_id` (for commit_expert_mentions).
   const EDIT_WINDOW_MS = 10 * 60 * 1000;
   const { data: existing, error: lookupErr } = await service
     .from('comments')
-    .select('user_id, created_at')
+    .select('user_id, created_at, body, article_id, parent_id')
     .eq('id', id)
     .maybeSingle();
   if (lookupErr || !existing) {
@@ -189,6 +200,165 @@ export async function PATCH(request, { params }) {
     );
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // EXPERT_THREADS.md Wave 3 — edit-time expert-mention enforcement
+  // (kill switch ON). Compute newly_added / newly_removed from the OLD
+  // body's expert tokens vs the NEW body's; reject duplicates; recheck
+  // the asker cap on the evaluator delta; commit counters + notifications
+  // for newly-added targets only.
+  // ──────────────────────────────────────────────────────────────────────
+  let editExpertNewlyAvailableIds = []; // ids to commit + notify (newly added AND not at quota)
+  let editExpertNewlyAddedRows = []; // [{user_id, username}] newly-added directed targets
+  if (expertConfig.killSwitch) {
+    const oldParts = parseMentions(existing.body || '');
+    const newParts = parseMentions(body);
+
+    // Server defense for "no duplicate @ of the same expert" on the new
+    // body (parser dedupes silently — re-scan to detect dupes pre-dedup).
+    if (newParts.expertDirected.length > 0) {
+      const counts = new Map();
+      const EXPERT_TOKEN_RE_LOCAL =
+        /(?<![a-zA-Z0-9_])@expert(?:_([a-zA-Z0-9_]{2,30}))?(?![a-zA-Z0-9_])/g;
+      for (const m of body.matchAll(EXPERT_TOKEN_RE_LOCAL)) {
+        const u = m[1];
+        if (!u) continue;
+        const lc = u.toLowerCase();
+        counts.set(lc, (counts.get(lc) || 0) + 1);
+        if (counts.get(lc) > 1) {
+          return NextResponse.json(
+            {
+              error: 'duplicate_expert_mention',
+              composer_message: "you've already @'d this expert in this comment.",
+            },
+            { status: 400, headers: NO_STORE }
+          );
+        }
+      }
+    }
+
+    // Set arithmetic on directed usernames (already lowercased + deduped
+    // by parser). Broadcast is treated as one slot per side: a broadcast
+    // present in NEW but not OLD adds 1; removed subtracts 1.
+    const oldDirected = new Set(oldParts.expertDirected);
+    const newDirected = new Set(newParts.expertDirected);
+    const newlyAddedDirected = [...newDirected].filter((u) => !oldDirected.has(u));
+    const newlyRemovedDirected = [...oldDirected].filter((u) => !newDirected.has(u));
+    const broadcastAdded = newParts.expertBroadcast && !oldParts.expertBroadcast;
+    const broadcastRemoved = oldParts.expertBroadcast && !newParts.expertBroadcast;
+
+    const newlyAddedCount = newlyAddedDirected.length + (broadcastAdded ? 1 : 0);
+    const newlyRemovedCount =
+      newlyRemovedDirected.length + (broadcastRemoved ? 1 : 0);
+
+    // Cap evaluator: spec §2 default `expert.mentions.edit_refunds_removed`
+    // = true → max(0, added - removed). When false → just `added`.
+    const refundsRemoved = await getSettingBoolean(
+      'expert.mentions.edit_refunds_removed',
+      true
+    );
+    const evaluatorValue = refundsRemoved
+      ? Math.max(0, newlyAddedCount - newlyRemovedCount)
+      : newlyAddedCount;
+
+    // The cap RPC requires p_n_targets >= 1 (it raises 22023 otherwise).
+    // Zero-delta edits skip the recheck — nothing to reserve.
+    if (evaluatorValue > 0) {
+      // p_is_broadcast: spec uses one bool for the whole reservation. If
+      // ANY of the newly-added targets is a broadcast, treat the slot as
+      // broadcast (multiplied by broadcast_cost inside the RPC). When the
+      // reservation contains both directed adds AND a broadcast add, we
+      // do two calls so each side gets the right cost — directed = 1×,
+      // broadcast = broadcast_cost×.
+      const directedAddCount = newlyAddedDirected.length;
+      const reservations = [];
+      if (directedAddCount > 0 && !broadcastAdded) {
+        reservations.push({ n: directedAddCount, broadcast: false });
+      } else if (broadcastAdded && directedAddCount === 0) {
+        reservations.push({ n: 1, broadcast: true });
+      } else if (broadcastAdded && directedAddCount > 0) {
+        // Mixed add: split.
+        reservations.push({ n: directedAddCount, broadcast: false });
+        reservations.push({ n: 1, broadcast: true });
+      }
+      // If `evaluatorValue` after refund is < `directedAddCount + (broadcast?1:0)`,
+      // we still call with the gross add counts — refund semantics are
+      // applied by NOT charging for removals separately. (The cap RPC has
+      // no "credit" mode; the only way to refund is to call it with a
+      // smaller reservation. To keep semantics simple, when refunds are
+      // enabled and removed >= added, we skip the call entirely; otherwise
+      // we charge the gross add and tolerate a small over-charge equal to
+      // the refunded slot count.)
+      if (refundsRemoved && newlyRemovedCount >= newlyAddedCount) {
+        // Net add ≤ 0 — no reservation needed.
+      } else {
+        for (const r of reservations) {
+          const { data: capData, error: capErr } = await service.rpc(
+            'check_and_reserve_asker_mention_cap',
+            {
+              p_user_id: user.id,
+              p_n_targets: r.n,
+              p_is_broadcast: r.broadcast,
+            }
+          );
+          if (capErr) {
+            console.error('[comments.PATCH.expert.cap]', capErr);
+            return NextResponse.json(
+              { error: 'cap_check_failed' },
+              { status: 500, headers: NO_STORE }
+            );
+          }
+          if (capData && capData.allowed === false) {
+            return NextResponse.json(
+              {
+                error: 'mention_cap_hit',
+                composer_message: 'you reached your mentions for today.',
+                detail: capData,
+              },
+              { status: 429, headers: NO_STORE }
+            );
+          }
+        }
+      }
+    }
+
+    // Resolve newly-added directed usernames → ids for the post-update
+    // commit + notification work (only after the edit_comment RPC succeeds
+    // below).
+    if (newlyAddedDirected.length > 0) {
+      const { data: rows, error: resolveErr } = await service
+        .from('users')
+        .select('id, username')
+        .in('username', newlyAddedDirected);
+      if (resolveErr) {
+        console.error('[comments.PATCH.expert.resolve]', resolveErr);
+      } else {
+        editExpertNewlyAddedRows = (rows || []).filter(
+          (r) => typeof r.id === 'string' && typeof r.username === 'string'
+        );
+      }
+
+      if (editExpertNewlyAddedRows.length > 0) {
+        const directedIds = editExpertNewlyAddedRows.map((r) => r.id);
+        const { data: quotaData, error: quotaErr } = await service.rpc(
+          'check_expert_mention_quota',
+          {
+            p_target_user_ids: directedIds,
+            p_article_id: existing.article_id,
+          }
+        );
+        if (quotaErr) {
+          console.error('[comments.PATCH.expert.quota]', quotaErr);
+          editExpertNewlyAvailableIds = [];
+        } else {
+          const available = Array.isArray(quotaData?.available)
+            ? quotaData.available
+            : [];
+          editExpertNewlyAvailableIds = available;
+        }
+      }
+    }
+  }
+
   const { error } = await service.rpc('edit_comment', {
     p_user_id: user.id,
     p_comment_id: id,
@@ -200,6 +370,57 @@ export async function PATCH(request, { params }) {
       fallbackStatus: 400,
       headers: NO_STORE,
     });
+
+  // Post-update expert work: commit counters for newly-added available
+  // targets and write one notification row per newly-added available
+  // target. Spec calls out NOT decrementing for `newly_removed` — refund
+  // semantics live entirely at the cap-evaluator delta.
+  if (
+    expertConfig.killSwitch &&
+    editExpertNewlyAvailableIds.length > 0 &&
+    existing.article_id
+  ) {
+    const { error: commitErr } = await service.rpc('commit_expert_mentions', {
+      p_asker_id: user.id,
+      p_target_user_ids: editExpertNewlyAvailableIds,
+      p_article_id: existing.article_id,
+    });
+    if (commitErr) {
+      console.error('[comments.PATCH.expert.commit]', commitErr);
+    }
+
+    const availableSet = new Set(editExpertNewlyAvailableIds);
+    const actorUsername = user?.username || user?.user_metadata?.username || null;
+    const notifRows = [];
+    for (const row of editExpertNewlyAddedRows) {
+      if (!availableSet.has(row.id)) continue; // inert
+      if (row.id === user.id) continue;
+      notifRows.push({
+        user_id: row.id,
+        type: 'mention',
+        title: actorUsername
+          ? `@${actorUsername} mentioned you as an expert`
+          : 'You were mentioned as an expert',
+        body: typeof body === 'string' ? body.slice(0, 280) : null,
+        metadata: {
+          comment_id: id,
+          article_id: existing.article_id,
+          actor_user_id: user.id,
+          actor_username: actorUsername,
+          mention_kind: 'expert_directed',
+          via_edit: true,
+          kill_switch_version: expertConfig.version,
+        },
+      });
+    }
+    if (notifRows.length > 0) {
+      const { error: notifErr } = await service.from('notifications').insert(notifRows);
+      if (notifErr) {
+        console.error('[comments.PATCH.expert.notif_insert]', notifErr);
+      }
+    }
+  }
+
   return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }
 

@@ -45,6 +45,23 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
   },
   poweredByHeader: false,
+  async redirects() {
+    // The standalone `/category/[id]` route was retired in favour of
+    // `/?cat=<slug>` filtering in the home shell. Old external links are
+    // 301'd. The `?sub=` query param can't be templated into the
+    // destination via Next.js redirect syntax (named query captures are
+    // not interpolated back), so URLs that carried a sub will land on the
+    // parent-category-filtered home and drop the sub. Acceptable for now;
+    // the destination page can re-resolve the sub from the URL once we
+    // wire that pass.
+    return [
+      {
+        source: '/category/:slug',
+        destination: '/?cat=:slug',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },

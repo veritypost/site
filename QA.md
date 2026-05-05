@@ -1032,6 +1032,20 @@ Keep ≤8 lines. If investigation grows, spin a finding doc under `UI_UX_REVIEW/
 - **Ready for fix:** n/a — shipped 2026-05-04. Awaiting owner in-browser run.
 - **Notes for next agent:** do NOT re-edit any of the seven touched surfaces until smoke passes or owner reports a failure. If `Run Feed` returns 409 unexpectedly, run `SELECT id, started_at FROM public.pipeline_runs WHERE pipeline_type='ingest' AND status='running'` via Supabase MCP — if the row's started_at is older than 10 minutes, the in-route reaper at /api/newsroom/ingest/run should pick it up on the next click; if the row is fresh AND no operator is actively triggering, that's a stuck Vercel lambda — wait 10 min then retry. If the staleStreaks list grows beyond 25 routinely, that's signal that operator-side feed pruning is overdue. Do NOT loosen the singleflight index — that's the sole protection against the error_count read-modify-write race and against double-cluster-insertion on overlapping runs. Do NOT remove the pipeline_type='ingest' filter on /api/admin/pipeline/health — it's the boundary that keeps generate-pipeline error messages out of admin.pipeline.run_ingest's reach.
 
+#### 23. Dead ad placement rows: `category_top` + `category_in_feed_1`
+
+- **Cluster:** other / data-cleanup
+- **What was seen:** Two `ad_placements` rows (`category_top`, `category_in_feed_1`) sit `is_active=true` with zero `ad_units`. Sole consumer (`/category/[id]` route) was folded into home as a `?cat=`/`?sub=` filter on 2026-05-05 and is now 301-redirected to `/?cat=...` — placements are unreachable.
+- **Surface:** DB rows in `public.ad_placements` where `name IN ('category_top','category_in_feed_1')`; legacy consumer at `web/src/app/category/[id]/page.js` (file still on disk; route gated by redirect added in `web/next.config.js` 2026-05-05).
+- **Associated:** `web/src/app/page.tsx` (home — 4/4 expert panel verdict 2026-05-05 to keep `home_*` placements firing on filtered views; subcategory attribution already lives on `articles.subcategory_id` and `events.subcategory_slug`, so placement-name forking adds no analytical power).
+- **Cross-platform parity:** web only. N/A iOS / kids (placements are server-side DB rows + web ad slot keys).
+- **Known context:** placements are noise; leaving them active risks future operators assuming they're meaningful and wiring creatives into a slot that no surface fires. Cleanest fix is `is_active=false` (soft) or row delete (hard). Decision blocks on whether to preserve historical impression FK rows from any pre-2026-05-05 traffic on the standalone category page.
+- **Confirmed:** yes (2026-05-05 — Supabase MCP: `category_top` and `category_in_feed_1` both 0 active units; redirect verified in `web/next.config.js`; standalone consumer route confirmed unreachable).
+- **Owner decision needed:** small — soft-deactivate (`is_active=false`, retain row + any impression FKs intact) vs. hard-delete (DELETE row + check `ad_impressions` cascade). Default = soft (preserves historical analytics; one UPDATE).
+- **Status:** confirmed (owner micro-decision pending).
+- **Ready for fix:** no — owner decision required.
+- **Notes for next agent:** doc-only finding. Do NOT mutate either DB row without owner call. If soft: single UPDATE on `ad_placements`. If hard: first query `pg_constraint` for `ad_impressions.placement_id` FK cascade behavior; only proceed if cascade is `SET NULL` or impressions are intentionally being dropped. Admin UI at `/admin/ads` (if present) is the preferred surface over raw SQL.
+
 ### 8.3. Roll-up by cluster
 
 #### Ready for fix (decision-locked, fix session can pull these)

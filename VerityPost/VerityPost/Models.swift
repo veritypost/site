@@ -322,6 +322,58 @@ struct ReadingLogItem: Codable, Identifiable {
     }
 }
 
+// MARK: - Expert Application
+//
+// Mirrors the `expert_applications` row used by Wave 4a/4b/5 settings UI:
+// pause modes, quiet hours, mention caps, iOS push prefs. The legacy
+// `vacation_until` column stays — "Until a date" pause mode writes to it
+// (existing API at /api/expert/vacation, replaced by /api/expert/availability
+// for the unified Pause/Quiet/Days save path).
+//
+// Spec: EXPERT_THREADS.md §2.5 expert_applications columns table + §B (Wave 5).
+
+struct ExpertApplication: Codable, Identifiable {
+    let id: String
+    var userId: String?
+    var status: String?
+    var applicationType: String?
+    var credentials: String?
+    var rejectionReason: String?
+    /// "Until a date" pause state — ISO timestamp, NULL when off / indefinite.
+    var vacationUntil: Date?
+    /// "Until I turn it back on" pause state.
+    var pauseUntilIndefinite: Bool?
+    /// Quiet hours window — "HH:MM[:SS]" times, NULL when disabled.
+    var mentionQuietHoursStart: String?
+    var mentionQuietHoursEnd: String?
+    /// Day-of-week ints (0=Sun..6=Sat). NULL when quiet hours disabled.
+    var mentionQuietHoursDays: [Int]?
+    /// Per-article mention cap. Default 3 (`expert.default_per_post_quota`).
+    var mentionQuotaPerPost: Int?
+    /// Per-day mention cap. Default 25 (`expert.default_per_day_quota`).
+    var mentionQuotaPerDay: Int?
+    /// iOS-only push opt-ins. Both off by default; web shows them as
+    /// read-only "Push managed in iOS app" when at least one is true.
+    var notifyPushOnMention: Bool?
+    var notifyPushOnCategoryArrival: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case id, status, credentials
+        case userId = "user_id"
+        case applicationType = "application_type"
+        case rejectionReason = "rejection_reason"
+        case vacationUntil = "vacation_until"
+        case pauseUntilIndefinite = "pause_until_indefinite"
+        case mentionQuietHoursStart = "mention_quiet_hours_start"
+        case mentionQuietHoursEnd = "mention_quiet_hours_end"
+        case mentionQuietHoursDays = "mention_quiet_hours_days"
+        case mentionQuotaPerPost = "mention_quota_per_post"
+        case mentionQuotaPerDay = "mention_quota_per_day"
+        case notifyPushOnMention = "notify_push_on_mention"
+        case notifyPushOnCategoryArrival = "notify_push_on_category_arrival"
+    }
+}
+
 // MARK: - Comment
 
 struct VPComment: Codable, Identifiable {
@@ -333,6 +385,18 @@ struct VPComment: Codable, Identifiable {
     var isPinned: Bool?
     var isContextPinned: Bool?
     var isExpertReply: Bool?
+    /// EXPERT_THREADS Wave 5 — comments thread-mode columns. The root
+    /// comment of an expert thread (depth 0 with `@expert` token) carries
+    /// `is_expert_thread_root=true`; replies below it carry an
+    /// `expert_thread_root_id` pointing at the root. `expert_thread_closed_at`
+    /// is set when the asker closes the thread; mods reopen by clearing it
+    /// + setting `last_reopen_at`. See spec §4 (schema additions) + §2
+    /// (thread mode locked decisions).
+    var isExpertThreadRoot: Bool?
+    var expertThreadRootId: String?
+    var expertThreadClosedAt: Date?
+    var expertThreadClosedBy: String?
+    var lastReopenAt: Date?
     var upvoteCount: Int?
     var downvoteCount: Int?
     var createdAt: Date?
@@ -398,6 +462,13 @@ struct VPComment: Codable, Identifiable {
         var avatarColor: String?
         var avatarUrl: String?
         var avatar: VPUser.AvatarRef?
+        /// EXPERT_THREADS Wave 5 — author's verified expert categories.
+        /// Distinctive expert reply chrome attaches when
+        /// `isExpert == true AND article.categoryId ∈ verifiedCategoryIds`,
+        /// per spec §2 "Distinctive expert reply chrome — attaches to
+        /// author.is_expert AND article.category ∈ author.verified_categories,
+        /// NOT to thread mode."
+        var verifiedCategoryIds: [String]?
 
         enum CodingKeys: String, CodingKey {
             case id, username, avatar
@@ -405,6 +476,7 @@ struct VPComment: Codable, Identifiable {
             case isVerifiedPublicFigure = "is_verified_public_figure"
             case avatarColor = "avatar_color"
             case avatarUrl = "avatar_url"
+            case verifiedCategoryIds = "verified_category_ids"
         }
     }
 
@@ -421,6 +493,11 @@ struct VPComment: Codable, Identifiable {
         case isPinned = "is_pinned"
         case isContextPinned = "is_context_pinned"
         case isExpertReply = "is_expert_reply"
+        case isExpertThreadRoot = "is_expert_thread_root"
+        case expertThreadRootId = "expert_thread_root_id"
+        case expertThreadClosedAt = "expert_thread_closed_at"
+        case expertThreadClosedBy = "expert_thread_closed_by"
+        case lastReopenAt = "last_reopen_at"
         case upvoteCount = "upvote_count"
         case downvoteCount = "downvote_count"
         case createdAt = "created_at"

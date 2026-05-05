@@ -114,6 +114,12 @@ export function ProfileApp({ defaultSection }: Props) {
           if (!cancelled && typeof n === 'number') setUnreadMessages(n);
         })
         .catch(() => {});
+      // Prime the perms cache before first render. NavWrapper loads perms in
+      // parallel but ProfileApp would otherwise read an empty cache on cold
+      // load and lock every perm-gated section until the 60s tick fires.
+      await refreshIfStale();
+      if (cancelled) return;
+      setPermsTick((t) => t + 1);
       setResolved(true);
     })();
     return () => {
@@ -316,6 +322,10 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '✉',
       group: 'Library',
       title: 'Messages',
+      // Hide entirely for users whose plan/role doesn't grant DM inbox —
+      // no need to advertise a feature that isn't on their plan.
+      // Owner-mode keeps the backstage view per the §8.4 lock.
+      hidden: !isOwnerMode && !perms.messagesInbox,
       locked: !isOwnerMode && !perms.messagesInbox,
       bypassed: isOwnerMode && !perms.messagesInbox,
       badge:
@@ -349,6 +359,10 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '◓',
       group: 'Family & expert',
       title: 'Family & kids',
+      // Hide entirely for users who aren't on a family plan — no need to
+      // show a "this is paid" lock for a feature that isn't on their plan.
+      // Owner-mode still sees it as a backstage pass.
+      hidden: !isOwnerMode && !perms.family,
       locked: !isOwnerMode && !perms.family,
       bypassed: isOwnerMode && !perms.family,
       reason: 'Manage kid accounts, seats, and supervisors on your plan.',
@@ -370,11 +384,14 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '✦',
       group: 'Family & expert',
       title: 'Expert queue',
+      // Non-experts (and non-owner-mode users) don't need the queue rail at
+      // all — hide the section instead of showing a lock affordance.
+      hidden: !isOwnerMode && !u.is_expert,
       locked: !isOwnerMode && !(perms.expertQueue && u.is_expert),
       bypassed: isOwnerMode && !(perms.expertQueue && u.is_expert),
       reason:
-        'Questions waiting on a verified answer in your areas — plus the back-channel for experts in those areas.',
-      keywords: ['expert', 'queue', 'questions', 'answer', 'back-channel', 'backchannel'],
+        'Questions waiting on a verified answer in your areas — plus expert chat for verified experts in those areas.',
+      keywords: ['expert', 'queue', 'questions', 'answer', 'chat', 'back-channel', 'backchannel'],
       render: () => <ExpertQueueSection preview={false} />,
     },
     {
@@ -382,6 +399,10 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '✎',
       group: 'Family & expert',
       title: 'Expert profile',
+      // Hide for non-experts unless they have a pending application (they
+      // need this section to track their application status). Owner-mode
+      // always sees it as a backstage pass.
+      hidden: !isOwnerMode && !u.is_expert && expertStatus !== 'pending',
       locked: !isOwnerMode && !(u.is_expert || expertStatus === 'pending'),
       bypassed: isOwnerMode && !(u.is_expert || expertStatus === 'pending'),
       reason: 'Your credentials, verified areas, and vacation status.',

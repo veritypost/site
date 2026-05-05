@@ -4,11 +4,28 @@ import Avatar from './Avatar';
 import VerifiedBadge from './VerifiedBadge';
 import CommentComposer from './CommentComposer';
 import { hasPermission } from '@/lib/permissions';
-import { MENTION_RE } from '@/lib/mentions';
 import { timeAgo } from '@/lib/dates';
 import type { Database } from '@/types/database';
 
 type CommentRowDb = Database['public']['Tables']['comments']['Row'];
+
+// EXPERT_THREADS Wave 4b — chain row drives asker affordances + grant.
+type ExpertThreadChain = {
+  thread_root_id: string;
+  asker_user_id: string;
+  expert_user_id: string;
+  asker_reply_count: number;
+  free_pass_granted_at: string | null;
+};
+
+// Spec-mandated cap default (D14 / plan_features); tunable per-plan but
+// for the asker affordance the constant fits all current plans (2/chain).
+const ASKER_REPLIES_PER_CHAIN_CAP = 2;
+
+type CloseResult =
+  | { ok: true }
+  | { ok: false; reason: 'wait_for_cooldown'; seconds_remaining: number }
+  | { ok: false; reason: 'unknown' };
 
 type CommentUser = {
   id?: string;
@@ -41,6 +58,12 @@ export type EnrichedComment = CommentRowDb & {
   cite_needed_count?: number | null;
   off_topic_count?: number | null;
   quality_score?: number | null;
+  // EXPERT_THREADS Wave 4b — newer columns the generated db.ts may not
+  // yet carry. Kept optional so loadAll's `select('*')` unwraps cleanly.
+  is_expert_thread_root?: boolean | null;
+  expert_thread_root_id?: string | null;
+  expert_thread_closed_at?: string | null;
+  last_reopen_at?: string | null;
 };
 
 interface CommentRowProps {
@@ -54,6 +77,16 @@ interface CommentRowProps {
   viewerIsSupervisor?: boolean;
   helpfulThreshold?: number;
   tagKinds?: TagKind[];
+  // EXPERT_THREADS Wave 4b — drives author-attribute-driven expert chrome
+  // + chain-cap affordances + close/reopen/grant buttons.
+  articleCategoryId?: string | null;
+  verifiedCategoriesByUser?: Record<string, Set<string>>;
+  chainsByRoot?: Record<string, Record<string, ExpertThreadChain>>;
+  rootAuthorByRoot?: Record<string, string>;
+  inertVisualGiveaway?: boolean;
+  onCloseThread?: (rootId: string) => Promise<CloseResult>;
+  onReopenThread?: (rootId: string) => Promise<boolean>;
+  onGrantFollowup?: (rootId: string, askerUserId: string) => Promise<boolean>;
   onToggleTag: (commentId: string, tagKind: TagKind) => void | Promise<void>;
   onDelete: (commentId: string) => void;
   onEdit: (commentId: string, body: string) => void | Promise<void>;
@@ -67,15 +100,70 @@ interface CommentRowProps {
 
 const DEFAULT_TAG_KINDS: TagKind[] = ['helpful', 'context', 'cite_needed', 'off_topic'];
 
-function renderBody(body: string, mentions: Mention[] = []): ReactNode[] {
+// EXPERT_THREADS Wave 4b — render expert tokens (`@expert` / `@expert_<u>`)
+// distinctly from bare mentions. Mentions array carries *resolved bare*
+// usernames only (the post path doesn't add expert authors there); inert
+// expert tokens (paused / quiet hours / at-quota) render normally by
+// default, and grayed/struck only when the visual_giveaway flag is on.
+//
+// We can't reliably tell from the client whether a given `@expert_<u>`
+// landed inert vs. live for THIS comment — the at-quota / paused status
+// at post time isn't persisted on the row. So when visual_giveaway is
+// false, we render every expert token in the same style as a resolved
+// bare mention (accent color, 600 weight). When true, we render expert
+// tokens dimmed regardless — the spec accepts that as a coarse signal,
+// not a per-token live/inert distinction.
+const EXPERT_TOKEN_RENDER_RE =
+  /(?<![a-zA-Z0-9_])@expert(?:_([a-zA-Z0-9_]{2,30}))?(?![a-zA-Z0-9_])/g;
+const ANY_MENTION_RENDER_RE =
+  /(?<![a-zA-Z0-9_])(@expert(?:_[a-zA-Z0-9_]{2,30})?(?![a-zA-Z0-9_])|@[a-zA-Z0-9_]{2,30})/g;
+
+function renderBody(
+  body: string,
+  mentions: Mention[] = [],
+  inertVisualGiveaway = false
+): ReactNode[] {
   const resolved = new Set((mentions || []).map((m) => m.username));
   const parts: ReactNode[] = [];
   let lastIndex = 0;
-  for (const match of body.matchAll(MENTION_RE)) {
-    const [full, name] = match;
+  for (const match of body.matchAll(ANY_MENTION_RENDER_RE)) {
+    const [full] = match;
     const idx = match.index ?? 0;
     if (idx > lastIndex) parts.push(body.slice(lastIndex, idx));
-    if (resolved.has(name)) {
+
+    // Expert token branch.
+    EXPERT_TOKEN_RENDER_RE.lastIndex = 0;
+    const expertMatch = EXPERT_TOKEN_RENDER_RE.exec(full);
+    if (expertMatch) {
+      const directedName = expertMatch[1];
+      // Visual_giveaway off (default): render in the same accent style
+      // as a resolved bare mention. Visual_giveaway on: dim + strike,
+      // signaling that the token is potentially inert.
+      const expertStyle: React.CSSProperties = inertVisualGiveaway
+        ? {
+            color: 'var(--dim, #999)',
+            fontWeight: 600,
+            textDecoration: 'line-through',
+          }
+        : { color: 'var(--success-text)', fontWeight: 700 };
+      const label = directedName ? `@expert_${directedName}` : '@expert';
+      parts.push(
+        <span key={idx} style={expertStyle} title={
+          inertVisualGiveaway
+            ? 'Expert mention may be inert (paused / quiet hours / at-quota).'
+            : undefined
+        }>
+          {label}
+        </span>
+      );
+      lastIndex = idx + full.length;
+      continue;
+    }
+
+    // Bare mention branch (existing behavior).
+    const bareMatch = full.match(/^@([a-zA-Z0-9_]{2,30})$/);
+    const name = bareMatch?.[1] ?? '';
+    if (name && resolved.has(name)) {
       parts.push(
         <a
           key={idx}
@@ -105,6 +193,14 @@ export default function CommentRow({
   viewerIsSupervisor = false,
   helpfulThreshold = 10,
   tagKinds = DEFAULT_TAG_KINDS,
+  articleCategoryId,
+  verifiedCategoriesByUser,
+  chainsByRoot,
+  rootAuthorByRoot,
+  inertVisualGiveaway = false,
+  onCloseThread,
+  onReopenThread,
+  onGrantFollowup,
   onToggleTag,
   onDelete,
   onEdit,
@@ -126,6 +222,15 @@ export default function CommentRow({
     comment._your_reaction ?? null
   );
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
+  // EXPERT_THREADS Wave 4b — close-thread cooldown countdown. Set when
+  // the close RPC returns 429 wait_for_cooldown; ticks down to 0 then
+  // re-enables the button. Cleared on successful close.
+  const [closeCooldown, setCloseCooldown] = useState<number>(0);
+  useEffect(() => {
+    if (closeCooldown <= 0) return;
+    const t = setTimeout(() => setCloseCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [closeCooldown]);
   const canReply = hasPermission('comments.reply');
   const canReport = hasPermission('comments.report');
   const canContextTag = hasPermission('comments.context_tag');
@@ -137,6 +242,14 @@ export default function CommentRow({
   const canHideAny = hasPermission('admin.comments.hide');
   const canBlockUser = hasPermission('comments.block.add');
   const canReadExpert = hasPermission('article.expert_responses.read');
+  // EXPERT_THREADS Wave 4b — moderate gates the reopen button on closed
+  // expert threads (spec §5 enforcement table).
+  const canModerate = hasPermission('comments.moderate');
+  // Asker can close threads they originated (and we're the originator).
+  const canCloseOwnThread = hasPermission('comments.thread.close.own');
+  // Expert grants asker another reply on their own chain (spec §2 +
+  // permission key list).
+  const canAllowFollowup = hasPermission('comments.expert_thread.allow_followup');
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -168,6 +281,31 @@ export default function CommentRow({
   const isDeleted = comment.status === 'deleted' || !!comment.deleted_at;
   const user: CommentUser = comment.users || {};
   const blurred = !!comment.is_expert_reply && !canReadExpert;
+
+  // EXPERT_THREADS Wave 4b — distinctive expert chrome attaches to
+  // author.is_expert AND article.category ∈ author.verified_categories
+  // (spec §2 — NOT thread-mode-driven). The legacy `comment.is_expert_reply`
+  // boolean (set by the expert-queue answer path) still triggers chrome
+  // for backward compatibility.
+  const authorIsInCategoryExpert = (() => {
+    if (!user.is_expert) return false;
+    if (!articleCategoryId) return false;
+    const set = (verifiedCategoriesByUser || {})[comment.user_id];
+    return !!set && set.has(articleCategoryId);
+  })();
+  const showExpertChrome = !!comment.is_expert_reply || authorIsInCategoryExpert;
+  const expertCategoryName: string | null = null; // Category name not threaded down; chip uses generic "Verified Expert".
+
+  // Thread-mode plumbing.
+  const isExpertThreadRoot = !!comment.is_expert_thread_root;
+  const isExpertThreadClosed = !!comment.expert_thread_closed_at;
+  const threadRootId =
+    isExpertThreadRoot ? comment.id : (comment.expert_thread_root_id || null);
+  const rootAuthorId = threadRootId
+    ? (rootAuthorByRoot || {})[threadRootId] || null
+    : null;
+  const viewerIsThreadOriginator =
+    isExpertThreadRoot && !!currentUserId && comment.user_id === currentUserId;
 
   const hasMenuItems = isOwner
     ? (canEditOwn || canDeleteOwn)
@@ -217,8 +355,8 @@ export default function CommentRow({
     <div
       style={{
         padding: depth === 0 ? '12px 0' : '10px 0',
-        borderBottom: depth === 0 && !comment.is_expert_reply ? '1px solid #e5e5e5' : 'none',
-        ...(comment.is_expert_reply ? {
+        borderBottom: depth === 0 && !showExpertChrome ? '1px solid #e5e5e5' : 'none',
+        ...(showExpertChrome ? {
           background: '#f0faf4',
           borderLeft: '3px solid var(--success-text)',
           borderRadius: '0 8px 8px 0',
@@ -253,12 +391,12 @@ export default function CommentRow({
             minWidth: 0,
             ...(depth > 0 ? {
               paddingLeft: 16,
-              ...(!comment.is_expert_reply ? { borderLeft: '2px solid #e0e0e0' } : {}),
+              ...(!showExpertChrome ? { borderLeft: '2px solid #e0e0e0' } : {}),
               marginLeft: 12,
             } : {}),
           }}
         >
-          {comment.is_expert_reply && (
+          {showExpertChrome && (
             <div style={{
               fontSize: 11,
               fontWeight: 700,
@@ -267,7 +405,9 @@ export default function CommentRow({
               color: 'var(--success-text)',
               marginBottom: 4,
             }}>
-              Expert Reply{user.expert_title ? ` · ${user.expert_title}` : ''}
+              {comment.is_expert_reply
+                ? `Expert Reply${user.expert_title ? ` · ${user.expert_title}` : ''}`
+                : `Verified Expert${expertCategoryName ? ` · ${expertCategoryName}` : (user.expert_title ? ` · ${user.expert_title}` : '')}`}
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
@@ -504,7 +644,7 @@ export default function CommentRow({
                 pointerEvents: blurred ? 'none' : 'auto',
               }}
             >
-              {renderBody(comment.body || '', mentions)}
+              {renderBody(comment.body || '', mentions, inertVisualGiveaway)}
             </div>
           )}
           {blurred && (
@@ -601,11 +741,83 @@ export default function CommentRow({
           })()}
 
           {/* Action row: Reply · Agree · Disagree */}
-          {!isDeleted && !editing && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 6 }}>
-              {canReply && commentDepth < commentMaxDepth && (
+          {!isDeleted && !editing && (() => {
+            // EXPERT_THREADS Wave 4b — chain lookup for cap affordances.
+            // Asker-side view: viewer is the root author and target is an
+            // in-category expert reply. The chain row tracks asker reply
+            // count + free_pass; both cap the asker's reply button.
+            const chainsForRoot = threadRootId ? (chainsByRoot || {})[threadRootId] : undefined;
+            const isExpertReplyByAuthor =
+              !!user.is_expert &&
+              !!articleCategoryId &&
+              !!(verifiedCategoriesByUser || {})[comment.user_id]?.has(articleCategoryId);
+            const viewerIsAsker =
+              !!currentUserId &&
+              !!rootAuthorId &&
+              currentUserId === rootAuthorId;
+            // Chain seen by the asker when replying to an expert.
+            const askerChain =
+              viewerIsAsker && isExpertReplyByAuthor && chainsForRoot
+                ? chainsForRoot[`${currentUserId}:${comment.user_id}`]
+                : undefined;
+            const askerCapHit =
+              !!askerChain &&
+              !askerChain.free_pass_granted_at &&
+              askerChain.asker_reply_count >= ASKER_REPLIES_PER_CHAIN_CAP;
+            const askerRepliesLeft =
+              askerChain &&
+              !askerChain.free_pass_granted_at &&
+              askerChain.asker_reply_count < ASKER_REPLIES_PER_CHAIN_CAP
+                ? ASKER_REPLIES_PER_CHAIN_CAP - askerChain.asker_reply_count
+                : null;
+            // Chain seen by an expert on their own reply: viewer === comment
+            // author, asker is rootAuthor. Used to show "Allow another reply"
+            // when the asker has actually replied to this expert at least once.
+            const expertChainOnOwnReply =
+              isOwner &&
+              isExpertReplyByAuthor &&
+              !!rootAuthorId &&
+              chainsForRoot
+                ? chainsForRoot[`${rootAuthorId}:${currentUserId}`]
+                : undefined;
+            const showAllowFollowup =
+              !!expertChainOnOwnReply &&
+              expertChainOnOwnReply.asker_reply_count > 0 &&
+              !expertChainOnOwnReply.free_pass_granted_at &&
+              canAllowFollowup &&
+              !!onGrantFollowup &&
+              !!threadRootId &&
+              !!rootAuthorId &&
+              !isExpertThreadClosed;
+            // Close + reopen permissions live on the root row only.
+            const showClose =
+              isExpertThreadRoot &&
+              !isExpertThreadClosed &&
+              viewerIsThreadOriginator &&
+              canCloseOwnThread &&
+              !!onCloseThread;
+            const showReopen =
+              isExpertThreadRoot &&
+              isExpertThreadClosed &&
+              canModerate &&
+              !!onReopenThread;
+            const replyDisabled =
+              isExpertThreadClosed || askerCapHit;
+            const replyButton =
+              canReply && commentDepth < commentMaxDepth ? (
                 <button
-                  onClick={() => setReplyOpen((v) => !v)}
+                  onClick={() => {
+                    if (replyDisabled) return;
+                    setReplyOpen((v) => !v);
+                  }}
+                  disabled={replyDisabled}
+                  title={
+                    isExpertThreadClosed
+                      ? 'This thread is closed.'
+                      : askerCapHit
+                        ? `Conversation complete with @${user.username || 'expert'} — they can grant another reply if you have a follow-up.`
+                        : undefined
+                  }
                   style={{
                     fontSize: 12,
                     fontWeight: 600,
@@ -614,14 +826,133 @@ export default function CommentRow({
                     minHeight: 30,
                     border: 'none',
                     background: 'transparent',
-                    color: 'var(--dim, #666)',
-                    cursor: 'pointer',
+                    color: replyDisabled ? 'var(--dim, #bbb)' : 'var(--dim, #666)',
+                    cursor: replyDisabled ? 'default' : 'pointer',
                     touchAction: 'manipulation',
                   }}
                 >
                   Reply
                 </button>
-              )}
+              ) : null;
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 6, flexWrap: 'wrap' }}>
+                  {replyButton}
+                  {askerRepliesLeft != null && askerRepliesLeft > 0 && (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: 'var(--dim, #888)',
+                        marginLeft: 4,
+                      }}
+                      aria-label={`${askerRepliesLeft} replies left in this expert chain`}
+                    >
+                      {askerRepliesLeft === 1 ? '1 reply left' : `${askerRepliesLeft} replies left`}
+                    </span>
+                  )}
+                  {showAllowFollowup && (
+                    <button
+                      onClick={async () => {
+                        if (busy === 'grant') return;
+                        setBusy('grant');
+                        try {
+                          await onGrantFollowup!(threadRootId!, rootAuthorId!);
+                        } finally {
+                          setBusy('');
+                        }
+                      }}
+                      disabled={busy === 'grant'}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        minHeight: 30,
+                        border: '1px solid var(--success-text)',
+                        background: 'rgba(22,163,74,0.06)',
+                        color: 'var(--success-text)',
+                        cursor: busy === 'grant' ? 'default' : 'pointer',
+                        marginLeft: 4,
+                      }}
+                    >
+                      {busy === 'grant' ? 'Granting…' : 'Allow another reply'}
+                    </button>
+                  )}
+                  {showClose && (
+                    <button
+                      onClick={async () => {
+                        if (busy === 'close' || closeCooldown > 0) return;
+                        setBusy('close');
+                        try {
+                          const result = await onCloseThread!(comment.id);
+                          if (!result.ok && result.reason === 'wait_for_cooldown') {
+                            setCloseCooldown(result.seconds_remaining);
+                          }
+                        } finally {
+                          setBusy('');
+                        }
+                      }}
+                      disabled={busy === 'close' || closeCooldown > 0}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        minHeight: 30,
+                        border: '1px solid var(--border, #e5e5e5)',
+                        background: 'transparent',
+                        color: closeCooldown > 0 ? 'var(--dim, #bbb)' : 'var(--dim, #666)',
+                        cursor: busy === 'close' || closeCooldown > 0 ? 'default' : 'pointer',
+                        marginLeft: 4,
+                      }}
+                      title={closeCooldown > 0 ? `Try again in ${closeCooldown}s.` : undefined}
+                    >
+                      {closeCooldown > 0
+                        ? `Close thread (${closeCooldown}s)`
+                        : busy === 'close'
+                          ? 'Closing…'
+                          : 'Close thread'}
+                    </button>
+                  )}
+                  {showReopen && (
+                    <button
+                      onClick={async () => {
+                        if (busy === 'reopen') return;
+                        setBusy('reopen');
+                        try {
+                          await onReopenThread!(comment.id);
+                        } finally {
+                          setBusy('');
+                        }
+                      }}
+                      disabled={busy === 'reopen'}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        minHeight: 30,
+                        border: '1px solid var(--border, #e5e5e5)',
+                        background: 'transparent',
+                        color: 'var(--dim, #666)',
+                        cursor: busy === 'reopen' ? 'default' : 'pointer',
+                        marginLeft: 4,
+                      }}
+                    >
+                      {busy === 'reopen' ? 'Reopening…' : 'Reopen (mod)'}
+                    </button>
+                  )}
+                  {isExpertThreadRoot && isExpertThreadClosed && !showReopen && (
+                    <span
+                      style={{ fontSize: 11, color: 'var(--dim, #999)', marginLeft: 8 }}
+                    >
+                      Thread closed
+                    </span>
+                  )}
+                  {askerCapHit && (
+                    <span style={{ fontSize: 11, color: 'var(--dim, #888)', marginLeft: 8 }}>
+                      Conversation complete with @{user.username || 'expert'} — they can grant another reply if you have a follow-up.
+                    </span>
+                  )}
               {canReact && !isOwner && (
                 <>
                   <span style={{ fontSize: 12, color: 'var(--border, #e0e0e0)', margin: '0 2px', userSelect: 'none' }}>&middot;</span>
@@ -651,8 +982,9 @@ export default function CommentRow({
                   ))}
                 </>
               )}
-            </div>
-          )}
+              </div>
+            );
+          })()}
 
           {replyOpen && canReply && (
             <div style={{ marginTop: 10 }}>

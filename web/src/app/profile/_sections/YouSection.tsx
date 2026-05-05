@@ -49,7 +49,7 @@ export function YouSection({ user, tier, next, perms }: Props) {
 
       <section>
         <h2 style={sectionHeading}>Your numbers</h2>
-        <div className="redesign-stat-grid" style={{ gap: S[3] }}>
+        <div className="redesign-stat-grid" style={{ gap: S[5] }}>
           <StatTile
             label="Verity Score"
             value={u.verity_score ?? 0}
@@ -78,8 +78,8 @@ export function YouSection({ user, tier, next, perms }: Props) {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-            gap: S[3],
+            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+            gap: S[5],
           }}
         >
           <ActionCard

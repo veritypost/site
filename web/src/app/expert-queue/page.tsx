@@ -166,10 +166,10 @@ export default function ExpertQueuePage() {
     try {
       const res = await fetch(`/api/expert/back-channel?category_id=${categoryId}`);
       const data = (await res.json().catch(() => ({}))) as BackChannelResponse;
-      if (!res.ok) throw new Error(data?.error || 'Back-channel load failed');
+      if (!res.ok) throw new Error(data?.error || 'Expert chat load failed');
       setBackMessages(data.messages || []);
     } catch (err) {
-      setError(friendlyError(err, 'Back-channel load failed'));
+      setError(friendlyError(err, 'Expert chat load failed'));
     }
   }
 
@@ -268,7 +268,7 @@ export default function ExpertQueuePage() {
     { k: 'pending', l: 'Pending' },
     { k: 'claimed', l: 'Claimed' },
     { k: 'answered', l: 'Answered' },
-    { k: 'back-channel', l: 'Back-channel' },
+    { k: 'back-channel', l: 'Expert chat' },
   ];
 
   return (
@@ -614,7 +614,7 @@ export default function ExpertQueuePage() {
               value={backDraft}
               onChange={(e) => setBackDraft(e.target.value)}
               rows={2}
-              placeholder="Post to the back-channel…"
+              placeholder="Post to expert chat…"
               style={{
                 width: '100%',
                 padding: 8,

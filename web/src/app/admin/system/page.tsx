@@ -57,6 +57,22 @@ const MONITORING_SETTINGS: { k: string; l: string; desc: string }[] = [
   { k: 'anomaly_alerts',    l: 'Anomaly detection alerts', desc: 'Email when nightly anomaly scan finds suspicious activity' },
 ];
 
+// Expert threads tunables (see EXPERT_THREADS.md §2.5).
+// `expert.config.version` is intentionally NOT exposed here — it is auto-
+// bumped by a DB trigger on settings/plan_features writes for cache
+// invalidation, so the save handler does not need to touch it.
+const EXPERT_BOOL_SETTINGS: { k: string; l: string; desc: string; def: boolean }[] = [
+  { k: 'features.expert_threads_enabled',         l: 'Expert threads feature',                         desc: 'Master kill switch. Flip per environment after iOS Wave 5 is in TestFlight.', def: false },
+  { k: 'expert.mentions.edit_refunds_removed',    l: 'Edit-swap mentions net new vs removed',          desc: 'When an asker edits a comment, count newly-added minus newly-removed mentions (clamped >= 0) instead of charging for the full new set.', def: true },
+  { k: 'expert.inert_mention.visual_giveaway',    l: 'Show visual giveaway on inert expert mentions',  desc: 'When @expert_<name> is inert (paused / quiet hours / at quota), render the token grayed/struck instead of normally.', def: false },
+];
+const EXPERT_NUMBER_SETTINGS: { k: string; l: string; desc: string; def: number; suffix: string }[] = [
+  { k: 'plan_features.cache_seconds',             l: 'Plan-features cache TTL (seconds)',              desc: 'How long expertConfig caches plan_features lookups before re-reading. Bypassed on version bump.', def: 300, suffix: 'seconds' },
+  { k: 'expert.default_per_post_quota',           l: 'Default expert mention cap per article',         desc: 'Seed value for new experts’ per-article mention cap.', def: 3,   suffix: 'mentions' },
+  { k: 'expert.default_per_day_quota',            l: 'Default expert mention cap per day',             desc: 'Seed value for new experts’ per-day mention cap.',     def: 25,  suffix: 'mentions' },
+  { k: 'expert_thread.close_cooldown_seconds',    l: 'Close-thread cooldown after expert reply (seconds)', desc: 'Seconds an asker must wait after the latest expert reply (or mod reopen) before they can close the thread.', def: 60, suffix: 'seconds' },
+];
+
 const RATE_LIMIT_DEFAULTS: UILimit[] = [
   { key: 'comment_posting',      endpoint: 'Comment posting',      count: 1,   window: 30, windowUnit: 'seconds', per: 'user', enabled: true },
   { key: 'quiz_attempts',        endpoint: 'Quiz attempts',        count: 10,  window: 1,  windowUnit: 'hours',   per: 'user', enabled: true, note: 'per story' },
@@ -88,11 +104,14 @@ export default function SystemAdmin() {
   const { push } = useToast();
 
   const [loading, setLoading] = useState<boolean>(true);
-  const [tab, setTab] = useState<'rate-limits' | 'transparency' | 'monitoring' | 'audit'>('rate-limits');
+  const [tab, setTab] = useState<'rate-limits' | 'transparency' | 'monitoring' | 'expert' | 'audit'>('rate-limits');
   const [limits, setLimits] = useState<UILimit[]>(RATE_LIMIT_DEFAULTS);
   const [config, setConfig] = useState<Record<string, boolean>>({});
   const [staleFeedHours, setStaleFeedHours] = useState<number>(6);
   const [brokenFeedFailures, setBrokenFeedFailures] = useState<number>(10);
+  const [expertNumbers, setExpertNumbers] = useState<Record<string, number>>(
+    Object.fromEntries(EXPERT_NUMBER_SETTINGS.map((s) => [s.k, s.def])),
+  );
   const [whitelist, setWhitelist] = useState<string[]>([]);
   const [blacklist, setBlacklist] = useState<string[]>([]);
   const [whiteInput, setWhiteInput] = useState<string>('');
@@ -145,10 +164,26 @@ export default function SystemAdmin() {
         const raw = settingsMap[item.k];
         defaultConfig[item.k] = raw !== undefined ? raw === 'true' : false;
       });
+      EXPERT_BOOL_SETTINGS.forEach((item) => {
+        const raw = settingsMap[item.k];
+        defaultConfig[item.k] = raw !== undefined ? raw === 'true' : item.def;
+      });
       setConfig(defaultConfig);
 
       if (settingsMap.stale_feed_hours)     setStaleFeedHours(parseInt(settingsMap.stale_feed_hours, 10) || 6);
       if (settingsMap.broken_feed_failures) setBrokenFeedFailures(parseInt(settingsMap.broken_feed_failures, 10) || 10);
+
+      setExpertNumbers((prev) => {
+        const next = { ...prev };
+        EXPERT_NUMBER_SETTINGS.forEach((item) => {
+          const raw = settingsMap[item.k];
+          if (raw !== undefined) {
+            const parsed = parseInt(raw, 10);
+            if (Number.isFinite(parsed)) next[item.k] = parsed;
+          }
+        });
+        return next;
+      });
 
       // rate limits — schema-synced to rate_limits (not feature_flags)
       const { data: rateLimitsData, error: rlError } = await supabase.from('rate_limits').select('*');
@@ -502,6 +537,7 @@ export default function SystemAdmin() {
               { k: 'rate-limits',  l: 'Rate limits' },
               { k: 'transparency', l: 'Transparency' },
               { k: 'monitoring',   l: 'Monitoring' },
+              { k: 'expert',       l: 'Expert threads' },
               { k: 'audit',        l: 'Audit trail' },
             ] as { k: typeof tab; l: string }[]).map((t) => {
               const active = tab === t.k;
@@ -601,6 +637,50 @@ export default function SystemAdmin() {
         <PageSection title="Monitoring" description="Observability and alerting integrations">
           {renderSwitchList(MONITORING_SETTINGS)}
         </PageSection>
+      )}
+
+      {tab === 'expert' && (
+        <>
+          <PageSection title="Expert threads" description="Kill switch and global tunables for expert mention caps and Q&A thread mode">
+            {renderSwitchList(EXPERT_BOOL_SETTINGS)}
+          </PageSection>
+
+          <PageSection title="Expert defaults & cooldowns" description="Numeric tunables that seed new experts and govern thread close behavior">
+            <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8, overflow: 'hidden' }}>
+              {EXPERT_NUMBER_SETTINGS.map((item, i) => (
+                <div
+                  key={item.k}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: S[3],
+                    padding: `${S[3]}px ${S[4]}px`,
+                    borderBottom: i === EXPERT_NUMBER_SETTINGS.length - 1 ? 'none' : `1px solid ${C.divider}`,
+                    background: C.bg,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: F.base, fontWeight: 500, color: C.ink }}>{item.l}</div>
+                    <div style={{ fontSize: F.xs, color: C.dim }}>{item.desc}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: S[2] }}>
+                    <NumberInput
+                      size="sm" block={false} min={0} value={expertNumbers[item.k] ?? item.def}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        const next = Math.max(0, parseInt(e.target.value, 10) || 0);
+                        setExpertNumbers((prev) => ({ ...prev, [item.k]: next }));
+                      }}
+                      onBlur={() => saveSetting(item.k, expertNumbers[item.k] ?? item.def)}
+                      style={{ width: 88 }}
+                    />
+                    <span style={{ fontSize: F.xs, color: C.dim }}>{item.suffix}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </PageSection>
+        </>
       )}
 
       {tab === 'audit' && (

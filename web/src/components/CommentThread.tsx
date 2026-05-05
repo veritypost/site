@@ -118,6 +118,28 @@ export default function CommentThread({
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<boolean>(false);
   const [permsLoaded, setPermsLoaded] = useState<boolean>(false);
+  // EXPERT_THREADS Wave 4b — distinctive expert chrome attaches to
+  // author.is_expert AND article.category ∈ author.verified_categories
+  // (spec §2 "Distinctive expert reply chrome"). Map: user_id → Set of
+  // approved category IDs.
+  const [verifiedCategoriesByUser, setVerifiedCategoriesByUser] = useState<
+    Record<string, Set<string>>
+  >({});
+  // EXPERT_THREADS Wave 4b — chain-cap affordances. expert_thread_chains
+  // rows for visible expert thread roots, keyed root_id → (askerId:expertId)
+  // → row. Used by CommentRow to render "1 reply left" / cap-hit copy and
+  // the "Allow another reply" button.
+  type ChainRow = {
+    thread_root_id: string;
+    asker_user_id: string;
+    expert_user_id: string;
+    asker_reply_count: number;
+    free_pass_granted_at: string | null;
+  };
+  const [chainsByRoot, setChainsByRoot] = useState<
+    Record<string, Record<string, ChainRow>>
+  >({});
+  const [inertVisualGiveaway, setInertVisualGiveaway] = useState<boolean>(false);
 
   const canViewSection = currentUserId
     ? (permsLoaded ? hasPermission('comments.section.view') : false)
@@ -154,6 +176,10 @@ export default function CommentThread({
         const t = data.helpful_badge_threshold;
         if (typeof t === 'number' && Number.isFinite(t) && t > 0) {
           setHelpfulThreshold(t);
+        }
+        // EXPERT_THREADS Wave 4b — inert mention render flag
+        if (typeof data.expert_inert_mention_visual_giveaway === 'boolean') {
+          setInertVisualGiveaway(data.expert_inert_mention_visual_giveaway);
         }
       })
       .catch(() => {
@@ -285,6 +311,62 @@ export default function CommentThread({
         if (r.user_id != null && r.score != null) map[r.user_id] = r.score;
       });
       setAuthorScores(map);
+    }
+
+    // EXPERT_THREADS Wave 4b — fetch thread-state (verified categories +
+    // chains) in one round-trip. Server-side because expert_applications
+    // RLS scopes reads to (user_id = auth.uid()) OR is_admin_or_above
+    // and expert_thread_chains isn't in the generated TS types yet.
+    // 404 → kill switch off; silently no-op (chrome falls back to the
+    // legacy is_expert_reply column, no chain affordances render).
+    try {
+      const tsRes = await fetch(
+        `/api/comments/expert-thread-state?article_id=${encodeURIComponent(articleId)}`
+      );
+      if (tsRes.ok) {
+        const tsJson = await tsRes.json().catch(() => null) as {
+          verifiedCategoriesByUser?: Record<string, string[]>;
+          chainsByRoot?: Record<
+            string,
+            Array<{
+              asker_user_id: string;
+              expert_user_id: string;
+              asker_reply_count: number;
+              free_pass_granted_at: string | null;
+            }>
+          >;
+        } | null;
+        if (tsJson) {
+          const byUser: Record<string, Set<string>> = {};
+          for (const [uid, cats] of Object.entries(tsJson.verifiedCategoriesByUser || {})) {
+            byUser[uid] = new Set(cats);
+          }
+          setVerifiedCategoriesByUser(byUser);
+
+          const byRoot: Record<string, Record<string, ChainRow>> = {};
+          for (const [rootId, chains] of Object.entries(tsJson.chainsByRoot || {})) {
+            const inner: Record<string, ChainRow> = {};
+            for (const c of chains) {
+              inner[`${c.asker_user_id}:${c.expert_user_id}`] = {
+                thread_root_id: rootId,
+                asker_user_id: c.asker_user_id,
+                expert_user_id: c.expert_user_id,
+                asker_reply_count: c.asker_reply_count,
+                free_pass_granted_at: c.free_pass_granted_at,
+              };
+            }
+            byRoot[rootId] = inner;
+          }
+          setChainsByRoot(byRoot);
+        }
+      } else if (tsRes.status === 404) {
+        // Kill switch off — clear any prior state.
+        setVerifiedCategoriesByUser({});
+        setChainsByRoot({});
+      }
+    } catch {
+      // Network blip — leave previous state. Worst case is missing
+      // chrome on author rows; functionality degrades gracefully.
     }
 
     setLoading(false);
@@ -596,6 +678,104 @@ export default function CommentThread({
     }
   }, [dialog]);
 
+  // EXPERT_THREADS Wave 4b — close/reopen/grant handlers. Each updates
+  // local state on success so the UI reflects the new state without a
+  // full reload. Errors surface inline via setError; the cooldown 429
+  // returns { ok:false, reason:'wait_for_cooldown', seconds_remaining }
+  // which the close handler returns to CommentRow so the row can show
+  // a per-comment countdown rather than a global error.
+  type CloseResult =
+    | { ok: true }
+    | { ok: false; reason: 'wait_for_cooldown'; seconds_remaining: number }
+    | { ok: false; reason: 'unknown' };
+  async function handleCloseThread(rootId: string): Promise<CloseResult> {
+    const res = await fetch(`/api/comments/${rootId}/close`, { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 429 && data?.reason === 'wait_for_cooldown') {
+      const sec = Number(data.seconds_remaining);
+      return {
+        ok: false,
+        reason: 'wait_for_cooldown',
+        seconds_remaining: Number.isFinite(sec) && sec > 0 ? sec : 60,
+      };
+    }
+    if (!res.ok) {
+      setError(friendlyError(data?.error, 'Could not close thread'));
+      return { ok: false, reason: 'unknown' };
+    }
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === rootId
+          ? ({
+              ...c,
+              expert_thread_closed_at: new Date().toISOString(),
+            } as CommentWithAuthor)
+          : c
+      )
+    );
+    return { ok: true };
+  }
+
+  async function handleReopenThread(rootId: string): Promise<boolean> {
+    const res = await fetch(`/api/comments/${rootId}/close?action=reopen`, { method: 'POST' });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setError(friendlyError(d?.error, 'Could not reopen thread'));
+      return false;
+    }
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === rootId
+          ? ({
+              ...c,
+              expert_thread_closed_at: null,
+              last_reopen_at: new Date().toISOString(),
+            } as CommentWithAuthor)
+          : c
+      )
+    );
+    return true;
+  }
+
+  async function handleGrantFollowup(rootId: string, askerUserId: string): Promise<boolean> {
+    const res = await fetch(`/api/expert/threads/${rootId}/grant`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ asker_user_id: askerUserId }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setError(friendlyError(d?.error, 'Could not grant another reply'));
+      return false;
+    }
+    // Optimistically stamp free_pass_granted_at on the chain row so the
+    // asker's reply button re-enables locally. Real persistence is in
+    // expert_thread_chains; the next refresh will pick up the durable row.
+    setChainsByRoot((prev) => {
+      const inner = { ...(prev[rootId] || {}) };
+      const key = `${askerUserId}:${currentUserId}`;
+      inner[key] = {
+        thread_root_id: rootId,
+        asker_user_id: askerUserId,
+        expert_user_id: currentUserId || '',
+        asker_reply_count: inner[key]?.asker_reply_count ?? 0,
+        free_pass_granted_at: new Date().toISOString(),
+      };
+      return { ...prev, [rootId]: inner };
+    });
+    return true;
+  }
+
+  // Build a quick map: thread_root_id → root author id (the asker). Drives
+  // chain key construction in CommentRow. Built from the visible comments;
+  // any expert thread root visible in the current view contributes.
+  const rootAuthorByRoot: Record<string, string> = {};
+  for (const c of comments) {
+    if ((c as { is_expert_thread_root?: boolean | null }).is_expert_thread_root) {
+      if (typeof c.user_id === 'string') rootAuthorByRoot[c.id] = c.user_id;
+    }
+  }
+
   function handlePosted(comment: CommentDb | null) {
     if (!comment) return;
     const enrich = async () => {
@@ -758,6 +938,14 @@ export default function CommentThread({
         currentUserTier={currentUserTier}
         authorCategoryScore={canViewScore ? authorScores[c.user_id] : null}
         articleId={articleId}
+        articleCategoryId={articleCategoryId}
+        verifiedCategoriesByUser={verifiedCategoriesByUser}
+        chainsByRoot={chainsByRoot}
+        rootAuthorByRoot={rootAuthorByRoot}
+        inertVisualGiveaway={inertVisualGiveaway}
+        onCloseThread={handleCloseThread}
+        onReopenThread={handleReopenThread}
+        onGrantFollowup={handleGrantFollowup}
         depth={depth}
         viewerIsSupervisor={viewerIsSupervisor}
         helpfulThreshold={helpfulThreshold}

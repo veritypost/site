@@ -360,19 +360,6 @@ export function AppShell({ user, tier, preview, defaultSection = 'you', sections
             )}
           </nav>
 
-          <footer
-            style={{
-              marginTop: 'auto',
-              padding: `${S[4]}px ${S[5]}px ${S[5]}px`,
-              borderTop: `1px solid ${C.divider}`,
-              fontSize: F.xs,
-              color: C.inkFaint,
-            }}
-          >
-            <Link href="/" style={{ color: C.inkMuted, textDecoration: 'none', fontWeight: 600 }}>
-              ← Back to Verity Post
-            </Link>
-          </footer>
         </aside>
 
         <main
