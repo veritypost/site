@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -15,6 +15,8 @@ import {
 import { HOME_SIDEBAR_BREAKPOINT_PX, type SidebarCategory } from './_HomeSidebar';
 
 const OVERLAY_ID = 'vp-home-sections-overlay';
+const RESULTS_LISTBOX_ID = 'vp-home-sections-search-results';
+const RESULT_OPTION_ID = (id: string) => `vp-home-sections-search-result-${id}`;
 const MONO_STACK = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
 type ArticleHit = {
@@ -34,6 +36,7 @@ const sortByOrder = (a: SidebarCategory, b: SidebarCategory) => {
 };
 
 export default function HomeSectionsMenu() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const activeCatSlug = searchParams?.get('cat') || null;
   const activeSubSlug = searchParams?.get('sub') || null;
@@ -46,6 +49,8 @@ export default function HomeSectionsMenu() {
   const [mounted, setMounted] = useState(false);
   const [results, setResults] = useState<ArticleHit[]>([]);
   const [resultsForQuery, setResultsForQuery] = useState<string>('');
+  const [isFetching, setIsFetching] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -105,6 +110,8 @@ export default function HomeSectionsMenu() {
       setExpanded(new Set());
       setResults([]);
       setResultsForQuery('');
+      setIsFetching(false);
+      setHighlightIndex(-1);
       abortRef.current?.abort();
       abortRef.current = null;
       return;
@@ -145,12 +152,15 @@ export default function HomeSectionsMenu() {
       abortRef.current = null;
       setResults([]);
       setResultsForQuery('');
+      setIsFetching(false);
+      setHighlightIndex(-1);
       return;
     }
     const handle = window.setTimeout(() => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
+      setIsFetching(true);
       void fetch(`/api/search?q=${encodeURIComponent(trimmed)}`, {
         signal: controller.signal,
       })
@@ -159,8 +169,12 @@ export default function HomeSectionsMenu() {
           if (controller.signal.aborted) return;
           const list = Array.isArray(body.articles) ? body.articles : [];
           // Skip articles missing a slug — they can't be navigated to.
-          setResults(list.filter((a) => a.stories?.slug));
+          const filtered = list.filter((a) => a.stories?.slug);
+          setResults(filtered);
           setResultsForQuery(trimmed);
+          setIsFetching(false);
+          // Default highlight to first result so Enter has something to act on.
+          setHighlightIndex(filtered.length > 0 ? 0 : -1);
         })
         .catch((err: unknown) => {
           if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -169,6 +183,8 @@ export default function HomeSectionsMenu() {
           // instead of stale results from an earlier query.
           setResults([]);
           setResultsForQuery(trimmed);
+          setIsFetching(false);
+          setHighlightIndex(-1);
         });
     }, 300);
     return () => {
@@ -186,6 +202,50 @@ export default function HomeSectionsMenu() {
   };
 
   const searching = query.trim().length > 0;
+  const trimmedQuery = query.trim();
+  const settledForCurrent = resultsForQuery === trimmedQuery;
+  const showResultsListbox = searching && settledForCurrent && results.length > 0;
+  const activeOptionId =
+    showResultsListbox && highlightIndex >= 0 && highlightIndex < results.length
+      ? RESULT_OPTION_ID(results[highlightIndex].id)
+      : undefined;
+  // Live-region announcement: only fire when a fetch settles for the current
+  // query. Empty during debounce / in-flight so we don't chatter on every
+  // keystroke.
+  const liveAnnouncement = !searching
+    ? ''
+    : !settledForCurrent
+      ? ''
+      : results.length === 0
+        ? 'No results'
+        : `${results.length} ${results.length === 1 ? 'result' : 'results'}`;
+
+  const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showResultsListbox) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightIndex((i) => Math.min(results.length - 1, (i < 0 ? -1 : i) + 1));
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIndex((i) => Math.max(0, (i < 0 ? 0 : i) - 1));
+      return;
+    }
+    if (e.key === 'Enter') {
+      const idx = highlightIndex >= 0 ? highlightIndex : 0;
+      const hit = results[idx];
+      const slug = hit?.stories?.slug;
+      if (slug) {
+        e.preventDefault();
+        close();
+        router.push(`/${slug}`);
+      }
+      return;
+    }
+    // Escape intentionally falls through to the document-level listener that
+    // closes the overlay.
+  };
 
   return (
     <>
@@ -298,8 +358,16 @@ export default function HomeSectionsMenu() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={onSearchKeyDown}
                 placeholder="search the record"
                 aria-label="Search the record"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-controls={RESULTS_LISTBOX_ID}
+                aria-expanded={showResultsListbox}
+                aria-activedescendant={activeOptionId}
+                autoComplete="off"
+                spellCheck={false}
                 className="vp-home-sections-search"
                 style={{
                   width: '100%',
@@ -314,14 +382,33 @@ export default function HomeSectionsMenu() {
                   padding: '0 0 10px',
                 }}
               />
+              {/* Visually-hidden live region — fires when a fetch settles. */}
+              <span
+                aria-live="polite"
+                aria-atomic="true"
+                style={{
+                  position: 'absolute',
+                  width: 1,
+                  height: 1,
+                  overflow: 'hidden',
+                  clip: 'rect(0,0,0,0)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {liveAnnouncement}
+              </span>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px 60px' }}>
               {searching ? (
                 <SearchResults
+                  listboxId={RESULTS_LISTBOX_ID}
                   query={query}
                   results={results}
                   resultsForQuery={resultsForQuery}
+                  highlightIndex={highlightIndex}
+                  onHighlight={setHighlightIndex}
+                  isFetching={isFetching}
                   onNavigate={close}
                 />
               ) : (
@@ -376,14 +463,22 @@ export default function HomeSectionsMenu() {
 }
 
 function SearchResults({
+  listboxId,
   query,
   results,
   resultsForQuery,
+  highlightIndex,
+  onHighlight,
+  isFetching,
   onNavigate,
 }: {
+  listboxId: string;
   query: string;
   results: ArticleHit[];
   resultsForQuery: string;
+  highlightIndex: number;
+  onHighlight: (i: number) => void;
+  isFetching: boolean;
   onNavigate: () => void;
 }) {
   // Only show the "no matches" copy once a fetch for the current trimmed
@@ -410,23 +505,39 @@ function SearchResults({
     );
   }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, paddingTop: 4 }}>
-      {results.map((a) => {
+    <div
+      id={listboxId}
+      role="listbox"
+      aria-label="Search results"
+      aria-busy={isFetching}
+      style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 4 }}
+    >
+      {results.map((a, idx) => {
         const slug = a.stories?.slug;
         if (!slug) return null;
         const categoryName = a.categories?.name ?? '';
         const dateStr = a.published_at ? formatDate(a.published_at) : '';
         const sep = categoryName && dateStr ? ' · ' : '';
+        const isHighlighted = idx === highlightIndex;
         return (
           <Link
             key={a.id}
+            id={RESULT_OPTION_ID(a.id)}
+            role="option"
+            aria-selected={isHighlighted}
             href={`/${slug}`}
             prefetch={false}
             onClick={onNavigate}
+            onMouseEnter={() => onHighlight(idx)}
             style={{
               display: 'block',
               textDecoration: 'none',
               color: 'inherit',
+              background: isHighlighted ? 'var(--stone-100, #f5f5f4)' : 'transparent',
+              padding: '12px 10px',
+              margin: '0 -10px',
+              borderRadius: 4,
+              transition: 'background 120ms ease',
             }}
           >
             <h3
