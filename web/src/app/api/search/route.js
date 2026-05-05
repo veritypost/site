@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { hasPermissionServer } from '@/lib/auth';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { runArticleSearch } from '@/lib/search/runArticleSearch';
+import { sanitizeIlikeTerm, sanitizeWebsearchTerm } from '@/lib/search/sanitize';
 
 // GET /api/search?q=...&category=...&subcategory=...&from=...&to=...&source=...
 // D26: basic keyword for everyone (anon can search titles), advanced
@@ -17,134 +19,70 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 // visitors are allowed basic title search (`search.articles.free` is
 // on the `anon` set); `requirePermission` would 401 them.
 //
-// Strip PostgREST filter-delimiter chars + wildcards so user input
-// can't break out of the enclosing .or()/.ilike() pattern.
-function sanitizeIlikeTerm(s) {
-  return String(s || '').replace(/[,.%*()"'\\]/g, ' ').trim();
-}
-function sanitizeWebsearchTerm(s) {
-  // Preserve double-quotes for phrase matching; strip other PostgREST-breaking chars
-  return String(s || '').replace(/[,.%*()'\\]/g, ' ').trim();
-}
+// Wave 1 of unified-search session extracted the data-access core to
+// `@/lib/search/runArticleSearch`. This handler stays a thin
+// permission/adapter layer — it resolves request → permissions →
+// filters, then forwards to the lib. Permission gates and any future
+// rate-limit calls live HERE in the route, not the lib.
 
 export async function GET(request) {
   const url = new URL(request.url);
   const rawQ = url.searchParams.get('q') || '';
-  const q = sanitizeIlikeTerm(rawQ);
-  const qAdvanced = sanitizeWebsearchTerm(rawQ);
-  if (!q && !qAdvanced) return NextResponse.json({ articles: [] });
+  // We re-run the sanitizers here purely to detect the empty-q
+  // case before doing any permission work. The lib re-sanitizes
+  // internally — duplication is intentional and cheap.
+  const qIlike = sanitizeIlikeTerm(rawQ);
+  const qWebsearch = sanitizeWebsearchTerm(rawQ);
+  if (!qIlike && !qWebsearch) return NextResponse.json({ articles: [] });
 
   // Permission-driven tier check. For anon callers this returns false
   // and we stay on the basic title-only path.
   const canAdvanced = await hasPermissionServer('search.advanced');
 
-  const category = url.searchParams.get('category');
-  const subcategory = url.searchParams.get('subcategory');
-  const source = sanitizeIlikeTerm(url.searchParams.get('source'));
-  const from = url.searchParams.get('from');
-  const to = url.searchParams.get('to');
-  const kidScope = url.searchParams.get('kids') === '1' || !!url.searchParams.get('kid_profile_id');
-
-  // Basic: title ILIKE. Paid: add body + excerpt, plus filter chain.
-  const service = createServiceClient();
-  let query = service
-    .from('articles')
-    .select(
-      'id, title, stories(slug), excerpt, published_at, category_id, is_kids_safe, categories!fk_articles_category_id(name)'
-    )
-    .eq('status', 'published')
-    .not('stories.slug', 'is', null)
-    .limit(50)
-    .order('published_at', { ascending: false });
-
-  // D12 (kid surfaces exclude adult content): when a kid context is
-  // signalled, only return articles flagged is_kids_safe. Belt +
-  // suspenders — even when called directly with ?kids=1.
-  if (kidScope) {
-    query = query.eq('is_kids_safe', true);
-  } else {
-    // Adults never want kid-only articles polluting results.
-    query = query.eq('is_kids_safe', false);
-  }
-
-  // H6 — track which filters the caller sent but the server dropped
-  // (either because they're not on advanced tier, or because their
-  // permission matrix has the specific filter gated off). UI can
-  // surface this so a free user hand-editing the URL doesn't get
-  // results that silently ignore their filters.
-  const ignoredFilters = [];
-
-  if (canAdvanced) {
-    // Migration 046 added articles.search_tsv (generated from title + excerpt + body)
-    // with a GIN index. websearch handles bare keywords + quoted phrases + AND/OR the
-    // way users expect, so we hand the sanitized q straight through.
-    query = query.textSearch('search_tsv', qAdvanced, { type: 'websearch', config: 'english' });
-    // Per-filter gates so an admin can revoke one field without
-    // disabling the whole advanced experience.
-    if (category) {
-      if (await hasPermissionServer('search.advanced.category')) {
-        query = query.eq('category_id', category);
-      } else {
-        ignoredFilters.push('category');
-      }
+  // Per-filter advanced-permission resolver. The lib invokes this
+  // lazily — only when a given filter is actually present — so we
+  // preserve the historical "no extra RPC if filter not supplied"
+  // behavior. Lib stays free of auth imports.
+  const checkAdvancedFilterPerm = (filter) => {
+    switch (filter) {
+      case 'category':
+        return hasPermissionServer('search.advanced.category');
+      case 'subcategory':
+        return hasPermissionServer('search.advanced.subcategory');
+      case 'date_range':
+        return hasPermissionServer('search.advanced.date_range');
+      case 'source':
+        return hasPermissionServer('search.advanced.source');
+      default:
+        return Promise.resolve(false);
     }
-    if (subcategory) {
-      if (await hasPermissionServer('search.advanced.subcategory')) {
-        query = query.eq('subcategory_id', subcategory);
-      } else {
-        ignoredFilters.push('subcategory');
-      }
-    }
-    if (from || to) {
-      if (await hasPermissionServer('search.advanced.date_range')) {
-        if (from) query = query.gte('published_at', from);
-        if (to) query = query.lte('published_at', to);
-      } else {
-        ignoredFilters.push('date_range');
-      }
-    }
-    if (source) {
-      if (await hasPermissionServer('search.advanced.source')) {
-        // Source filter requires a join through the sources table.
-        const { data: srcArticleIds } = await service
-          .from('sources')
-          .select('article_id')
-          .ilike('publisher', `%${source}%`)
-          .limit(500);
-        const ids = (srcArticleIds || []).map((r) => r.article_id).slice(0, 200);
-        if ((srcArticleIds || []).length > 200) {
-          ignoredFilters.push('source_partial');
-        }
-        if (ids.length === 0) {
-          return NextResponse.json({
-            articles: [],
-            applied: { source },
-            ignored_filters: ignoredFilters,
-          });
-        }
-        query = query.in('id', ids);
-      } else {
-        ignoredFilters.push('source');
-      }
-    }
-  } else {
-    query = query.ilike('title', `%${q}%`);
-    // H6 — in basic mode, record each advanced filter the caller
-    // passed so the UI can show "Advanced filters ignored — upgrade
-    // to apply category / date / source filters."
-    if (category) ignoredFilters.push('category');
-    if (subcategory) ignoredFilters.push('subcategory');
-    if (from || to) ignoredFilters.push('date_range');
-    if (source) ignoredFilters.push('source');
-  }
+  };
 
-  const { data, error } = await query;
-  if (error)
-    return safeErrorResponse(NextResponse, error, { route: 'search', fallbackStatus: 400 });
+  const filters = {
+    category: url.searchParams.get('category'),
+    subcategory: url.searchParams.get('subcategory'),
+    from: url.searchParams.get('from'),
+    to: url.searchParams.get('to'),
+    source: url.searchParams.get('source'),
+  };
+  const kidScope =
+    url.searchParams.get('kids') === '1' || !!url.searchParams.get('kid_profile_id');
 
-  return NextResponse.json({
-    articles: data || [],
-    mode: canAdvanced ? 'advanced' : 'basic',
-    ignored_filters: ignoredFilters,
+  const result = await runArticleSearch({
+    q: rawQ,
+    filters,
+    canAdvanced,
+    checkAdvancedFilterPerm,
+    kidScope,
+    supabase: createServiceClient(),
   });
+
+  if (!result.ok) {
+    return safeErrorResponse(NextResponse, result.error, {
+      route: 'search',
+      fallbackStatus: 400,
+    });
+  }
+
+  return NextResponse.json(result.value);
 }
