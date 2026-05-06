@@ -66,7 +66,7 @@ struct InviteFriendsView: View {
             Text("Invite friends")
                 .font(.system(size: VP.Size.xl, weight: .semibold, design: .serif))
                 .foregroundColor(VP.ink)
-            Text("You have two invite links to share. Each one lets one friend join Verity Post.")
+            Text("Share either link to invite a friend.")
                 .font(.system(size: VP.Size.base))
                 .foregroundColor(VP.inkMuted)
                 .lineSpacing(2)

@@ -321,7 +321,7 @@ struct ProfileView: View {
             Text("Verify your email")
                 .font(.system(.title3, design: .default, weight: .bold))
                 .foregroundColor(VP.text)
-            Text("Confirm your email to see your reading history, categories, and achievements.")
+            Text("Confirm your email to get started.")
                 .font(.footnote)
                 .foregroundColor(VP.dim)
                 .multilineTextAlignment(.center)
