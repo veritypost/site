@@ -60,6 +60,7 @@
 ## Ready to fix — no decision needed, just needs doing
 
 - 12: Migration `_210000_grant_feed_clusters_browse_access.sql` is not idempotent — CREATE POLICY lines need DROP IF EXISTS guards. **Note:** file not found in repo — migrations appear to be managed directly in Supabase Studio. Owner to locate or skip.
+
 ---
 
 ## Needs runtime diagnosis — can't move from code alone
@@ -81,9 +82,10 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 ## Profile / Cleanup (owner to explain)
 
-- 31: Categories section in profile — needs cleanup. Details TBD.
-- 32: Milestones section in profile — decision needed. Options: (a) replace static milestones with progress bars tied to the subcategory/category scoring system from TODO 36 (e.g. "Read 10 articles in World"), (b) remove the section entirely. Owner leaning toward either dynamic progress or removal — no static/fixed milestone list.
-- 33: "You" area of the profile — needs cleanup. Details TBD.
+- 29: Appearance section is a standalone nav rail item containing only a single Light/System/Dark toggle (`AppearanceSection.tsx`). Decision: collapse it into another Settings section, or keep it standalone?
+- 31: Categories section exists and is wired in (`CategoriesSection.tsx`, profile rail → Library group). Has parent/subcategory pills + scope card. Needs cleanup — details TBD from owner.
+- 32: Milestones section exists and is wired in (`MilestonesSection.tsx`, profile rail → Library group). Shows earned + still-ahead milestones. Decision: (a) replace with dynamic progress bars tied to category scoring (e.g. "Read 10 articles in World"), or (b) remove entirely. Owner leaning toward dynamic or removal — no static list.
+- 33: "You" section exists and is the top profile rail item (`YouSection.tsx`). Shows stats grid (Verity Score, Quizzes, Comments, Followers, Following) + profile polish CTAs. Needs cleanup — details TBD from owner.
 
 ---
 
@@ -102,7 +104,7 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
   **UI gaps to fix:**
   - No entry point from articles or profile to the category leaderboard — user reads an article in Politics but can't jump to "See Politics leaderboard"
   - Profile `CategoriesSection` shows the user's own score but never shows their rank within that category (no "Your rank: #12 in Politics")
-  - Leaderboard sticky rank bar says "#5" without clarifying if that's global, category, or subcategory context
+  - Leaderboard sticky rank bar shows rank + score but no category label (shows "#5" not "Politics #5")
   - `context` tag does not award points — only `helpful` does; decide if `context` should score
   - Subcategory deselect-on-click in profile is inconsistent with leaderboard pill behavior
 
@@ -113,23 +115,8 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 ---
 
-## Profile / Activity
+## Article surface — sources
 
----
-
-## Profile / Plan
-
-- 28: ~~Done~~ — Inline plan cards shipped in BillingCard. Free-tier users now see Verity + Family cards with prices and CTAs inline; no redirect to /pricing needed.
-
-- 29: Appearance section may not need to be its own nav rail item — it only contains a single Light/System/Dark toggle (`AppearanceSection.tsx`). Decision: collapse it into another section (e.g. Settings/General), or keep it standalone?
-
----
-
----
-
-## Article surface — bold + sources
-
-- 25: Comment/tag UI has multiple bold elements — `CommentRow.tsx` has `fontWeight: 700/600` on tag labels, usernames, and action buttons throughout. Needs a pass to identify which are intentional vs incorrect.
 - 26: Sources still showing "Unknown" for some articles — `SourcesSection.tsx:88` renders `s.title || s.publisher || hostFromUrl(s.url) || 'Source'`. The backfill migration `20260503000007_backfill_unknown_sources_to_null.sql` has not been applied yet (see TODO 19), so rows with literal `'Unknown'` in the `title` column pass the `s.title` check and render "Unknown" instead of falling through to `hostFromUrl`. Fix: apply the backfill migration (owner action, TODO 19) — no code change needed.
 
 ---
@@ -144,13 +131,11 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 - 38: Article page desktop layout feels off-center — `ArticleReaderTabs.tsx` uses a 75/25 flex split (`flex: 75` article column + `flex: 25` sticky timeline rail, `max-width: 1280px` container). The article body is capped at 680px inside the left column, so on a wide screen the text sits left-heavy with the timeline rail on the right and dead space outside. Decision needed: (a) keep 75/25 sidebar but tighten max-width so dead space shrinks, (b) move timeline above/below the article body and drop the rail, (c) make timeline a slide-in drawer/overlay on desktop instead of a persistent column. This is connected to TODO 3 (sources moving out of the timeline slot into the article body) — layout decision should be made together.
 
-- 37: Mobile web profile layout — AvatarEditor grid is now responsive (`min(160px, 40vw)` first column, `minWidth: 0` on preview panel). If profile still overflows on your phone after this, open DevTools → Elements on mobile and look for any element wider than the viewport; other candidates are `InviteLinkCard` (`minWidth: 96`) and any grid that doesn't collapse.
-
 ---
 
 ## Bookmarks → Follow (story subscription)
 
-- 43: ~~Copy sweep done~~ — "Bookmark" → "Follow" shipped across web (BookmarkButton, bookmarks page, ProfileApp rail, BookmarksSection) and iOS (ProfileView quick action + quick link, StoryDetailView button + alert, SubscriptionView plan features). Schema untouched.
+- 43: Copy sweep done — "Bookmark" → "Follow" shipped across web + iOS. Schema untouched.
 
   **Still needs your decision — story-update surfacing:**
   - When a new article is published on a story the user follows, surface it. Options: (a) badge/entry in the Activity feed, (b) push notification (iOS), (c) both.

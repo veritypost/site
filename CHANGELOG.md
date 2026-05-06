@@ -4,6 +4,47 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ---
 
+## 2026-05-06 (continued)
+
+### TODO 28 — Inline plan cards in BillingCard
+**Files:** `web/src/app/profile/settings/_cards/BillingCard.tsx`, `web/src/app/pricing/_CheckoutButton.tsx` (reused)
+- Free-tier users now see Verity + Family plan cards inline in the Plan section — no redirect to /pricing
+- Fetches DB pricing via Supabase client; falls back to `pricingCopy.ts` constants if fetch fails
+- Verity card: shows live price + `CheckoutButton` (or "Subscribe via iOS App" disabled state when `stripe_price_id` is null)
+- Family card: shows price + "Available on iOS →" link to /kids-app
+- **iOS / iOS Kids:** not applicable (native subscription flow unchanged)
+
+### TODO 25 — CommentRow bold cleanup
+**File:** `web/src/components/CommentRow.tsx`
+- "Helpful" chip: `fontWeight: 700` → `600`
+- "VS score" chip: `fontWeight: 700` → `600`
+- Active tag chip: `fontWeight: active ? 700 : 500` → `active ? 600 : 500`
+- Intentional bolds kept: "Pinned as Article Context" label, Expert chrome label, Save button
+- **iOS / iOS Kids:** not applicable
+
+### TODO 37 — AvatarEditor responsive grid
+**File:** `web/src/app/profile/_components/AvatarEditor.tsx`
+- Grid column changed from `auto 1fr` to `min(160px, 40vw) 1fr` — preview column now shrinks on narrow viewports instead of forcing a fixed 160px minimum
+- Removed `minWidth: 160` from preview panel (was redundant and overrode the column width)
+- **Verify:** open /profile → Avatar on a phone; if overflow persists check `InviteLinkCard` (`minWidth: 96`) via DevTools
+- **iOS / iOS Kids:** not applicable (native avatar editor)
+
+### TODO 43 — Bookmark → Follow copy sweep
+**Files:** `web/src/components/BookmarkButton.tsx`, `web/src/app/bookmarks/page.tsx`, `web/src/app/profile/_components/ProfileApp.tsx`, `web/src/app/profile/_sections/BookmarksSection.tsx`, `VerityPost/VerityPost/ProfileView.swift`, `VerityPost/VerityPost/StoryDetailView.swift`, `VerityPost/VerityPost/SubscriptionView.swift`
+- Web: button label "Bookmark"/"Saved" → "Follow"/"Following"; page title → "Following"; empty state copy updated; toast → "Removed from Following"; rail label → "Following"; Download copy updated
+- iOS: quick action chip "Saved" → "Following"; quick link "Bookmarks" → "Following"; article button "Save"/"Saved" → "Follow"/"Following"; upgrade alert updated; plan feature list updated
+- Schema untouched — `bookmarks` table, permissions, collections all unchanged
+- **Remaining:** story-update surfacing (notify on new articles in followed stories) — awaiting owner decision on channel (Activity badge / push / both)
+- **iOS Kids:** not applicable
+
+### TODO 46 — "New since last visit" pill on iOS home feed
+- Shipped as part of the iOS nav restructure (commit 925104eb)
+- `HomeView.swift`: reads/writes `vp_last_home_visit_at` in UserDefaults; story cards show "New" badge when `publishedAt > lastVisitDate`
+- **Web:** already existed via `_HomeVisitTimestamp.tsx`
+- **iOS Kids:** not applicable
+
+---
+
 ## 2026-05-06
 
 ### TODO 41 — iOS comment thread depth capped at 2
