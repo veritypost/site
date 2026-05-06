@@ -225,7 +225,7 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
 
 6. BANNED VERBS:
    slammed, blasted, torched, ripped, hammered, championed,
-   hailed, vowed (unless in a direct quote that IS the news)
+   hailed, vowed
    USE: criticized, opposed, supported, praised, said, stated
 
 7. No rhetorical questions. Ever.
@@ -264,12 +264,9 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
     Collins, M.D., Ph.D., Director of the National Institutes
     of Health."
 
-17. Quotes: include a direct quote ONLY if the quote IS the news
-    — a declaration, an ultimatum, a policy statement. Never
-    include reaction quotes, pundit quotes, or quotes used for
-    color. "Has not been charged" and "undermined public
-    confidence" are reaction quotes — paraphrase them. If unsure
-    whether a quote clears this bar, paraphrase it.
+17. No quotes. Ever. Paraphrase everything. Verity Post is
+    a facts-only publication — we summarize what happened, we
+    do not transcribe what people said.
 
 18. SPECIFICITY RULE: Every paragraph must contain at least one
     concrete anchor — a name, a number, a place, or an exact
@@ -291,10 +288,8 @@ a new article from facts — NOT rephrasing source articles.
 - Do NOT use any phrases, clauses, or distinctive wording
   from source articles. Extract the FACTS, then write
   entirely new prose expressing those facts in your own words.
-- Do NOT quote source articles. Paraphrase everything. The
-  only exception: a direct statement from a named person that
-  IS itself the news (e.g. a president announcing a policy at
-  a press conference). Even then, keep it to one sentence.
+- Do NOT use quotation marks around anything a person said.
+  Paraphrase everything, always, no exceptions.
 - If a source writes "the market plunged amid fears of a
   global recession," you do NOT write "markets plunged amid
   recession fears" or any variation. You write your own
@@ -385,9 +380,7 @@ Conflict stories should feel urgent through brevity, not through
 adjectives. Sentences stay short. Paragraphs stay tight.
 Include: what physically happened, who was involved, direct
 consequence (territory, casualties, infrastructure). When
-claims conflict, state both plainly. Only include quotes
-from officials if the quote IS the news (declaration of war,
-ceasefire offer, ultimatum with deadline).
+claims conflict, state both plainly. No quotes from anyone.
 
 INCLUDE: Scale (numbers affected, geographic scope). Response
 (what governments or international bodies did). Casualty
@@ -545,10 +538,7 @@ comparison context — "first title since [year]," "largest
 margin since [game]," "most points by a [role] since [player]."
 Records and firsts ALWAYS need the comparison.
 
-QUOTES: Only if the quote captures a moment — a coach's
-reaction that IS the story, a player's statement that defines
-the narrative. Never post-game cliches ("we gave 110%," "one
-game at a time"). Paraphrase instead.
+No quotes. Paraphrase what was said as a fact.
 
 STRIP: Play-by-play recaps. Betting lines. Fan reactions.
 Social media reactions. Speculation about future seasons,
@@ -1013,7 +1003,7 @@ When covering government, elections, laws, or policy:
 - Do NOT characterize any side as right or wrong
 - Do NOT explain why one side thinks this is good or bad
 - State both sides' positions as flat facts: "Some people think X. Others think Y."
-- If a law or policy has a legal text source, quote what the law actually says
+- If a law or policy has specific provisions, state what it says in plain terms.
 
 EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy phrasing from any source. Read the facts, close them, write fresh for kids.
 
@@ -1074,7 +1064,7 @@ When covering government, elections, laws, or policy:
 - Do NOT characterize any side as right or wrong
 - Do NOT explain why one side thinks this is good or bad
 - State both sides' positions as flat facts: "Some people support this. Others oppose it."
-- If a law or policy has a legal text source, quote what the law actually says
+- If a law or policy has specific provisions, state what it says in plain terms.
 
 EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy phrasing from any source.
 
