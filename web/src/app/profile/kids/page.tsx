@@ -393,13 +393,13 @@ export default function ParentKidsPage() {
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
-      <a href="/profile/settings" style={{ fontSize: 12, color: C.dim, textDecoration: 'none' }}>
-        &larr; Back to settings
+      <a href="/profile/settings" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: C.dim, textDecoration: 'none', marginBottom: 12 }}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        Settings
       </a>
-      <h1 style={{ fontSize: 24, fontWeight: 800, margin: '8px 0 4px' }}>Family reading</h1>
+      <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 4px' }}>Family reading</h1>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 16 }}>
-        Kid profiles are completely private &mdash; not in search, not on leaderboards, not visible
-        to anyone outside your family (D12).
+        Kid profiles are private — not in search, not on leaderboards, not visible to anyone outside your family.
       </div>
 
       {flash && (
@@ -669,6 +669,7 @@ const KIDS_APP_STORE_URL: string | null = null;
 
 function KidsAppBanner() {
   const live = !!KIDS_APP_STORE_URL;
+  if (!live) return null;
   return (
     <div
       style={{

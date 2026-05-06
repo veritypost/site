@@ -169,8 +169,9 @@ export default function FamilyDashboard() {
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px 80px' }}>
-      <a href="/profile/kids" style={{ fontSize: 12, color: C.dim, textDecoration: 'none' }}>
-        &larr; Kids
+      <a href="/profile/kids" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: C.dim, textDecoration: 'none', marginBottom: 12 }}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        Family reading
       </a>
       <h1 style={{ fontSize: 22, fontWeight: 700, margin: '6px 0' }}>Family dashboard</h1>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 20 }}>
