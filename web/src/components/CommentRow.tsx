@@ -399,7 +399,7 @@ export default function CommentRow({
                 title={`Marked helpful by ${comment.helpful_count} readers`}
                 style={{
                   fontSize: 10,
-                  fontWeight: 700,
+                  fontWeight: 600,
                   padding: '1px 6px',
                   borderRadius: 4,
                   background: 'rgba(22,163,74,0.12)',
@@ -414,7 +414,7 @@ export default function CommentRow({
                 title="Verity Score in this category"
                 style={{
                   fontSize: 10,
-                  fontWeight: 700,
+                  fontWeight: 600,
                   padding: '1px 6px',
                   borderRadius: 10,
                   background: 'rgba(17,17,17,0.08)',
@@ -669,7 +669,7 @@ export default function CommentRow({
                       disabled={!!busy}
                       style={{
                         fontSize: 11,
-                        fontWeight: active ? 700 : 500,
+                        fontWeight: active ? 600 : 500,
                         padding: '2px 8px',
                         borderRadius: 5,
                         border: `1px solid ${active ? meta.color : 'var(--border, #e5e5e5)'}`,

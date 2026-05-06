@@ -66,7 +66,7 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
         <svg width="12" height="13" viewBox="0 0 12 13" fill="none" aria-hidden="true">
           <path d="M2 1h8a1 1 0 011 1v10l-5-3-5 3V2a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
         </svg>
-        Bookmark
+        Follow
       </button>
     );
   }
@@ -85,13 +85,13 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
       const data = await res.json().catch(() => ({}));
       if (data.preview) {
         setBusy(false);
-        setError('Preview mode — bookmark not saved.');
+        setError('Preview mode — follow not saved.');
         return;
       }
-      if (!res.ok) throw new Error(friendlyError(data?.error, 'Could not bookmark. Try again.'));
+      if (!res.ok) throw new Error(friendlyError(data?.error, 'Could not follow. Try again.'));
       setBookmarked(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not bookmark. Try again.');
+      setError(err instanceof Error ? err.message : 'Could not follow. Try again.');
     } finally {
       setBusy(false);
     }
@@ -129,7 +129,7 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
             <path d="M2 1h8a1 1 0 011 1v10l-5-3-5 3V2a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
           </svg>
         )}
-        {busy ? '…' : bookmarked ? 'Saved' : 'Bookmark'}
+        {busy ? '…' : bookmarked ? 'Following' : 'Follow'}
       </button>
       {error && <span style={{ fontSize: 11, color: 'var(--danger, #b94040)' }}>{error}</span>}
     </span>

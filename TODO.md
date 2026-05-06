@@ -59,7 +59,7 @@
 
 ## Ready to fix — no decision needed, just needs doing
 
-- 12: Migration `_210000_grant_feed_clusters_browse_access.sql` is not idempotent — CREATE POLICY lines need DROP IF EXISTS guards
+- 12: Migration `_210000_grant_feed_clusters_browse_access.sql` is not idempotent — CREATE POLICY lines need DROP IF EXISTS guards. **Note:** file not found in repo — migrations appear to be managed directly in Supabase Studio. Owner to locate or skip.
 ---
 
 ## Needs runtime diagnosis — can't move from code alone
@@ -150,23 +150,11 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 ## Bookmarks → Follow (story subscription)
 
-- 43: Rename "Bookmark" to "Follow" everywhere and wire up story-update surfacing.
+- 43: ~~Copy sweep done~~ — "Bookmark" → "Follow" shipped across web (BookmarkButton, bookmarks page, ProfileApp rail, BookmarksSection) and iOS (ProfileView quick action + quick link, StoryDetailView button + alert, SubscriptionView plan features). Schema untouched.
 
-  **Concept shift:** Bookmarking saves an article. Following subscribes to a story — you want to know when new articles drop on that story. The `/following` page framework already shows stories you've read from; make it the canonical "stories you're following" page.
-
-  **Rename (copy + UI only, no schema change):**
-  - `web/src/components/BookmarkButton.tsx` — button label "Bookmark"/"Saved" → "Follow"/"Following"; icon can stay or swap to a bell/pin
-  - `web/src/app/bookmarks/page.tsx` — page title + empty state copy → "Following" / "Stories you're following"
-  - Rail nav label "Bookmarks" → "Following" (wherever the rail item is defined in `ProfileApp.tsx` or `AppShell.tsx`)
-  - `web/src/app/following/page.tsx` — currently shows reading-history stories; merge or redirect so there's one canonical Following page, not two
-  - iOS: `BookmarkButton` equivalent label + Bookmarks tab in profile rail → "Following"
-  - iOS Kids: not applicable (no bookmarks/following)
-
-  **Story-update surfacing (new behavior):**
-  - When a new article is published on a story the user follows, surface it. Options: (a) badge/entry in the Activity feed ("New article in a story you follow: [title]"), (b) push notification (iOS), (c) both. Decision needed from owner before implementing this part.
-  - Underlying data: `bookmarks` table already stores `article_id`; to notify on story updates need to know `story_id` — either join through `articles.story_id` or add a `story_id` column to `bookmarks`. The `/following` page already does this join via `reading_log → articles → stories`.
-
-  **Note:** `bookmark_collections`, `bookmarks.note.add`, `bookmarks.export` permissions exist — keep them alive, just rename the UI label. Do not drop the schema.
+  **Still needs your decision — story-update surfacing:**
+  - When a new article is published on a story the user follows, surface it. Options: (a) badge/entry in the Activity feed, (b) push notification (iOS), (c) both.
+  - Underlying data: `bookmarks` stores `article_id`; notify on story updates by joining `articles.story_id`. The `/following` page already does this join via `reading_log → articles → stories`.
 
 ---
 
@@ -180,11 +168,6 @@ Web mobile is the product standard. These items bring iOS in line.
   - Add article-level ad slots in `StoryDetailView.swift` — check web `[slug]/page.tsx` for placement positions
   - Register impressions via `/api/ads/impression` and clicks via `/api/ads/click`
   - iOS Kids: not applicable
-
-- 46: **"New since last visit" pill on iOS home feed** — web marks story cards with a "New" badge when `published_at > vp_last_home_visit_at`. iOS has no equivalent. Complexity: S.
-  - Web: `_HomeVisitTimestamp.tsx` writes the timestamp; story cards read it. Check `web/src/app/page.tsx` for exact condition.
-  - iOS: store last-visit timestamp in `UserDefaults` key `vp_last_home_visit_at`. On `HomeView` appear, record current time. On card render, compare `story.publishedAt > lastVisit` and show a "New" badge/pill on the story card.
-  - iOS Kids: not applicable (kids home feed is separate)
 
 - 47: **Advanced search filters on iOS** — `FindView.swift` is keyword-only. Web `/search` supports category, date range, and source publisher filters for `search.advanced` users. Complexity: M.
   - Add a filter panel / sheet to `FindView.swift` with category picker, date range picker, source field — gated by `search.advanced` permission

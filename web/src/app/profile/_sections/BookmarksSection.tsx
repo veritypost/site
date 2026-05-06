@@ -92,8 +92,8 @@ export function BookmarksSection({ preview }: Props) {
   if (rows.length === 0) {
     return (
       <EmptyState
-        title="No bookmarks yet"
-        body="Tap the bookmark icon on any article to save it here."
+        title="Not following anything yet"
+        body="Tap Follow on any article to save it here."
         cta={{ label: 'Read today’s top stories', href: '/' }}
         variant="full"
       />

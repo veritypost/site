@@ -245,7 +245,7 @@ export default function BookmarksPage() {
 
     const toastId = show(
       <span>
-        Bookmark removed{' '}
+        Removed from Following{' '}
         <button
           onClick={() => {
             dismiss(toastId);
@@ -457,7 +457,7 @@ export default function BookmarksPage() {
           }}
         >
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
-            Bookmarks ·{' '}
+            Following ·{' '}
             {/* M14 — when a collection filter is active, show
                 "<filtered> of <total>" so the count matches the visible
                 rows; "<total>" alone hid empty/sparse collections. */}
@@ -490,7 +490,7 @@ export default function BookmarksPage() {
             <div style={{ display: 'flex', gap: 8 }}>
               {canExport && (
                 <button onClick={exportAll} style={btnGhost}>
-                  Download my bookmarks
+                  Download my follows
                 </button>
               )}
               {canCollections && (
@@ -754,8 +754,8 @@ export default function BookmarksPage() {
           {filtered.length === 0 && !error && (
             // T-041: replaced inline empty-state div with shared EmptyState component.
             <EmptyState
-              headline="No bookmarks yet"
-              body="Save articles here. Tap the bookmark icon on any story to come back later."
+              headline="Not following anything yet"
+              body="Tap Follow on any article to keep it in your library."
               cta={{ label: 'Browse articles', href: '/' }}
             />
           )}

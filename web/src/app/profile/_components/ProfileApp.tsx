@@ -278,8 +278,8 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '⌛',
       group: 'Library',
       title: 'Activity',
-      reason: 'Everything you’ve read, commented on, or bookmarked.',
-      keywords: ['history', 'reads', 'comments', 'bookmarks', 'timeline'],
+      reason: ‘Everything you’ve read, commented on, or followed.’,
+      keywords: [‘history’, ‘reads’, ‘comments’, ‘following’, ‘timeline’],
       render: () => (
         <ActivitySection
           authUserId={authUserId}
@@ -293,9 +293,9 @@ export function ProfileApp({ defaultSection }: Props) {
       id: 'bookmarks',
       glyph: '◧',
       group: 'Library',
-      title: 'Bookmarks',
-      reason: 'The articles you saved for later.',
-      keywords: ['saved', 'reading list', 'later'],
+      title: 'Following',
+      reason: 'Stories you're following.',
+      keywords: ['following', 'saved', 'reading list'],
       render: () => <BookmarksSection preview={false} />,
     },
     {

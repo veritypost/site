@@ -496,7 +496,7 @@ struct ProfileView: View {
             NavigationLink {
                 BookmarksView().environmentObject(auth)
             } label: {
-                quickActionChip(icon: "bookmark.fill", label: "Saved")
+                quickActionChip(icon: "bookmark.fill", label: "Following")
             }
             .buttonStyle(.plain)
             .simultaneousGesture(TapGesture().onEnded {
@@ -881,8 +881,8 @@ struct ProfileView: View {
                                   description: "Your direct conversations",
                                   destination: AnyView(MessagesView().environmentObject(auth)))
                     }
-                    quickLink(label: "Bookmarks",
-                              description: "Articles you've saved",
+                    quickLink(label: "Following",
+                              description: "Stories you're following",
                               destination: AnyView(BookmarksView().environmentObject(auth)))
                     if canViewFamily {
                         quickLink(label: "Kids",

@@ -478,7 +478,7 @@ struct SubscriptionView: View {
             return [
                 "Read up to 5 articles per month",
                 "Take quizzes, join discussions",
-                "10 bookmarks",
+                "Follow up to 10 stories",
                 "One breaking-news alert per day",
                 "Global leaderboard"
             ]
@@ -486,7 +486,7 @@ struct SubscriptionView: View {
             return [
                 "Everything in Free",
                 "Unlimited reading",
-                "Unlimited bookmarks + collections",
+                "Unlimited story follows + collections",
                 "Direct messages, follows, mentions",
                 "Advanced search + filters",
                 "Listen to articles (TTS)",

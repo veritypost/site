@@ -401,7 +401,7 @@ struct StoryDetailView: View {
                 Button {
                     Task { await attemptBookmark() }
                 } label: {
-                    Text(isBookmarked ? "Saved" : "Save")
+                    Text(isBookmarked ? "Following" : "Follow")
                         .font(.system(.footnote, design: .default, weight: .semibold))
                         .foregroundColor(isBookmarked ? VP.accent : VP.text)
                 }
@@ -423,11 +423,11 @@ struct StoryDetailView: View {
                 .accessibilityLabel("More options")
             }
         }
-        .alert("Bookmark limit reached", isPresented: $showUpgradeAlert) {
+        .alert("Follow limit reached", isPresented: $showUpgradeAlert) {
             Button("See paid plans") { showSubscription = true }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("You\u{2019}ve hit the bookmark limit for free accounts. Upgrade to save unlimited bookmarks.")
+            Text("You\u{2019}ve hit the follow limit for free accounts. Upgrade to follow unlimited stories.")
         }
         .sheet(isPresented: $showSubscription) { SubscriptionView().environmentObject(auth) }
         .sheet(isPresented: $showRegistrationSheet) {
