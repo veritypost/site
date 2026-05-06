@@ -1480,7 +1480,7 @@ export async function POST(req: Request) {
     // Outlet may be null when the upstream feed has no source_name; we
     // persist that null so render layers can derive a hostname fallback,
     // but the LLM-prompt path still gets a literal placeholder string.
-    const sourceTexts: Array<{ outlet: string | null; url: string; text: string }> = [];
+    const sourceTexts: Array<{ outlet: string | null; raw_title: string | null; url: string; text: string }> = [];
     for (const it of scrapedItems) {
       if (!it.raw_body) continue;
       const rawOutlet =
@@ -1488,7 +1488,7 @@ export async function POST(req: Request) {
           ? (it.metadata as { outlet?: string | null }).outlet ?? null
           : null;
       const outlet = rawOutlet && rawOutlet.trim() ? rawOutlet.trim() : null;
-      sourceTexts.push({ outlet, url: it.raw_url, text: it.raw_body });
+      sourceTexts.push({ outlet, raw_title: it.raw_title ?? null, url: it.raw_url, text: it.raw_body });
     }
     let corpus = sourceTexts.map((s) => wrapSource(s.outlet ?? 'Unknown', s.url, s.text)).join('\n\n---\n\n');
     const freeformBlock = freeform_instructions
@@ -2318,10 +2318,10 @@ Empty array if all correct.`;
     const sourcesPayload: PersistArticleSource[] = sourceTexts
       .filter((s) => attachSet === null || attachSet.has(s.url))
       .map((s, i) => ({
-        title: s.outlet,
+        title: s.raw_title || s.outlet,
         url: s.url,
         publisher: s.outlet,
-        quote: s.text.slice(0, 500),
+        quote: null,
         sort_order: i,
       }));
     const timelinePayload: PersistArticleTimelineEntry[] = timelineParsed.events.map((e, i) => ({
