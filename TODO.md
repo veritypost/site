@@ -2,6 +2,31 @@
 
 ---
 
+## URL restructure — /{category}/{slug}
+
+- 44: Change article URLs from `/{slug}` to `/{category-slug}/{story-slug}` (e.g. `/politics/us-tariffs-2026`). Complexity 4/5 — do as a dedicated session.
+
+  **What's already in place (don't rebuild):**
+  - `categories.slug` is non-null in DB, already fetched by `[slug]/page.tsx` on every load
+  - Story slug is globally unique — category segment is SEO-only; server resolves by slug alone
+  - `/story/{slug}` redirect already exists (`web/src/app/story/[slug]/page.tsx`) — same pattern needed for old `/{slug}` URLs
+
+  **Implementation sequence:**
+  1. **NavWrapper blocker first** — `NavWrapper.tsx` detects article pages via `pathname.startsWith('/story')` to suppress bottom nav/footer. Must replace with a layout-level signal (e.g. `<html data-page="article">` in the article layout, or maintain a known list of non-article top-level segments) before any URL changes ship.
+  2. Create new route `web/src/app/[category]/[slug]/page.tsx` — copy of current `[slug]/page.tsx` with `params: { category: string; slug: string }`, resolves by `slug` only (category segment validated but not used for lookup).
+  3. Keep `web/src/app/[slug]/page.tsx` as redirect-only: resolves slug → joins category → 301s to `/{category}/{slug}`.
+  4. Update all 13 link-construction sites (each needs category slug alongside story slug — requires upstream query changes):
+     - `_HomeBreakingStrip.tsx:91`, `_HomeSectionsMenu.tsx:528`, `page.tsx:609+836`, `signup/_FeaturedArticle.tsx:236`, `admin/newsroom/_components/ArticlesTable.tsx:460`, `search/page.tsx:414`, `bookmarks/page.tsx:617`, `profile/_sections/BookmarksSection.tsx:129`, `profile/_sections/ActivitySection.tsx:278`, `following/page.tsx:179`, `NextStoryFooter.tsx:36`, `article/UpNextSheet.tsx:139`, internal `redirect()` calls in `[slug]/page.tsx:138+254`
+  5. Update `web/src/app/sitemap.js` — extend article query to join `categories(slug)`, update URL construction.
+  6. Update `generateMetadata` in new route file — `params` type changes.
+  7. Clean up `web/src/app/story/[slug]/layout.js` — currently emits its own OG metadata with canonical pointing at `/story/{slug}` instead of deferring to the destination. Fix canonical to point at `/{category}/{slug}`.
+
+  **iOS:** No changes needed if `/story/{slug}` redirect stays alive. iOS share URL is `veritypost.com/story/{slug}` which redirects through. No AASA update, no App Store review.
+
+  **API:** `web/src/app/api/articles/by-slug/[slug]/route.ts` takes slug as URL param — keep as-is (internal API, not public-facing).
+
+---
+
 ## Needs your decision before anything can move
 
 **Dark mode — bundle 1 + 2 together**
