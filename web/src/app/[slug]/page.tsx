@@ -179,7 +179,7 @@ export default async function ArticleSlugPage({
             .order('sort_order', { ascending: true }),
           service
             .from('timelines')
-            .select('id, event_date, event_label, event_body, type, linked_article_id')
+            .select('id, event_date, event_label, event_body, type, linked_article_id, metadata')
             .eq('story_id', story.id)
             .order('event_date', { ascending: true }),
           article.category_id

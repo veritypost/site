@@ -15,6 +15,7 @@ export type AudienceBand = 'adult' | 'tweens' | 'kids';
 export const STEP_LABELS: Record<string, string> = {
   audience_safety_check: 'Checking audience safety',
   source_fetch: 'Fetching sources',
+  enrich_wikipedia: 'Building historical context',
   headline: 'Writing headline',
   summary: 'Drafting summary',
   categorization: 'Categorizing',
@@ -41,6 +42,7 @@ export const ERROR_LABELS: Record<string, string> = {
 
 export const ADULT_STEPS: string[] = [
   'source_fetch',
+  'enrich_wikipedia',
   'headline',
   'summary',
   'categorization',
@@ -56,6 +58,7 @@ export const ADULT_STEPS: string[] = [
 export const KID_STEPS: string[] = [
   'audience_safety_check',
   'source_fetch',
+  'enrich_wikipedia',
   'headline',
   'summary',
   'categorization',

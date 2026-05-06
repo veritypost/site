@@ -1005,20 +1005,35 @@ export async function POST(req: Request) {
         return { inserted: 0, skipped: 0, raceDeduped: 0, insertedByFeed: new Map() };
       }
 
-      // Dedup query in batches of 100
+      // Dedup query in batches of 25 — best-effort. If any batch fails
+      // (e.g. stale keep-alive connection after long RSS fanout), we log
+      // and break; the upsert below uses ignoreDuplicates=true so any
+      // unchecked duplicates are still silently dropped at the DB level.
       const existingUrls = new Set<string>();
       const urls = items.map((i) => i.raw_url);
-      for (let i = 0; i < urls.length; i += 100) {
-        const batch = urls.slice(i, i + 100);
-        const { data: existing, error: existErr } = await service
-          .from('discovery_items')
-          .select('raw_url')
-          .in('raw_url', batch);
-        if (existErr) {
-          throw new Error(`discovery_items dedup lookup failed: ${existErr.message}`);
-        }
-        for (const row of existing ?? []) {
-          if (row.raw_url) existingUrls.add(row.raw_url);
+      for (let i = 0; i < urls.length; i += 25) {
+        const batch = urls.slice(i, i + 25);
+        try {
+          const { data: existing, error: existErr } = await service
+            .from('discovery_items')
+            .select('raw_url')
+            .in('raw_url', batch);
+          if (existErr) {
+            console.warn(
+              '[newsroom.ingest] dedup batch error — relying on upsert ignoreDuplicates for remainder:',
+              existErr.message,
+            );
+            break;
+          }
+          for (const row of existing ?? []) {
+            if (row.raw_url) existingUrls.add(row.raw_url);
+          }
+        } catch (fetchErr) {
+          console.warn(
+            '[newsroom.ingest] dedup batch threw — relying on upsert ignoreDuplicates for remainder:',
+            fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
+          );
+          break;
         }
       }
 
@@ -1385,7 +1400,13 @@ export async function POST(req: Request) {
                 previewUpdate.ai_category_id = clusterPreview.category_id;
                 previewUpdate.ai_subcategory_id = clusterPreview.subcategory_id;
               }
-              await service.from('stories').update(previewUpdate).eq('id', storyId);
+              const { error: previewUpdateErr } = await service
+                .from('stories')
+                .update(previewUpdate)
+                .eq('id', storyId);
+              if (previewUpdateErr) {
+                throw new Error(`stories preview update failed: ${previewUpdateErr.message}`);
+              }
             } catch (metaErr) {
               const metaMsg = metaErr instanceof Error ? metaErr.message : 'unknown error';
               console.warn('[newsroom.ingest.run] cluster story preview pick failed:', metaMsg);
@@ -1599,7 +1620,13 @@ export async function POST(req: Request) {
                 sPreviewUpdate.ai_category_id = sPreview.category_id;
                 sPreviewUpdate.ai_subcategory_id = sPreview.subcategory_id;
               }
-              await service.from('stories').update(sPreviewUpdate).eq('id', singletonStoryId);
+              const { error: sPreviewUpdateErr } = await service
+                .from('stories')
+                .update(sPreviewUpdate)
+                .eq('id', singletonStoryId);
+              if (sPreviewUpdateErr) {
+                throw new Error(`singleton stories preview update failed: ${sPreviewUpdateErr.message}`);
+              }
             } catch (sMetaErr) {
               const sMetaMsg = sMetaErr instanceof Error ? sMetaErr.message : 'unknown error';
               console.warn('[newsroom.ingest.run] singleton story preview pick failed:', sMetaMsg);

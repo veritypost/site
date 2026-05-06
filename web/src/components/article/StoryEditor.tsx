@@ -87,6 +87,7 @@ const EMPTY_STORY: StoryForm = {
 type TimelineEntry = {
   id: string;
   event_date: string;
+  date_display?: string;
   is_current: boolean;
   type: 'story' | 'event';
   title: string;
@@ -425,9 +426,12 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         // conditional fallback would silently flip on reload).
         const content = isAnchor ? (cast.body || '') : eventBody;
         const summary = isAnchor ? (cast.excerpt || '') : eventBody;
+        const metadata = ev.metadata as Record<string, unknown> | null | undefined;
+        const dateDisplay = (metadata?.date_display as string | undefined) ?? undefined;
         return {
           id: e.id,
           event_date: eventDate,
+          date_display: dateDisplay,
           is_current: Boolean(ev.is_current),
           type: localType,
           title: eventLabel,
@@ -699,9 +703,12 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         const eventDate = rawEventDate ? rawEventDate.split('T')[0] : '';
         const content = isAnchor ? (story.body || '') : eventBody;
         const summary = isAnchor ? (story.summary || '') : eventBody;
+        const reloadMeta = ev.metadata as Record<string, unknown> | null | undefined;
+        const reloadDateDisplay = (reloadMeta?.date_display as string | undefined) ?? undefined;
         return {
           id: e.id,
           event_date: eventDate,
+          date_display: reloadDateDisplay,
           is_current: Boolean(ev.is_current),
           type: localType,
           title: eventLabel,
@@ -1348,7 +1355,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                   {entry.is_current && <Badge variant="warn" size="xs">Now</Badge>}
                   {entry.event_date && (
                     <span style={{ fontSize: F.xs, color: C.muted, fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap' }}>
-                      {formatTimelineDate(entry.event_date)}
+                      {entry.date_display || formatTimelineDate(entry.event_date)}
                     </span>
                   )}
                   <span style={{ fontSize: F.base, fontWeight: 600, color: C.ink, flex: '1 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>

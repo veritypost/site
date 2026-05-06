@@ -40,7 +40,8 @@ export interface PersistArticleSource {
 export interface PersistArticleTimelineEntry {
   title?: string | null;
   description?: string | null;
-  event_date: string; // ISO timestamptz — required (RPC falls back to now())
+  event_date: string; // YYYY, YYYY-MM, or YYYY-MM-DD — RPC converts via parse_timeline_event_date
+  date_display?: string | null; // human-readable label e.g. "1922", "Jun 2024", "Apr 5, 2026" — stored in metadata by RPC
   event_label: string; // short label — required (RPC falls back to 'Event')
   event_body?: string | null;
   event_image_url?: string | null;

@@ -409,9 +409,9 @@ const HeadlineSummarySchema = z.object({
 // sub) rather than crashing the run.
 const CategorizationSchema = z.object({
   category_id: z.string().uuid(),
-  category_name: z.string().optional(),
+  category_name: z.string().nullish(),
   subcategory_id: z.string().uuid().nullable().optional(),
-  subcategory_name: z.string().optional(),
+  subcategory_name: z.string().nullish(),
 });
 
 const BodySchema = z.object({
@@ -439,6 +439,7 @@ const SourceGroundingSchema = z.object({
 
 const TimelineEventSchema = z.object({
   event_date: z.string(),
+  date_display: z.string().optional().nullable(),
   event_label: z.string(),
   event_body: z.string().optional().nullable(),
   source_url: z.string().optional().nullable(),
@@ -1424,9 +1425,15 @@ export async function POST(req: Request) {
           error_type: text === null ? 'scrape_empty' : null,
           metadata: { url: it.raw_url, mode: scrape_mode, bytes: byteLen } as Json,
         });
+        const excerptFallback =
+          !text &&
+          typeof it.metadata === 'object' &&
+          it.metadata !== null
+            ? ((it.metadata as Record<string, unknown>).excerpt as string | null | undefined) ?? null
+            : null;
         return {
           ...it,
-          raw_body: text ?? it.raw_body ?? null,
+          raw_body: text ?? it.raw_body ?? (excerptFallback && excerptFallback.length > 0 ? excerptFallback : null),
           _scrape_mode: scrape_mode,
           _scrape_ok: text !== null,
         };
@@ -1968,7 +1975,7 @@ Return JSON:
         : effectiveAgeBand === 'tweens'
           ? TWEENS_TIMELINE_PROMPT
           : KIDS_TIMELINE_PROMPT;
-    const timelineUser = `ARTICLE BODY:\n${finalBodyMarkdown}\n\nGenerate the timeline as JSON:\n{\n  "events": [\n    {"event_date": "YYYY-MM-DDTHH:mm:ssZ", "event_label": "Short label", "event_body": "...", "source_url": "..."}\n  ]\n}${freeformBlock}\n\nSOURCES:\n${corpus}`;
+    const timelineUser = `ARTICLE BODY:\n${finalBodyMarkdown}\n\nGenerate the timeline as JSON:\n{\n  "events": [\n    {"event_date": "YYYY or YYYY-MM or YYYY-MM-DD (use only the precision you actually know — never pad with fake Jan 1 or first-of-month)", "date_display": "human label matching that precision, e.g. '1922', 'Jun 2024', or 'Apr 5, 2026'", "event_label": "Short label", "event_body": "...", "source_url": "..."}\n  ]\n}${freeformBlock}\n\nSOURCES:\n${corpus}`;
     promptParts.push({
       step: timelineStepName,
       system: timelineSystem,
@@ -2181,11 +2188,19 @@ Empty array if all correct.`;
     assertPerRunCap(totalCostUsd, perRunCapUsd);
     const verifyParsed = QuizVerifySchema.parse(extractJSON(verifyRes.text));
     if (verifyParsed.fixes.length > 0) {
-      // Per spec: throw on mismatch, do NOT regenerate. Operator can re-click
-      // Generate if desired.
-      throw new Error(
-        `quiz_verification failed: ${verifyParsed.fixes.length} question(s) mis-keyed`
-      );
+      for (const fix of verifyParsed.fixes) {
+        const q = quizQuestions[fix.question_index];
+        if (q && fix.correct_answer >= 0 && fix.correct_answer < q.options.length) {
+          quizQuestions[fix.question_index] = { ...q, correct_index: fix.correct_answer };
+        }
+      }
+      pipelineLog.warn('newsroom.generate.quiz_verification', {
+        run_id: runId,
+        cluster_id,
+        audience,
+        step: verifyStepName,
+        fixes_applied: verifyParsed.fixes.length,
+      });
     }
     stepTimings[verifyStepName] = Date.now() - verifyStart;
 
@@ -2268,6 +2283,7 @@ Empty array if all correct.`;
       title: e.event_label,
       description: e.event_body ?? null,
       event_date: e.event_date,
+      date_display: e.date_display ?? null,
       event_label: e.event_label,
       event_body: e.event_body ?? null,
       source_url: e.source_url ?? null,
@@ -2298,7 +2314,7 @@ Empty array if all correct.`;
       cluster_id,
       pipeline_run_id: runId,
       title: cleanText(headline),
-      subtitle: null,
+      subtitle: summary || null,
       body: finalBodyMarkdown,
       body_html: bodyHtml,
       excerpt: summary || null,
