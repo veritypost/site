@@ -4,6 +4,23 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ---
 
+## 2026-05-06 (continued again)
+
+### TODOs 1+2 — Dark mode: chrome + article text
+**Files:** `web/src/app/NavWrapper.tsx`, `web/src/components/article/ArticleSurface.tsx`, `ArticleReaderTabs.tsx`, `SourcesSection.tsx`, `MidBodyQuizTeaser.tsx`, `TimelineSection.tsx`, `UpNextSheet.tsx`, `AnonArticleCtaBanner.tsx`, `StoryArticlePicker.tsx`, `web/src/components/CommentRow.tsx`
+- **Chrome fix:** `rgba(var(--bg-rgb, 255, 255, 255), 0.97)` → `rgba(var(--bg-rgb), 0.97)` on top bar + bottom nav (NavWrapper lines 398, 431). `--bg-rgb` already had correct dark overrides; the hardcoded white fallback was the entire problem.
+- **Article text fix:** Swept 9 files from legacy CSS vars to `--p-*` tokens:
+  - `--text-primary` / `--text` → `--p-ink`
+  - `--dim` (dark shades #888/#666/#555) → `--p-ink-muted`
+  - `--dim` (light shades #bbb/#999/#aaa) → `--p-ink-faint`
+  - `--bg` → `--p-bg`
+  - `--border` → `--p-border`
+  - `--accent` (#0070f3/#2563eb, blue uses) → `--p-accent`
+  - `--accent` (#111, dark ink uses) → `--p-ink`
+- **iOS / iOS Kids:** not applicable (native theme system)
+
+---
+
 ## 2026-05-06 (continued)
 
 ### TODO 28 — Inline plan cards in BillingCard

@@ -29,10 +29,6 @@
 
 ## Needs your decision before anything can move
 
-**Dark mode — bundle 1 + 2 together**
-- 1: Chrome (top bar + bottom nav) stays white in dark mode — need to pick token strategy: new --chrome-bg/--chrome-text tokens, or reuse existing --p-surface/--p-ink tokens
-- 2: Article body text stays dark in dark mode — fix path A (redefine full legacy palette in CSS, bigger QA surface) or path B (sweep article components to --p-ink only, smaller blast)
-
 **Article reader**
 - 3: Move Sources block out of `timelineSlot` and into the main article body, after `ArticleActions`. Redesign the display: show publisher favicon/logo instead of text title. Interaction: clicking a logo expands/reveals the raw source headline (`s.title`); clicking that headline opens the source URL in a new tab (`target="_blank" rel="noopener noreferrer"`). Do not navigate inside the app — user must land outside so they can return cleanly.
   - Move: `web/src/app/[slug]/page.tsx:355` — remove `<SourcesSection>` from `timelineSlot`, add it after `<ArticleActions>` (line 347)
