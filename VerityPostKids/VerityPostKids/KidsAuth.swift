@@ -11,6 +11,12 @@ final class KidsAuth: ObservableObject {
     @Published var kid: KidReference? = nil
     @Published var authError: String? = nil
     @Published var isBusy: Bool = false
+    @Published var parentSession: ParentSession? = nil
+
+    struct ParentSession {
+        let email: String
+        let accessToken: String
+    }
 
     struct KidReference: Equatable {
         let id: String
@@ -31,6 +37,17 @@ final class KidsAuth: ObservableObject {
         if let stored = await PairingClient.shared.restore() {
             self.kid = KidReference(id: stored.kidProfileId, name: stored.kidName)
         }
+    }
+
+    /// Called after a parent completes signup and their JWT is available.
+    func adoptParentSession(email: String, accessToken: String) {
+        self.parentSession = ParentSession(email: email, accessToken: accessToken)
+        self.authError = nil
+    }
+
+    /// Clears the transient parent session (e.g. after pairing completes or is cancelled).
+    func clearParentSession() {
+        self.parentSession = nil
     }
 
     /// Called by PairCodeView after successful /api/kids/pair.

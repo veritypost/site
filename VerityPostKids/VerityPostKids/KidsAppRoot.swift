@@ -52,7 +52,7 @@ struct KidsAppRoot: View {
             // briefly on every cold launch. Now: a neutral loading gate
             // until restore() resolves; only then does the view branch
             // into tabbedApp (paired) or PairCodeView (unpaired).
-            if auth.isBusy && auth.kid == nil {
+            if auth.isBusy && auth.kid == nil && auth.parentSession == nil {
                 launchGate
                     .environmentObject(auth)
                     .transition(.opacity)
@@ -61,6 +61,10 @@ struct KidsAppRoot: View {
                     .environmentObject(auth)
                     .environmentObject(state)
                     .transition(.opacity)
+            } else if auth.parentSession != nil {
+                CreateKidInKidsAppView()
+                    .environmentObject(auth)
+                    .transition(.opacity)
             } else {
                 PairCodeView()
                     .environmentObject(auth)
@@ -68,6 +72,7 @@ struct KidsAppRoot: View {
             }
         }
         .animation(.easeInOut(duration: 0.35), value: auth.kid?.id)
+        .animation(.easeInOut(duration: 0.35), value: auth.parentSession == nil)
         .animation(.easeInOut(duration: 0.2), value: auth.isBusy)
         .task(id: auth.kid?.id) {
             guard let kid = auth.kid else { return }

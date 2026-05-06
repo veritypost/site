@@ -22,6 +22,7 @@ struct PairCodeView: View {
     // behind a parental check.
     @State private var showHelpGate: Bool = false
     @State private var showMailUnavailable: Bool = false
+    @State private var showParentAuth: Bool = false
     @FocusState private var focused: Bool
 
     // Ext-W5 — 8-slot grid is intentional (owner decision 2026-04-25).
@@ -132,6 +133,21 @@ struct PairCodeView: View {
                     .buttonStyle(.plain)
                     .contentShape(Rectangle())
                     .accessibilityLabel("Need help — ask a grown-up to email support")
+
+                    Divider()
+                        .padding(.vertical, 4)
+
+                    Button {
+                        showParentAuth = true
+                    } label: {
+                        Text("I\u{2019}m a parent — set up here")
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                            .foregroundStyle(K.dim)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Set up the kids app as a parent")
                 }
 
             }
@@ -145,6 +161,10 @@ struct PairCodeView: View {
         .onAppear {
             focused = true
             assertServerCodeLengthMatches()
+        }
+        .sheet(isPresented: $showParentAuth) {
+            ParentAuthView()
+                .environmentObject(auth)
         }
         .parentalGate(isPresented: $showHelpGate) {
             // After grown-up passes the math check, open the mail composer.

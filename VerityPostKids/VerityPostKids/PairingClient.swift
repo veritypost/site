@@ -148,6 +148,51 @@ final class PairingClient {
         }
     }
 
+    // MARK: Pair Direct (parent signup flow)
+
+    /// Called during parent-signup: parent's access token authorises the pair,
+    /// no 8-char code needed. Returns the resulting kid session.
+    func pairDirect(parentToken: String, kidName: String) async throws -> PairSuccess {
+        let url = SupabaseKidsClient.shared.siteURL
+            .appendingPathComponent("api/kids/pair-direct")
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 15
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(parentToken)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["kid_name": kidName])
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: req)
+        } catch {
+            throw PairError.network
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw PairError.server("Unexpected response")
+        }
+
+        if http.statusCode == 200 {
+            let success = try JSONDecoder().decode(PairSuccess.self, from: data)
+            persist(success)
+            try await applySession(token: success.access_token)
+            return success
+        }
+
+        // Error branches
+        let msg = (try? JSONDecoder().decode(ServerError.self, from: data))?.error
+            ?? "Pairing failed"
+        switch http.statusCode {
+        case 400:  throw PairError.invalidCode
+        case 401:  throw PairError.unauthorized
+        case 429:  throw PairError.rateLimited
+        case 503:  throw PairError.notConfigured
+        default:   throw PairError.server(msg)
+        }
+    }
+
     // MARK: Persistence + Supabase session
 
     func restore() async -> StoredPair? {
