@@ -515,9 +515,8 @@ struct HomeView: View {
                 .select("*, stories(slug)")
                 .eq("status", value: "published")
                 .eq("browse_only", value: false)
-                .gte("published_at", value: todayStartIso)
                 .order("published_at", ascending: false)
-                .limit(20)
+                .limit(12)
                 .execute()
                 .value
 
@@ -528,7 +527,6 @@ struct HomeView: View {
                 .eq("status", value: "published")
                 .eq("is_breaking", value: true)
                 .eq("browse_only", value: false)
-                .gte("published_at", value: todayStartIso)
                 .order("published_at", ascending: false)
                 .limit(1)
                 .execute()
