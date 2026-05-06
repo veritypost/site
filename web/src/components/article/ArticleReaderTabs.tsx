@@ -58,9 +58,8 @@ export default function ArticleReaderTabs({ articleSlot, timelineSlot, engagemen
         })}
       </div>
 
-      {/* Body: flex row on desktop, block on mobile/tablet */}
+      {/* Body: flex row on desktop — ONLY article + timeline so sticky rail stops here */}
       <div data-reader-body>
-        {/* Left column (desktop) / stacked panels (mobile): article + engagement */}
         <div data-reader-main>
           <div
             role="tabpanel"
@@ -70,16 +69,6 @@ export default function ArticleReaderTabs({ articleSlot, timelineSlot, engagemen
           >
             {articleSlot}
           </div>
-          {showEngagement && (
-            <div
-              role="tabpanel"
-              id="reader-panel-engagement"
-              aria-labelledby="reader-tab-engagement"
-              data-reader-panel="engagement"
-            >
-              {engagementSlot}
-            </div>
-          )}
         </div>
 
         {/* Right rail on desktop / separate tab panel on mobile: timeline + sources */}
@@ -93,6 +82,21 @@ export default function ArticleReaderTabs({ articleSlot, timelineSlot, engagemen
         </div>
       </div>
 
+      {/* Engagement (quiz + comments) lives below the two-column flex so the
+          sticky timeline rail stops at the article body, not here */}
+      {showEngagement && (
+        <div data-reader-engagement>
+          <div
+            role="tabpanel"
+            id="reader-panel-engagement"
+            aria-labelledby="reader-tab-engagement"
+            data-reader-panel="engagement"
+          >
+            {engagementSlot}
+          </div>
+        </div>
+      )}
+
       <style>{`
         /* ── Desktop (≥1024px): 75/25 flex split ── */
         [data-reader-tabstrip] { display: none; }
@@ -105,6 +109,11 @@ export default function ArticleReaderTabs({ articleSlot, timelineSlot, engagemen
           padding: 0 40px;
         }
         [data-reader-main] { flex: 75; min-width: 0; }
+        [data-reader-engagement] {
+          max-width: 1280px;
+          margin: 0 auto;
+          padding: 0 40px;
+        }
         [data-reader-panel="timeline"] {
           flex: 25;
           min-width: 0;
@@ -155,6 +164,7 @@ export default function ArticleReaderTabs({ articleSlot, timelineSlot, engagemen
           }
           [data-reader-body] { display: block; max-width: none; margin: 0; padding: 0; }
           [data-reader-main] { display: block; flex: none; }
+          [data-reader-engagement] { max-width: none; margin: 0; padding: 0; }
           [data-reader-panel="timeline"] {
             position: static;
             flex: none;
