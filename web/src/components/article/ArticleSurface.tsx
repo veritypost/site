@@ -11,7 +11,6 @@ import Link from 'next/link';
 import Ad from '@/components/Ad';
 import UpNextSheet from '@/components/article/UpNextSheet';
 import ReadingProgressRibbon from '@/components/ReadingProgressRibbon';
-import MidBodyQuizTeaser from '@/components/article/MidBodyQuizTeaser';
 import type { UpNextArticle, UpNextSheetHandle } from '@/components/article/UpNextSheet';
 
 export type ArticleSurfaceArticle = {
@@ -35,8 +34,6 @@ export type ArticleSurfaceProps = {
   canViewBody?: boolean;
   isSignedIn?: boolean;
   nearbyArticles?: UpNextArticle[];
-  hasQuiz?: boolean;
-  quizPassed?: boolean;
 };
 
 const PAGE_STYLE: React.CSSProperties = {
@@ -66,7 +63,7 @@ const BODY_STYLE: React.CSSProperties = {
   color: 'var(--p-ink)',
 };
 
-export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true, isSignedIn = false, nearbyArticles = [], hasQuiz = false, quizPassed = false }: ArticleSurfaceProps) {
+export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true, isSignedIn = false, nearbyArticles = [] }: ArticleSurfaceProps) {
   const editHref = article.is_kids_safe
     ? `/admin/kids-story-manager?article=${article.id}`
     : `/admin/story-manager?article=${article.id}`;
@@ -153,16 +150,6 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
               articles are long enough that the reader has scrolled 30%+ by
               the time this slot is visible. */}
           <Ad placement="article_in_body" page="article" position="in_body" articleId={article.id} />
-          {/* MidBodyQuizTeaser intentionally hidden for anon — the locked
-              quiz card at the bottom + the AnonArticleCtaBanner at the top
-              already cover signup, and a third inline CTA piles up. */}
-          {isSignedIn && (
-            <MidBodyQuizTeaser
-              hasQuiz={hasQuiz}
-              quizPassed={quizPassed}
-              onScrollToQuiz={() => document.getElementById('article-quiz')?.scrollIntoView({ behavior: 'smooth' })}
-            />
-          )}
         </>
       ) : (
         <div

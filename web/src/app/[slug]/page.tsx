@@ -335,8 +335,6 @@ export default async function ArticleSlugPage({
               canEdit={canEdit}
               canViewBody={isAnon ? true : canViewBody}
               nearbyArticles={nearbyArticles}
-              hasQuiz={hasQuiz}
-              quizPassed={initialPassed}
               isSignedIn={!!user}
             />
             {!isCoppa && (article.status === 'published' || canEdit || isOwnerModeViewer) && (
