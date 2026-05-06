@@ -123,7 +123,7 @@ export default function AppealPage() {
       });
       load();
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError('Something went wrong. Try again.');
     } finally {
       setSubmitting(null);
     }

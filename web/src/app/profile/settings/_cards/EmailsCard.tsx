@@ -60,7 +60,7 @@ export function EmailsCard({ user, preview }: Props) {
         setConfirming(false);
         return;
       }
-      toast.success(`Verification link sent to ${newEmail}. Click it to confirm the change.`);
+      toast.success(`Verification link sent to ${newEmail}.`);
       setNewEmail('');
       setConfirming(false);
     } catch {

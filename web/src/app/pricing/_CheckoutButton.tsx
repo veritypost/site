@@ -48,7 +48,7 @@ export function CheckoutButton({
       }
       if (!res.ok || !data.url) {
         localStorage.removeItem(CHECKOUT_IN_FLIGHT_KEY);
-        setError(data.error || 'Something went wrong. Please try again.');
+        setError(data.error || 'Something went wrong. Try again.');
         return;
       }
       // Clear the in-flight key on redirect so returning to /pricing
@@ -57,7 +57,7 @@ export function CheckoutButton({
       window.location.href = data.url;
     } catch {
       localStorage.removeItem(CHECKOUT_IN_FLIGHT_KEY);
-      setError('Something went wrong. Please try again.');
+      setError('Something went wrong. Try again.');
     } finally {
       setLoading(false);
     }

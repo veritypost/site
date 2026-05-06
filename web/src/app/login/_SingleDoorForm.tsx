@@ -86,7 +86,7 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
       });
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; reason?: string };
       if (!res.ok) {
-        setEmailError(json.error || 'Could not send code. Please try again.');
+        setEmailError(json.error || 'Could not send code. Try again.');
         return;
       }
       if (json.reason === 'invite_required') {
@@ -97,7 +97,7 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
       setStage('code');
       startResendCooldown();
     } catch {
-      setEmailError('Network issue. Please try again.');
+      setEmailError('Network issue. Try again.');
     } finally {
       setEmailBusy(false);
     }
@@ -117,7 +117,7 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
       });
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok) {
-        setCodeError(json.error || 'Invalid code. Please try again.');
+        setCodeError(json.error || 'Invalid code. Try again.');
         return;
       }
       if (!json.ok) {
@@ -138,7 +138,7 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
       const safe = resolveNext(rawNext, null);
       router.replace(safe || '/');
     } catch {
-      setCodeError('Network issue. Please try again.');
+      setCodeError('Network issue. Try again.');
     } finally {
       setCodeBusy(false);
     }
@@ -157,7 +157,7 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
       if (res.ok) {
         startResendCooldown();
       } else {
-        setCodeError('Could not resend. Please try again.');
+        setCodeError('Could not resend. Try again.');
       }
     } catch {
       setCodeError('Could not resend. Check your connection.');

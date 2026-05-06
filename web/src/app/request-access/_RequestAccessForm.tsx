@@ -71,12 +71,12 @@ export default function RequestAccessForm() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError((body as { error?: string }).error ?? 'Something went wrong. Please try again.');
+        setError((body as { error?: string }).error ?? 'Something went wrong. Try again.');
         return;
       }
       setStage('sent');
     } catch {
-      setError('Network issue. Please try again.');
+      setError('Network issue. Try again.');
     } finally {
       setBusy(false);
     }

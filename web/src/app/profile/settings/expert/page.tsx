@@ -205,7 +205,7 @@ export default function ExpertSettings() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Submission failed');
-      setFlash('Application submitted - you will hear back after editorial review.');
+      setFlash('Application submitted.');
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

@@ -1114,44 +1114,11 @@ function MessagesPageInner() {
                     discovery CTA points at the article browse surface
                     where users encounter it. New-message search remains
                     available below as a secondary action. */}
-                <div
-                  style={{
-                    border: '1px solid #e5e5e5',
-                    background: '#f7f7f7',
-                    borderRadius: 12,
-                    padding: '16px 18px',
-                    textAlign: 'left',
-                    marginBottom: 16,
-                  }}
-                >
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#111', marginBottom: 4 }}>
-                    Have a question? Ask an expert.
-                  </div>
-                  <div style={{ fontSize: 12, lineHeight: 1.5, color: '#666', marginBottom: 12 }}>
-                    Browse articles and tap &ldquo;Ask an Expert&rdquo; under any story to route
-                    your question to a verified expert in that category.
-                  </div>
-                  <a
-                    href="/"
-                    style={{
-                      display: 'inline-block',
-                      padding: '8px 14px',
-                      background: '#111',
-                      color: '#fff',
-                      borderRadius: 8,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      textDecoration: 'none',
-                    }}
-                  >
-                    Browse articles
-                  </a>
-                </div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#111', marginBottom: 6 }}>
                   No conversations yet
                 </div>
                 <div style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 16 }}>
-                  Message an expert, author, or friend to get started.
+                  Start a conversation by replying to a story.
                 </div>
                 <button
                   onClick={() => setShowSearch(true)}

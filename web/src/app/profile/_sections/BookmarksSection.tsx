@@ -51,7 +51,7 @@ export function BookmarksSection({ preview }: Props) {
     if (queryError) {
       setError(true);
       setLoading(false);
-      toast.error('Could not load bookmarks. Tap Retry to try again.');
+      toast.error('Could not load bookmarks.');
       return;
     }
     setRows((data ?? []) as unknown as BookmarkRow[]);

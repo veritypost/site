@@ -74,13 +74,13 @@ export default function ContactPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Failed to submit. Please try again.');
+        setError(data.error || 'Failed to submit. Try again.');
         setSubmitting(false);
         return;
       }
       setSubmitted(true);
     } catch {
-      setError('Network error. Please try again.');
+      setError('Network error. Try again.');
     }
     setSubmitting(false);
   };

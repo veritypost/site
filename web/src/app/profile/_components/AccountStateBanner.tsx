@@ -108,7 +108,7 @@ function visual(state: AccountState): Visual | null {
         title: 'Posting is paused',
         body: state.until
           ? `You can read but can't comment, message, or post until ${formatTime(state.until)}.`
-          : "You can read but can't comment, message, or post for now. This usually lifts within 24 hours.",
+          : "Can't comment, message, or post for now.",
       };
     case 'shadow_banned':
       return null;
@@ -121,7 +121,7 @@ function visual(state: AccountState): Visual | null {
         title: 'Expert application not approved',
         body: state.reason
           ? `${state.reason}. You can re-apply after addressing the feedback.`
-          : "Your expert application wasn't approved this round. You can re-apply once you have updated credentials.",
+          : "Expert application not approved. Update your credentials and re-apply.",
         cta: { label: 'Re-apply', href: '/profile/settings?section=expert-profile' },
       };
     case 'plan_grace':

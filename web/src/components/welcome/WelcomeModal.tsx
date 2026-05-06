@@ -90,13 +90,13 @@ export default function WelcomeModal({ nextPath }: Props) {
         return;
       }
       if (!res.ok || !json.ok) {
-        setSaveError(json.error || 'Could not save username. Please try again.');
+        setSaveError(json.error || 'Could not save username. Try again.');
         return;
       }
       // Success — navigate to destination.
       window.location.href = nextPath || '/';
     } catch {
-      setSaveError('Network issue. Please try again.');
+      setSaveError('Network issue. Try again.');
     } finally {
       setSaving(false);
     }

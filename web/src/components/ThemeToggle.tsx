@@ -72,9 +72,9 @@ export default function ThemeToggle() {
   }
 
   const LABELS: Record<ThemePref, string> = {
-    light: 'Light mode — click to switch to dark',
-    dark: 'Dark mode — click to switch to system',
-    system: 'System mode — click to switch to light',
+    light: 'Light',
+    dark: 'Dark',
+    system: 'System',
   };
 
   return (
