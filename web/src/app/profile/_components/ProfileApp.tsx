@@ -278,8 +278,8 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '⌛',
       group: 'Library',
       title: 'Activity',
-      reason: ‘Everything you’ve read, commented on, or followed.’,
-      keywords: [‘history’, ‘reads’, ‘comments’, ‘following’, ‘timeline’],
+      reason: "Everything you've read, commented on, or followed.",
+      keywords: ['history', 'reads', 'comments', 'following', 'timeline'],
       render: () => (
         <ActivitySection
           authUserId={authUserId}
@@ -294,7 +294,7 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '◧',
       group: 'Library',
       title: 'Following',
-      reason: 'Stories you're following.',
+      reason: "Stories you're following.",
       keywords: ['following', 'saved', 'reading list'],
       render: () => <BookmarksSection preview={false} />,
     },
@@ -329,7 +329,7 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '✺',
       group: 'Library',
       title: 'Milestones',
-      reason: 'The badges you’ve earned and what’s next on the ladder.',
+      reason: "The badges you've earned and what's next on the ladder.",
       keywords: ['achievements', 'badges', 'awards'],
       render: () => <MilestonesSectionConnected authUserId={authUserId} user={user} />,
     },
@@ -415,7 +415,7 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '⌬',
       group: 'Settings',
       title: 'Login activity',
-      reason: 'Where you’re currently signed in. Revoke any device that doesn’t belong.',
+      reason: "Where you're currently signed in. Revoke any device that doesn't belong.",
       keywords: ['sessions', 'devices', 'login', 'revoke'],
       render: () => <SessionsSection preview={false} />,
     },
