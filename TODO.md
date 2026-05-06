@@ -116,33 +116,14 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 ## Comments / tagging
 
 - 39: Tag button UI after passing quiz is messy — clicking tags on another user's comment has poor UX (button states, picker, feedback). Needs investigation and redesign of the tag interaction in `CommentRow.tsx` and iOS `StoryDetailView.swift`.
-- 40: Never show "@mentions are a paid feature" or any mention-gating message anywhere. Find and remove all such copy across web and iOS.
 
 ---
 
 ## Layout / visual
 
-- 42: Timeline sticky rail must not scroll past the end of the article. On desktop the timeline panel is `position: sticky` with `max-height: calc(100vh - 100px)` and `overflow-y: auto` (`ArticleReaderTabs.tsx`). When the article is short or the user scrolls to the bottom, the timeline rail keeps sticking beyond the article's natural end and floats over the footer/engagement zone. Fix: constrain the sticky rail so it stops when the article column ends — likely via a wrapping element with `align-items: flex-start` already in place, but the rail needs `align-self: flex-start` or the parent needs `align-items: stretch` removed so the sticky container doesn't stretch taller than the article content.
-  - Web: `ArticleReaderTabs.tsx` — `[data-reader-panel="timeline"]` sticky styles
-  - iOS: Timeline is a separate tab on mobile, not a sticky rail — not applicable
-  - iOS Kids: No timeline — not applicable
-
 - 38: Article page desktop layout feels off-center — `ArticleReaderTabs.tsx` uses a 75/25 flex split (`flex: 75` article column + `flex: 25` sticky timeline rail, `max-width: 1280px` container). The article body is capped at 680px inside the left column, so on a wide screen the text sits left-heavy with the timeline rail on the right and dead space outside. Decision needed: (a) keep 75/25 sidebar but tighten max-width so dead space shrinks, (b) move timeline above/below the article body and drop the rail, (c) make timeline a slide-in drawer/overlay on desktop instead of a persistent column. This is connected to TODO 3 (sources moving out of the timeline slot into the article body) — layout decision should be made together.
 
 - 37: Mobile web profile renders poorly — zooms in and doesn't give a clean view. Viewport meta is correct (`device-width`, `initialScale: 1`). AppShell rail is properly hidden off-screen on mobile (<860px). Most likely cause: a fixed-width element inside one of the profile sections is causing horizontal overflow, which makes the browser shrink the page to fit. Needs browser-side diagnosis — open `/profile` on mobile, open DevTools, look for any element wider than the viewport in the Elements panel. Suspect candidates: `AvatarEditor` (`minWidth: 160`), `InviteLinkCard` (`minWidth: 96`), or a grid that doesn't collapse properly. Fix will depend on what's overflowing.
-
----
-
-## Score tier / Newcomer removal
-
-- 35: Remove all score tier (newcomer/reader/informed/analyst/scholar/luminary) UI across web and iOS. Plan tier (free/pro/family) in `Models.swift` is subscription gating — do NOT touch.
-  - `web/src/lib/scoreTiers.ts` — delete entire file
-  - `web/src/app/profile/_components/TierProgress.tsx` — delete entire component
-  - `web/src/app/profile/_sections/YouSection.tsx` — remove `TierProgress` render (line 48) and `ScoreTier` props (`tier`, `next`)
-  - `web/src/app/profile/_sections/MilestonesSection.tsx` — remove tier references
-  - `web/src/components/CommentRow.tsx` — remove `currentUserTier` prop (line 72, 189, 944) and all downstream uses
-  - `web/src/components/CommentThread.tsx` — remove `currentUserTier` prop (lines 60, 99, 926, 1022) and all downstream uses
-  - `VerityPost/VerityPost/ProfileView.swift:956` — remove `tierFor(score:)?.displayName ?? "Newcomer"` display; drop `scoreTiers` state loaded at lines 105-106 and 193
 
 ---
 

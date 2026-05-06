@@ -30,6 +30,24 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ---
 
+### TODO 35 — Score tier UI removed
+**Files:** `web/src/lib/scoreTiers.ts` (deleted), `web/src/app/profile/_components/TierProgress.tsx` (deleted), `ProfileApp.tsx`, `AppShell.tsx`, `YouSection.tsx`, `PublicProfileSection.tsx`, `CommentRow.tsx`, `CommentThread.tsx`, `CommentComposer.tsx`, `admin/users/page.tsx`, `admin/users/[id]/page.tsx`, `u/[username]/page.tsx`, `VerityPost/ProfileView.swift`
+- All newcomer/reader/informed/analyst/scholar/luminary labels, the TierProgress bar, and scoreTiers loading logic removed everywhere
+- Plan tier (free/pro/family) untouched — only score tier removed
+- **iOS Kids:** not applicable
+
+### TODO 42 — Timeline sticky rail overflow fixed
+**File:** `web/src/components/article/ArticleReaderTabs.tsx`
+- Added `align-self: flex-start` to `[data-reader-panel="timeline"]` — the rail now stops at the article container's bottom edge instead of floating over the footer
+- **iOS:** timeline is a separate tab on mobile, not a sticky rail — not applicable
+- **iOS Kids:** no timeline — not applicable
+
+### TODO 40 — @mentions paid-gating copy (iOS)
+- Swept iOS codebase — no paid-gating mention copy exists in Swift; web was already cleaned last commit
+- Item fully done, no code change needed on iOS
+
+---
+
 ## Earlier this session (2026-05-06)
 
 ### Bold / weight cleanup — article surface
