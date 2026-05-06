@@ -193,7 +193,6 @@ export async function GET(
         'id, article_id, question_text, question_type, options, explanation, difficulty, points, sort_order'
       )
       .eq('article_id', articleId)
-      .eq('is_active', true)
       .is('deleted_at', null)
       .order('sort_order', { ascending: true })
       .limit(10);

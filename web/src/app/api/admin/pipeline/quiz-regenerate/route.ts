@@ -32,6 +32,23 @@ export const maxDuration = 120;
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 const SONNET_MODEL = 'claude-sonnet-4-6';
 
+async function getPerRunCapUsd(service: ReturnType<typeof createServiceClient>): Promise<number> {
+  const { data, error } = await service
+    .from('settings')
+    .select('value')
+    .eq('key', 'pipeline.per_run_cost_usd_cap')
+    .maybeSingle();
+  if (error || !data) return 1.0;
+  const n = Number(data.value);
+  return Number.isFinite(n) && n > 0 ? n : 1.0;
+}
+
+function assertPerRunCap(totalCostUsd: number, capUsd: number): void {
+  if (totalCostUsd > capUsd) {
+    throw new Error(`[quiz-regenerate] per-run cost cap exceeded: $${totalCostUsd.toFixed(6)} > $${capUsd.toFixed(2)}`);
+  }
+}
+
 const RequestSchema = z.object({
   article_id: z.string().uuid(),
 });
@@ -131,6 +148,8 @@ export async function POST(req: Request) {
     );
   }
 
+  const perRunCapUsd = await getPerRunCapUsd(service);
+
   const { data: article, error: articleErr } = await service
     .from('articles')
     .select('id, body, is_kids_safe, age_band')
@@ -176,6 +195,7 @@ Each option MUST be an object with a "text" field — never a bare string.`;
 
   // Step 1 — Quiz generation
   let quizText: string;
+  let totalCostUsd = 0;
   try {
     const res = await callModel({
       provider: 'anthropic',
@@ -189,6 +209,8 @@ Each option MUST be an object with a "text" field — never a bare string.`;
       audience,
     });
     quizText = res.text;
+    totalCostUsd += res.cost_usd;
+    assertPerRunCap(totalCostUsd, perRunCapUsd);
   } catch (err) {
     console.error('[quiz-regenerate] quiz step failed', err);
     return NextResponse.json({ error: 'Quiz generation failed. Try again.' }, { status: 500 });
@@ -253,6 +275,8 @@ Each option MUST be an object with a "text" field — never a bare string.`;
       audience,
     });
     verifyText = res.text;
+    totalCostUsd += res.cost_usd;
+    assertPerRunCap(totalCostUsd, perRunCapUsd);
   } catch (err) {
     console.error('[quiz-regenerate] verify step failed', err);
     return NextResponse.json({ error: 'Quiz verification failed. Try again.' }, { status: 500 });
@@ -288,7 +312,6 @@ Each option MUST be an object with a "text" field — never a bare string.`;
     difficulty: q.difficulty || null,
     points: q.points || 10,
     sort_order: i,
-    is_active: true,
   }));
 
   const { error: insertErr } = await service.from('quizzes').insert(quizRows as never);

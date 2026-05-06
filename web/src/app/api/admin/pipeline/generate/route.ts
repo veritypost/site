@@ -332,8 +332,7 @@ async function getPerRunCapUsd(service: SupabaseClient<Database>): Promise<numbe
     .eq('key', 'pipeline.per_run_cost_usd_cap')
     .maybeSingle();
   if (error || !data) {
-    console.warn('[newsroom.generate.per_run_cap] settings read failed; defaulting to 1.0');
-    return 1.0;
+    throw new Error('[newsroom.generate.per_run_cap] settings read failed — cannot proceed without cost cap');
   }
   const n = Number(data.value);
   return Number.isFinite(n) && n > 0 ? n : 1.0;

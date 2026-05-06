@@ -62,8 +62,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const { data: pool } = await service
     .from('quizzes')
     .select('id')
-    .eq('article_id', story.id)
-    .eq('is_active', true);
+    .eq('article_id', story.id);
   const total = (pool || []).length;
   if (total === 0) {
     return NextResponse.json({ error: `No active quiz questions for "${slug}"` }, { status: 400 });

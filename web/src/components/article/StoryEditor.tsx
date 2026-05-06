@@ -453,6 +453,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         .from('quizzes')
         .select('*')
         .eq('article_id', id)
+        .is('deleted_at', null)
         .order('sort_order', { ascending: true });
       const loadedQuizzes: QuizLocal[] = (quizData || []).map((q) => {
         const qr = q as unknown as Record<string, unknown>;
@@ -888,7 +889,6 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
             options: q.options.map((o) => ({ text: o.text, is_correct: o.is_correct })),
             explanation: q.explanation || '',
             sort_order: i,
-            is_active: true,
             points: 10,
           })),
         }),

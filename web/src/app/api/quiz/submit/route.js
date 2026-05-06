@@ -52,15 +52,13 @@ export async function POST(request) {
 
   const service = createServiceClient();
 
-  // Validate length against the article's actual quiz count rather than
-  // hardcoded 5 — quiz length is DB-driven (submit_quiz_attempt reads
-  // quizzes by article_id) and weekly recap / future variable-length
-  // quizzes want different counts. Previously rejected any length !== 5.
+  // Confirm the article has at least one quiz question. The RPC handles
+  // per-answer validation; we don't enforce exact count here because the
+  // serving layer may return a subset (e.g. first 5 of N stored rows).
   const { count: quizCount, error: countErr } = await service
     .from('quizzes')
     .select('*', { count: 'exact', head: true })
     .eq('article_id', article_id)
-    .eq('is_active', true)
     .is('deleted_at', null);
   if (countErr) {
     console.error('[quiz.submit] count quizzes', countErr);
@@ -69,8 +67,8 @@ export async function POST(request) {
   if (!quizCount || quizCount === 0) {
     return NextResponse.json({ error: 'No quiz for this article' }, { status: 400 });
   }
-  if (answers.length !== quizCount) {
-    return NextResponse.json({ error: `Expected ${quizCount} answers` }, { status: 400 });
+  if (answers.length === 0 || answers.length > quizCount) {
+    return NextResponse.json({ error: 'Invalid number of answers' }, { status: 400 });
   }
 
   // Rate-limit: 30 submits per minute per user. Generous enough for

@@ -32,6 +32,23 @@ export const maxDuration = 120;
 
 const SONNET_MODEL = 'claude-sonnet-4-6';
 
+async function getPerRunCapUsd(service: ReturnType<typeof createServiceClient>): Promise<number> {
+  const { data, error } = await service
+    .from('settings')
+    .select('value')
+    .eq('key', 'pipeline.per_run_cost_usd_cap')
+    .maybeSingle();
+  if (error || !data) return 1.0;
+  const n = Number(data.value);
+  return Number.isFinite(n) && n > 0 ? n : 1.0;
+}
+
+function assertPerRunCap(totalCostUsd: number, capUsd: number): void {
+  if (totalCostUsd > capUsd) {
+    throw new Error(`[sources-regenerate] per-run cost cap exceeded: $${totalCostUsd.toFixed(6)} > $${capUsd.toFixed(2)}`);
+  }
+}
+
 const RequestSchema = z.object({
   article_id: z.string().uuid(),
 });
@@ -129,6 +146,8 @@ export async function POST(req: Request) {
     );
   }
 
+  const perRunCapUsd = await getPerRunCapUsd(service);
+
   const { data: article, error: articleErr } = await service
     .from('articles')
     .select('id, body, title')
@@ -161,6 +180,7 @@ export async function POST(req: Request) {
       audience: 'adult',
     });
     llmText = res.text;
+    assertPerRunCap(res.cost_usd, perRunCapUsd);
   } catch (err) {
     console.error('[sources-regenerate] LLM step failed', err);
     return NextResponse.json({ error: 'Source extraction failed. Try again.' }, { status: 500 });

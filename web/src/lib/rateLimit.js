@@ -80,7 +80,7 @@ export async function getRateLimit(supabase, policyKey, fallback) {
   const cached = POLICY_CACHE.get(policyKey);
   if (cached && cached.expiresAt > now) {
     if (cached.isActive === false)
-      return { max: Infinity, windowSec: fallback.windowSec, disabled: true };
+      return { max: fallback.max, windowSec: fallback.windowSec };
     return { max: cached.max, windowSec: cached.windowSec };
   }
 
@@ -113,7 +113,7 @@ export async function getRateLimit(supabase, policyKey, fallback) {
       expiresAt: now + POLICY_TTL_MS,
     });
     if (data.is_active === false) {
-      return { max: Infinity, windowSec: fallback.windowSec, disabled: true };
+      return { max: fallback.max, windowSec: fallback.windowSec };
     }
     return { max: data.max_requests, windowSec: data.window_seconds };
   } catch (err) {

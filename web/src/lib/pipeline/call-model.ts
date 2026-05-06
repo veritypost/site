@@ -343,6 +343,9 @@ async function writePipelineCost(row: {
 // 12. callModel — main entry point
 export async function callModel(params: CallModelParams): Promise<CallModelResult> {
   if (params.signal?.aborted) throw new AbortedError();
+  if (params.max_tokens > 8192) {
+    throw new Error(`[call-model] max_tokens ${params.max_tokens} exceeds limit of 8192`);
+  }
 
   const pricing = await getModelPricing(params.provider, params.model);
 

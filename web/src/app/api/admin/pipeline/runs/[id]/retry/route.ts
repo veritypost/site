@@ -77,7 +77,20 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: 'Run not found' }, { status: 404 });
   }
 
-  // 4. Gate: retry applies only to failed generate runs with full params.
+  // 4. Lifetime retry cap — reject after 3 prior retries on this run.
+  const { count: priorRetries } = await service
+    .from('admin_audit_log')
+    .select('*', { count: 'exact', head: true })
+    .eq('action', 'pipeline_retry')
+    .eq('target_id', params.id);
+  if ((priorRetries ?? 0) >= 3) {
+    return NextResponse.json(
+      { error: 'Max retries (3) reached for this run' },
+      { status: 429 }
+    );
+  }
+
+  // 5. Gate: retry applies only to failed generate runs with full params.
   if (run.pipeline_type !== 'generate') {
     return NextResponse.json({ error: 'Only generate runs can be retried' }, { status: 400 });
   }
@@ -88,7 +101,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: 'Run has insufficient params' }, { status: 422 });
   }
 
-  // 5. Forward to generate route via internal same-origin fetch.
+  // 6. Forward to generate route via internal same-origin fetch.
   // Cookie pass-through preserves the admin session so generate's own
   // requirePermission('admin.pipeline.generate') resolves against the same actor.
   const generateUrl = new URL('/api/admin/pipeline/generate', req.url);
@@ -122,11 +135,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
   const newRunId = typeof bodyJson.run_id === 'string' ? bodyJson.run_id : null;
 
-  // 6. Extract original failure reason for audit forensics from the dedicated
+  // 7. Extract original failure reason for audit forensics from the dedicated
   // error_type column (migration 120). Legacy output_summary stash is gone.
   const originalErrorType = run.error_type ?? null;
 
-  // 7. Audit only when generate actually spawned a new run.
+  // 8. Audit only when generate actually spawned a new run.
   if (response.ok && newRunId) {
     try {
       await recordAdminAction({
@@ -145,7 +158,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
   }
 
-  // 8. Pass through generate's status + body; append old/new run ids for the UI.
+  // 9. Pass through generate's status + body; append old/new run ids for the UI.
   return NextResponse.json(
     { ...bodyJson, old_run_id: params.id, new_run_id: newRunId },
     { status: response.status }

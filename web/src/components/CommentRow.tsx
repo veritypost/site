@@ -53,7 +53,6 @@ const TAG_META: Record<TagKind, { label: string; color: string; challenge: boole
 export type EnrichedComment = CommentRowDb & {
   users?: CommentUser;
   _your_tags?: Set<TagKind>;
-  _your_reaction?: 'agree' | 'disagree' | null;
   helpful_count?: number | null;
   cite_needed_count?: number | null;
   off_topic_count?: number | null;
@@ -96,6 +95,7 @@ interface CommentRowProps {
   onHide?: (commentId: string) => void;
   onReplied?: (comment: CommentRowDb | null) => void;
   depth?: number;
+  quizPassed?: boolean;
 }
 
 const DEFAULT_TAG_KINDS: TagKind[] = ['helpful', 'context', 'cite_needed', 'off_topic'];
@@ -210,6 +210,7 @@ export default function CommentRow({
   onHide,
   onReplied,
   depth = 0,
+  quizPassed = true,
 }: CommentRowProps) {
   const [replyOpen, setReplyOpen] = useState<boolean>(false);
   const [editing, setEditing] = useState<boolean>(false);
@@ -218,9 +219,6 @@ export default function CommentRow({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState<string>('');
   const [commentMaxDepth, setCommentMaxDepth] = useState<number>(2);
-  const [yourReaction, setYourReaction] = useState<'agree' | 'disagree' | null>(
-    comment._your_reaction ?? null
-  );
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   // EXPERT_THREADS Wave 4b — close-thread cooldown countdown. Set when
   // the close RPC returns 429 wait_for_cooldown; ticks down to 0 then
@@ -234,7 +232,6 @@ export default function CommentRow({
   const canReply = hasPermission('comments.reply');
   const canReport = hasPermission('comments.report');
   const canContextTag = hasPermission('comments.context_tag');
-  const canReact = hasPermission('comments.react');
   const canEditOwn = hasPermission('comments.edit.own');
   const canDeleteOwn = hasPermission('comments.delete.own');
   const canEditAny = hasPermission('admin.comments.edit.any');
@@ -330,24 +327,6 @@ export default function CommentRow({
       setBusy('');
     }
   }
-  async function doAgree(reaction: 'agree' | 'disagree') {
-    if (busy || isOwner) return;
-    setBusy(`react:${reaction}`);
-    try {
-      const res = await fetch(`/api/comments/${comment.id}/agree`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reaction }),
-      });
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setYourReaction(data.reaction ?? null);
-      }
-    } finally {
-      setBusy('');
-    }
-  }
-
   const mentions = (Array.isArray(comment.mentions) ? comment.mentions : []) as Mention[];
   const commentDepth = comment.thread_depth ?? depth;
 
@@ -740,7 +719,7 @@ export default function CommentRow({
             );
           })()}
 
-          {/* Action row: Reply · Agree · Disagree */}
+          {/* Action row: Reply */}
           {!isDeleted && !editing && (() => {
             // EXPERT_THREADS Wave 4b — chain lookup for cap affordances.
             // Asker-side view: viewer is the root author and target is an
@@ -802,7 +781,7 @@ export default function CommentRow({
               canModerate &&
               !!onReopenThread;
             const replyDisabled =
-              isExpertThreadClosed || askerCapHit;
+              isExpertThreadClosed || askerCapHit || quizPassed === false;
             const replyButton =
               canReply && commentDepth < commentMaxDepth ? (
                 <button
@@ -953,35 +932,6 @@ export default function CommentRow({
                       Conversation complete with @{user.username || 'expert'} — they can grant another reply if you have a follow-up.
                     </span>
                   )}
-              {canReact && !isOwner && (
-                <>
-                  <span style={{ fontSize: 12, color: 'var(--border, #e0e0e0)', margin: '0 2px', userSelect: 'none' }}>&middot;</span>
-                  {(['agree', 'disagree'] as const).map(r => (
-                    <button
-                      key={r}
-                      onClick={() => doAgree(r)}
-                      disabled={!!busy}
-                      aria-pressed={yourReaction === r}
-                      style={{
-                        fontSize: 12,
-                        fontWeight: yourReaction === r ? 700 : 500,
-                        padding: '4px 10px',
-                        borderRadius: 6,
-                        minHeight: 30,
-                        border: 'none',
-                        background: 'transparent',
-                        color: yourReaction === r
-                          ? (r === 'agree' ? 'var(--success-text)' : '#b94040')
-                          : 'var(--dim, #888)',
-                        cursor: busy ? 'default' : 'pointer',
-                        touchAction: 'manipulation',
-                      }}
-                    >
-                      {r === 'agree' ? 'Agree' : 'Disagree'}
-                    </button>
-                  ))}
-                </>
-              )}
               </div>
             );
           })()}

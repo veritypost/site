@@ -106,7 +106,6 @@ export default function CommentThread({
   const commentsRef = useRef<CommentWithAuthor[]>([]);
   const mountedRef = useRef<boolean>(true);
   const [authorScores, setAuthorScores] = useState<Record<string, number>>({});
-  const [yourReactions, setYourReactions] = useState<Record<string, 'agree' | 'disagree'>>({});
   const [yourTags, setYourTags] = useState<Map<string, Set<TagKind>>>(new Map());
   // Threshold above which the inline "Helpful" badge is shown next to
   // the author. Pulled from /api/settings/public; falls back to 10 on
@@ -253,16 +252,6 @@ export default function CommentThread({
 
     if (currentUserId) {
       if (commentIds.length > 0) {
-        const { data: ar } = await supabase
-          .from('comment_agree_disagree')
-          .select('comment_id, reaction')
-          .eq('user_id', currentUserId)
-          .in('comment_id', commentIds);
-        const reactions: Record<string, 'agree' | 'disagree'> = {};
-        ((ar || []) as unknown as Array<{ comment_id: string; reaction: 'agree' | 'disagree' }>)
-          .forEach((row) => { reactions[row.comment_id] = row.reaction; });
-        setYourReactions(reactions);
-
         const { data: t } = await supabase
           .from('comment_context_tags')
           .select('comment_id, tag_kind')
@@ -926,7 +915,6 @@ export default function CommentThread({
     const kids = (childrenByParent[c.id] || []).map((child) => renderWithReplies(child, depth + 1));
     const enriched: EnrichedComment = {
       ...c,
-      _your_reaction: yourReactions[c.id] ?? null,
       _your_tags: yourTags.get(c.id) ?? new Set<TagKind>(),
     };
     return (
@@ -958,6 +946,7 @@ export default function CommentThread({
         onFlag={handleFlag}
         onHide={handleHide}
         onReplied={handlePosted}
+        quizPassed={quizPassed}
       />
     );
   };
