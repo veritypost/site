@@ -157,7 +157,7 @@ struct LoginView: View {
         }
         .disabled(!canSubmit)
 
-        Text("By continuing, you agree to our [Terms](https://verityposts.com/terms) and [Privacy Policy](https://verityposts.com/privacy).")
+        Text("By continuing, you agree to our [Terms](https://veritypost.com/terms) and [Privacy Policy](https://veritypost.com/privacy).")
             .font(.caption)
             .foregroundColor(VP.dim)
             .multilineTextAlignment(.center)

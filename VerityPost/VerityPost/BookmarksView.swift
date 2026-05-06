@@ -44,8 +44,8 @@ struct BookmarksView: View {
     // Tone escalates: neutral (5-6), amber (7-8), danger (9+).
     private var nearCap: Bool { isFreeTier && items.count >= 5 }
     private var capToneColor: Color {
-        if items.count >= 9 { return Color(hex: "dc2626") }
-        if items.count >= 7 { return Color(hex: "b45309") }
+        if items.count >= 9 { return VP.danger }
+        if items.count >= 7 { return VP.warn }
         return VP.dim
     }
 

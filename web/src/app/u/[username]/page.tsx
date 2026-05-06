@@ -487,7 +487,7 @@ export default function ProfilePage() {
               <VerifiedBadge user={target} />
               {me && me.id === target.id && hasPermission('admin.owner_mode') && (
                 <span style={{
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: 600,
                   color: 'var(--accent)',
                   background: 'var(--accent-subtle)',
@@ -505,7 +505,7 @@ export default function ProfilePage() {
               {target.created_at ? ` · Member since ${formatMemberSince(target.created_at)}` : ''}
             </div>
             {target.is_expert && (canSeeExpert || (me && me.id === target.id)) && (
-              <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 700, marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--success-text, #16a34a)', fontWeight: 700, marginTop: 2 }}>
                 {target.expert_title ? `${target.expert_title}` : 'Expert'}
                 {target.expert_organization ? ` · ${target.expert_organization}` : ''}
               </div>

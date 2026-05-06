@@ -864,7 +864,7 @@ struct DMThreadView: View {
                                             .foregroundColor(isMe ? .white : VP.text)
                                             .padding(.horizontal, 14)
                                             .padding(.vertical, 9)
-                                            .background(isMe ? VP.accent : Color(hex: "E9E9EB"))
+                                            .background(isMe ? VP.accent : VP.surfaceSunken)
                                             .clipShape(RoundedRectangle(cornerRadius: 18))
                                         if !isMe { Spacer(minLength: 60) }
                                     }
@@ -922,14 +922,14 @@ struct DMThreadView: View {
                     } label: {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.largeTitle)
-                            .foregroundColor(input.trimmingCharacters(in: .whitespaces).isEmpty ? Color(hex: "CCCCCC") : VP.accent)
+                            .foregroundColor(input.trimmingCharacters(in: .whitespaces).isEmpty ? VP.inkFaint : VP.accent)
                     }
                     .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || sending)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
-            .background(Color(hex: "F7F7F7"))
+            .background(VP.surfaceSunken)
             .animation(.easeInOut(duration: 0.2), value: sendError)
         }
         .task(id: conversation.id) { await loadMessages() }
