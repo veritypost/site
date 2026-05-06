@@ -197,7 +197,7 @@ async function callAnthropicOnce(
     {
       model: params.model,
       max_tokens: params.max_tokens,
-      temperature: params.temperature ?? 0.2,
+      temperature: params.temperature ?? 0.3,
       system: [{ type: 'text', text: params.system, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: params.prompt }],
       ...(params.tools ? { tools: params.tools as Anthropic.Tool[] } : {}),
@@ -230,7 +230,7 @@ async function callOpenAIOnce(
     {
       model: params.model,
       max_completion_tokens: params.max_tokens,
-      temperature: params.temperature ?? 0.2,
+      temperature: params.temperature ?? 0.3,
       messages: [
         { role: 'system', content: params.system },
         { role: 'user', content: params.prompt },

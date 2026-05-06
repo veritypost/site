@@ -227,6 +227,11 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
   const [saving, setSaving] = useState(false);
   const [regenQuizLoading, setRegenQuizLoading] = useState(false);
   const [regenSourcesLoading, setRegenSourcesLoading] = useState(false);
+  const [factCheckData, setFactCheckData] = useState<{
+    conflicts: Array<{ claim: string; note: string; sources: string[] }>;
+    single_source: Array<{ claim: string; note: string; sources: string[] }>;
+    implausibilities: Array<{ claim: string; note: string }>;
+  } | null>(null);
   const [regenTimelineLoading, setRegenTimelineLoading] = useState(false);
   const [followupLoading, setFollowupLoading] = useState(false);
   const [followupSourceUrls, setFollowupSourceUrls] = useState('');
@@ -398,6 +403,16 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
       });
       setStoryId(id);
       setArticleAgeBand(cast.age_band ?? null);
+
+      const castMeta = cast.metadata as Record<string, unknown> | null;
+      const fc = castMeta?.fact_check as Record<string, unknown> | null | undefined;
+      if (fc && typeof fc === 'object') {
+        setFactCheckData({
+          conflicts: (fc.conflicts as Array<{ claim: string; note: string; sources: string[] }>) ?? [],
+          single_source: (fc.single_source as Array<{ claim: string; note: string; sources: string[] }>) ?? [],
+          implausibilities: (fc.implausibilities as Array<{ claim: string; note: string }>) ?? [],
+        });
+      }
 
       // Wave 7 fix: include type='article' anchor rows so quiz sections
       // (which key off type='story' locally) find their parent entry.
@@ -1442,6 +1457,44 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                         Delete entry
                       </Button>
                     </div>
+
+                    {entry.type === 'story' && factCheckData && (
+                      (factCheckData.conflicts.length > 0 || factCheckData.single_source.length > 0 || factCheckData.implausibilities.length > 0) && (
+                        <div style={{ marginTop: S[3], paddingTop: S[3], borderTop: `1px solid ${C.divider}` }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: S[2], marginBottom: S[2] }}>
+                            <span style={{ fontSize: F.xs, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#b45309' }}>
+                              Fact-check flags
+                            </span>
+                            <span style={{ fontSize: F.xs, color: C.muted }}>
+                              ({factCheckData.conflicts.length} conflict{factCheckData.conflicts.length !== 1 ? 's' : ''}, {factCheckData.single_source.length} single-source, {factCheckData.implausibilities.length} plausibility)
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
+                            {factCheckData.conflicts.map((f, i) => (
+                              <div key={i} style={{ padding: S[2], background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, fontSize: F.sm }}>
+                                <div style={{ fontWeight: 600, color: '#92400e', marginBottom: 2 }}>Conflict</div>
+                                <div style={{ color: '#78350f', marginBottom: 2 }}>&ldquo;{f.claim}&rdquo;</div>
+                                <div style={{ color: '#92400e' }}>{f.note}</div>
+                              </div>
+                            ))}
+                            {factCheckData.single_source.map((f, i) => (
+                              <div key={i} style={{ padding: S[2], background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: F.sm }}>
+                                <div style={{ fontWeight: 600, color: '#1e40af', marginBottom: 2 }}>Single source</div>
+                                <div style={{ color: '#1e3a8a', marginBottom: 2 }}>&ldquo;{f.claim}&rdquo;</div>
+                                <div style={{ color: '#1e40af' }}>{f.note}</div>
+                              </div>
+                            ))}
+                            {factCheckData.implausibilities.map((f, i) => (
+                              <div key={i} style={{ padding: S[2], background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 6, fontSize: F.sm }}>
+                                <div style={{ fontWeight: 600, color: '#9f1239', marginBottom: 2 }}>Plausibility</div>
+                                <div style={{ color: '#881337', marginBottom: 2 }}>&ldquo;{f.claim}&rdquo;</div>
+                                <div style={{ color: '#9f1239' }}>{f.note}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    )}
 
                     {entry.type === 'story' && (
                       <div style={{ marginTop: S[3], paddingTop: S[3], borderTop: `1px solid ${C.divider}` }}>

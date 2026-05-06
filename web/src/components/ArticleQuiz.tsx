@@ -252,7 +252,7 @@ export default function ArticleQuiz({
           }}
         >
           <div style={{ fontWeight: 700, color: C.success, fontSize: 14 }}>
-            {isKid ? ‘Quiz passed!’ : ‘Discussion unlocked’}
+            {isKid ? 'Quiz passed!' : 'Discussion unlocked'}
           </div>
           {/* T141 — give passed-state a forward path. One line, two
               targets: jump to the unlocked thread, or go pick the next

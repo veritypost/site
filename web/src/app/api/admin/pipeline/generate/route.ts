@@ -59,6 +59,7 @@ import {
   QUIZ_PROMPT,
   TIMELINE_PROMPT,
   AUDIENCE_PROMPT,
+  FACT_CHECK_PROMPT,
   KIDS_HEADLINE_PROMPT,
   KIDS_ARTICLE_PROMPT,
   KIDS_TIMELINE_PROMPT,
@@ -174,6 +175,7 @@ type Step =
   | 'body'
   | 'source_grounding'
   | 'plagiarism_check'
+  | 'fact_check'
   | 'timeline'
   | 'kid_url_sanitizer'
   | 'quiz'
@@ -191,6 +193,7 @@ const ALL_STEPS: readonly Step[] = [
   'body',
   'source_grounding',
   'plagiarism_check',
+  'fact_check',
   'timeline',
   'kid_url_sanitizer',
   'quiz',
@@ -436,6 +439,18 @@ const SourceGroundingSchema = z.object({
     .default([]),
   unsupported_claims: z.array(z.string()).default([]),
 });
+
+const FactCheckFlagSchema = z.object({
+  claim: z.string(),
+  note: z.string(),
+  sources: z.array(z.string()).optional().default([]),
+});
+const FactCheckResultSchema = z.object({
+  conflicts: z.array(FactCheckFlagSchema).default([]),
+  single_source: z.array(FactCheckFlagSchema).default([]),
+  implausibilities: z.array(FactCheckFlagSchema).default([]),
+});
+type FactCheckResult = z.infer<typeof FactCheckResultSchema>;
 
 const TimelineEventSchema = z.object({
   event_date: z.string(),
@@ -1959,6 +1974,36 @@ Return JSON:
     stepTimings[plagStepName] = Date.now() - plagStart;
 
     // ────────────────────────────────────────────────────────────────────────
+    // 9i.0. fact_check — conflict detection, single-source flagging, plausibility
+    // Non-fatal: failures produce an empty result, pipeline continues.
+    // ────────────────────────────────────────────────────────────────────────
+    let factCheckResult: FactCheckResult = { conflicts: [], single_source: [], implausibilities: [] };
+    const factCheckStepName: Step = 'fact_check';
+    await checkCancel(runId);
+    pipelineLog.info(`newsroom.generate.${factCheckStepName}`, { run_id: runId, cluster_id, audience, step: factCheckStepName });
+    const factCheckStart = Date.now();
+    try {
+      const sourceList = sourceTexts
+        .map((s, i) => `SOURCE ${i + 1} (${s.outlet ?? 'Unknown'}):\n${s.text.slice(0, 2000)}`)
+        .join('\n\n---\n\n');
+      const factCheckRes = await callModel({
+        provider: 'anthropic',
+        model: HAIKU_MODEL,
+        system: FACT_CHECK_PROMPT,
+        prompt: `ARTICLE:\n${finalBodyMarkdown}\n\n---\n\n${sourceList}`,
+        max_tokens: 1500,
+        temperature: 0.1,
+        pipeline_run_id: runId,
+        step_name: factCheckStepName,
+      });
+      factCheckResult = FactCheckResultSchema.parse(extractJSON(factCheckRes.text));
+      totalCostUsd += factCheckRes.cost_usd;
+    } catch (err) {
+      pipelineLog.warn(`newsroom.generate.${factCheckStepName}`, { run_id: runId, cluster_id, audience, step: factCheckStepName, error: String(err) });
+    }
+    stepTimings[factCheckStepName] = Date.now() - factCheckStart;
+
+    // ────────────────────────────────────────────────────────────────────────
     // 9i. timeline
     // ────────────────────────────────────────────────────────────────────────
     const timelineStart = Date.now();
@@ -2328,6 +2373,9 @@ Empty array if all correct.`;
       source_feed_id: null,
       word_count: computedWordCount,
       reading_time_minutes: bodyParsed.reading_time_minutes,
+      metadata: {
+        fact_check: factCheckResult,
+      },
       sources: sourcesPayload,
       timeline: timelinePayload,
       quizzes: quizzesPayload,
