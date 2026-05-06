@@ -8,7 +8,7 @@ type MidBodyQuizTeaserProps = {
 
 const CARD_STYLE: React.CSSProperties = {
   background: 'var(--hover, #f5f5f5)',
-  border: '1px solid var(--border, #e5e5e5)',
+  border: '1px solid var(--p-border)',
   borderRadius: 10,
   padding: 16,
   margin: '24px 0',
@@ -25,13 +25,13 @@ const TEXT_COL_STYLE: React.CSSProperties = {
 
 const HEADLINE_STYLE: React.CSSProperties = {
   fontSize: 14,
-  color: 'var(--text-primary, #111)',
+  color: 'var(--p-ink)',
   margin: 0,
 };
 
 const SUBLINE_STYLE: React.CSSProperties = {
   fontSize: 13,
-  color: 'var(--dim, #888)',
+  color: 'var(--p-ink-muted)',
   marginTop: 4,
   display: 'block',
 };
@@ -40,7 +40,7 @@ const BUTTON_STYLE: React.CSSProperties = {
   flexShrink: 0,
   fontSize: 13,
   fontWeight: 600,
-  color: 'var(--accent, #2563eb)',
+  color: 'var(--p-accent)',
   background: 'none',
   border: 'none',
   cursor: 'pointer',

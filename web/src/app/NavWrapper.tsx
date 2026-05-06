@@ -395,7 +395,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     // 255,255,255 (light) → 18,18,18 (dark) so the bar reads dark in
     // dark mode instead of staying hardcoded white. Letter colors
     // (C.accent / C.dim) are already var-driven and flip with theme.
-    background: 'rgba(var(--bg-rgb, 255, 255, 255), 0.97)',
+    background: 'rgba(var(--bg-rgb), 0.97)',
     backdropFilter: 'blur(12px)',
     borderTop: `1px solid ${C.border}`,
     display: 'flex',
@@ -428,7 +428,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     // Theme-aware glass: --bg-rgb flips light → dark with the theme so
     // the wordmark stays legible in both modes (text is C.text =
     // var(--text), which already inverts).
-    background: 'rgba(var(--bg-rgb, 255, 255, 255), 0.97)',
+    background: 'rgba(var(--bg-rgb), 0.97)',
     backdropFilter: 'blur(12px)',
     borderBottom: `1px solid ${C.border}`,
     display: 'flex',

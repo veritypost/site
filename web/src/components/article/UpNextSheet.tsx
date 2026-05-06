@@ -87,7 +87,7 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
           maxWidth: 600,
           margin: '0 auto',
           borderRadius: '12px 12px 0 0',
-          background: 'var(--bg, #fff)',
+          background: 'var(--p-bg)',
           padding: 24,
           zIndex: 101,
         }}
@@ -108,7 +108,7 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
               fontWeight: 600,
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              color: 'var(--dim, #888)',
+              color: 'var(--p-ink-muted)',
             }}
           >
             Read next
@@ -122,7 +122,7 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
               cursor: 'pointer',
               fontSize: 20,
               lineHeight: 1,
-              color: 'var(--dim, #888)',
+              color: 'var(--p-ink-muted)',
               padding: '0 2px',
               fontFamily: 'inherit',
             }}
@@ -158,7 +158,7 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
                 <div
                   style={{
                     fontSize: 11,
-                    color: 'var(--dim, #888)',
+                    color: 'var(--p-ink-muted)',
                     marginBottom: 3,
                     letterSpacing: '0.04em',
                     textTransform: 'uppercase',
@@ -172,7 +172,7 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
                   fontWeight: 700,
                   fontSize: 15,
                   lineHeight: 1.3,
-                  color: 'var(--text-primary, #111)',
+                  color: 'var(--p-ink)',
                   marginBottom: article.excerpt ? 4 : 0,
                 }}
               >
@@ -182,7 +182,7 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
                 <div
                   style={{
                     fontSize: 13,
-                    color: 'var(--dim, #888)',
+                    color: 'var(--p-ink-muted)',
                     lineHeight: 1.4,
                     overflow: 'hidden',
                     whiteSpace: 'nowrap',

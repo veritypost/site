@@ -28,7 +28,7 @@ export default function StoryArticlePicker({
         gap: '8px',
         overflowX: 'auto',
         padding: '12px 20px',
-        borderBottom: '1px solid var(--border, #e5e5e5)',
+        borderBottom: '1px solid var(--p-border)',
         marginBottom: '24px',
       }}
     >
@@ -52,7 +52,7 @@ export default function StoryArticlePicker({
               borderRadius: '6px',
               textDecoration: 'none',
               backgroundColor: isActive ? 'var(--accent-bg, #f0f0f0)' : 'transparent',
-              borderBottom: isActive ? '2px solid var(--accent, #111)' : '2px solid transparent',
+              borderBottom: isActive ? '2px solid var(--p-ink)' : '2px solid transparent',
               color: isActive ? 'var(--foreground, #111)' : 'var(--muted-foreground, #555)',
             }}
             aria-current={isActive ? 'page' : undefined}

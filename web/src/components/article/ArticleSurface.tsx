@@ -50,20 +50,20 @@ const TITLE_STYLE: React.CSSProperties = {
   fontWeight: 700,
   lineHeight: 1.2,
   margin: '0 0 12px',
-  color: 'var(--text-primary, #111)',
+  color: 'var(--p-ink)',
 };
 
 const SUBTITLE_STYLE: React.CSSProperties = {
   fontSize: 18,
   lineHeight: 1.4,
   margin: '0 0 24px',
-  color: 'var(--dim, #555)',
+  color: 'var(--p-ink-muted)',
 };
 
 const BODY_STYLE: React.CSSProperties = {
   fontSize: 17,
   lineHeight: 1.6,
-  color: 'var(--text-primary, #111)',
+  color: 'var(--p-ink)',
 };
 
 export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true, isSignedIn = false, nearbyArticles = [], hasQuiz = false, quizPassed = false }: ArticleSurfaceProps) {
@@ -122,9 +122,9 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
             style={{
               fontSize: 12,
               padding: '4px 10px',
-              border: '1px solid var(--border, #ccc)',
+              border: '1px solid var(--p-border)',
               borderRadius: 4,
-              color: 'var(--dim, #555)',
+              color: 'var(--p-ink-muted)',
               textDecoration: 'none',
               fontFamily: 'inherit',
             }}
@@ -135,7 +135,7 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
       )}
       <h1 style={TITLE_STYLE}>{article.title}</h1>
       {article.subtitle && <p style={SUBTITLE_STYLE}>{article.subtitle}</p>}
-      <p style={{ fontSize: 12, color: 'var(--text, #111)', marginBottom: 16, letterSpacing: '0.03em' }}>verity post</p>
+      <p style={{ fontSize: 12, color: 'var(--p-ink)', marginBottom: 16, letterSpacing: '0.03em' }}>verity post</p>
       {/* article_header: between title/byline block and body (DECISION #048) */}
       <Ad placement="article_header" page="article" position="header" articleId={article.id} />
       {canViewBody ? (
@@ -167,7 +167,7 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
           style={{
             padding: '32px 0',
             textAlign: 'center',
-            color: 'var(--dim, #555)',
+            color: 'var(--p-ink-muted)',
             fontSize: 14,
           }}
         >
@@ -178,8 +178,8 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
               display: 'inline-block',
               padding: '8px 20px',
               borderRadius: 8,
-              background: 'var(--accent, #0070f3)',
-              color: 'var(--bg, #fff)',
+              background: 'var(--p-accent)',
+              color: 'var(--p-bg)',
               fontWeight: 600,
               textDecoration: 'none',
               fontSize: 13,

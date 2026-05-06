@@ -12,7 +12,7 @@ export type SourceItem = {
 const SECTION_STYLE: React.CSSProperties = {
   marginTop: 40,
   paddingTop: 24,
-  borderTop: '1px solid var(--border, #e5e5e5)',
+  borderTop: '1px solid var(--p-border)',
 };
 
 const HEADING_STYLE: React.CSSProperties = {
@@ -20,7 +20,7 @@ const HEADING_STYLE: React.CSSProperties = {
   fontWeight: 600,
   letterSpacing: '0.06em',
   textTransform: 'uppercase' as const,
-  color: 'var(--dim, #888)',
+  color: 'var(--p-ink-muted)',
   margin: '0 0 12px',
 };
 
@@ -39,13 +39,13 @@ const ITEM_STYLE: React.CSSProperties = {
 };
 
 const LINK_STYLE: React.CSSProperties = {
-  color: 'var(--text-primary, #111)',
+  color: 'var(--p-ink)',
   textDecoration: 'none',
   fontWeight: 500,
 };
 
 const PUB_STYLE: React.CSSProperties = {
-  color: 'var(--dim, #888)',
+  color: 'var(--p-ink-muted)',
   marginLeft: 6,
 };
 
@@ -64,11 +64,11 @@ export default function SourcesSection({ sources, showTease = false, articleCoun
     return (
       <section style={SECTION_STYLE}>
         <h2 style={{ ...HEADING_STYLE, margin: '0 0 6px' }}>Sources</h2>
-        <p style={{ fontSize: 14, color: 'var(--dim, #777)', margin: '0 0 8px', lineHeight: 1.5 }}>
+        <p style={{ fontSize: 14, color: 'var(--p-ink-muted)', margin: '0 0 8px', lineHeight: 1.5 }}>
           {articleCountReached ? 'Available with an account.' : (
             <>
               Sources are a Verity Plus perk.{' '}
-              <a href="/pricing" style={{ color: 'var(--text-primary, #111)', fontWeight: 500 }}>
+              <a href="/pricing" style={{ color: 'var(--p-ink)', fontWeight: 500 }}>
                 See plans
               </a>
             </>

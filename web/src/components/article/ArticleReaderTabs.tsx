@@ -136,7 +136,7 @@ export default function ArticleReaderTabs({ articleSlot, timelineSlot, engagemen
             max-width: 680px;
             margin: 0 auto;
             padding: 12px 20px 0;
-            border-bottom: 1px solid var(--border, #e5e5e5);
+            border-bottom: 1px solid var(--p-border);
           }
           [data-reader-tabstrip] button {
             flex: 1;
@@ -147,18 +147,18 @@ export default function ArticleReaderTabs({ articleSlot, timelineSlot, engagemen
             font: inherit;
             font-size: 13px;
             font-weight: 600;
-            color: var(--dim, #888);
+            color: var(--p-ink-muted);
             cursor: pointer;
             margin-bottom: -1px;
             white-space: nowrap;
             min-height: 44px;
           }
           [data-reader-tabstrip] button[data-active="true"] {
-            color: var(--text-primary, #111);
-            border-bottom-color: var(--text-primary, #111);
+            color: var(--p-ink);
+            border-bottom-color: var(--p-ink);
           }
           [data-reader-tabstrip] button:focus-visible {
-            outline: 2px solid var(--accent, #0070f3);
+            outline: 2px solid var(--p-accent);
             outline-offset: -2px;
             border-radius: 4px;
           }

@@ -12,7 +12,7 @@ export default function AnonArticleCtaBanner() {
       padding: '20px 24px',
       borderRadius: 12,
       background: 'var(--card, #f9f9f9)',
-      border: '1px solid var(--border, #e5e5e5)',
+      border: '1px solid var(--p-border)',
       display: 'flex',
       alignItems: 'center',
       gap: 16,
@@ -20,10 +20,10 @@ export default function AnonArticleCtaBanner() {
       flexWrap: 'wrap' as const,
     }}>
       <div>
-        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--text-primary, #111)' }}>
+        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--p-ink)' }}>
           Join the discussion
         </p>
-        <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--dim, #666)' }}>
+        <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--p-ink-muted)' }}>
           Sign up free to bookmark, follow topics, and comment after the quiz.
         </p>
       </div>
@@ -32,8 +32,8 @@ export default function AnonArticleCtaBanner() {
           href={`/login?next=${encodeURIComponent(pathname)}`}
           style={{
             display: 'inline-block',
-            background: 'var(--accent, #111)',
-            color: 'var(--bg, #fff)',
+            background: 'var(--p-ink)',
+            color: 'var(--p-bg)',
             fontSize: 13,
             fontWeight: 600,
             padding: '9px 18px',
@@ -50,7 +50,7 @@ export default function AnonArticleCtaBanner() {
             background: 'transparent',
             border: 0,
             fontSize: 12,
-            color: 'var(--dim, #888)',
+            color: 'var(--p-ink-muted)',
             cursor: 'pointer',
             padding: '4px 8px',
             whiteSpace: 'nowrap' as const,

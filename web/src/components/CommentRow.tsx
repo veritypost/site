@@ -45,7 +45,7 @@ export type TagKind = 'context' | 'helpful' | 'cite_needed' | 'off_topic';
 // No counts shown in UI — quality_score is the only derived number surfaced.
 const TAG_META: Record<TagKind, { label: string; color: string; challenge: boolean }> = {
   helpful:     { label: 'Helpful',     color: 'var(--success-text)', challenge: false },
-  context:     { label: 'Context',     color: 'var(--accent, #111)', challenge: false },
+  context:     { label: 'Context',     color: 'var(--p-ink)', challenge: false },
   cite_needed: { label: 'Cite needed', color: '#ea580c', challenge: true },
   off_topic:   { label: 'Off-topic',   color: '#6b7280', challenge: true },
 };
@@ -140,7 +140,7 @@ function renderBody(
       // signaling that the token is potentially inert.
       const expertStyle: React.CSSProperties = inertVisualGiveaway
         ? {
-            color: 'var(--dim, #999)',
+            color: 'var(--p-ink-faint)',
             fontWeight: 600,
             textDecoration: 'line-through',
           }
@@ -167,7 +167,7 @@ function renderBody(
         <a
           key={idx}
           href={`/card/${name}`}
-          style={{ color: 'var(--accent, #111)', fontWeight: 600, textDecoration: 'none' }}
+          style={{ color: 'var(--p-ink)', fontWeight: 600, textDecoration: 'none' }}
         >
           @{name}
         </a>
@@ -346,9 +346,9 @@ export default function CommentRow({
     >
       {comment.is_context_pinned && (
         <div
-          style={{ borderLeft: '2px solid var(--accent, #111)', paddingLeft: 8, marginBottom: 8 }}
+          style={{ borderLeft: '2px solid var(--p-ink)', paddingLeft: 8, marginBottom: 8 }}
         >
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--accent, #111)' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--p-ink)' }}>
             Pinned as Article Context
           </span>
         </div>
@@ -390,7 +390,7 @@ export default function CommentRow({
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary, #111)' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--p-ink)' }}>
               {user.username || 'user'}
             </span>
             <VerifiedBadge user={user} />
@@ -418,7 +418,7 @@ export default function CommentRow({
                   padding: '1px 6px',
                   borderRadius: 10,
                   background: 'rgba(17,17,17,0.08)',
-                  color: 'var(--accent, #111)',
+                  color: 'var(--p-ink)',
                 }}
               >
                 VS {authorCategoryScore}
@@ -457,7 +457,7 @@ export default function CommentRow({
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: menuOpen ? 'var(--text, #333)' : 'var(--dim, #bbb)',
+                    color: menuOpen ? 'var(--p-ink)' : 'var(--p-ink-faint)',
                     cursor: 'pointer',
                     fontSize: 15,
                     padding: '2px 6px',
@@ -477,7 +477,7 @@ export default function CommentRow({
                       top: '100%',
                       zIndex: 10,
                       background: '#fff',
-                      border: '1px solid var(--border, #e5e5e5)',
+                      border: '1px solid var(--p-border)',
                       borderRadius: 8,
                       boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
                       minWidth: 140,
@@ -539,9 +539,9 @@ export default function CommentRow({
 
           {editing ? (
             <div style={{
-              borderLeft: '3px solid var(--accent, #111)',
+              borderLeft: '3px solid var(--p-ink)',
               borderRadius: '0 10px 10px 0',
-              border: '1px solid var(--border, #e5e5e5)',
+              border: '1px solid var(--p-border)',
               padding: '10px 12px',
               background: 'var(--card, #f7f7f7)',
               marginBottom: 2,
@@ -557,14 +557,14 @@ export default function CommentRow({
                   border: 'none',
                   fontSize: 14,
                   lineHeight: 1.6,
-                  color: 'var(--text, #1a1a1a)',
+                  color: 'var(--p-ink)',
                   outline: 'none',
                   fontFamily: 'inherit',
                   resize: 'vertical',
                   padding: '2px 0',
                 }}
               />
-              <div style={{ display: 'flex', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border, #e5e5e5)' }}>
+              <div style={{ display: 'flex', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--p-border)' }}>
                 <button
                   onClick={doSaveEdit}
                   disabled={busy === 'edit' || !editBody.trim()}
@@ -573,7 +573,7 @@ export default function CommentRow({
                     padding: '7px 16px',
                     borderRadius: 9,
                     border: 'none',
-                    background: editBody.trim() && busy !== 'edit' ? 'var(--accent, #111)' : '#ccc',
+                    background: editBody.trim() && busy !== 'edit' ? 'var(--p-ink)' : '#ccc',
                     color: '#fff',
                     fontWeight: 700,
                     cursor: busy === 'edit' || !editBody.trim() ? 'default' : 'pointer',
@@ -592,7 +592,7 @@ export default function CommentRow({
                     borderRadius: 9,
                     border: 'none',
                     background: 'transparent',
-                    color: 'var(--dim, #666)',
+                    color: 'var(--p-ink-muted)',
                     cursor: 'pointer',
                   }}
                 >
@@ -605,7 +605,7 @@ export default function CommentRow({
               style={{
                 fontSize: 13,
                 lineHeight: 1.65,
-                color: 'var(--dim, #666)',
+                color: 'var(--p-ink-muted)',
                 fontStyle: 'italic',
               }}
             >
@@ -616,7 +616,7 @@ export default function CommentRow({
               style={{
                 fontSize: 15,
                 lineHeight: 1.65,
-                color: 'var(--text, #1a1a1a)',
+                color: 'var(--p-ink)',
                 filter: blurred ? 'blur(6px)' : 'none',
                 userSelect: blurred ? 'none' : 'auto',
                 pointerEvents: blurred ? 'none' : 'auto',
@@ -626,11 +626,11 @@ export default function CommentRow({
             </div>
           )}
           {blurred && (
-            <div style={{ fontSize: 12, marginTop: 6, color: 'var(--dim, #666)' }}>
+            <div style={{ fontSize: 12, marginTop: 6, color: 'var(--p-ink-muted)' }}>
               Expert response &mdash;{' '}
               <a
                 href="/profile/settings#billing"
-                style={{ color: 'var(--accent, #111)', fontWeight: 600 }}
+                style={{ color: 'var(--p-ink)', fontWeight: 600 }}
               >
                 available on paid plans
               </a>
@@ -651,7 +651,7 @@ export default function CommentRow({
               <div style={{ marginTop: 8 }}>
                 <button
                   onClick={() => setTagPickerOpen(true)}
-                  style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px dashed var(--border, #e0e0e0)', background: 'transparent', color: 'var(--dim, #aaa)', cursor: 'pointer', lineHeight: 1.6 }}
+                  style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px dashed var(--p-border)', background: 'transparent', color: 'var(--p-ink-faint)', cursor: 'pointer', lineHeight: 1.6 }}
                 >
                   + Tag
                 </button>
@@ -672,9 +672,9 @@ export default function CommentRow({
                         fontWeight: active ? 600 : 500,
                         padding: '2px 8px',
                         borderRadius: 5,
-                        border: `1px solid ${active ? meta.color : 'var(--border, #e5e5e5)'}`,
+                        border: `1px solid ${active ? meta.color : 'var(--p-border)'}`,
                         background: active ? `${meta.color}18` : 'transparent',
-                        color: active ? meta.color : 'var(--dim, #888)',
+                        color: active ? meta.color : 'var(--p-ink-muted)',
                         cursor: 'pointer',
                         lineHeight: 1.6,
                       }}
@@ -686,7 +686,7 @@ export default function CommentRow({
                 {inactiveTags.length > 0 && (
                   <button
                     onClick={() => setTagPickerOpen(v => !v)}
-                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px dashed var(--border, #e0e0e0)', background: 'transparent', color: 'var(--dim, #aaa)', cursor: 'pointer', lineHeight: 1.6 }}
+                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px dashed var(--p-border)', background: 'transparent', color: 'var(--p-ink-faint)', cursor: 'pointer', lineHeight: 1.6 }}
                   >
                     {tagPickerOpen ? '−' : '+'}
                   </button>
@@ -703,9 +703,9 @@ export default function CommentRow({
                         fontWeight: 500,
                         padding: '2px 8px',
                         borderRadius: 5,
-                        border: '1px dashed var(--border, #e0e0e0)',
+                        border: '1px dashed var(--p-border)',
                         background: 'transparent',
-                        color: 'var(--dim, #888)',
+                        color: 'var(--p-ink-muted)',
                         cursor: 'pointer',
                         lineHeight: 1.6,
                       }}
@@ -804,7 +804,7 @@ export default function CommentRow({
                     minHeight: 30,
                     border: 'none',
                     background: 'transparent',
-                    color: replyDisabled ? 'var(--dim, #bbb)' : 'var(--dim, #666)',
+                    color: replyDisabled ? 'var(--p-ink-faint)' : 'var(--p-ink-muted)',
                     cursor: replyDisabled ? 'default' : 'pointer',
                     touchAction: 'manipulation',
                   }}
@@ -819,7 +819,7 @@ export default function CommentRow({
                     <span
                       style={{
                         fontSize: 11,
-                        color: 'var(--dim, #888)',
+                        color: 'var(--p-ink-muted)',
                         marginLeft: 4,
                       }}
                       aria-label={`${askerRepliesLeft} replies left in this expert chain`}
@@ -876,9 +876,9 @@ export default function CommentRow({
                         padding: '4px 10px',
                         borderRadius: 6,
                         minHeight: 30,
-                        border: '1px solid var(--border, #e5e5e5)',
+                        border: '1px solid var(--p-border)',
                         background: 'transparent',
-                        color: closeCooldown > 0 ? 'var(--dim, #bbb)' : 'var(--dim, #666)',
+                        color: closeCooldown > 0 ? 'var(--p-ink-faint)' : 'var(--p-ink-muted)',
                         cursor: busy === 'close' || closeCooldown > 0 ? 'default' : 'pointer',
                         marginLeft: 4,
                       }}
@@ -909,9 +909,9 @@ export default function CommentRow({
                         padding: '4px 10px',
                         borderRadius: 6,
                         minHeight: 30,
-                        border: '1px solid var(--border, #e5e5e5)',
+                        border: '1px solid var(--p-border)',
                         background: 'transparent',
-                        color: 'var(--dim, #666)',
+                        color: 'var(--p-ink-muted)',
                         cursor: busy === 'reopen' ? 'default' : 'pointer',
                         marginLeft: 4,
                       }}
@@ -921,13 +921,13 @@ export default function CommentRow({
                   )}
                   {isExpertThreadRoot && isExpertThreadClosed && !showReopen && (
                     <span
-                      style={{ fontSize: 11, color: 'var(--dim, #999)', marginLeft: 8 }}
+                      style={{ fontSize: 11, color: 'var(--p-ink-faint)', marginLeft: 8 }}
                     >
                       Thread closed
                     </span>
                   )}
                   {askerCapHit && (
-                    <span style={{ fontSize: 11, color: 'var(--dim, #888)', marginLeft: 8 }}>
+                    <span style={{ fontSize: 11, color: 'var(--p-ink-muted)', marginLeft: 8 }}>
                       Conversation complete with @{user.username || 'expert'} — they can grant another reply if you have a follow-up.
                     </span>
                   )}
@@ -975,7 +975,7 @@ function MenuItem({ children, onClick, danger }: MenuItemProps) {
         fontSize: 13,
         background: 'transparent',
         border: 'none',
-        color: danger ? '#dc2626' : 'var(--text-primary, #111)',
+        color: danger ? '#dc2626' : 'var(--p-ink)',
         cursor: 'pointer',
         borderRadius: 6,
       }}
