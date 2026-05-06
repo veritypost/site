@@ -78,6 +78,7 @@ import {
 } from '@/lib/pipeline/persist-article';
 import { renderBodyHtml } from '@/lib/pipeline/render-body';
 import { pipelineLog } from '@/lib/pipeline/logger';
+import { enrichFromWikipedia, formatWikiEnrichment } from '@/lib/pipeline/wikipedia-enrich';
 import {
   reserveCostOrFail,
   reconcileCostReservation,
@@ -166,6 +167,7 @@ type RequestInput = z.infer<typeof RequestSchema>;
 type Step =
   | 'audience_safety_check'
   | 'source_fetch'
+  | 'enrich_wikipedia'
   | 'headline'
   | 'summary'
   | 'categorization'
@@ -182,6 +184,7 @@ type Step =
 const ALL_STEPS: readonly Step[] = [
   'audience_safety_check',
   'source_fetch',
+  'enrich_wikipedia',
   'headline',
   'summary',
   'categorization',
@@ -1465,10 +1468,18 @@ export async function POST(req: Request) {
       const outlet = rawOutlet && rawOutlet.trim() ? rawOutlet.trim() : null;
       sourceTexts.push({ outlet, url: it.raw_url, text: it.raw_body });
     }
-    const corpus = sourceTexts.map((s) => wrapSource(s.outlet ?? 'Unknown', s.url, s.text)).join('\n\n---\n\n');
+    let corpus = sourceTexts.map((s) => wrapSource(s.outlet ?? 'Unknown', s.url, s.text)).join('\n\n---\n\n');
     const freeformBlock = freeform_instructions
       ? `\n\n<user_instructions>\n${escapeFreeform(freeform_instructions)}\n</user_instructions>`
       : '';
+
+    // 9e.wiki — Fire Wikipedia enrichment in background while the headline/
+    // summary/categorization batch runs. Uses the cluster title as the search
+    // term. Awaited and appended to corpus just before body generation so the
+    // LLM gets historical context and factual grounding. Silent-fail: a
+    // timeout or missing page never aborts the run.
+    const wikiEnrichStart = Date.now();
+    const wikiEnrichPromise = enrichFromWikipedia(clusterRow.title ?? '', req.signal);
 
     // ────────────────────────────────────────────────────────────────────────
     // 9e. Parallel batch: headline, summary, categorization
@@ -1635,6 +1646,34 @@ ${catListText}`;
       duration_ms: batchDur,
       cost_usd: headlineRes.cost_usd,
     });
+
+    // 9e.wiki (await) — resolve the background Wikipedia fetch started after
+    // corpus assembly. Append enrichment to corpus if we got a usable result.
+    try {
+      const wikiItem = await wikiEnrichPromise;
+      const wikiDur = Date.now() - wikiEnrichStart;
+      if (wikiItem) {
+        corpus = corpus + '\n\n---\n\n' + formatWikiEnrichment(wikiItem);
+        pipelineLog.info('newsroom.generate.enrich_wikipedia', {
+          run_id: runId, cluster_id, audience,
+          step: 'enrich_wikipedia',
+          duration_ms: wikiDur,
+          title: wikiItem.title,
+          extract_chars: wikiItem.extract.length,
+        });
+      } else {
+        pipelineLog.info('newsroom.generate.enrich_wikipedia', {
+          run_id: runId, cluster_id, audience,
+          step: 'enrich_wikipedia',
+          duration_ms: wikiDur,
+          result: 'no_match',
+        });
+      }
+      stepTimings['enrich_wikipedia'] = wikiDur;
+    } catch {
+      // Silent fail — enrichment is always best-effort.
+      stepTimings['enrich_wikipedia'] = Date.now() - wikiEnrichStart;
+    }
 
     // ────────────────────────────────────────────────────────────────────────
     // 9f. body — serial
