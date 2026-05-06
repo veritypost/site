@@ -156,13 +156,6 @@ Web mobile is the product standard. These items bring iOS in line.
   - Permission keys: `search.advanced`, `search.advanced.category`, `search.advanced.date_range`, `search.advanced.source`
   - iOS Kids: not applicable (kids has no search)
 
-- 48: **Login activity / session revocation on iOS** — web `SessionsSection` shows active sessions with device/browser/IP and a per-session Revoke button. iOS `LoginActivityView` in `SettingsView.swift` shows an audit log only — no live session list, no revoke. Complexity: M.
-  - Expand `LoginActivityView` in `SettingsView.swift` to add a "Active sessions" section above the audit log
-  - Fetch from `/api/account/sessions` (GET) — same endpoint web uses
-  - Each session row shows device, browser, IP, last-seen timestamp + a Revoke button → DELETE `/api/account/sessions/[id]`
-  - "Revoke all other sessions" button at the bottom
-  - Permission keys: `settings.account.sessions.revoke`, `settings.account.sessions.revoke_all_other`
-  - iOS Kids: not applicable
 
 
 - 19: Apply `supabase/migrations/20260503000007_backfill_unknown_sources_to_null.sql` — 4 "Unknown" source rows in prod still render legacy values until it runs

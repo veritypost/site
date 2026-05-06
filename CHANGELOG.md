@@ -4,6 +4,20 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ---
 
+## 2026-05-06 (continued × 4)
+
+### TODO 48 — iOS login activity: active sessions + per-session revoke
+**File:** `VerityPost/VerityPost/SettingsView.swift` (`LoginActivityView`)
+- Added `SessionRow` decodable struct (id, user_agent, ip, last_seen_at, is_current)
+- New "Active sessions" section loads above the audit log via `GET /api/account/sessions`; device label parsed from user_agent (platform + browser detection); IP + last-seen shown as caption; current session gets a "This device" badge
+- Per-row `Revoke` button in VP.danger color → `DELETE /api/account/sessions/[id]`; removes row from local state immediately on 200
+- "Revoke all other sessions" button → `DELETE /api/account/sessions`; clears non-current rows on 200
+- Both revoke actions gated on `settings.account.sessions.revoke` / `settings.account.sessions.revoke_all_other` permissions; in-flight state prevents concurrent taps
+- Error banner on network/API failure; audit log section unchanged
+- **iOS Kids:** not applicable. **Web:** already existed.
+
+---
+
 ## 2026-05-06 (continued × 3)
 
 ### TODO 49 — iOS theme toggle
