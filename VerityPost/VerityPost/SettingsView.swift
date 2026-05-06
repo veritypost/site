@@ -1363,6 +1363,9 @@ struct AccountSettingsView: View {
                             Circle().fill(Color(hex: color)).frame(width: 32, height: 32)
                                 .overlay(Circle().stroke(VP.text,
                                                           lineWidth: avatarOuter == color ? 3 : 0))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Circle())
+                                .accessibilityLabel("Select ring color")
                                 .onTapGesture { avatarOuter = color }
                         }
                     }
@@ -1377,12 +1380,18 @@ struct AccountSettingsView: View {
                         }
                         .frame(width: 32, height: 32)
                         .overlay(Circle().stroke(VP.text, lineWidth: avatarInner == nil ? 3 : 0))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
+                        .accessibilityLabel("Clear inner fill")
                         .onTapGesture { avatarInner = nil }
 
                         ForEach(colorOptions, id: \.self) { color in
                             Circle().fill(Color(hex: color)).frame(width: 32, height: 32)
                                 .overlay(Circle().stroke(VP.text,
                                                           lineWidth: avatarInner == color ? 3 : 0))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Circle())
+                                .accessibilityLabel("Select inner fill color")
                                 .onTapGesture { avatarInner = color }
                         }
                     }

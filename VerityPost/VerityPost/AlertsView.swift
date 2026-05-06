@@ -404,6 +404,7 @@ struct AlertsView: View {
                                             .font(.headline)
                                             .foregroundColor(VP.dim)
                                     }
+                                    .accessibilityLabel("Remove subscription")
                                 }
                             }
                             .padding(.horizontal, 14)
@@ -470,6 +471,7 @@ struct AlertsView: View {
                                             .font(.headline)
                                             .foregroundColor(VP.dim)
                                     }
+                                    .accessibilityLabel("Remove subscription")
                                 }
                             }
                             .padding(.horizontal, 14)
@@ -536,6 +538,7 @@ struct AlertsView: View {
                                                 .font(.system(.caption2, design: .default, weight: .bold))
                                                 .foregroundColor(VP.dim)
                                         }
+                                        .accessibilityLabel("Remove keyword")
                                     }
                                 }
                                 .padding(.horizontal, 10)
@@ -566,6 +569,7 @@ struct AlertsView: View {
                                     .font(.title)
                                     .foregroundColor(newKeyword.trimmingCharacters(in: .whitespaces).isEmpty ? VP.dim : VP.accent)
                             }
+                            .accessibilityLabel("Add keyword")
                             .disabled(newKeyword.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
                     }

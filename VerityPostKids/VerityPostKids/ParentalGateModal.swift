@@ -146,6 +146,7 @@ struct ParentalGateModal: View {
                         .background(answer.isEmpty ? K.dim : K.tealDark)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
+                .accessibilityLabel("Submit answer")
                 .buttonStyle(.plain)
                 .disabled(answer.isEmpty)
             }

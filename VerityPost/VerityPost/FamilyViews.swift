@@ -425,8 +425,9 @@ struct FamilyDashboardView: View {
                     .font(.system(size: VP.Size.xs, weight: .bold))
                     .foregroundColor(color.opacity(0.7))
                     .padding(6)
-                    .frame(minWidth: 28, minHeight: 28)
+                    .frame(minWidth: 44, minHeight: 44)
             }
+            .accessibilityLabel("Dismiss")
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 12)

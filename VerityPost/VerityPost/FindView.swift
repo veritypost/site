@@ -75,6 +75,7 @@ struct FindView: View {
                         .font(.system(.subheadline))
                         .foregroundColor(VP.dim)
                 }
+                .accessibilityLabel("Clear search")
                 .buttonStyle(.plain)
             }
         }
