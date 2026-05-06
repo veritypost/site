@@ -1707,12 +1707,99 @@ struct LoginActivityView: View {
         }
     }
 
+    struct SessionRow: Decodable, Identifiable {
+        let id: String
+        let user_agent: String?
+        let ip: String?
+        let last_seen_at: String?
+        let created_at: String?
+        let is_current: Bool?
+    }
+
     @State private var rows: [AuditRow] = []
     @State private var loaded = false
     @State private var loadError = false
+    @State private var sessions: [SessionRow] = []
+    @State private var sessionsLoaded = false
+    @State private var canRevoke = false
+    @State private var canRevokeAll = false
+    @State private var revokingId: String? = nil
+    @State private var revokingAll = false
+    @State private var revokeError: String? = nil
 
     var body: some View {
         SettingsPageShell(title: "Sign-in activity") {
+            // Active sessions
+            if sessionsLoaded && !sessions.isEmpty {
+                SettingsSectionHeader(title: "Active sessions", tone: .normal)
+                SettingsCard {
+                    ForEach(Array(sessions.enumerated()), id: \.element.id) { idx, s in
+                        let isCurrent = s.is_current == true
+                        let isLast = idx == sessions.count - 1
+                        HStack(spacing: 10) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(spacing: 6) {
+                                    Text(Self.deviceLabel(s.user_agent))
+                                        .font(.system(size: VP.Size.base, weight: .medium))
+                                        .foregroundColor(VP.text)
+                                    if isCurrent {
+                                        Text("This device")
+                                            .font(.system(size: VP.Size.xs, weight: .semibold))
+                                            .foregroundColor(VP.brand)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(VP.brandSoft)
+                                            .cornerRadius(4)
+                                    }
+                                }
+                                Text([s.ip, s.last_seen_at.flatMap { Self.formatDate($0) }]
+                                        .compactMap { $0 }.joined(separator: " \u{00B7} "))
+                                    .font(.caption)
+                                    .foregroundColor(VP.dim)
+                            }
+                            Spacer(minLength: 8)
+                            if !isCurrent && canRevoke {
+                                Button {
+                                    Task { await revokeSession(s.id) }
+                                } label: {
+                                    if revokingId == s.id {
+                                        ProgressView().scaleEffect(0.7)
+                                    } else {
+                                        Text("Revoke")
+                                            .font(.system(size: VP.Size.sm, weight: .semibold))
+                                            .foregroundColor(VP.danger)
+                                    }
+                                }
+                                .disabled(revokingId != nil || revokingAll)
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .overlay(alignment: .bottom) {
+                            if !isLast {
+                                Rectangle().fill(VP.border.opacity(0.6)).frame(height: 1).padding(.leading, 16)
+                            }
+                        }
+                    }
+                }
+                if canRevokeAll && sessions.filter({ $0.is_current != true }).count > 0 {
+                    SettingsPrimaryButton(
+                        title: revokingAll ? "Revoking\u{2026}" : "Revoke all other sessions",
+                        isLoading: revokingAll,
+                        isDisabled: revokingId != nil || revokingAll
+                    ) {
+                        Task { await revokeAll() }
+                    }
+                }
+            }
+
+            if let msg = revokeError {
+                SettingsErrorBanner(text: msg, actionLabel: "Dismiss") { revokeError = nil }
+            }
+
+            // Audit log
             if loadError {
                 SettingsErrorBanner(text: "Couldn\u{2019}t load sign-in activity. Try again.", actionLabel: "Retry") {
                     loadError = false
@@ -1722,9 +1809,11 @@ struct LoginActivityView: View {
             } else if !loaded {
                 ProgressView().padding(.top, 40)
             } else if rows.isEmpty {
-                Text("No recent sign-in activity.")
-                    .font(.footnote).foregroundColor(VP.dim)
-                    .padding(.top, 40)
+                if sessions.isEmpty {
+                    Text("No recent sign-in activity.")
+                        .font(.footnote).foregroundColor(VP.dim)
+                        .padding(.top, 40)
+                }
             } else {
                 SettingsSectionHeader(title: "Recent", tone: .normal)
                 SettingsCard {
@@ -1756,7 +1845,10 @@ struct LoginActivityView: View {
                 }
             }
         }
-        .task { await load() }
+        .task {
+            await loadSessions()
+            await load()
+        }
     }
 
     private static let loginActivityISO = ISO8601DateFormatter()
@@ -1769,6 +1861,22 @@ struct LoginActivityView: View {
     private static func formatDate(_ iso: String?) -> String {
         guard let s = iso, let date = Self.loginActivityISO.date(from: s) else { return "" }
         return Self.loginActivityDisplayFmt.string(from: date)
+    }
+
+    private static func deviceLabel(_ ua: String?) -> String {
+        guard let ua else { return "Unknown device" }
+        var parts: [String] = []
+        if ua.contains("iPhone") { parts.append("iPhone") }
+        else if ua.contains("iPad") { parts.append("iPad") }
+        else if ua.contains("Macintosh") { parts.append("Mac") }
+        else if ua.contains("Windows") { parts.append("Windows") }
+        else if ua.contains("Android") { parts.append("Android") }
+        else if ua.contains("Linux") { parts.append("Linux") }
+        if ua.contains("Edg/") || ua.contains("EdgA/") { parts.append("Edge") }
+        else if ua.contains("CriOS") || ua.contains("Chrome/") { parts.append("Chrome") }
+        else if ua.contains("FxiOS") || ua.contains("Firefox/") { parts.append("Firefox") }
+        else if ua.contains("Safari/") { parts.append("Safari") }
+        return parts.isEmpty ? "Unknown device" : parts.joined(separator: " \u{00B7} ")
     }
 
     private func load() async {
@@ -1784,6 +1892,68 @@ struct LoginActivityView: View {
             Log.d("Login activity load error:", error)
             loadError = true
         }
+    }
+
+    private func loadSessions() async {
+        canRevoke = PermissionService.shared.has("settings.account.sessions.revoke")
+        canRevokeAll = PermissionService.shared.has("settings.account.sessions.revoke_all_other")
+        guard let session = try? await client.auth.session else { sessionsLoaded = true; return }
+        let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/account/sessions")
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, _) = try await URLSession.shared.data(for: req)
+            struct Response: Decodable { let sessions: [SessionRow] }
+            let parsed = try JSONDecoder().decode(Response.self, from: data)
+            sessions = parsed.sessions
+        } catch {
+            Log.d("Sessions load error:", error)
+        }
+        sessionsLoaded = true
+    }
+
+    private func revokeSession(_ id: String) async {
+        revokingId = id
+        guard let session = try? await client.auth.session else { revokingId = nil; return }
+        let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/account/sessions/\(id)")
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            if (resp as? HTTPURLResponse)?.statusCode == 200 {
+                sessions.removeAll { $0.id == id }
+            } else {
+                struct ErrBody: Decodable { let error: String? }
+                revokeError = (try? JSONDecoder().decode(ErrBody.self, from: data))?.error
+                    ?? "Couldn\u{2019}t revoke session."
+            }
+        } catch {
+            revokeError = "Network error. Check your connection."
+        }
+        revokingId = nil
+    }
+
+    private func revokeAll() async {
+        revokingAll = true
+        guard let session = try? await client.auth.session else { revokingAll = false; return }
+        let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/account/sessions")
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, resp) = try await URLSession.shared.data(for: req)
+            if (resp as? HTTPURLResponse)?.statusCode == 200 {
+                sessions = sessions.filter { $0.is_current == true }
+            } else {
+                struct ErrBody: Decodable { let error: String? }
+                revokeError = (try? JSONDecoder().decode(ErrBody.self, from: data))?.error
+                    ?? "Couldn\u{2019}t revoke sessions."
+            }
+        } catch {
+            revokeError = "Network error. Check your connection."
+        }
+        revokingAll = false
     }
 }
 
