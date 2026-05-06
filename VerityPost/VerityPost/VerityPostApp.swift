@@ -37,6 +37,15 @@ struct VerityPostApp: App {
     @StateObject private var auth = AuthViewModel()
     @ObservedObject private var articleRouter = ArticleRouter.shared
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("vp_theme") private var vpTheme: String = "system"
+
+    private var preferredScheme: ColorScheme? {
+        switch vpTheme {
+        case "light": return .light
+        case "dark":  return .dark
+        default:      return nil
+        }
+    }
 
     init() {
         // S-07 — access PermissionStore.shared before the view hierarchy
@@ -48,6 +57,7 @@ struct VerityPostApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(preferredScheme)
                 .environmentObject(auth)
                 .environmentObject(articleRouter)
                 .onOpenURL { url in

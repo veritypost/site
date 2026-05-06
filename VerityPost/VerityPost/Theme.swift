@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum VP {
     // === Legacy tokens ===
@@ -6,16 +7,16 @@ enum VP {
     // not been migrated to the redesign palette. New views should reach
     // for the redesign tokens below (VP.brand, VP.ink, VP.surfaceRaised,
     // etc.) and only fall back to these where a v1.1 sweep hasn't landed.
-    static let bg = Color.white
-    static let card = Color(hex: "f7f7f7")
-    static let border = Color(hex: "e5e5e5")
-    static let rule = Color(hex: "e5e5e5")
-    static let strong = Color(hex: "222222")
-    static let text = Color(hex: "111111")
-    static let soft = Color(hex: "444444")
-    static let dim = Color(hex: "666666")
-    static let muted = Color(hex: "999999")
-    static let accent = Color(hex: "111111")
+    static let bg = Color(UIColor.systemBackground)
+    static let card = Color(UIColor.secondarySystemBackground)
+    static let border = Color(UIColor.separator)
+    static let rule = Color(UIColor.separator)
+    static let strong = Color(UIColor.label)
+    static let text = Color(UIColor.label)
+    static let soft = Color(UIColor.secondaryLabel)
+    static let dim = Color(UIColor.secondaryLabel)
+    static let muted = Color(UIColor.tertiaryLabel)
+    static let accent = Color(UIColor.label)
     static let success = Color(hex: "22c55e")
     static let right = Color(hex: "22c55e")
     static let warn = Color(hex: "f59e0b")
@@ -28,8 +29,8 @@ enum VP {
     static let danger = Color(hex: "b91c1c")
     static let wrong = Color(hex: "b91c1c")
     static let breaking = Color(hex: "ef4444")
-    static let tlLine = Color(hex: "e5e5e5")
-    static let tlDot = Color(hex: "d4d4d4")
+    static let tlLine = Color(UIColor.separator)
+    static let tlDot = Color(UIColor.separator)
 
     // Quiz badge backgrounds
     static let passBg = Color(hex: "f0fdf4")
@@ -76,21 +77,21 @@ enum VP {
     static let ring      = Color(red: 11.0 / 255, green: 92.0 / 255, blue: 255.0 / 255, opacity: 0.30)
 
     // Ink ramp (5 levels of neutral text emphasis)
-    static let ink       = Color(hex: "0a0a0a")
-    static let inkSoft   = Color(hex: "27272a")
-    static let inkMuted  = Color(hex: "52525b")
-    static let inkDim    = Color(hex: "71717a")
-    static let inkFaint  = Color(hex: "a1a1aa")
+    static let ink       = Color(UIColor.label)
+    static let inkSoft   = Color(UIColor.label)
+    static let inkMuted  = Color(UIColor.secondaryLabel)
+    static let inkDim    = Color(UIColor.secondaryLabel)
+    static let inkFaint  = Color(UIColor.tertiaryLabel)
 
     // Surface ramp (depth via lightness, not shadow)
-    static let surface       = Color(hex: "fafafa")
-    static let surfaceRaised = Color(hex: "ffffff")
-    static let surfaceSunken = Color(hex: "f4f4f5")
+    static let surface       = Color(UIColor.systemBackground)
+    static let surfaceRaised = Color(UIColor.systemBackground)
+    static let surfaceSunken = Color(UIColor.secondarySystemBackground)
 
     // Lines (3 grades — soft for cards, strong for outlined controls, divider for inter-row)
-    static let borderSoft   = Color(hex: "e4e4e7")
-    static let borderStrong = Color(hex: "d4d4d8")
-    static let divider      = Color(hex: "f1f1f3")
+    static let borderSoft   = Color(UIColor.separator)
+    static let borderStrong = Color(UIColor.separator)
+    static let divider      = Color(UIColor.separator)
 
     // Soft semantic backgrounds (use with full-tone text from existing semantics)
     static let successSoft = Color(hex: "dcfce7")
@@ -385,7 +386,7 @@ struct PillButton: View {
                 .font(.system(.footnote, design: .default, weight: .semibold))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 6)
-                .background(isActive ? VP.brand : Color.white)
+                .background(isActive ? VP.brand : Color(UIColor.systemBackground))
                 .foregroundColor(isActive ? .white : VP.dim)
                 .overlay(
                     RoundedRectangle(cornerRadius: 99)
@@ -407,7 +408,7 @@ struct SkeletonBar: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: radius)
-            .fill(Color(hex: "e0e0e0"))
+            .fill(Color(UIColor.systemGray5))
             .frame(width: width, height: height)
             .opacity(pulse ? 0.45 : 1.0)
             .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)

@@ -667,6 +667,15 @@ struct SettingsView: View {
     @State private var dmReceiptsLoading: Bool = true
     // RID-031 — shown when saveDmReceiptsPref fails and reverts the toggle.
     @State private var dmReceiptsErrorAlert: Bool = false
+    @AppStorage("vp_theme") private var vpTheme: String = "system"
+
+    private var themeLabel: String {
+        switch vpTheme {
+        case "light": return "Light"
+        case "dark":  return "Dark"
+        default:      return "System"
+        }
+    }
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -1008,6 +1017,15 @@ struct SettingsView: View {
                                onTap: onTap))
             })
         }
+        out.append(HubRowSpec(id: "appearance",
+                              keywords: ["appearance", "theme", "dark", "light", "display", "color", "scheme"]) { isLast, onTap in
+            AnyView(HubRow(icon: "circle.lefthalf.filled", title: "Appearance",
+                           subtitle: "Light, Dark, or System",
+                           valuePreview: self.themeLabel,
+                           showDivider: !isLast,
+                           kind: .push(AnyView(AppearanceSettingsView())),
+                           onTap: onTap))
+        })
         return out
     }
 
@@ -4092,6 +4110,61 @@ struct BlockedAccountsView: View {
         await MainActor.run {
             if ok { rows.removeAll { $0.id == rowId } }
             busyId = nil
+        }
+    }
+}
+
+// MARK: - Appearance settings
+
+struct AppearanceSettingsView: View {
+    @AppStorage("vp_theme") private var vpTheme: String = "system"
+
+    private let options: [(value: String, label: String, icon: String)] = [
+        ("light",  "Light",  "sun.max.fill"),
+        ("system", "System", "circle.lefthalf.filled"),
+        ("dark",   "Dark",   "moon.fill"),
+    ]
+
+    var body: some View {
+        SettingsPageShell(title: "Appearance") {
+            SettingsSectionHeader(title: "Color scheme", tone: .normal)
+            SettingsCard {
+                ForEach(Array(options.enumerated()), id: \.offset) { idx, option in
+                    let isLast = idx == options.count - 1
+                    Button {
+                        vpTheme = option.value
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: option.icon)
+                                .font(.system(size: VP.Size.base))
+                                .foregroundColor(VP.brand)
+                                .frame(width: 22)
+                            Text(option.label)
+                                .font(.system(size: VP.Size.md, weight: .medium))
+                                .foregroundColor(VP.text)
+                            Spacer()
+                            if vpTheme == option.value {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: VP.Size.base, weight: .semibold))
+                                    .foregroundColor(VP.brand)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .frame(minHeight: 56)
+                        .contentShape(Rectangle())
+                        .overlay(alignment: .bottom) {
+                            if !isLast {
+                                Rectangle()
+                                    .fill(VP.border.opacity(0.6))
+                                    .frame(height: 1)
+                                    .padding(.leading, 16)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 }
