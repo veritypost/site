@@ -39,7 +39,7 @@ export type ArticleSurfaceProps = {
 const PAGE_STYLE: React.CSSProperties = {
   maxWidth: 680,
   margin: '0 auto',
-  padding: '32px 20px 56px',
+  padding: '32px 20px 16px',
 };
 
 const TITLE_STYLE: React.CSSProperties = {
