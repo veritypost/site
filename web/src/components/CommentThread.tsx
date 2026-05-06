@@ -968,7 +968,7 @@ export default function CommentThread({
             <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text, #1a1a1a)' }}>
               {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
             </span>
-            <span style={{ fontSize: 11, color: '#bbb', fontWeight: 400 }}>· quiz-verified</span>
+            <span style={{ fontSize: 11, color: 'var(--dim, #5a5a5a)', fontWeight: 500 }}>· quiz-verified</span>
           </div>
           <div style={{ display: 'flex', gap: 2 }}>
             {(['top', 'newest'] as const).map((s) => (

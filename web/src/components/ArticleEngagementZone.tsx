@@ -32,7 +32,7 @@ export default function ArticleEngagementZone({
 
   const sectionStyle = {
     maxWidth: 680,
-    margin: '40px auto 0',
+    margin: '24px auto 0',
     padding: '0 20px',
   };
 

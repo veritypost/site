@@ -78,13 +78,25 @@ enum VP {
 
     // Ink ramp (5 levels of neutral text emphasis)
     static let ink       = Color(UIColor.label)
-    static let inkSoft   = Color(UIColor.label)
+    static let inkSoft = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0xe4/255.0, green: 0xe4/255.0, blue: 0xe7/255.0, alpha: 1)
+            : UIColor(red: 0x27/255.0, green: 0x27/255.0, blue: 0x2a/255.0, alpha: 1)
+    })
     static let inkMuted  = Color(UIColor.secondaryLabel)
-    static let inkDim    = Color(UIColor.secondaryLabel)
+    static let inkDim = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0xa1/255.0, green: 0xa1/255.0, blue: 0xaa/255.0, alpha: 1)
+            : UIColor(red: 0x71/255.0, green: 0x71/255.0, blue: 0x7a/255.0, alpha: 1)
+    })
     static let inkFaint  = Color(UIColor.tertiaryLabel)
 
     // Surface ramp (depth via lightness, not shadow)
-    static let surface       = Color(UIColor.systemBackground)
+    static let surface = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x11/255.0, green: 0x11/255.0, blue: 0x13/255.0, alpha: 1)
+            : UIColor(red: 0xfa/255.0, green: 0xfa/255.0, blue: 0xfa/255.0, alpha: 1)
+    })
     static let surfaceRaised = Color(UIColor.systemBackground)
     static let surfaceSunken = Color(UIColor.secondarySystemBackground)
 

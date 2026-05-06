@@ -42,7 +42,7 @@ export type ArticleSurfaceProps = {
 const PAGE_STYLE: React.CSSProperties = {
   maxWidth: 680,
   margin: '0 auto',
-  padding: '32px 20px 96px',
+  padding: '32px 20px 56px',
 };
 
 const TITLE_STYLE: React.CSSProperties = {
@@ -135,7 +135,9 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
       )}
       <h1 style={TITLE_STYLE}>{article.title}</h1>
       {article.subtitle && <p style={SUBTITLE_STYLE}>{article.subtitle}</p>}
-      <p style={{ fontSize: 12, color: 'var(--p-ink)', marginBottom: 16, letterSpacing: '0.03em' }}>verity post</p>
+      <p style={{ fontSize: 12, color: 'var(--p-ink-muted)', marginBottom: 16, letterSpacing: '0.03em' }}>
+        Verity Post{article.published_at ? ` · ${new Date(article.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` : ''}
+      </p>
       {/* article_header: between title/byline block and body (DECISION #048) */}
       <Ad placement="article_header" page="article" position="header" articleId={article.id} />
       {canViewBody ? (

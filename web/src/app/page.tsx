@@ -439,14 +439,6 @@ export default async function HomePage({
           </p>
         )}
 
-        {/* home_top — "Advertisement" label required per DECISION #050 */}
-        <div style={{ textAlign: 'center', marginBottom: 8, marginTop: 24 }}>
-          <div style={{ fontSize: 10, color: 'var(--dim, #5a5a5a)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
-            Advertisement
-          </div>
-          <Ad placement="home_top" page="home" position="top" />
-        </div>
-
         {!fetchFailed && hero && (
           <Hero
             story={hero}
@@ -454,6 +446,14 @@ export default async function HomePage({
             isNew={isNewStory(hero)}
           />
         )}
+
+        {/* home_top — after hero so editorial content leads; "Advertisement" label required per DECISION #050 */}
+        <div style={{ textAlign: 'center', marginBottom: 8, marginTop: 24 }}>
+          <div style={{ fontSize: 10, color: 'var(--dim, #5a5a5a)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+            Advertisement
+          </div>
+          <Ad placement="home_top" page="home" position="top" />
+        </div>
 
         {!fetchFailed && supporting.length > 0 && (
           <section aria-label="Supporting stories" style={{ marginTop: 56 }}>

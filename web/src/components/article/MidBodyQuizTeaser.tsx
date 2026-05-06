@@ -44,7 +44,8 @@ const BUTTON_STYLE: React.CSSProperties = {
   background: 'none',
   border: 'none',
   cursor: 'pointer',
-  padding: 0,
+  padding: '0 8px',
+  minHeight: 44,
   whiteSpace: 'nowrap' as const,
 };
 

@@ -123,8 +123,14 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
               fontSize: 20,
               lineHeight: 1,
               color: 'var(--p-ink-muted)',
-              padding: '0 2px',
+              padding: '12px',
+              minWidth: 44,
+              minHeight: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               fontFamily: 'inherit',
+              marginRight: -12,
             }}
           >
             ×
@@ -159,7 +165,7 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
                   style={{
                     fontSize: 11,
                     color: 'var(--p-ink-muted)',
-                    marginBottom: 3,
+                    marginBottom: 6,
                     letterSpacing: '0.04em',
                     textTransform: 'uppercase',
                   }}

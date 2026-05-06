@@ -556,7 +556,7 @@ export default function CommentComposer({
         onBlur={() => setTimeout(() => setMentionSuggest(null), 150)}
         placeholder={isReply ? 'Write a reply\u2026' : 'Add to the discussion.'}
         aria-label={isReply ? 'Reply text' : 'Comment text'}
-        rows={isReply ? 2 : 3}
+        rows={isReply ? 3 : 4}
         style={textareaStyle}
       />
       {pickerNotice && (
@@ -799,10 +799,10 @@ const containerStyle: CSSProperties = {
 const replyContainerStyle: CSSProperties = {
   border: '1px solid var(--border, #e5e5e5)',
   borderRadius: 10,
-  padding: '10px 12px',
-  background: 'transparent',
+  padding: '14px 16px',
+  background: 'var(--card, #f7f7f7)',
   marginBottom: 12,
-  marginTop: 6,
+  marginTop: 8,
 };
 const textareaStyle: CSSProperties = {
   width: '100%',

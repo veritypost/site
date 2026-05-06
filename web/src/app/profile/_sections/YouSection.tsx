@@ -42,11 +42,34 @@ export function YouSection({ user, perms }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: S[5], fontFamily: FONT.sans }}>
       <section>
         <h2 style={sectionHeading}>Your numbers</h2>
+        {/* Verity Score leads — the metric that defines the product gets hero size */}
+        <div
+          style={{
+            background: C.surfaceRaised,
+            border: `1px solid ${C.border}`,
+            borderRadius: R.lg,
+            padding: S[5],
+            boxShadow: SH.ambient,
+            fontFamily: FONT.sans,
+            marginBottom: S[5],
+          }}
+        >
+          <div style={{ fontSize: F.xs, color: C.inkMuted, fontWeight: 600, marginBottom: S[2] }}>
+            Verity Score
+          </div>
+          <div
+            style={{
+              fontWeight: 800,
+              color: C.ink,
+              fontSize: 'clamp(2.5rem, 8vw, 3.5rem)',
+              lineHeight: 1,
+              letterSpacing: '-0.03em',
+            }}
+          >
+            {(u.verity_score ?? 0).toLocaleString()}
+          </div>
+        </div>
         <div className="redesign-stat-grid" style={{ gap: S[5] }}>
-          <StatTile
-            label="Verity Score"
-            value={u.verity_score ?? 0}
-          />
           <StatTile label="Quizzes" value={u.quizzes_completed_count ?? 0} />
           <StatTile label="Comments" value={u.comment_count ?? 0} />
           {perms.followersView ? (

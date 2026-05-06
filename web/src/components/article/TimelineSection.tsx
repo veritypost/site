@@ -141,7 +141,7 @@ export default function TimelineSection({ events, storySlug, showTease = false, 
               <div style={DATE_STYLE}>{((ev.metadata as Record<string, unknown> | null)?.date_display as string | undefined) || formatTimelineDate(ev.event_date)}</div>
               <div style={DOT_COL_STYLE}>
                 {isNow && (
-                  <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--p-accent)', letterSpacing: 1, textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--p-accent)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                     NOW
                   </span>
                 )}

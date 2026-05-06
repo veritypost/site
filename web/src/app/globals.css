@@ -77,6 +77,7 @@
   --warn-text: #b45309;
   --hover: #f5f5f5;
   --accent-bg: #f0f0f0;
+  --accent-subtle: #e4e4e8;
   --foreground: #111111;
   --muted-foreground: #555555;
   /* Browse-page tokens previously orphaned (page-local C palette
@@ -179,6 +180,7 @@
     /* Orphan-fallback tokens now formally remapped */
     --hover: #27272a;
     --accent-bg: #1c1c1f;
+    --accent-subtle: #2c2c32;
     --foreground: #fafafa;
     --muted-foreground: #a1a1aa;
     /* Browse-page tokens — see :root for the legacy fallback rationale. */
@@ -264,6 +266,7 @@
   --breaking: #ef4444;
   --hover: #27272a;
   --accent-bg: #1c1c1f;
+  --accent-subtle: #2c2c32;
   --foreground: #fafafa;
   --muted-foreground: #a1a1aa;
   --text-secondary: #d4d4d8;

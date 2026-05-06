@@ -13,11 +13,11 @@ export default function NextStoryFooter({ category, nearbyStories }: NextStoryFo
         <section style={{ marginBottom: 28 }}>
           <p
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: '0.08em',
+              letterSpacing: '0.06em',
               textTransform: 'uppercase',
-              color: 'var(--dim, #999)',
+              color: 'var(--dim, #5a5a5a)',
               margin: '0 0 12px',
             }}
           >

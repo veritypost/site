@@ -368,9 +368,8 @@ export default function CommentRow({
             flex: 1,
             minWidth: 0,
             ...(depth > 0 ? {
-              paddingLeft: 16,
+              paddingLeft: 12,
               ...(!showExpertChrome ? { borderLeft: '2px solid #e0e0e0' } : {}),
-              marginLeft: 12,
             } : {}),
           }}
         >
@@ -801,7 +800,7 @@ export default function CommentRow({
                     fontWeight: 600,
                     padding: '4px 10px',
                     borderRadius: 6,
-                    minHeight: 30,
+                    minHeight: 44,
                     border: 'none',
                     background: 'transparent',
                     color: replyDisabled ? 'var(--p-ink-faint)' : 'var(--p-ink-muted)',

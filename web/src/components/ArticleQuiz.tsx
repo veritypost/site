@@ -362,13 +362,13 @@ export default function ArticleQuiz({
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 3, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
           {questions.map((_, i) => (
             <div
               key={i}
               style={{
                 flex: 1,
-                height: 3,
+                height: 5,
                 borderRadius: 4,
                 background:
                   i < currentIndex
@@ -511,26 +511,25 @@ export default function ArticleQuiz({
           >
             <div
               style={{
-                fontSize: 34,
+                fontSize: 32,
                 fontWeight: 700,
                 color: C.text,
                 lineHeight: 1.1,
                 letterSpacing: '-0.02em',
               }}
             >
-              {correct} of {total}.
+              You&rsquo;re in.
             </div>
             <div
               style={{
-                fontSize: 20,
-                fontWeight: 500,
-                color: C.text,
-                marginTop: 14,
-                lineHeight: 1.35,
+                fontSize: 15,
+                fontWeight: 400,
+                color: C.dim,
+                marginTop: 10,
+                lineHeight: 1.4,
               }}
             >
-              You&rsquo;re in.{' '}
-              <span style={{ color: C.dim, fontWeight: 400 }}>The conversation is below.</span>
+              {correct} of {total}.{' '}The conversation is below.
             </div>
           </div>
         </>
