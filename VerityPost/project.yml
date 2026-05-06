@@ -87,10 +87,8 @@ targets:
         VP_SITE_URL: "https://veritypost.com"
       configs:
         Debug:
-          CODE_SIGN_IDENTITY: "Apple Development"
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
         Release:
-          CODE_SIGN_IDENTITY: "Apple Distribution"
           SWIFT_COMPILATION_MODE: wholemodule
 
   VerityPostUITests:
