@@ -72,6 +72,7 @@ import {
 } from '@/lib/pipeline/grab-plan';
 import { searchWikipedia } from '@/lib/pipeline/wikipedia-search';
 import { pickStoryMetadata } from '@/lib/pipeline/story-metadata';
+import { pickClusterPreview } from '@/lib/pipeline/cluster-preview';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -121,6 +122,7 @@ type FeedRow = Pick<
   error_count?: number | null;
   extraction_config?: unknown;
   metadata?: Record<string, unknown> | null;
+  content_type?: string | null;
 };
 
 interface FlatItem {
@@ -597,7 +599,7 @@ export async function POST(req: Request) {
     // wikipediaRun consumer ever calls fetch() on those rows.
     let feedsQuery = serviceAny
       .from('feeds')
-      .select('id,url,source_name,feed_type,name,priority_weight,allowed_category_slugs,error_count,extraction_config,metadata')
+      .select('id,url,source_name,feed_type,name,priority_weight,allowed_category_slugs,error_count,extraction_config,metadata,content_type')
       .eq('is_active', true)
       .is('deleted_at', null)
       .in('feed_type', ['feed', 'rss', 'scrape_html', 'scrape_json', 'search_api']);
@@ -1185,12 +1187,32 @@ export async function POST(req: Request) {
       // Pre-load source_class per feed once so we can stamp observations
       // without a per-item lookup. Same feed-set as the fetch fanout.
       const feedSourceClass = new Map<string, 'rss' | 'scrape_html' | 'scrape_json' | 'search_api'>();
+      const feedContentType = new Map<string, string>();
       for (const f of feeds) {
         const fc = f.feed_type;
         if (fc === 'feed' || fc === 'rss') feedSourceClass.set(f.id, 'rss');
         else if (fc === 'scrape_html') feedSourceClass.set(f.id, 'scrape_html');
         else if (fc === 'scrape_json') feedSourceClass.set(f.id, 'scrape_json');
         else if (fc === 'search_api') feedSourceClass.set(f.id, 'search_api');
+        feedContentType.set(f.id, f.content_type ?? 'news');
+      }
+
+      // Pre-load categories once for the entire clustering pass so both
+      // cluster and singleton branches can pass them to pickClusterPreview
+      // without an extra round-trip per story.
+      type CategoryLite = { id: string; name: string; parent_id: string | null };
+      let allCategories: CategoryLite[] = [];
+      if (process.env.CLUSTER_PREVIEW_ENABLED === 'true') {
+        const { data: catData, error: catErr } = await service
+          .from('categories')
+          .select('id, name, parent_id')
+          .is('deleted_at', null)
+          .order('sort_order', { ascending: true });
+        if (catErr) {
+          console.warn('[newsroom.ingest.run] categories pre-load failed:', catErr.message);
+        } else {
+          allCategories = (catData ?? []) as CategoryLite[];
+        }
       }
 
       const inputs: ClusterInputArticle[] = rows.map((r) => {
@@ -1210,6 +1232,15 @@ export async function POST(req: Request) {
       for (const cluster of clusters) {
         try {
           const itemIds = cluster.articles.map((a) => a.id);
+
+          // Content-type gate: skip cluster formation if every source is
+          // non-news (data/academic). These items can still extend an existing
+          // story via the match path below, but they cannot anchor a new one.
+          const hasNewsFeed = itemIds.some((id) => {
+            const row = rowById.get(id);
+            if (!row?.feed_id) return true; // unknown feed → allow
+            return (feedContentType.get(row.feed_id) ?? 'news') === 'news';
+          });
 
           // Wave 2 — unbounded story match against stories.keywords using
           // the GIN index added in Wave 1. No recency cap, no time window
@@ -1236,6 +1267,12 @@ export async function POST(req: Request) {
               }
             }
           }
+
+          // Gate: if every source is data/academic AND no existing story
+          // matched, skip cluster formation entirely. Items stay 'pending'
+          // and age out naturally — they won't anchor a new Discovery card.
+          // If a news story already exists on this topic they still attach.
+          if (!hasNewsFeed && !matchedStoryId) continue;
 
           // Legacy feed_clusters write — kept until Wave 5 rebuilds the
           // Discovery tab on stories. Existing /admin/newsroom UI still
@@ -1321,40 +1358,41 @@ export async function POST(req: Request) {
             storyId = newStory.id as string;
             summary.storiesFormed += 1;
 
-            // Wave 7 — AI picks category + subcategory for newly-formed stories.
+            // AI picks headline, slug, category + subcategory for newly-formed stories.
             // Best-effort: if the pick fails or returns nulls, the story still
             // ships uncategorized; operator can fill it in later.
             const clusterSources = itemIds.flatMap((id) => {
               const r = rowById.get(id);
               if (!r) return [];
               const md = r.metadata ?? {};
-              return [{ outlet: md.outlet ?? null, title: r.raw_title, excerpt: md.excerpt ?? null }];
+              return [{ outlet: md.outlet ?? '', title: r.raw_title }];
             });
             try {
-              const clusterMeta = await pickStoryMetadata(
-                {
-                  title: cluster.title || 'Untitled',
-                  keywords: cluster.keywords,
-                  sources: clusterSources,
-                },
+              const clusterPreview = await pickClusterPreview({
+                title: cluster.title || 'Untitled',
+                keywords: cluster.keywords,
+                sources: clusterSources,
+                categories: allCategories,
                 runId,
-              );
-              if (clusterMeta.category_id !== null || clusterMeta.subcategory_id !== null) {
-                await service
-                  .from('stories')
-                  .update({
-                    ai_category_id: clusterMeta.category_id,
-                    ai_subcategory_id: clusterMeta.subcategory_id,
-                  })
-                  .eq('id', storyId);
+                serviceClient: service,
+              });
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const previewUpdate: any = {
+                ai_suggested_headline: clusterPreview.headline,
+                ai_suggested_slug: clusterPreview.slug,
+              };
+              if (clusterPreview.category_id !== null || clusterPreview.subcategory_id !== null) {
+                previewUpdate.ai_category_id = clusterPreview.category_id;
+                previewUpdate.ai_subcategory_id = clusterPreview.subcategory_id;
               }
+              await service.from('stories').update(previewUpdate).eq('id', storyId);
             } catch (metaErr) {
               const metaMsg = metaErr instanceof Error ? metaErr.message : 'unknown error';
-              console.warn('[newsroom.ingest.run] cluster story metadata pick failed:', metaMsg);
+              console.warn('[newsroom.ingest.run] cluster story preview pick failed:', metaMsg);
               captureWithRedact(metaErr);
               summary.clusterErrors.push({
                 title: cluster.title || '(untitled)',
-                error: `metadata pick failed: ${metaMsg}`,
+                error: `preview pick failed: ${metaMsg}`,
               });
             }
           }
@@ -1452,6 +1490,11 @@ export async function POST(req: Request) {
             }
           }
 
+          // Gate: data/academic singletons with no story match are skipped.
+          const singletonIsNews = !singletonRow.feed_id ||
+            (feedContentType.get(singletonRow.feed_id) ?? 'news') === 'news';
+          if (!singletonIsNews && !singletonMatchedStoryId) continue;
+
           // Single-item feed_clusters row — keeps back-compat with Discovery
           // tab generation paths that resolve cluster_id from discovery_items.
           const singletonClusterPayload = {
@@ -1531,39 +1574,39 @@ export async function POST(req: Request) {
             singletonStoryId = sNewStory.id as string;
             summary.storiesFormed += 1;
 
-            // Wave 7 — AI metadata pick for singleton-formed stories.
+            // AI picks headline, slug, category + subcategory for singleton-formed stories.
             const singletonSources = [
               {
-                outlet: (singletonRow.metadata ?? {}).outlet ?? null,
+                outlet: (singletonRow.metadata ?? {}).outlet ?? '',
                 title: singletonRow.raw_title,
-                excerpt: (singletonRow.metadata ?? {}).excerpt ?? null,
               },
             ];
             try {
-              const sMeta = await pickStoryMetadata(
-                {
-                  title: singletonRow.raw_title ?? 'Untitled',
-                  keywords: singletonKeywords,
-                  sources: singletonSources,
-                },
+              const sPreview = await pickClusterPreview({
+                title: singletonRow.raw_title ?? 'Untitled',
+                keywords: singletonKeywords,
+                sources: singletonSources,
+                categories: allCategories,
                 runId,
-              );
-              if (sMeta.category_id !== null || sMeta.subcategory_id !== null) {
-                await service
-                  .from('stories')
-                  .update({
-                    ai_category_id: sMeta.category_id,
-                    ai_subcategory_id: sMeta.subcategory_id,
-                  })
-                  .eq('id', singletonStoryId);
+                serviceClient: service,
+              });
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const sPreviewUpdate: any = {
+                ai_suggested_headline: sPreview.headline,
+                ai_suggested_slug: sPreview.slug,
+              };
+              if (sPreview.category_id !== null || sPreview.subcategory_id !== null) {
+                sPreviewUpdate.ai_category_id = sPreview.category_id;
+                sPreviewUpdate.ai_subcategory_id = sPreview.subcategory_id;
               }
+              await service.from('stories').update(sPreviewUpdate).eq('id', singletonStoryId);
             } catch (sMetaErr) {
               const sMetaMsg = sMetaErr instanceof Error ? sMetaErr.message : 'unknown error';
-              console.warn('[newsroom.ingest.run] singleton story metadata pick failed:', sMetaMsg);
+              console.warn('[newsroom.ingest.run] singleton story preview pick failed:', sMetaMsg);
               captureWithRedact(sMetaErr);
               summary.clusterErrors.push({
                 title: singletonRow.raw_title ?? '(untitled)',
-                error: `singleton metadata pick failed: ${sMetaMsg}`,
+                error: `singleton preview pick failed: ${sMetaMsg}`,
               });
             }
           }
