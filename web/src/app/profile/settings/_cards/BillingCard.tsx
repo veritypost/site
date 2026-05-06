@@ -6,12 +6,16 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import Link from 'next/link';
 
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/app/NavWrapper';
 import { friendlyError } from '@/lib/friendlyError';
 import type { Tables } from '@/types/database-helpers';
+
+import { CheckoutButton } from '@/app/pricing/_CheckoutButton';
+import { FALLBACK_FAMILY_MONTHLY, FALLBACK_VERITY_MONTHLY, formatCents } from '@/lib/pricingCopy';
 
 import { Card } from '../../_components/Card';
 import { ConfirmDialog } from '../../_components/ConfirmDialog';
@@ -70,6 +74,13 @@ export function BillingCard({ user, preview }: Props) {
   // Stripe webhook is still in-flight.
   const [forceRefreshTrigger, setForceRefreshTrigger] = useState(0);
   const [retryOnSuccess, setRetryOnSuccess] = useState(false);
+  const [upgradePlans, setUpgradePlans] = useState<Array<{
+    name: string;
+    display_name: string | null;
+    price_cents: number | null;
+    stripe_price_id: string | null;
+    is_visible: boolean;
+  }>>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -145,6 +156,17 @@ export function BillingCard({ user, preview }: Props) {
     if (forceRefreshTrigger === 0) return;
     void fetchData();
   }, [forceRefreshTrigger, fetchData]);
+
+  // Fetch upgrade plan rows when user has no active subscription.
+  useEffect(() => {
+    if (loading || sub) return;
+    supabase
+      .from('plans')
+      .select('name, display_name, price_cents, stripe_price_id, is_visible')
+      .in('name', ['verity_monthly', 'verity_family_monthly'])
+      .eq('is_active', true)
+      .then(({ data }) => { if (data) setUpgradePlans(data); });
+  }, [loading, sub, supabase]);
 
   // gotPaidSubRef guards the retry loop against closure-stale sub state.
   // Once a paid sub is confirmed we flip the ref synchronously so the next
@@ -328,21 +350,121 @@ export function BillingCard({ user, preview }: Props) {
   }
 
   if (!sub) {
+    const verityRow = upgradePlans.find((p) => p.name === 'verity_monthly');
+    const verityReady = verityRow?.is_visible === true && !!verityRow?.stripe_price_id;
+    const verityPrice = verityRow?.price_cents != null
+      ? formatCents(verityRow.price_cents)
+      : FALLBACK_VERITY_MONTHLY.formatted;
+    const familyRow = upgradePlans.find((p) => p.name === 'verity_family_monthly');
+    const familyPrice = familyRow?.price_cents != null
+      ? formatCents(familyRow.price_cents)
+      : FALLBACK_FAMILY_MONTHLY.formatted;
+
+    const planCardStyle: CSSProperties = {
+      flex: 1,
+      minWidth: 'min(200px, 100%)',
+      background: C.surfaceSunken,
+      border: `1px solid ${C.border}`,
+      borderRadius: R.lg,
+      padding: S[4],
+      display: 'flex',
+      flexDirection: 'column',
+      gap: S[2],
+      fontFamily: FONT.sans,
+    };
+    const planLabelStyle: CSSProperties = {
+      fontSize: F.xs,
+      fontWeight: 600,
+      color: C.inkMuted,
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em',
+    };
+    const planPriceStyle: CSSProperties = {
+      fontSize: F.xl,
+      fontWeight: 700,
+      color: C.ink,
+    };
+    const planPeriodStyle: CSSProperties = {
+      fontSize: F.sm,
+      fontWeight: 400,
+      color: C.inkMuted,
+      marginLeft: 2,
+    };
+    const planFeaturesStyle: CSSProperties = {
+      margin: 0,
+      padding: '0 0 0 16px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 4,
+      fontSize: F.sm,
+      color: C.inkSoft,
+      flex: 1,
+    };
+    const disabledCtaStyle: CSSProperties = {
+      marginTop: 'auto',
+      padding: `${S[2]}px ${S[4]}px`,
+      textAlign: 'center',
+      fontSize: F.sm,
+      fontWeight: 600,
+      border: `1px solid ${C.border}`,
+      borderRadius: R.md,
+      color: C.inkMuted,
+    };
+
     return (
       <Card
         title="Plan"
-        description="You're on the free tier. Upgrade to unlock activity, milestones, and more."
+        description="You're on the free tier. Upgrade to unlock unlimited reading, ad-free, and more."
       >
-        <Link
-          href="/pricing"
-          style={{
-            ...buttonPrimaryStyle,
-            display: 'inline-block',
-            textDecoration: 'none',
-          }}
-        >
-          See plans
-        </Link>
+        <div style={{ display: 'flex', gap: S[3], flexWrap: 'wrap' }}>
+          <div style={planCardStyle}>
+            <div style={planLabelStyle}>Verity</div>
+            <div style={planPriceStyle}>
+              {verityPrice}<span style={planPeriodStyle}>/mo</span>
+            </div>
+            <ul style={planFeaturesStyle}>
+              <li>Unlimited reading</li>
+              <li>Ad-free</li>
+              <li>Ask an Expert</li>
+              <li>Full activity history</li>
+            </ul>
+            {verityReady ? (
+              <CheckoutButton planName="verity_monthly" cta="Start Verity" highlight />
+            ) : (
+              <div style={disabledCtaStyle}>Subscribe via iOS App</div>
+            )}
+          </div>
+
+          <div style={planCardStyle}>
+            <div style={planLabelStyle}>Family</div>
+            <div style={planPriceStyle}>
+              {familyPrice}<span style={planPeriodStyle}>/mo</span>
+            </div>
+            <ul style={planFeaturesStyle}>
+              <li>Everything in Verity</li>
+              <li>Up to 6 family members</li>
+              <li>1 kid included</li>
+            </ul>
+            <div style={{ marginTop: 'auto' }}>
+              <a
+                href="/kids-app"
+                style={{
+                  display: 'block',
+                  padding: `${S[2]}px ${S[4]}px`,
+                  textAlign: 'center',
+                  fontSize: F.sm,
+                  fontWeight: 600,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: R.md,
+                  color: C.ink,
+                  textDecoration: 'none',
+                }}
+              >
+                Available on iOS →
+              </a>
+            </div>
+          </div>
+        </div>
       </Card>
     );
   }

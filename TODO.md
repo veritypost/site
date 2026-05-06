@@ -119,7 +119,7 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 ## Profile / Plan
 
-- 28: Clicking Plan in profile takes free users to a "See plans →" button that links to `/pricing` — a separate page. User wants the plan options to open immediately when they land on the Plan section. `BillingCard.tsx:330-346` renders the "See plans" → `/pricing` link for users with no subscription. Fix: replace the link with inline plan cards (or pull `/pricing` content into a modal/inline component) so upgrade is one step, not two. `AppShell.tsx:614` also links locked sections to `/profile?section=plan` which then hits the same two-hop problem.
+- 28: ~~Done~~ — Inline plan cards shipped in BillingCard. Free-tier users now see Verity + Family cards with prices and CTAs inline; no redirect to /pricing needed.
 
 - 29: Appearance section may not need to be its own nav rail item — it only contains a single Light/System/Dark toggle (`AppearanceSection.tsx`). Decision: collapse it into another section (e.g. Settings/General), or keep it standalone?
 
@@ -144,7 +144,7 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 - 38: Article page desktop layout feels off-center — `ArticleReaderTabs.tsx` uses a 75/25 flex split (`flex: 75` article column + `flex: 25` sticky timeline rail, `max-width: 1280px` container). The article body is capped at 680px inside the left column, so on a wide screen the text sits left-heavy with the timeline rail on the right and dead space outside. Decision needed: (a) keep 75/25 sidebar but tighten max-width so dead space shrinks, (b) move timeline above/below the article body and drop the rail, (c) make timeline a slide-in drawer/overlay on desktop instead of a persistent column. This is connected to TODO 3 (sources moving out of the timeline slot into the article body) — layout decision should be made together.
 
-- 37: Mobile web profile renders poorly — zooms in and doesn't give a clean view. Viewport meta is correct (`device-width`, `initialScale: 1`). AppShell rail is properly hidden off-screen on mobile (<860px). Most likely cause: a fixed-width element inside one of the profile sections is causing horizontal overflow, which makes the browser shrink the page to fit. Needs browser-side diagnosis — open `/profile` on mobile, open DevTools, look for any element wider than the viewport in the Elements panel. Suspect candidates: `AvatarEditor` (`minWidth: 160`), `InviteLinkCard` (`minWidth: 96`), or a grid that doesn't collapse properly. Fix will depend on what's overflowing.
+- 37: Mobile web profile layout — AvatarEditor grid is now responsive (`min(160px, 40vw)` first column, `minWidth: 0` on preview panel). If profile still overflows on your phone after this, open DevTools → Elements on mobile and look for any element wider than the viewport; other candidates are `InviteLinkCard` (`minWidth: 96`) and any grid that doesn't collapse.
 
 ---
 

@@ -211,7 +211,7 @@ export function AvatarEditor({ user, preview, onUserUpdated }: Props) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'auto 1fr',
+          gridTemplateColumns: 'min(160px, 40vw) 1fr',
           gap: S[5],
           alignItems: 'flex-start',
           fontFamily: FONT.sans,
@@ -228,7 +228,7 @@ export function AvatarEditor({ user, preview, onUserUpdated }: Props) {
             background: C.surfaceSunken,
             border: `1px solid ${C.border}`,
             borderRadius: R.lg,
-            minWidth: 160,
+            minWidth: 0,
           }}
         >
           <Avatar user={previewUser} size={104} />
