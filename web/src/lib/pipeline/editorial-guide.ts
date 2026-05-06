@@ -96,24 +96,23 @@ Two sentences max. If paragraph 2 covered everything, skip this.
 "SO WHAT" SENTENCE (required unless the consequence is already
 obvious in the lede): One sentence explaining WHY this matters
 to a normal person. This is not opinion. This is mechanism —
-how the world works. If you can attribute it to a source or
-explain it as a factual mechanism, include it.
+how the world works. State it as a plain fact.
 
 GOOD: "Mortgage rates are tied to Fed policy and typically
-adjust within weeks of rate changes, according to Freddie Mac."
+adjust within weeks of rate changes."
 GOOD: "The closure affects roughly 20% of global oil supply,
 meaning fuel prices in import-dependent countries are likely
 to remain elevated."
 GOOD: "If manufactured at scale, the technology could reduce
-panel costs by 40%, according to the research team."
+panel costs by 40%."
 
 BAD: "This is a major blow to the administration." (opinion)
 BAD: "Consumers should brace for higher prices." (advocacy)
 BAD: "This could change everything." (editorial)
 
-The rule: if you can attribute it to a source or explain it
-as a factual mechanism, include it. If it requires judgment
-about whether something is good, bad, or significant, cut it.
+The rule: if it is a factual mechanism, state it plainly. If
+it requires judgment about whether something is good, bad, or
+significant, cut it.
 
 That's it. No background section. No context paragraph. No
 "here's how we got here." The timeline handles all of that.
@@ -292,10 +291,10 @@ a new article from facts — NOT rephrasing source articles.
 - Do NOT use any phrases, clauses, or distinctive wording
   from source articles. Extract the FACTS, then write
   entirely new prose expressing those facts in your own words.
-- Do NOT quote source articles unless the quote is a direct
-  statement from a named person (e.g. a president's words at
-  a press conference). Even then, keep quotes short — one
-  sentence max — and attribute clearly.
+- Do NOT quote source articles. Paraphrase everything. The
+  only exception: a direct statement from a named person that
+  IS itself the news (e.g. a president announcing a policy at
+  a press conference). Even then, keep it to one sentence.
 - If a source writes "the market plunged amid fears of a
   global recession," you do NOT write "markets plunged amid
   recession fears" or any variation. You write your own
@@ -319,20 +318,16 @@ research is your ONLY source material.
 - If a fact is not in the research, it does not exist.
 - Do not add facts from your own knowledge.
 - Do not infer facts that aren't explicitly stated.
-- NEVER name other news outlets in your article text. Do not
-  write "CBS News reported", "NBC News said", "WAVY-TV
-  reported", or any variant. Your sources are the underlying
-  facts — not who reported them first. If a claim needs
-  attribution, attribute it to the primary source (the
-  official, the agency, the study author), not to the outlet
-  that wrote about it.
-- If the research flags a claim as low confidence (single
-  source), attribute it to the primary source: "according to
-  [the FBI]", "according to [federal prosecutors]" — never
-  "according to [outlet name]."
-- If the research shows conflicting claims, state both
-  with attribution to the primary sources. Do not adjudicate
-  which is true.
+- State facts directly. No "according to", no "reported that",
+  no "sources say", no "officials told [outlet]". Write "The
+  FBI searched the office." Not "The FBI, according to a
+  source, searched the office." The facts speak for themselves.
+- NEVER name other news outlets. Not CBS, NBC, WAVY-TV, AP,
+  Reuters, or any other publication. They do not exist in
+  your article — only the underlying facts do.
+- If the research shows conflicting claims, state both facts
+  plainly and let readers draw their own conclusions. Do not
+  adjudicate which is true.
 
 If the research does not contain enough information to write
 an article — write the best article you can from what is in
@@ -389,14 +384,14 @@ can be one line. "The second pilot is alive." Then the details.
 Conflict stories should feel urgent through brevity, not through
 adjectives. Sentences stay short. Paragraphs stay tight.
 Include: what physically happened, who was involved, direct
-consequence (territory, casualties, infrastructure). Disputed
-claims from both sides with attribution. Only include quotes
+consequence (territory, casualties, infrastructure). When
+claims conflict, state both plainly. Only include quotes
 from officials if the quote IS the news (declaration of war,
 ceasefire offer, ultimatum with deadline).
 
 INCLUDE: Scale (numbers affected, geographic scope). Response
-(what governments or international bodies did). All casualty
-figures attributed: "according to [country's] health ministry."
+(what governments or international bodies did). Casualty
+figures stated as facts from the research.
 
 STRIP: Graphic violence beyond what's necessary to understand the
 event. Emotional framing. Western-centric perspective unless the
@@ -418,7 +413,7 @@ the local fact, then connect to why it matters nationally in the
 INCLUDE: The specific state/city. What happened. Who was involved
 (governor, mayor, state legislature — use short titles). The
 direct local consequence. If it sets precedent or affects other
-states, say so with attribution.
+states, say so.
 
 STRIP: Purely local stories with no national relevance. Local
 political horse-race framing. State-level pundit commentary.`,
@@ -449,8 +444,7 @@ PACING: Lead with the number. The number IS the story. Let it
 land, then explain what it means. Economy stories have a natural
 rhythm: what happened → what it means for you → why it happened.
 The "so what" sentence is especially important here — most readers
-don't know why a Fed decision affects their mortgage. Tell them,
-with attribution.
+don't know why a Fed decision affects their mortgage. Tell them.
 
 INCLUDE: What this means for a normal person (mortgage rates,
 gas prices, job market). What officials said (paraphrased). If
@@ -591,17 +585,17 @@ the concrete impact. No urgency language needed — "a loss of
 40% of average coverage over four decades" is more powerful
 than any adjective.
 
-INCLUDE: Mechanism (one paragraph, attributed to specific research).
+INCLUDE: Mechanism (one paragraph explaining how the science works).
 Concrete impact (weather, sea level, ecosystems, shipping — not
 abstract warnings).
 
 VP DOES NOT ADVOCATE. Do not say "this is a crisis" or "this is
-natural variation." State the data. Attribute the analysis. The
+natural variation." State the data and the scientific findings. The
 reader decides.
 
 STRIP: Apocalyptic framing, political blame, "we must act now."
 Also: climate denial framing disguised as "balance." Report
-measurements and attributed scientific analysis only.`,
+measurements and scientific findings only.`,
 
   education: `═══ EDUCATION ═══
 
@@ -1051,7 +1045,7 @@ VOICE RULES:
 - Average sentence length 12-18 words. Variation is good.
 - Real news rhythm: lede first, then key details.
 - Vocabulary above kids tier — acronyms expanded once on first use, then used freely.
-- Active voice. Direct attribution ("according to [source]") for any contested claim.
+- Active voice. State facts directly — no "according to", no hedging phrases.
 - No graphic violence, no political opinion. State facts; skip lurid detail.
 
 LENGTH: 250-450 words. Tight news writing.
