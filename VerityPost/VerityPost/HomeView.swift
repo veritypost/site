@@ -45,6 +45,10 @@ struct HomeView: View {
     // chrome; it was relocated to the home feed so the search entry point
     // is contextual rather than persistent on every surface.
     @State private var canSearch: Bool = false
+    // Sections sheet — grid icon in top bar opens HomeSectionsSheet.
+    @State private var showSectionsMenu = false
+    // "New since last visit" pill — tracks when home was last opened.
+    @State private var lastVisitDate: Date? = nil
 
     private static let editorialTimeZone = TimeZone(identifier: "America/New_York") ?? .current
 
@@ -213,6 +217,10 @@ struct HomeView: View {
             // T244b — share `refreshTask` with `.refreshable` so a pull-to-refresh
             // started before the initial load finishes cancels the in-flight task
             // instead of stacking a second writer onto the same @State.
+            // Capture last visit before loading so "New" badges reflect the
+            // previous session, then stamp the current visit time.
+            lastVisitDate = UserDefaults.standard.object(forKey: "vp_last_home_visit_at") as? Date
+            UserDefaults.standard.set(Date(), forKey: "vp_last_home_visit_at")
             today = HomeView.computeToday()
             refreshTask?.cancel()
             refreshTask = Task { await loadData() }
@@ -226,13 +234,11 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Top bar (brand + search)
+    // MARK: - Top bar (brand + sections + search)
     //
-    // Mirrors ProfileView.topBar shape so the brand chrome reads the same
-    // across the app. Wordmark on the left, magnifier on the right when
-    // the viewer has `search.basic` (logged-in only — anon's PermissionStore
-    // returns false for everything). Pushes FindView via NavigationLink so
-    // the search experience inherits the tab's navigation stack.
+    // Nav restructure 2026-05-06: mirrors mobile web top bar.
+    // Wordmark left; sections grid icon + optional search icon right.
+    // Date moved out of the top bar (was mid-bar; web doesn't show it there).
 
     private var topBar: some View {
         HStack(spacing: 0) {
@@ -243,11 +249,6 @@ struct HomeView: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
             Spacer()
-            Text(today.humanDate)
-                .font(.system(size: VP.Size.sm, weight: .medium))
-                .foregroundColor(VP.dim)
-                .lineLimit(1)
-                .padding(.trailing, canSearch ? 8 : 0)
             if canSearch {
                 NavigationLink {
                     FindView().environmentObject(auth)
@@ -261,6 +262,17 @@ struct HomeView: View {
                 .accessibilityLabel("Search")
                 .buttonStyle(.plain)
             }
+            Button {
+                showSectionsMenu = true
+            } label: {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(VP.text)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Browse sections")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -269,6 +281,9 @@ struct HomeView: View {
             Rectangle().fill(VP.border).frame(height: 1),
             alignment: .bottom
         )
+        .sheet(isPresented: $showSectionsMenu) {
+            HomeSectionsSheet(categories: categories)
+        }
     }
 
     // MARK: - Hero / Supporting
@@ -335,7 +350,21 @@ struct HomeView: View {
 
     @ViewBuilder
     private func supportingCard(_ story: Story) -> some View {
+        let isNew: Bool = {
+            guard let pub = story.publishedAt, let last = lastVisitDate else { return false }
+            return pub > last
+        }()
         VStack(alignment: .leading, spacing: 0) {
+            if isNew {
+                Text("New")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(VP.accent)
+                    .clipShape(Capsule())
+                    .padding(.bottom, 6)
+            }
             if let cat = categoryName(for: story.categoryId) {
                 eyebrow(cat).padding(.bottom, 8)
             }
@@ -1112,6 +1141,224 @@ struct CategoryDetailView: View {
             Log.d("CategoryDetailView load failed: \(error)")
             loadFailed = true
             loading = false
+        }
+    }
+}
+
+// MARK: - HomeSectionsSheet
+//
+// Sheet opened from the grid icon in HomeView's top bar. Shows all categories
+// with sub-categories nested, plus an inline search. Mirrors the web
+// HomeSectionsMenu component. Categories are passed from HomeView so no extra
+// fetch is needed — HomeView already loads them on appear.
+
+struct HomeSectionsSheet: View {
+    let categories: [VPCategory]
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    @State private var searchResults: [Story] = []
+    @State private var isSearching = false
+    private let client = SupabaseManager.shared.client
+
+    // Top-level categories: those with nil categoryId (the parent_id column).
+    private var parentCats: [VPCategory] {
+        categories.filter { $0.categoryId == nil }
+            .sorted { ($0.displayOrder ?? 999) < ($1.displayOrder ?? 999) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Search input
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(VP.dim)
+                    TextField("Search articles\u{2026}", text: $query)
+                        .font(.system(.body))
+                        .foregroundColor(VP.text)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .onSubmit { Task { await runSearch() } }
+                    if !query.isEmpty {
+                        Button {
+                            query = ""
+                            searchResults = []
+                        } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundColor(VP.dim)
+                        }
+                    }
+                }
+                .padding(10)
+                .background(VP.surfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+
+                Divider()
+
+                if !query.isEmpty {
+                    searchResultsList
+                } else {
+                    categoryList
+                }
+            }
+            .background(VP.bg)
+            .navigationTitle("Sections")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .font(.system(.body, weight: .medium))
+                        .foregroundColor(VP.accent)
+                }
+            }
+        }
+        .onChange(of: query) { _, newVal in
+            if newVal.count >= 2 { Task { await runSearch() } }
+            else if newVal.isEmpty { searchResults = [] }
+        }
+    }
+
+    private var categoryList: some View {
+        List {
+            ForEach(parentCats) { cat in
+                let subs = categories.filter { $0.categoryId == cat.id }
+                    .sorted { ($0.displayOrder ?? 999) < ($1.displayOrder ?? 999) }
+                Section {
+                    NavigationLink(destination: categoryFeedView(cat: cat)) {
+                        Text(cat.displayName)
+                            .font(.system(.body, weight: .semibold))
+                            .foregroundColor(VP.text)
+                            .padding(.vertical, 2)
+                    }
+                    ForEach(subs) { sub in
+                        NavigationLink(destination: categoryFeedView(cat: sub)) {
+                            Text(sub.displayName)
+                                .font(.system(.subheadline))
+                                .foregroundColor(VP.dim)
+                                .padding(.leading, 8)
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    private var searchResultsList: some View {
+        Group {
+            if isSearching {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if searchResults.isEmpty && query.count >= 2 {
+                Text("No results for \u{201C}\(query)\u{201D}")
+                    .font(.subheadline).foregroundColor(VP.dim)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List(searchResults) { story in
+                    NavigationLink(destination: StoryDetailView(story: story)) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(story.title ?? "")
+                                .font(.system(.subheadline, weight: .semibold))
+                                .foregroundColor(VP.text)
+                                .lineLimit(2)
+                            if let ex = story.excerpt {
+                                Text(ex).font(.caption).foregroundColor(VP.dim).lineLimit(2)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+    }
+
+    private func categoryFeedView(cat: VPCategory) -> some View {
+        CategoryFeedView(category: cat)
+            .onDisappear { dismiss() }
+    }
+
+    private func runSearch() async {
+        guard query.count >= 2 else { return }
+        isSearching = true
+        defer { isSearching = false }
+        do {
+            let results: [Story] = try await client.from("articles")
+                .select("*, stories(slug)")
+                .eq("status", value: "published")
+                .eq("browse_only", value: false)
+                .ilike("title", value: "%\(query)%")
+                .order("published_at", ascending: false)
+                .limit(20)
+                .execute()
+                .value
+            searchResults = results
+        } catch {
+            searchResults = []
+        }
+    }
+}
+
+// MARK: - CategoryFeedView
+//
+// Simple article list for a single category or subcategory.
+// Used as the drill-in destination from HomeSectionsSheet.
+// Distinguishes top-level vs sub by checking VPCategory.categoryId (parent_id).
+
+struct CategoryFeedView: View {
+    let category: VPCategory
+    @State private var stories: [Story] = []
+    @State private var loading = true
+    private let client = SupabaseManager.shared.client
+
+    var body: some View {
+        Group {
+            if loading {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if stories.isEmpty {
+                Text("No articles in \(category.displayName).")
+                    .foregroundColor(VP.dim)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List(stories) { story in
+                    NavigationLink(destination: StoryDetailView(story: story)) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(story.title ?? "")
+                                .font(.system(.subheadline, weight: .semibold))
+                                .foregroundColor(VP.text)
+                                .lineLimit(3)
+                            if let ex = story.excerpt {
+                                Text(ex).font(.caption).foregroundColor(VP.dim).lineLimit(2)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .navigationTitle(category.displayName)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+    }
+
+    private func load() async {
+        loading = true
+        defer { loading = false }
+        do {
+            // Top-level categories filter by category_id; subcategories by subcategory_id.
+            let col = category.categoryId == nil ? "category_id" : "subcategory_id"
+            stories = try await client.from("articles")
+                .select("*, stories(slug)")
+                .eq("status", value: "published")
+                .eq("browse_only", value: false)
+                .eq(col, value: category.id)
+                .order("published_at", ascending: false)
+                .limit(20)
+                .execute()
+                .value
+        } catch {
+            stories = []
         }
     }
 }

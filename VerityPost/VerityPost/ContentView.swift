@@ -220,7 +220,7 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Main Tab View — 3-tab layout: Today, Browse, Profile (Following intentionally dropped, FollowingView retained for re-expose)
+// MARK: - Main Tab View — 2-tab layout: Home, Profile (Browse + Following dropped; BrowseLanding + FollowingView retained for re-expose)
 
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthViewModel
@@ -234,11 +234,11 @@ struct MainTabView: View {
     @State private var deepLinkStory: Story?
     private let deepLinkClient = SupabaseManager.shared.client
 
-    // IA Wave 4 (Slice 03 locked): Today / Browse / Profile.
-    // "Browse" is discovery by category. Following dropped pre-launch.
-    // Notifications and Rankings moved into Profile.
+    // Nav restructure 2026-05-06: 2-tab layout matching mobile web.
+    // Browse removed from bottom nav; sections accessible via HomeSectionsSheet.
+    // Following dropped pre-launch. Notifications and Rankings moved into Profile.
     // Profile slot relabels to "Sign up" for anon users.
-    enum Tab: Hashable { case today, browse, profile }
+    enum Tab: Hashable { case today, profile }
 
     private var isLoggedIn: Bool { auth.currentUser != nil }
 
@@ -264,9 +264,10 @@ struct MainTabView: View {
 
     // MARK: - Adult tab bar
     //
-    // 3 tabs: Today, Browse, Profile.
+    // 2 tabs: Home, Profile — matches mobile web nav.
+    // Browse removed; sections accessible via HomeSectionsSheet on the home toolbar.
     // Text-only (no icons), bottom-fixed, translucent white with a blur.
-    // Active tab renders in accent color, bold. Anon users see the same 3
+    // Active tab renders in accent color, bold. Anon users see the same 2
     // slots; the Profile slot flips to "Sign up" via the SignInGate
     // destination. Alerts and Rankings are accessed from Profile.
 
@@ -274,7 +275,6 @@ struct MainTabView: View {
         ZStack {
             switch selectedTab {
             case .today: NavigationStack { HomeView() }
-            case .browse: NavigationStack { BrowseLanding() }
             case .profile:
                 NavigationStack {
                     if isLoggedIn {
@@ -453,10 +453,10 @@ struct TextTabBar: View {
     }
 
     private var items: [Item] {
-        // Following dropped pre-launch; FollowingView.swift kept alive for one-line re-expose if needed.
+        // Nav restructure 2026-05-06: 2 tabs matching mobile web.
+        // FollowingView.swift + BrowseLanding kept alive for one-line re-expose if needed.
         [
-            Item(id: .today, label: "Today"),
-            Item(id: .browse, label: "Browse"),
+            Item(id: .today, label: "Home"),
             Item(id: .profile, label: isLoggedIn ? "Profile" : "Sign up"),
         ]
     }
