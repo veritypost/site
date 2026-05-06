@@ -38,13 +38,6 @@ const linkStyle: React.CSSProperties = {
   padding: '0 4px',
 };
 
-const bodyStyle: React.CSSProperties = {
-  fontFamily: serifStack,
-  fontSize: 15,
-  color: C.soft,
-  margin: 0,
-  lineHeight: 1.5,
-};
 
 export default function HomeFooter() {
   const { loggedIn, user } = useAuth() as { loggedIn: boolean; user: any };
@@ -112,17 +105,5 @@ export default function HomeFooter() {
     return null;
   }
 
-  // Anon: sign-up pitch (DECISION #027 — Browse link and read access are NEVER restricted)
-  return (
-    <footer style={footerStyle}>
-      <p style={bodyStyle}>
-        Create a free account to join the discussion.
-      </p>
-      <p style={{ margin: '12px 0 0' }}>
-        <Link href="/signup" style={linkStyle}>
-          Create free account &rarr;
-        </Link>
-      </p>
-    </footer>
-  );
+  return null;
 }
