@@ -9,7 +9,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { createClient } from '@/lib/supabase/client';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
-import { getScoreTiers, nextTier, tierFor, type ScoreTier } from '@/lib/scoreTiers';
 import type { Tables } from '@/types/database-helpers';
 
 import { AccountStateBanner } from './AccountStateBanner';
@@ -52,7 +51,6 @@ export function ProfileApp({ defaultSection }: Props) {
 
   const [user, setUser] = useState<UserRow | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
-  const [tiers, setTiers] = useState<ScoreTier[]>([]);
   // T342 — perms-tick. The /profile shell is a long-lived SPA host
   // (no remount on internal section nav), so admin perm flips / plan
   // upgrades / cohort grants don't reach the rendered tree until
@@ -80,9 +78,8 @@ export function ProfileApp({ defaultSection }: Props) {
         router.replace('/login?next=/profile');
         return;
       }
-      const [userRes, tiersRes, expertRes] = await Promise.all([
+      const [userRes, expertRes] = await Promise.all([
         supabase.from('users').select('*').eq('id', authUser.id).maybeSingle(),
-        getScoreTiers(supabase),
         supabase
           .from('expert_applications')
           .select('status, rejection_reason')
@@ -99,7 +96,6 @@ export function ProfileApp({ defaultSection }: Props) {
       }
       if (userRes.data) setUser(userRes.data as UserRow);
       setAuthUserId(authUser.id);
-      setTiers(tiersRes);
       if (expertRes.data) {
         const exp = expertRes.data as { status?: string | null; rejection_reason?: string | null };
         const s = exp.status as 'pending' | 'approved' | 'rejected' | 'revoked' | undefined;
@@ -227,18 +223,6 @@ export function ProfileApp({ defaultSection }: Props) {
   );
   if (!user) return null;
 
-  const userWithFrozen = user as UserRow & {
-    verity_score?: number | null;
-    frozen_verity_score?: number | null;
-    frozen_at?: string | null;
-  };
-  const displayScore =
-    userWithFrozen.frozen_at != null
-      ? (userWithFrozen.frozen_verity_score ?? userWithFrozen.verity_score ?? 0)
-      : (userWithFrozen.verity_score ?? 0);
-  const currentTier = tierFor(displayScore, tiers);
-  const upcomingTier = nextTier(currentTier, tiers);
-
   const topState = accountStates[0];
   if (isHardBlock(topState)) {
     return (
@@ -268,9 +252,7 @@ export function ProfileApp({ defaultSection }: Props) {
       keywords: ['home', 'dashboard', 'score', 'tier', 'stats'],
       render: () => (
         <YouSection
-          user={{ ...user, verity_score: displayScore } as typeof user}
-          tier={currentTier}
-          next={upcomingTier}
+          user={user}
           perms={perms}
         />
       ),
@@ -284,7 +266,6 @@ export function ProfileApp({ defaultSection }: Props) {
       render: () => (
         <PublicProfileSection
           user={user}
-          tier={currentTier}
           preview={false}
           onUserUpdated={setUser}
         />
@@ -574,7 +555,6 @@ export function ProfileApp({ defaultSection }: Props) {
       ) : null}
       <AppShell
         user={user}
-        tier={currentTier}
         preview={false}
         defaultSection={defaultSection}
         sections={sections}

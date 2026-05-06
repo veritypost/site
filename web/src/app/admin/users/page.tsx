@@ -33,7 +33,6 @@ import EmptyState from '@/components/admin/EmptyState';
 import StatCard from '@/components/admin/StatCard';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
-import { getScoreTiers, tierFor, type ScoreTier } from '@/lib/scoreTiers';
 import { getPlans } from '@/lib/plans';
 import { getRoleNames } from '@/lib/roles';
 import type { Tables } from '@/types/database-helpers';
@@ -42,12 +41,6 @@ type UserRow = Tables<'users'> & {
   plans?: { name: string | null } | null;
   user_roles?: Array<{ roles: { name: string } | null }> | null;
 };
-
-// Tier data is DB-backed via `score_tiers` — see `@/lib/scoreTiers`.
-// Prior hardcoded TIERS const used keys (`contributor`/`trusted`/
-// `distinguished`) and thresholds (500/2000/5000/10000) that didn't
-// match the live DB (`informed`/`analyst`/`scholar` at 300/600/1000/
-// 1500). See T-001 in TASKS.md.
 
 // T-103: role hierarchy loaded from `roles.hierarchy_level` via
 // getRoleNames() in @/lib/roles. Prior code hardcoded a 9-entry array
@@ -107,8 +100,6 @@ export default function UsersAdmin() {
   // label list — prior hardcoded 8 didn't overlap any of the 26 DB rows).
   const [achievementsList, setAchievementsList] = useState<{ id: string; name: string; key: string }[]>([]);
   const [achievement, setAchievement] = useState<string>('');
-  // score_tiers is loaded once per mount; getScoreTiers caches for 60s.
-  const [scoreTiers, setScoreTiers] = useState<ScoreTier[]>([]);
   // T-102 / T-103: DB-live plan + role ordering. Cached 60s in lib.
   const [roleNamesOrdered, setRoleNamesOrdered] = useState<string[]>([]);
   const [planChoices, setPlanChoices] = useState<Array<{ name: string; label: string }>>([]);
@@ -185,9 +176,6 @@ export default function UsersAdmin() {
       setAchievementsList(rows);
       if (rows.length > 0) setAchievement(rows[0].name);
 
-      // Load DB-backed score tiers for the row/drawer tier chip.
-      const tiers = await getScoreTiers(supabase);
-      setScoreTiers(tiers);
     };
     init();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -454,23 +442,21 @@ export default function UsersAdmin() {
       header: 'User',
       sortable: false,
       render: (u: UserRow) => {
-        const t = tierFor(u.verity_score, scoreTiers);
-        const tierColor = t?.color_hex || ADMIN_C.muted;
         const initial = ((u.username || '?')[0] || '?').toUpperCase();
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: S[2], minWidth: 0 }} title={t?.display_name}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: S[2], minWidth: 0 }}>
             <div
               style={{
                 width: 28,
                 height: 28,
                 borderRadius: '50%',
-                border: `2px solid ${tierColor}`,
+                border: `2px solid ${ADMIN_C.muted}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: F.xs,
                 fontWeight: 700,
-                color: tierColor,
+                color: ADMIN_C.muted,
                 flexShrink: 0,
               }}
             >
@@ -640,7 +626,6 @@ export default function UsersAdmin() {
           quizScore={quizScore} setQuizScore={setQuizScore}
           achievement={achievement} setAchievement={setAchievement}
           achievementsList={achievementsList}
-          scoreTiers={scoreTiers}
         />}
       </Drawer>
 
@@ -719,18 +704,15 @@ function UserDetail(props: {
   quizScore: string; setQuizScore: (v: string) => void;
   achievement: string; setAchievement: (v: string) => void;
   achievementsList: { id: string; name: string; key: string }[];
-  scoreTiers: ScoreTier[];
 }) {
   const {
     user, onToggleBan, onDelete, onExport, onChangeRole, onChangePlan,
     onMarkRead, onMarkQuiz, onAwardAchievement,
     markReadBusy, markQuizBusy, awardBusy,
     readSlug, setReadSlug, quizSlug, setQuizSlug, quizScore, setQuizScore,
-    achievement, setAchievement, achievementsList, scoreTiers,
+    achievement, setAchievement, achievementsList,
   } = props;
 
-  const tier = tierFor(user.verity_score, scoreTiers);
-  const tierColor = tier?.color_hex || ADMIN_C.muted;
   const initial = ((user.username || '?')[0] || '?').toUpperCase();
   const roleName = user.user_roles?.[0]?.roles?.name || 'user';
   const planName = user.plans?.name || 'free';
@@ -743,13 +725,13 @@ function UserDetail(props: {
             width: 48,
             height: 48,
             borderRadius: '50%',
-            border: `3px solid ${tierColor}`,
+            border: `3px solid ${ADMIN_C.muted}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: F.lg,
             fontWeight: 700,
-            color: tierColor,
+            color: ADMIN_C.muted,
             flexShrink: 0,
           }}
         >
@@ -760,7 +742,7 @@ function UserDetail(props: {
             Joined {user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}
           </div>
           <div style={{ display: 'flex', gap: S[1], marginTop: S[1], flexWrap: 'wrap' }}>
-            <Badge size="xs" style={{ color: tierColor }}>{tier?.display_name || 'Newcomer'} ({user.verity_score || 0} VP)</Badge>
+            <Badge size="xs">{user.verity_score || 0} VP</Badge>
             <Badge size="xs">{planName}</Badge>
             <Badge size="xs">{roleName}</Badge>
             {user.is_verified_public_figure && <Badge variant="success" size="xs">verified</Badge>}

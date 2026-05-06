@@ -108,6 +108,7 @@ export default function ArticleReaderTabs({ articleSlot, timelineSlot, engagemen
         [data-reader-panel="timeline"] {
           flex: 25;
           min-width: 0;
+          align-self: flex-start;
           position: sticky;
           top: 80px;
           max-height: calc(100vh - 100px);

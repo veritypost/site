@@ -15,7 +15,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import Avatar from '@/components/Avatar';
 import type { Tables } from '@/types/database-helpers';
-import type { ScoreTier } from '@/lib/scoreTiers';
 
 import { C, F, FONT, R, S, SH } from '../_lib/palette';
 import { useFocusTrap } from '../_lib/useFocusTrap';
@@ -53,13 +52,12 @@ export interface SectionDef {
 
 interface Props {
   user: UserRow;
-  tier: ScoreTier | null;
   preview: boolean;
   defaultSection?: string;
   sections: SectionDef[];
 }
 
-export function AppShell({ user, tier, preview, defaultSection = 'you', sections }: Props) {
+export function AppShell({ user, preview, defaultSection = 'you', sections }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -203,7 +201,7 @@ export function AppShell({ user, tier, preview, defaultSection = 'you', sections
           className={`redesign-shell-rail ${drawerOpen ? 'redesign-shell-rail-open' : ''}`}
           aria-label="Profile sections"
         >
-          <IdentityRailCard user={user} tier={tier} preview={preview} />
+          <IdentityRailCard user={user} preview={preview} />
 
           <div style={{ position: 'relative', padding: `${S[3]}px ${S[4]}px ${S[2]}px` }}>
             <input
@@ -460,11 +458,9 @@ function groupedNav(items: SectionDef[]): { label: string | null; items: Section
 
 function IdentityRailCard({
   user,
-  tier,
   preview,
 }: {
   user: UserRow;
-  tier: ScoreTier | null;
   preview: boolean;
 }) {
   const u = user as UserRow & {
@@ -550,7 +546,7 @@ function IdentityRailCard({
           ) : null}
         </div>
       </div>
-      {tier ? (
+      {typeof u.verity_score === 'number' ? (
         <div
           style={{
             marginTop: S[3],
@@ -559,8 +555,7 @@ function IdentityRailCard({
             fontWeight: 500,
           }}
         >
-          {tier.display_name ?? tier.name}
-          {typeof u.verity_score === 'number' ? ` · ${u.verity_score.toLocaleString()}` : ''}
+          {u.verity_score.toLocaleString()} pts
         </div>
       ) : null}
       {preview ? (

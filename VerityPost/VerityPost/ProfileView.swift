@@ -29,7 +29,6 @@ import Supabase
 //   - users.verity_score / quizzes_completed_count / comment_count /
 //     followers_count / following_count / display_name / bio
 //     — loaded by AuthViewModel.loadUser
-//   - score_tiers — live query, cached per screen
 //   - reading_log / quiz_attempts / comments — activity feed
 //   - user_achievements + achievements — badge showcase
 //   - comment_votes — per-category upvote tally (milestones tab)
@@ -99,8 +98,6 @@ struct ProfileView: View {
     /// user_achievements rows. Empty value means locked.
     @State private var earnedMap: [String: Date] = [:]
     @State private var achievementsLoaded = false
-    @State private var scoreTiers: [ScoreTierRow] = []
-    @State private var scoreTiersLoaded = false
 
     // Expansion state (milestones / categories drilldown)
     @State private var expandedCat: String? = nil
@@ -187,7 +184,6 @@ struct ProfileView: View {
             _ = await refreshTask?.value
         }
         .task { await SettingsService.shared.loadIfNeeded() }
-        .task { await loadScoreTiers() }
         .task {
             if let uid = auth.currentUser?.id {
                 async let a: Void = loadActivity(userId: uid)
@@ -836,7 +832,7 @@ struct ProfileView: View {
                     Text("A preview of your public card. Share it on socials or link to your public profile.")
                         .font(.caption)
                         .foregroundColor(VP.dim)
-                    profileCardPreview(user: user, tierColor: tierColorFor(score: user.verityScore ?? 0))
+                    profileCardPreview(user: user)
                     HStack(spacing: 8) {
                         if let cardURL = profileCardURL(for: uname) {
                             Link(destination: cardURL) {
@@ -939,19 +935,15 @@ struct ProfileView: View {
         .buttonStyle(.plain)
     }
 
-    private func profileCardPreview(user: VPUser, tierColor: Color) -> some View {
+    private func profileCardPreview(user: VPUser) -> some View {
         HStack(spacing: 12) {
             AvatarView(user: user, size: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(profileCardTitle(user))
                     .font(.system(.subheadline, design: .default, weight: .semibold))
                     .foregroundColor(VP.text)
-                HStack(spacing: 4) {
-                    if let uname = user.username { Text("@\(uname)").font(.caption).foregroundColor(VP.dim) }
-                    Text("·").font(.caption).foregroundColor(VP.dim)
-                    Text(tierFor(score: user.verityScore ?? 0)?.displayName ?? "Newcomer")
-                        .font(.system(.caption, design: .default, weight: .semibold))
-                        .foregroundColor(tierColor)
+                if let uname = user.username {
+                    Text("@\(uname)").font(.caption).foregroundColor(VP.dim)
                 }
                 HStack(spacing: 10) {
                     inlineStat(value: "\((user.verityScore ?? 0).formatted())", label: "score")
@@ -1294,58 +1286,10 @@ struct ProfileView: View {
         .opacity(unlocked ? 1 : 0.5)
     }
 
-    // MARK: - Milestones tab (tier-progress + achievement grid)
+    // MARK: - Milestones tab (achievement grid)
     @ViewBuilder
     private func milestonesTab(_ user: VPUser) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            let score = user.verityScore ?? 0
-            let current = tierFor(score: score)
-            let next = nextTier(after: current)
-            // Owner rule: no color-per-tier — neutral palette token only.
-            let tierColor = VP.inkMuted
-            let tierLabel = current?.displayName ?? "Newcomer"
-            let minScore = current?.minScore ?? 0
-            let range = (next?.minScore ?? 0) - minScore
-            let progress: Double = (next == nil || range <= 0) ? 1.0 : min(1.0, max(0.0, Double(score - minScore) / Double(range)))
-
-            VStack(alignment: .leading, spacing: 8) {
-                sectionTitle("Tier progress")
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(tierLabel)
-                                .font(.system(.subheadline, design: .default, weight: .bold))
-                                .foregroundColor(VP.text)
-                            Text(tierProgressSubtitle(score: score, next: next))
-                                .font(.caption2)
-                                .foregroundColor(VP.dim)
-                        }
-                        Spacer()
-                        Text("\(score.formatted()) pts")
-                            .font(.system(.caption, design: .default, weight: .semibold))
-                            .foregroundColor(tierColor)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: VP.radiusFull).stroke(tierColor, lineWidth: 1)
-                            )
-                    }
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 3).fill(VP.border).frame(height: 6)
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(tierColor)
-                                .frame(width: geo.size.width * CGFloat(progress), height: 6)
-                        }
-                    }
-                    .frame(height: 6)
-                }
-                .padding(14)
-                .background(VP.card)
-                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
-                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-            }
-
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline) {
                     sectionTitle("Achievements")
@@ -1453,12 +1397,6 @@ struct ProfileView: View {
         .opacity(isEarned ? 1 : 0.55)
     }
 
-    private func tierProgressSubtitle(score: Int, next: ScoreTierRow?) -> String {
-        guard let next = next else { return "Top tier reached" }
-        let delta = max(0, next.minScore - score)
-        return "\(delta.formatted()) points to \(next.displayName)"
-    }
-
     private static let achFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"; return f
     }()
@@ -1493,61 +1431,6 @@ struct ProfileView: View {
         .padding(.bottom, 100)
     }
 
-    // MARK: - Tier helpers (score_tiers)
-    struct ScoreTierRow: Decodable, Identifiable {
-        let key: String
-        let displayName: String
-        let minScore: Int
-        let colorHex: String?
-        let sortOrder: Int?
-        var id: String { key }
-        enum CodingKeys: String, CodingKey {
-            case key
-            case displayName = "display_name"
-            case minScore = "min_score"
-            case colorHex = "color_hex"
-            case sortOrder = "sort_order"
-        }
-    }
-
-    private func tierFor(score: Int) -> ScoreTierRow? {
-        var best: ScoreTierRow? = nil
-        for t in scoreTiers where t.minScore <= score {
-            if best == nil || t.minScore > (best?.minScore ?? Int.min) { best = t }
-        }
-        return best
-    }
-
-    private func nextTier(after current: ScoreTierRow?) -> ScoreTierRow? {
-        let currentMin = current?.minScore ?? -1
-        let sorted = scoreTiers.sorted { $0.minScore < $1.minScore }
-        return sorted.first(where: { $0.minScore > currentMin })
-    }
-
-    /// Owner rule: tiers don't get distinct hues. Every tier badge / ring
-    /// renders in `VP.muted`. Helper kept so callers don't need to reach
-    /// for the palette token directly (and so a future polish pass that
-    /// wants to opacity-vary the muted token can land in one place).
-    private func tierColorFor(score: Int) -> Color {
-        _ = tierFor(score: score)
-        return VP.muted
-    }
-
-    private func loadScoreTiers() async {
-        do {
-            let rows: [ScoreTierRow] = try await client.from("score_tiers")
-                .select("key, display_name, min_score, color_hex, sort_order")
-                .eq("is_active", value: true)
-                .order("min_score", ascending: true)
-                .execute().value
-            scoreTiers = rows
-        } catch { Log.d("Load score_tiers error: \(error)") }
-        // Always set the loaded flag — even on failure we want the hero to
-        // exit the skeleton state and render a "Newcomer" fallback rather
-        // than spin forever if score_tiers ever 404s.
-        scoreTiersLoaded = true
-    }
-
     // MARK: - Refresh (pull-to-refresh)
     private func refreshAll() async {
         guard let uid = auth.currentUser?.id else { return }
@@ -1557,9 +1440,8 @@ struct ProfileView: View {
         async let a: Void = loadActivity(userId: uid)
         async let c: Void = loadCategories(userId: uid)
         async let ach: Void = loadAchievements(userId: uid)
-        async let t: Void = loadScoreTiers()
         async let u: Void = auth.loadUser(id: uid)
-        _ = await (a, c, ach, t, u)
+        _ = await (a, c, ach, u)
     }
 
     // MARK: - Tab-triggered data loading

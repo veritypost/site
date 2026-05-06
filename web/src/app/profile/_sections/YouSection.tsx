@@ -1,8 +1,7 @@
 // "You" — the new home of the profile experience. Replaces the legacy
 // dashboard tabs. Three blocks:
-//   1. Tier progress (the most loaded daily question — "where am I")
-//   2. Numbers grid (score / quizzes / comments / followers)
-//   3. What's next — contextual nudges that swap based on bookmarks,
+//   1. Numbers grid (score / quizzes / comments / followers)
+//   2. What's next — contextual nudges that swap based on bookmarks,
 //      expert queue, etc.
 // Activity / Categories / Milestones aren't tabs anymore — they're sections
 // of their own in the rail, reachable directly.
@@ -12,9 +11,7 @@
 import Link from 'next/link';
 
 import type { Tables } from '@/types/database-helpers';
-import type { ScoreTier } from '@/lib/scoreTiers';
 
-import { TierProgress } from '../_components/TierProgress';
 import { StatTile } from '../_components/StatTile';
 import { C, F, FONT, R, S, SH } from '../_lib/palette';
 
@@ -22,8 +19,6 @@ type UserRow = Tables<'users'>;
 
 interface Props {
   user: UserRow;
-  tier: ScoreTier | null;
-  next: ScoreTier | null;
   perms: {
     bookmarksList: boolean;
     messagesInbox: boolean;
@@ -34,7 +29,7 @@ interface Props {
   };
 }
 
-export function YouSection({ user, tier, next, perms }: Props) {
+export function YouSection({ user, perms }: Props) {
   const u = user as UserRow & {
     verity_score?: number | null;
     quizzes_completed_count?: number | null;
@@ -45,15 +40,12 @@ export function YouSection({ user, tier, next, perms }: Props) {
   };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: S[5], fontFamily: FONT.sans }}>
-      <TierProgress score={u.verity_score ?? 0} current={tier} next={next} />
-
       <section>
         <h2 style={sectionHeading}>Your numbers</h2>
         <div className="redesign-stat-grid" style={{ gap: S[5] }}>
           <StatTile
             label="Verity Score"
             value={u.verity_score ?? 0}
-            hint={tier ? `${tier.display_name ?? tier.name} tier` : 'No tier yet'}
           />
           <StatTile label="Quizzes" value={u.quizzes_completed_count ?? 0} />
           <StatTile label="Comments" value={u.comment_count ?? 0} />

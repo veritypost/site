@@ -69,7 +69,6 @@ interface CommentRowProps {
   comment: EnrichedComment;
   replies?: ReactNode[];
   currentUserId?: string | null;
-  currentUserTier?: string;
   currentUserVerified?: boolean;
   authorCategoryScore?: number | null;
   articleId: string;
@@ -186,7 +185,6 @@ export default function CommentRow({
   comment,
   replies = [],
   currentUserId,
-  currentUserTier,
   currentUserVerified = true,
   authorCategoryScore,
   articleId,
@@ -941,7 +939,6 @@ export default function CommentRow({
               <CommentComposer
                 articleId={articleId}
                 parentId={comment.id}
-                currentUserTier={currentUserTier}
                 onPosted={(c) => {
                   setReplyOpen(false);
                   onReplied?.(c);

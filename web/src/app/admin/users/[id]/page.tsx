@@ -19,8 +19,6 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { ADMIN_ROLES } from '@/lib/roles';
-import { getScoreTiers, tierFor, type ScoreTier } from '@/lib/scoreTiers';
-
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
 import Button from '@/components/admin/Button';
@@ -81,8 +79,6 @@ export default function UserDossierPage() {
   const [actionsOn, setActionsOn] = useState<AuditRow[]>([]);
   const [actionsBy, setActionsBy] = useState<AuditRow[]>([]);
   const [warnings, setWarnings] = useState<WarningRow[]>([]);
-  const [scoreTiers, setScoreTiers] = useState<ScoreTier[]>([]);
-
   async function refreshUser() {
     if (!userId) return;
     const { data } = await supabase
@@ -120,7 +116,6 @@ export default function UserDossierPage() {
         actionsOnRes,
         actionsByRes,
         warningsRes,
-        tiersRes,
       ] = await Promise.all([
         supabase
           .from('users')
@@ -155,7 +150,6 @@ export default function UserDossierPage() {
           .select('*, issuer:issued_by(username)')
           .eq('user_id', userId)
           .order('created_at', { ascending: false }),
-        getScoreTiers(supabase),
       ]);
 
       if (userRes.error || !userRes.data) {
@@ -169,7 +163,6 @@ export default function UserDossierPage() {
       setActionsOn((actionsOnRes.data || []) as unknown as AuditRow[]);
       setActionsBy((actionsByRes.data || []) as unknown as AuditRow[]);
       setWarnings((warningsRes.data || []) as unknown as WarningRow[]);
-      setScoreTiers(tiersRes);
       setLoading(false);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -234,8 +227,6 @@ export default function UserDossierPage() {
   const roleNames = ((user.user_roles || []) as Array<{ roles: { name: string } | null }>)
     .map((r) => r.roles?.name).filter(Boolean) as string[];
   const planName = user.plans?.display_name || user.plans?.name || 'free';
-  const tier = tierFor(user.verity_score, scoreTiers);
-  const tierColor = tier?.color_hex || ADMIN_C.muted;
   const initial = ((user.username || '?')[0] || '?').toUpperCase();
 
   return (
@@ -267,13 +258,13 @@ export default function UserDossierPage() {
               width: 56,
               height: 56,
               borderRadius: '50%',
-              border: `3px solid ${tierColor}`,
+              border: `3px solid ${ADMIN_C.muted}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: F.xl,
               fontWeight: 700,
-              color: tierColor,
+              color: ADMIN_C.muted,
               flexShrink: 0,
             }}
           >
@@ -283,7 +274,6 @@ export default function UserDossierPage() {
             <div style={{ fontSize: F.lg, fontWeight: 700, color: ADMIN_C.ink }}>{user.username || '—'}</div>
             <div style={{ fontSize: F.sm, color: ADMIN_C.dim, marginTop: 2 }}>{user.email}</div>
             <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap', marginTop: S[2] }}>
-              <Badge size="xs" style={{ color: tierColor }}>{tier?.display_name || 'Newcomer'}</Badge>
               <Badge size="xs">{planName}</Badge>
               {roleNames.length === 0
                 ? <Badge size="xs">role: user</Badge>

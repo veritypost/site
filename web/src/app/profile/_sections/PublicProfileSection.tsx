@@ -14,8 +14,6 @@ import Avatar from '@/components/Avatar';
 import { createClient } from '@/lib/supabase/client';
 import type { Json } from '@/types/database';
 import type { Tables } from '@/types/database-helpers';
-import type { ScoreTier } from '@/lib/scoreTiers';
-
 import { Card } from '../_components/Card';
 import { Field, buttonPrimaryStyle, textareaStyle } from '../_components/Field';
 import { useToast } from '../_components/Toast';
@@ -26,12 +24,11 @@ type UserRow = Tables<'users'>;
 
 interface Props {
   user: UserRow;
-  tier: ScoreTier | null;
   preview: boolean;
   onUserUpdated?: (next: UserRow) => void;
 }
 
-export function PublicProfileSection({ user, tier, preview, onUserUpdated }: Props) {
+export function PublicProfileSection({ user, preview, onUserUpdated }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const toast = useToast();
 
@@ -46,7 +43,6 @@ export function PublicProfileSection({ user, tier, preview, onUserUpdated }: Pro
     expert_title?: string | null;
     expert_organization?: string | null;
     is_verified_public_figure?: boolean | null;
-    verity_score?: number | null;
   };
 
   const [bio, setBio] = useState(u.bio ?? '');
@@ -162,30 +158,9 @@ export function PublicProfileSection({ user, tier, preview, onUserUpdated }: Pro
             {/* T351 — empty-bio prompt removed; the textarea below has its
                 own placeholder ("Tell people what you read about…") which
                 serves the same role without duplicating the call-to-fill. */}
-            {tier ? (
-              <div
-                style={{
-                  marginTop: S[3],
-                  display: 'flex',
-                  gap: S[2],
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  fontSize: F.sm,
-                  color: C.inkMuted,
-                  fontWeight: 500,
-                }}
-              >
-                <span>
-                  {tier.display_name ?? tier.name}
-                  {typeof u.verity_score === 'number'
-                    ? ` · ${u.verity_score.toLocaleString()}`
-                    : ''}
-                </span>
-                {visibility === 'private' ? (
-                  <span style={privatePill}>Private</span>
-                ) : visibility === 'hidden' ? (
-                  <span style={privatePill}>Hidden</span>
-                ) : null}
+            {(visibility === 'private' || visibility === 'hidden') ? (
+              <div style={{ marginTop: S[3] }}>
+                <span style={privatePill}>{visibility === 'hidden' ? 'Hidden' : 'Private'}</span>
               </div>
             ) : null}
             {user.username && visibility === 'public' ? (

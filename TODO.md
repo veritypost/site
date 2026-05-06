@@ -146,7 +146,25 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 ---
 
-## Pending owner action (not code)
+## Bookmarks → Follow (story subscription)
+
+- 43: Rename "Bookmark" to "Follow" everywhere and wire up story-update surfacing.
+
+  **Concept shift:** Bookmarking saves an article. Following subscribes to a story — you want to know when new articles drop on that story. The `/following` page framework already shows stories you've read from; make it the canonical "stories you're following" page.
+
+  **Rename (copy + UI only, no schema change):**
+  - `web/src/components/BookmarkButton.tsx` — button label "Bookmark"/"Saved" → "Follow"/"Following"; icon can stay or swap to a bell/pin
+  - `web/src/app/bookmarks/page.tsx` — page title + empty state copy → "Following" / "Stories you're following"
+  - Rail nav label "Bookmarks" → "Following" (wherever the rail item is defined in `ProfileApp.tsx` or `AppShell.tsx`)
+  - `web/src/app/following/page.tsx` — currently shows reading-history stories; merge or redirect so there's one canonical Following page, not two
+  - iOS: `BookmarkButton` equivalent label + Bookmarks tab in profile rail → "Following"
+  - iOS Kids: not applicable (no bookmarks/following)
+
+  **Story-update surfacing (new behavior):**
+  - When a new article is published on a story the user follows, surface it. Options: (a) badge/entry in the Activity feed ("New article in a story you follow: [title]"), (b) push notification (iOS), (c) both. Decision needed from owner before implementing this part.
+  - Underlying data: `bookmarks` table already stores `article_id`; to notify on story updates need to know `story_id` — either join through `articles.story_id` or add a `story_id` column to `bookmarks`. The `/following` page already does this join via `reading_log → articles → stories`.
+
+  **Note:** `bookmark_collections`, `bookmarks.note.add`, `bookmarks.export` permissions exist — keep them alive, just rename the UI label. Do not drop the schema.
 
 - 19: Apply `supabase/migrations/20260503000007_backfill_unknown_sources_to_null.sql` — 4 "Unknown" source rows in prod still render legacy values until it runs
 - 20: Verity Monthly Stripe price: plans.verity_monthly has stripe_price_id=NULL — owner must click Mint at /admin/plans

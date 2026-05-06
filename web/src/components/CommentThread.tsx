@@ -57,7 +57,6 @@ interface CommentThreadProps {
   articleId: string;
   articleCategoryId?: string | null;
   currentUserId?: string | null;
-  currentUserTier?: string;
   // Signature moment per Future Projects/13_QUIZ_UNLOCK_MOMENT.md.
   // Set true ONLY on the first reveal after the reader passes the quiz
   // in this session — the first five comments fade in 50ms-staggered.
@@ -96,7 +95,6 @@ export default function CommentThread({
   articleId,
   articleCategoryId,
   currentUserId,
-  currentUserTier,
   justRevealed = false,
   emptyStateExtra,
   quizPassed = false,
@@ -923,7 +921,6 @@ export default function CommentThread({
         comment={enriched}
         replies={kids as ReactNode[]}
         currentUserId={currentUserId}
-        currentUserTier={currentUserTier}
         authorCategoryScore={canViewScore ? authorScores[c.user_id] : null}
         articleId={articleId}
         articleCategoryId={articleCategoryId}
@@ -1019,7 +1016,6 @@ export default function CommentThread({
       {currentUserId && (
         <CommentComposer
           articleId={articleId}
-          currentUserTier={currentUserTier}
           onPosted={handlePosted}
           autoFocus={justRevealed}
           quizPassed={quizPassed}

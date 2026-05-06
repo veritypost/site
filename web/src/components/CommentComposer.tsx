@@ -13,7 +13,6 @@ type CommentRow = Database['public']['Tables']['comments']['Row'];
 interface CommentComposerProps {
   articleId: string;
   parentId?: string | null;
-  currentUserTier?: string;
   onPosted?: (comment: CommentRow | null) => void;
   onCancel?: () => void;
   autoFocus?: boolean;

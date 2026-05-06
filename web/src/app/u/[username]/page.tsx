@@ -11,7 +11,6 @@ import VerifiedBadge from '@/components/VerifiedBadge';
 import UnderConstruction from '@/components/UnderConstruction';
 import { useToast } from '@/components/Toast';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
-import { getScoreTiers, tierFor, type ScoreTier } from '@/lib/scoreTiers';
 import type { Tables } from '@/types/database-helpers';
 import { PROFILE_REPORT_REASONS } from '@/lib/reportReasons';
 
@@ -34,7 +33,7 @@ const PUBLIC_PROFILE_ENABLED = true;
 //   - Block + Report actions for non-self viewers (POST /api/users/[id]/block,
 //     POST /api/reports). Confirm dialog on Block; Report opens a tiny inline
 //     reason picker.
-//   - Tier pill from `score_tiers` (DB-backed via lib/scoreTiers).
+//   - Verity score from `users.verity_score`.
 //   - banner_url validated as http/https before CSS injection (prevents
 //     `javascript:`/`data:` sneaks via the user-controlled column).
 //   - profile_visibility: only 'private' returns notFound (post-migration 142
@@ -115,7 +114,6 @@ export default function ProfilePage() {
   const [canSeeVerityScore, setCanSeeVerityScore] = useState<boolean>(false);
   const [canShareCard, setCanShareCard] = useState<boolean>(false);
   const [canSeeExpert, setCanSeeExpert] = useState<boolean>(false);
-  const [scoreTiers, setScoreTiers] = useState<ScoreTier[]>([]);
   const [tab, setTab] = useState<FollowsTab>('followers');
   const [following, setFollowing] = useState<boolean>(false);
   const [followers, setFollowers] = useState<UserListItem[]>([]);
@@ -167,8 +165,6 @@ export default function ProfilePage() {
         setCanSeeVerityScore(hasPermission('profile.score.view.other.total'));
         setCanShareCard(hasPermission('profile.card_share'));
         setCanSeeExpert(hasPermission('profile.expert.badge.view'));
-        const tiers = await getScoreTiers(supabase);
-        setScoreTiers(tiers);
       } else {
         // Q1 — anon visitors short-circuit BEFORE the target fetch. We
         // deliberately don't hit the `users` table with an anon RLS read
@@ -385,8 +381,6 @@ export default function ProfilePage() {
   // refs we don't want — keep the regex narrow and explicit.
   const bannerHref =
     target.banner_url && /^https?:\/\//i.test(target.banner_url) ? target.banner_url : null;
-  const tierInfo = tierFor(target.verity_score, scoreTiers);
-
   async function handleConfirmBlock() {
     if (!target) return;
     setBlockBusy(true);
@@ -491,22 +485,6 @@ export default function ProfilePage() {
             >
               {target.display_name || target.username || 'Anonymous'}
               <VerifiedBadge user={target} />
-              {tierInfo && (
-                // Tier renders as plain text in muted ink per
-                // feedback_no_color_per_tier (no hue, no gradient, no border tint).
-                <span
-                  title={`Tier: ${tierInfo.display_name}`}
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: C.dim,
-                    letterSpacing: '0.02em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {tierInfo.display_name}
-                </span>
-              )}
               {me && me.id === target.id && hasPermission('admin.owner_mode') && (
                 <span style={{
                   fontSize: 11,
