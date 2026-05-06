@@ -100,10 +100,6 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 ---
 
-## Notifications
-
-- 27: "Mobile push" toggle shows in Notifications settings on desktop web (`NotificationsCard.tsx:41-44`). The row reads "Time-sensitive notifications on the iOS app. Web is in-app and email only." — the toggle is meaningless on web since push is iOS-only. Decision needed: hide the row entirely on web, or show it read-only/greyed with an explanation that it's controlled from the iOS app.
-
 ---
 
 ## Article surface — bold + sources
