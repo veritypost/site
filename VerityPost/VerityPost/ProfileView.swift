@@ -468,18 +468,30 @@ struct ProfileView: View {
         if permsLoaded && (canViewFollowers || canViewFollowing) {
             HStack(spacing: 8) {
                 if canViewFollowers {
-                    statTile(
-                        label: "Followers",
-                        value: "\((user.followersCount ?? 0).formatted())",
-                        icon: "person.2.fill"
-                    )
+                    NavigationLink {
+                        UserFollowListView(userId: user.id, mode: .followers)
+                            .environmentObject(auth)
+                    } label: {
+                        statTile(
+                            label: "Followers",
+                            value: "\((user.followersCount ?? 0).formatted())",
+                            icon: "person.2.fill"
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
                 if canViewFollowing {
-                    statTile(
-                        label: "Following",
-                        value: "\((user.followingCount ?? 0).formatted())",
-                        icon: "person.crop.circle.badge.plus"
-                    )
+                    NavigationLink {
+                        UserFollowListView(userId: user.id, mode: .following)
+                            .environmentObject(auth)
+                    } label: {
+                        statTile(
+                            label: "Following",
+                            value: "\((user.followingCount ?? 0).formatted())",
+                            icon: "person.crop.circle.badge.plus"
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 16)
@@ -1855,6 +1867,106 @@ struct AvatarQuickEditSheet: View {
                 errorMsg = "Couldn't save. Try again."
                 saving = false
             }
+        }
+    }
+}
+
+// MARK: - Follower / Following list
+
+enum UserFollowMode { case followers, following }
+
+struct UserFollowListView: View {
+    @EnvironmentObject var auth: AuthViewModel
+    let userId: String
+    let mode: UserFollowMode
+    private let client = SupabaseManager.shared.client
+
+    struct FollowUser: Decodable, Identifiable {
+        let id: String
+        let username: String?
+        let avatar_color: String?
+        let avatar_url: String?
+    }
+
+    private struct FollowRow: Decodable {
+        let users: FollowUser?
+    }
+
+    @State private var users: [FollowUser] = []
+    @State private var loaded = false
+    @State private var loadError = false
+
+    var body: some View {
+        Group {
+            if !loaded {
+                ProgressView().frame(maxWidth: .infinity).padding(.top, 60)
+            } else if loadError {
+                VStack(spacing: 8) {
+                    Text("Couldn\u{2019}t load list.")
+                        .font(.system(.callout, design: .default, weight: .semibold))
+                        .foregroundColor(VP.text)
+                    Button("Try again") { loaded = false; loadError = false; Task { await load() } }
+                        .font(.system(.footnote, design: .default, weight: .medium))
+                        .foregroundColor(VP.brand)
+                }
+                .frame(maxWidth: .infinity).padding(.top, 60)
+            } else if users.isEmpty {
+                Text(mode == .followers ? "No followers yet." : "Not following anyone yet.")
+                    .font(.footnote).foregroundColor(VP.dim)
+                    .frame(maxWidth: .infinity).padding(.top, 60)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(users.enumerated()), id: \.element.id) { idx, u in
+                            HStack(spacing: 12) {
+                                AvatarView(
+                                    outerHex: u.avatar_color,
+                                    initials: String(u.username?.prefix(1).uppercased() ?? "?"),
+                                    size: 36
+                                )
+                                Text(u.username ?? "user")
+                                    .font(.system(size: VP.Size.base, weight: .medium))
+                                    .foregroundColor(VP.text)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .overlay(alignment: .bottom) {
+                                if idx < users.count - 1 {
+                                    Rectangle()
+                                        .fill(VP.border.opacity(0.6))
+                                        .frame(height: 1)
+                                        .padding(.leading, 68)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle(mode == .followers ? "Followers" : "Following")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+    }
+
+    private func load() async {
+        do {
+            let fkHint = mode == .followers
+                ? "users!fk_follows_follower_id(id, username, avatar_color, avatar_url)"
+                : "users!fk_follows_following_id(id, username, avatar_color, avatar_url)"
+            let filterKey = mode == .followers ? "following_id" : "follower_id"
+            let rows: [FollowRow] = try await client
+                .from("follows")
+                .select(fkHint)
+                .eq(filterKey, value: userId)
+                .limit(200)
+                .execute().value
+            users = rows.compactMap { $0.users }
+            loaded = true
+        } catch {
+            Log.d("UserFollowListView load error:", error)
+            loadError = true
+            loaded = true
         }
     }
 }

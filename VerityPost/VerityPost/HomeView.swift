@@ -190,6 +190,29 @@ struct HomeView: View {
                                 .padding(.top, 40)
                             }
 
+                            NavigationLink {
+                                RecapListView().environmentObject(auth)
+                            } label: {
+                                HStack {
+                                    Image(systemName: "clock.fill")
+                                        .font(.system(size: VP.Size.sm, weight: .semibold))
+                                        .foregroundColor(VP.brand)
+                                    Text("See all recaps")
+                                        .font(.system(size: VP.Size.base, weight: .semibold))
+                                        .foregroundColor(VP.text)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: VP.Size.sm, weight: .semibold))
+                                        .foregroundColor(VP.muted)
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 16)
+                                .background(VP.card)
+                                .overlay(Rectangle().fill(VP.border).frame(height: 1), alignment: .top)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.top, 32)
+
                         }
                     }
                     .navigationDestination(for: Story.self) { story in

@@ -338,13 +338,29 @@ export function BillingCard({ user, preview }: Props) {
   }
 
   // Owner Mode short-circuit. Replaces both the free-tier upsell branch
-  // below and the cancel/portal/change-plan block. Hides every
-  // billing-mutation surface so Owner Mode holders never see a "Cancel"
-  // CTA on a phantom subscription.
+  // below and the cancel/portal/change-plan block. When the owner also has
+  // a real Stripe subscription (e.g. testing the billing flow), surface a
+  // minimal portal link so they can cancel it — the normal cancel button is
+  // hidden by this branch.
   if (isOwnerMode) {
+    const hasRealStripeSub = !loading && sub?.platform === 'stripe';
     return (
       <Card title="Plan" description="Full access (no subscription required).">
-        {null}
+        {hasRealStripeSub && (
+          <div style={{ fontFamily: FONT.sans, display: 'flex', flexDirection: 'column', gap: S[2] }}>
+            <p style={{ margin: 0, fontSize: F.sm, color: C.inkMuted }}>
+              You have an active Stripe subscription. Manage or cancel it through the billing portal.
+            </p>
+            <button
+              type="button"
+              onClick={openPortal}
+              disabled={!!busy}
+              style={{ ...buttonSecondaryStyle, alignSelf: 'flex-start' }}
+            >
+              {busy === 'portal' ? 'Opening…' : 'Manage in Stripe portal'}
+            </button>
+          </div>
+        )}
       </Card>
     );
   }
