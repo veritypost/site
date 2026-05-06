@@ -109,7 +109,15 @@ final class PushRegistration: NSObject, UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let info = response.notification.request.content.userInfo
-        let slug = (info["story_slug"] as? String) ?? (info["article_slug"] as? String)
+        // Server sends action_url (e.g. https://veritypost.com/story/<slug>).
+        // Fall back to legacy story_slug / article_slug keys for older payloads.
+        let slug: String?
+        if let actionUrlStr = info["action_url"] as? String,
+           let actionUrl = URL(string: actionUrlStr) {
+            slug = ArticleRouter.slug(from: actionUrl)
+        } else {
+            slug = (info["story_slug"] as? String) ?? (info["article_slug"] as? String)
+        }
         if let slug, !slug.isEmpty {
             NotificationCenter.default.post(
                 name: .vpOpenStory,

@@ -314,6 +314,11 @@ struct MainTabView: View {
         .onChange(of: articleRouter.pendingSlug) { _, slug in
             consumePendingSlugIfReady(slug: slug)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .vpOpenStory)) { note in
+            if let slug = note.userInfo?["slug"] as? String {
+                articleRouter.pendingSlug = slug
+            }
+        }
         .onChange(of: auth.currentUser?.username) { _, _ in
             // Item 13 — when the first-login username sheet finishes,
             // currentUser.username flips from nil/empty to the picked
