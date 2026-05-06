@@ -1130,12 +1130,6 @@ struct StoryDetailView: View {
 
     private var quizHeader: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("BEFORE YOU DISCUSS")
-                    .font(.system(.caption2, design: .default, weight: .bold))
-                    .tracking(1)
-                    .foregroundColor(VP.dim)
-            }
             Spacer()
             if !quizQuestions.isEmpty {
                 HStack(spacing: 5) {

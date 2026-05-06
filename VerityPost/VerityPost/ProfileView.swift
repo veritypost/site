@@ -603,7 +603,7 @@ struct ProfileView: View {
                     .foregroundColor(VP.danger)
                     .padding(.vertical, 8)
             } else if top3.isEmpty {
-                Text("No activity yet. Read an article or leave a comment.")
+                Text("No activity yet.")
                     .font(.caption)
                     .foregroundColor(VP.dim)
                     .padding(.vertical, 8)
@@ -841,9 +841,6 @@ struct ProfileView: View {
             if canViewCard, let uname = user.username, !uname.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     sectionTitle("Profile card")
-                    Text("A preview of your public card. Share it on socials or link to your public profile.")
-                        .font(.caption)
-                        .foregroundColor(VP.dim)
                     profileCardPreview(user: user)
                     HStack(spacing: 8) {
                         if let cardURL = profileCardURL(for: uname) {
@@ -1029,13 +1026,6 @@ struct ProfileView: View {
                     description: "There was a problem loading your activity. Pull to refresh."
                 )
             } else {
-                if !canViewActivityFullHistory {
-                    Text("Showing last 30 days.")
-                        .font(.caption)
-                        .foregroundColor(VP.dim)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 4)
-                }
                 let filtered = filteredActivityItems()
                 if filtered.isEmpty {
                     VStack(spacing: 10) {
