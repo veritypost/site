@@ -174,7 +174,7 @@ export default function FamilyDashboard() {
       </a>
       <h1 style={{ fontSize: 22, fontWeight: 700, margin: '6px 0' }}>Family dashboard</h1>
       <div style={{ fontSize: 12, color: C.dim, marginBottom: 20 }}>
-        Private to your household (D24). Nobody outside the family sees any of this.
+        Private to your household. Nobody outside the family sees any of this.
       </div>
 
       {/* Phase 6 of AI + Plan Change Implementation: family seat summary card. */}
