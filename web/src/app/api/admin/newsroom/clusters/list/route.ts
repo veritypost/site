@@ -359,7 +359,24 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Could not load runs' }, { status: 500 });
   }
 
-  // 6. Resolve feed source_name in one batched lookup.
+  // 6. Resolve category names in one batched lookup.
+  const categoryIds = Array.from(
+    new Set(page.map((c) => c.category_id).filter((id): id is string => !!id))
+  );
+  let categoryMap = new Map<string, string>();
+  if (categoryIds.length > 0) {
+    const { data: catRows, error: catErr } = await service
+      .from('categories')
+      .select('id, name')
+      .in('id', categoryIds);
+    if (catErr) {
+      console.error('[newsroom.clusters.list.categories]', catErr.message);
+    } else {
+      categoryMap = new Map((catRows as Array<{ id: string; name: string }>).map((r) => [r.id, r.name]));
+    }
+  }
+
+  // 6b. Resolve feed source_name in one batched lookup.
   const feedIds = Array.from(
     new Set((discoveryRes.data as DiscoveryRow[]).map((d) => d.feed_id).filter((id): id is string => !!id))
   );
@@ -474,6 +491,8 @@ export async function GET(req: Request) {
         is_breaking: c.is_breaking ?? false,
         is_active: c.is_active ?? true,
         category_id: c.category_id,
+        category_name: c.category_id ? (categoryMap.get(c.category_id) ?? null) : null,
+        subcategory_name: null,
         keywords: c.keywords ?? [],
         created_at: c.created_at,
         updated_at: c.updated_at,

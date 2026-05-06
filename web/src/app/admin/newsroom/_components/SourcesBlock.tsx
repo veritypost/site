@@ -28,7 +28,7 @@ type Props = {
 };
 
 export default function SourcesBlock({ sources, selectedUrls, onToggle, onRemove }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   const outlets = useMemo(() => {

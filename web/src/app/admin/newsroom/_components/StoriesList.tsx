@@ -12,19 +12,20 @@
  *   ?from=<ISO> ?to=<ISO> first_seen date range
  *   ?job=<uuid>           scope to a single research_jobs.id (banner shown)
  *   ?dq=<text>            free-text title/slug search
- *   ?story=<uuid>         opens StoryDetailDrawer for that id
+ *   ?cat=<uuid>           category filter
+ *   ?subcat=<uuid>        subcategory filter
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Button from '@/components/admin/Button';
 import Select from '@/components/admin/Select';
 import TextInput from '@/components/admin/TextInput';
 import EmptyState from '@/components/admin/EmptyState';
 import Spinner from '@/components/admin/Spinner';
-import Badge from '@/components/admin/Badge';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
-import StoryDetailDrawer from './StoryDetailDrawer';
+import { MODEL_OPTIONS } from '@/lib/newsroomModels';
+import { createClient } from '@/lib/supabase/client';
 
 type Band = 'adult' | 'tweens' | 'kids';
 
@@ -48,6 +49,10 @@ type StoryRow = {
   observation_count: number;
   source_count: number;
   articles: StoryArticleRollup[];
+  category_name?: string | null;
+  subcategory_name?: string | null;
+  ai_suggested_headline?: string | null;
+  ai_suggested_slug?: string | null;
 };
 
 type ListResponse = {
@@ -61,6 +66,28 @@ type SavedQuery = {
   query_text: string;
 };
 
+type CategoryRow = {
+  id: string;
+  name: string;
+  parent_id: string | null;
+};
+
+type SourceItem = {
+  id: string;
+  url: string;
+  title: string | null;
+  outlet: string | null;
+};
+
+type DetailResponse = {
+  observations: SourceItem[];
+};
+
+type StorySearchResult = {
+  id: string;
+  title: string;
+};
+
 const STATE_FILTERS = [
   { value: 'forming', label: 'Forming' },
   { value: 'clustered', label: 'Clustered' },
@@ -71,54 +98,33 @@ const STATE_FILTERS = [
   { value: 'archived', label: 'Archived' },
 ] as const;
 
-function fmtDate(iso: string | null): string {
+type BandGenState = 'idle' | 'generating' | 'generated' | 'failed';
+
+function fmtRelative(iso: string | null): string {
   if (!iso) return '—';
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const diffS = Math.floor(diffMs / 1000);
+    if (diffS < 60) return 'just now';
+    const diffM = Math.floor(diffS / 60);
+    if (diffM < 60) return `${diffM}m ago`;
+    const diffH = Math.floor(diffM / 60);
+    if (diffH < 24) return `${diffH}h ago`;
+    const diffD = Math.floor(diffH / 24);
+    if (diffD < 30) return `${diffD}d ago`;
+    const diffW = Math.floor(diffD / 7);
+    if (diffD < 60) return `${diffW}w ago`;
+    const diffMo = Math.floor(diffD / 30);
+    return `${diffMo}mo ago`;
   } catch {
     return '—';
   }
 }
 
-function bandLabel(band: Band): string {
-  if (band === 'adult') return 'Adult';
+function bandDisplayLabel(band: Band): string {
+  if (band === 'adult') return 'Adults';
   if (band === 'tweens') return 'Tweens';
   return 'Kids';
-}
-
-function bandBadgeVariant(state: StoryArticleRollup['state']): 'success' | 'warn' | 'neutral' | 'danger' {
-  switch (state) {
-    case 'published':
-      return 'success';
-    case 'draft':
-      return 'warn';
-    case 'archived':
-      return 'danger';
-    default:
-      return 'neutral';
-  }
-}
-
-function generationBadgeVariant(state: string | null): 'success' | 'warn' | 'neutral' | 'danger' | 'info' {
-  switch (state) {
-    case 'published':
-      return 'success';
-    case 'generating':
-    case 'ready':
-      return 'info';
-    case 'forming':
-    case 'clustered':
-      return 'warn';
-    case 'rejected':
-    case 'archived':
-      return 'danger';
-    default:
-      return 'neutral';
-  }
 }
 
 export default function StoriesList({ selectedModelIdx = 0 }: { selectedModelIdx?: number }) {
@@ -131,7 +137,8 @@ export default function StoriesList({ selectedModelIdx = 0 }: { selectedModelIdx
   const dateTo = sp.get('to') ?? '';
   const job = sp.get('job') ?? '';
   const dq = sp.get('dq') ?? '';
-  const openStoryId = sp.get('story') ?? '';
+  const cat = sp.get('cat') ?? '';
+  const subcat = sp.get('subcat') ?? '';
 
   const [dqInput, setDqInput] = useState(dq);
   useEffect(() => {
@@ -152,8 +159,29 @@ export default function StoriesList({ selectedModelIdx = 0 }: { selectedModelIdx
   const [error, setError] = useState<string | null>(null);
 
   const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([]);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
 
-  // Load saved queries for the dropdown
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+    void (async () => {
+      try {
+        const { data } = await supabase
+          .from('categories')
+          .select('id, name, parent_id')
+          .is('deleted_at', null)
+          .order('name');
+        if (cancelled) return;
+        setCategories((data as CategoryRow[] | null) ?? []);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     fetch('/api/admin/newsroom/research/queries')
@@ -177,9 +205,11 @@ export default function StoriesList({ selectedModelIdx = 0 }: { selectedModelIdx
       if (dateTo) params.set('date_to', dateTo);
       if (job) params.set('job', job);
       if (dq) params.set('q', dq);
+      if (cat) params.set('category_id', cat);
+      if (subcat) params.set('subcategory_id', subcat);
       return params.toString();
     },
-    [rq, gsRaw, dateFrom, dateTo, job, dq],
+    [rq, gsRaw, dateFrom, dateTo, job, dq, cat, subcat],
   );
 
   const reload = useCallback(async () => {
@@ -241,14 +271,6 @@ export default function StoriesList({ selectedModelIdx = 0 }: { selectedModelIdx
     setParam('job', null);
   }
 
-  function openStory(id: string) {
-    setParam('story', id);
-  }
-
-  function closeStory() {
-    setParam('story', null);
-  }
-
   const queryNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const sq of savedQueries) {
@@ -257,9 +279,18 @@ export default function StoriesList({ selectedModelIdx = 0 }: { selectedModelIdx
     return map;
   }, [savedQueries]);
 
+  const topCategories = useMemo(
+    () => categories.filter((c) => c.parent_id === null),
+    [categories],
+  );
+
+  const subcategories = useMemo(
+    () => (cat ? categories.filter((c) => c.parent_id === cat) : []),
+    [categories, cat],
+  );
+
   return (
     <div>
-      {/* Job-scope banner */}
       {job && (
         <div
           style={{
@@ -283,7 +314,6 @@ export default function StoriesList({ selectedModelIdx = 0 }: { selectedModelIdx
         </div>
       )}
 
-      {/* Filter row */}
       <div
         style={{
           display: 'flex',
@@ -327,6 +357,46 @@ export default function StoriesList({ selectedModelIdx = 0 }: { selectedModelIdx
             </option>
           ))}
         </Select>
+        <Select
+          value={cat}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+            const next = e.target.value || null;
+            const params = new URLSearchParams(sp.toString());
+            if (next) params.set('cat', next);
+            else params.delete('cat');
+            params.delete('subcat');
+            const qs = params.toString();
+            router.replace(qs ? `?${qs}` : '?', { scroll: false });
+          }}
+          block={false}
+          style={{ minWidth: 150, minHeight: 40 }}
+          aria-label="Category"
+        >
+          <option value="">All categories</option>
+          {topCategories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </Select>
+        {cat && subcategories.length > 0 && (
+          <Select
+            value={subcat}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+              setParam('subcat', e.target.value || null)
+            }
+            block={false}
+            style={{ minWidth: 150, minHeight: 40 }}
+            aria-label="Subcategory"
+          >
+            <option value="">All subcategories</option>
+            {subcategories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        )}
         <input
           type="date"
           value={dateFrom}
@@ -378,13 +448,13 @@ export default function StoriesList({ selectedModelIdx = 0 }: { selectedModelIdx
         />
       ) : (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
             {stories.map((s) => (
-              <StoryRowItem
+              <StoryCard
                 key={s.id}
                 story={s}
-                queryName={s.research_query_id ? queryNameById.get(s.research_query_id) ?? null : null}
-                onOpen={() => openStory(s.id)}
+                selectedModelIdx={selectedModelIdx}
+                onMutated={() => void reload()}
               />
             ))}
           </div>
@@ -397,120 +467,503 @@ export default function StoriesList({ selectedModelIdx = 0 }: { selectedModelIdx
           )}
         </>
       )}
+    </div>
+  );
+}
 
-      {openStoryId && (
-        <StoryDetailDrawer
-          storyId={openStoryId}
-          selectedModelIdx={selectedModelIdx}
-          onClose={closeStory}
-          onMutated={() => {
-            void reload();
+function MovePicker({
+  observationId,
+  sourceStoryId,
+  onMoved,
+  onClose,
+}: {
+  observationId: string;
+  sourceStoryId: string;
+  onMoved: () => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<StorySearchResult[]>([]);
+  const [moving, setMoving] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (debounceRef.current !== undefined) clearTimeout(debounceRef.current);
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams({ q: query.trim(), limit: '10' });
+      fetch(`/api/admin/newsroom/research/stories?${params.toString()}`)
+        .then((res) => res.json())
+        .then((json: { stories?: StorySearchResult[] }) => {
+          setResults(
+            (json.stories ?? []).filter((s) => s.id !== sourceStoryId),
+          );
+        })
+        .catch(() => {});
+    }, 300);
+    return () => {
+      if (debounceRef.current !== undefined) clearTimeout(debounceRef.current);
+    };
+  }, [query, sourceStoryId]);
+
+  async function handleSelect(targetId: string) {
+    if (moving) return;
+    setMoving(true);
+    try {
+      const res = await fetch(
+        `/api/admin/newsroom/research/stories/${sourceStoryId}/move-observation`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ observation_id: observationId, target_story_id: targetId }),
+        },
+      );
+      if (res.ok) {
+        onMoved();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setMoving(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: 4,
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        background: C.bg,
+        padding: S[2],
+        width: 280,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: S[1], marginBottom: S[1] }}>
+        <input
+          autoFocus
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search stories…"
+          style={{
+            flex: 1,
+            fontSize: F.xs,
+            padding: '4px 6px',
+            border: `1px solid ${C.border}`,
+            borderRadius: 4,
+            background: C.bg,
+            color: C.ink,
+            fontFamily: 'inherit',
           }}
         />
+        <button
+          onClick={onClose}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: C.muted,
+            fontSize: F.sm,
+            lineHeight: 1,
+            padding: '2px 4px',
+          }}
+          aria-label="Close"
+        >
+          ×
+        </button>
+      </div>
+      {results.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {results.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => void handleSelect(r.id)}
+              disabled={moving}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: moving ? 'default' : 'pointer',
+                textAlign: 'left',
+                fontSize: F.xs,
+                color: C.ink,
+                padding: '4px 6px',
+                borderRadius: 4,
+                width: '100%',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = C.card;
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = 'none';
+              }}
+            >
+              {r.title}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-function StoryRowItem({
+function StoryCard({
   story,
-  queryName,
-  onOpen,
+  selectedModelIdx,
+  onMutated,
 }: {
   story: StoryRow;
-  queryName: string | null;
-  onOpen: () => void;
+  selectedModelIdx: number;
+  onMutated: () => void;
 }) {
+  const headline = story.ai_suggested_headline ?? story.title;
+  const slug = story.ai_suggested_slug ?? story.slug;
+
+  const [sources, setSources] = useState<SourceItem[] | null>(null);
+  const [sourcesLoading, setSourcesLoading] = useState(true);
+  const [openPickerId, setOpenPickerId] = useState<string | null>(null);
+  const fetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+    fetch(`/api/admin/newsroom/research/stories/${story.id}`)
+      .then((res) => res.json())
+      .then((json: DetailResponse) => {
+        setSources(json.observations ?? []);
+      })
+      .catch(() => {
+        setSources(null);
+      })
+      .finally(() => {
+        setSourcesLoading(false);
+      });
+  }, [story.id]);
+
+  const initialBandStates = useMemo((): Record<Band, BandGenState> => {
+    const result = {} as Record<Band, BandGenState>;
+    for (const a of story.articles) {
+      if (a.state === 'pending') {
+        result[a.band] = 'idle';
+      } else {
+        result[a.band] = 'generated';
+      }
+    }
+    const allBands: Band[] = ['adult', 'tweens', 'kids'];
+    for (const b of allBands) {
+      if (!(b in result)) result[b] = 'idle';
+    }
+    return result;
+  }, [story.articles]);
+
+  const [bandStates, setBandStates] = useState<Record<Band, BandGenState>>(initialBandStates);
+  const [bandRunIds, setBandRunIds] = useState<Partial<Record<Band, string>>>({});
+  const pollTimers = useRef<Partial<Record<Band, ReturnType<typeof setInterval>>>>({});
+
+  useEffect(() => {
+    return () => {
+      for (const timer of Object.values(pollTimers.current)) {
+        if (timer !== undefined) clearInterval(timer);
+      }
+    };
+  }, []);
+
+  function articleIdForBand(band: Band): string | null {
+    return story.articles.find((a) => a.band === band)?.article_id ?? null;
+  }
+
+  async function handleGenerate(band: Band) {
+    if (bandStates[band] === 'generating') return;
+    setBandStates((prev) => ({ ...prev, [band]: 'generating' }));
+
+    try {
+      const { provider, model } = MODEL_OPTIONS[selectedModelIdx] ?? MODEL_OPTIONS[0];
+      const res = await fetch('/api/admin/pipeline/generate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          story_id: story.id,
+          age_band: band,
+          provider,
+          model,
+        }),
+      });
+      const json = (await res.json().catch(() => ({}))) as { run_id?: string; error?: string };
+      if (!res.ok || !json.run_id) {
+        setBandStates((prev) => ({ ...prev, [band]: 'failed' }));
+        return;
+      }
+      const runId = json.run_id;
+      setBandRunIds((prev) => ({ ...prev, [band]: runId }));
+      startPolling(band, runId);
+    } catch {
+      setBandStates((prev) => ({ ...prev, [band]: 'failed' }));
+    }
+  }
+
+  function startPolling(band: Band, runId: string) {
+    if (pollTimers.current[band] !== undefined) {
+      clearInterval(pollTimers.current[band]);
+    }
+    const timer = setInterval(() => {
+      void pollRun(band, runId);
+    }, 2000);
+    pollTimers.current[band] = timer;
+  }
+
+  async function pollRun(band: Band, runId: string) {
+    try {
+      const res = await fetch(`/api/admin/pipeline/runs/${runId}`);
+      if (!res.ok) return;
+      const json = (await res.json().catch(() => ({}))) as { status?: string };
+      const status = json.status;
+      if (status === 'completed' || status === 'done' || status === 'success') {
+        if (pollTimers.current[band] !== undefined) {
+          clearInterval(pollTimers.current[band]);
+          delete pollTimers.current[band];
+        }
+        setBandStates((prev) => ({ ...prev, [band]: 'generated' }));
+        setBandRunIds((prev) => {
+          const next = { ...prev };
+          delete next[band];
+          return next;
+        });
+        onMutated();
+      } else if (status === 'failed' || status === 'error') {
+        if (pollTimers.current[band] !== undefined) {
+          clearInterval(pollTimers.current[band]);
+          delete pollTimers.current[band];
+        }
+        setBandStates((prev) => ({ ...prev, [band]: 'failed' }));
+        setBandRunIds((prev) => {
+          const next = { ...prev };
+          delete next[band];
+          return next;
+        });
+      }
+    } catch {
+      // silently ignore transient poll errors
+    }
+  }
+
+  const allBands: Band[] = ['adult', 'tweens', 'kids'];
+
   return (
     <article
-      onClick={onOpen}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: S[2],
-        padding: `${S[3]}px ${S[4]}px`,
         border: `1px solid ${C.divider}`,
         borderRadius: 10,
         background: C.bg,
-        cursor: 'pointer',
-        transition: 'border-color 120ms',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = C.accent;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = C.divider;
+        overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: S[3] }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 style={{ margin: 0, fontSize: F.md, fontWeight: 600, color: C.ink, lineHeight: 1.35 }}>
-            {story.title}
+      {/* Header section */}
+      <div style={{ padding: `${S[3]}px ${S[4]}px` }}>
+        {/* Top row: headline + timestamp */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: S[3],
+            marginBottom: S[2],
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              fontSize: F.md,
+              fontWeight: 600,
+              color: C.ink,
+              lineHeight: 1.35,
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            {headline}
           </h3>
-          <div style={{ marginTop: S[1], fontSize: F.xs, color: C.dim }}>
-            {queryName ? <span>Query: {queryName} · </span> : null}
-            <span>First seen {fmtDate(story.first_seen_at)}</span>
-            {story.last_observed_at && story.last_observed_at !== story.first_seen_at && (
-              <span> · Last observed {fmtDate(story.last_observed_at)}</span>
-            )}
-          </div>
+          <span
+            style={{
+              fontSize: F.xs,
+              color: C.muted,
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {fmtRelative(story.last_observed_at)}
+          </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: S[2], flexShrink: 0 }}>
-          {story.is_locked && (
-            <Badge variant="warn" size="xs">
-              Locked
-            </Badge>
-          )}
-          {/* Only render the lifecycle badge when it's an explicit end-state
-              the operator set (rejected / archived) or a publish marker.
-              Internal states (forming / clustered / ready / generating)
-              are not surfaced — the card existing IS the "ready to
-              generate" signal. */}
-          {(story.generation_state === 'rejected' ||
-            story.generation_state === 'archived' ||
-            story.generation_state === 'published') && (
-            <Badge variant={generationBadgeVariant(story.generation_state)} size="xs">
-              {story.generation_state}
-            </Badge>
-          )}
+
+        {/* Category, subcategory, slug + band buttons row */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end',
+            gap: S[3],
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {story.category_name && (
+              <span style={{ fontSize: F.xs, color: C.muted }}>{story.category_name}</span>
+            )}
+            {story.subcategory_name && (
+              <span style={{ fontSize: F.xs, color: C.muted }}>{story.subcategory_name}</span>
+            )}
+            <span
+              style={{
+                fontSize: F.xs,
+                color: C.muted,
+                fontFamily: 'monospace',
+              }}
+            >
+              {slug}
+            </span>
+          </div>
+
+          {/* Band generate buttons */}
+          <div style={{ display: 'flex', gap: S[1], flexShrink: 0, flexWrap: 'wrap' }}>
+            {allBands.map((band) => {
+              const state = bandStates[band];
+              const articleId = articleIdForBand(band);
+              const label = bandDisplayLabel(band);
+
+              if (state === 'generating') {
+                return (
+                  <Button key={band} variant="secondary" size="sm" disabled>
+                    Generating…
+                  </Button>
+                );
+              }
+
+              if (state === 'generated' && articleId) {
+                return (
+                  <a
+                    key={band}
+                    href={`/admin/story-manager?article=${articleId}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      fontSize: F.xs,
+                      color: C.muted,
+                      padding: `4px ${S[2]}px`,
+                      border: `1px solid ${C.divider}`,
+                      borderRadius: 6,
+                      textDecoration: 'none',
+                      gap: 4,
+                    }}
+                  >
+                    ✓ {label}
+                  </a>
+                );
+              }
+
+              if (state === 'generated' && !articleId) {
+                return (
+                  <Button
+                    key={band}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleGenerate(band)}
+                  >
+                    {label}
+                  </Button>
+                );
+              }
+
+              if (state === 'failed') {
+                return (
+                  <Button
+                    key={band}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleGenerate(band)}
+                    style={{ color: C.danger, borderColor: C.danger } as React.CSSProperties}
+                  >
+                    Retry
+                  </Button>
+                );
+              }
+
+              return (
+                <Button
+                  key={band}
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void handleGenerate(band)}
+                >
+                  {label}
+                </Button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: S[4], alignItems: 'center', flexWrap: 'wrap', fontSize: F.xs, color: C.muted }}>
-        <span>
-          {story.source_count} {story.source_count === 1 ? 'source' : 'sources'}
-        </span>
-        <span>
-          {story.observation_count} {story.observation_count === 1 ? 'observation' : 'observations'}
-        </span>
-        <div style={{ display: 'flex', gap: S[1], marginLeft: 'auto' }}>
-          {story.articles.map((a) => {
-            // pending = no article exists for this band yet → render
-            // a plain "Generate" affordance (clicking the row opens the
-            // drawer where the actual button lives). Only show a badge
-            // when there's a real article state to convey.
-            if (a.state === 'pending') {
-              return (
-                <Badge key={a.band} variant="neutral" size="xs">
-                  {bandLabel(a.band)}: Generate
-                </Badge>
-              );
-            }
-            return (
-              <Badge key={a.band} variant={bandBadgeVariant(a.state)} size="xs">
-                {bandLabel(a.band)}: {a.state}
-              </Badge>
-            );
-          })}
-        </div>
+      {/* Sources section */}
+      <div
+        style={{
+          borderTop: `1px solid ${C.divider}`,
+          padding: `${S[2]}px ${S[4]}px`,
+        }}
+      >
+        {sourcesLoading ? (
+          <span style={{ fontSize: F.xs, color: C.muted }}>Loading sources…</span>
+        ) : sources && sources.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: S[1] }}>
+            {sources.map((src) => (
+              <div key={src.id}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: S[1] }}>
+                  <span style={{ fontSize: F.sm, color: C.ink, flex: 1, minWidth: 0 }}>
+                    {src.outlet && (
+                      <span style={{ color: C.muted, marginRight: 4 }}>{src.outlet} —</span>
+                    )}
+                    <a
+                      href={src.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      style={{ color: C.accent, textDecoration: 'none' }}
+                    >
+                      {src.title ?? src.url}
+                    </a>
+                  </span>
+                  <button
+                    onClick={() =>
+                      setOpenPickerId((prev) => (prev === src.id ? null : src.id))
+                    }
+                    style={{
+                      background: 'none',
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      fontSize: F.xs,
+                      color: C.muted,
+                      padding: '2px 6px',
+                      flexShrink: 0,
+                    }}
+                  >
+                    Move
+                  </button>
+                </div>
+                {openPickerId === src.id && (
+                  <MovePicker
+                    observationId={src.id}
+                    sourceStoryId={story.id}
+                    onMoved={() => {
+                      setSources((prev) => prev?.filter((s) => s.id !== src.id) ?? null);
+                      setOpenPickerId(null);
+                    }}
+                    onClose={() => setOpenPickerId(null)}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </article>
   );

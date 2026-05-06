@@ -66,6 +66,10 @@ type StoryRow = {
   generation_state: string | null;
   research_query_id: string | null;
   is_locked: boolean;
+  ai_category_id: string | null;
+  ai_subcategory_id: string | null;
+  ai_suggested_headline: string | null;
+  ai_suggested_slug: string | null;
 };
 
 type ObservationCountRow = {
@@ -147,6 +151,12 @@ export async function GET(req: Request) {
   const qRaw = url.searchParams.get('q');
   const q = qRaw ? qRaw.trim().slice(0, 200) : null;
 
+  const categoryIdRaw = url.searchParams.get('category_id');
+  const categoryId = categoryIdRaw && UUID_RE.test(categoryIdRaw) ? categoryIdRaw : null;
+
+  const subcategoryIdRaw = url.searchParams.get('subcategory_id');
+  const subcategoryId = subcategoryIdRaw && UUID_RE.test(subcategoryIdRaw) ? subcategoryIdRaw : null;
+
   const service = createServiceClient();
 
   // job= scoping: scope by OBSERVATION TIME, not by
@@ -196,7 +206,7 @@ export async function GET(req: Request) {
   let storiesQ = service
     .from('stories')
     .select(
-      'id, slug, title, keywords, first_seen_at, last_observed_at, generation_state, research_query_id, is_locked',
+      'id, slug, title, keywords, first_seen_at, last_observed_at, generation_state, research_query_id, is_locked, ai_category_id, ai_subcategory_id, ai_suggested_headline, ai_suggested_slug',
     )
     .order('first_seen_at', { ascending: false, nullsFirst: false })
     .order('id', { ascending: false })
@@ -207,6 +217,8 @@ export async function GET(req: Request) {
   if (fromValid) storiesQ = storiesQ.gte('first_seen_at', fromValid);
   if (toValid) storiesQ = storiesQ.lte('first_seen_at', toValid);
   if (jobScopedStoryIds) storiesQ = storiesQ.in('id', jobScopedStoryIds);
+  if (categoryId) storiesQ = storiesQ.eq('ai_category_id', categoryId);
+  if (subcategoryId) storiesQ = storiesQ.eq('ai_subcategory_id', subcategoryId);
   if (cursor) {
     // Older-than tuple: (first_seen_at, id) < (cursor.ts, cursor.id)
     // Encoded as: first_seen_at < ts OR (first_seen_at = ts AND id < cursor.id)
@@ -224,7 +236,7 @@ export async function GET(req: Request) {
     console.error('[research.stories.list.read]', rowsErr.message);
     return NextResponse.json({ error: 'Could not load stories' }, { status: 500 });
   }
-  const rows = (rowsRaw ?? []) as StoryRow[];
+  const rows = (rowsRaw ?? []) as unknown as StoryRow[];
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
   const last = hasMore ? page[page.length - 1] : null;
@@ -235,6 +247,27 @@ export async function GET(req: Request) {
   }
 
   const storyIds = page.map((s) => s.id);
+
+  // Resolve category and subcategory names in one batched lookup.
+  const allCategoryIds = Array.from(
+    new Set(
+      page.flatMap((s) => [s.ai_category_id, s.ai_subcategory_id]).filter((id): id is string => !!id)
+    )
+  );
+  let categoryNameMap = new Map<string, string>();
+  if (allCategoryIds.length > 0) {
+    const { data: catRows, error: catErr } = await service
+      .from('categories')
+      .select('id, name')
+      .in('id', allCategoryIds);
+    if (catErr) {
+      console.error('[research.stories.list.categories]', catErr.message);
+    } else {
+      categoryNameMap = new Map(
+        (catRows as Array<{ id: string; name: string }>).map((r) => [r.id, r.name])
+      );
+    }
+  }
 
   // Fetch all observations for the page in one shot, then aggregate
   // counts client-side. PostgREST has no group-by on the JS client,
@@ -330,6 +363,12 @@ export async function GET(req: Request) {
       generation_state: s.generation_state,
       research_query_id: s.research_query_id,
       is_locked: s.is_locked,
+      ai_category_id: s.ai_category_id,
+      ai_subcategory_id: s.ai_subcategory_id,
+      ai_suggested_headline: s.ai_suggested_headline,
+      ai_suggested_slug: s.ai_suggested_slug,
+      category_name: s.ai_category_id ? (categoryNameMap.get(s.ai_category_id) ?? null) : null,
+      subcategory_name: s.ai_subcategory_id ? (categoryNameMap.get(s.ai_subcategory_id) ?? null) : null,
       observation_count: obsCount.get(s.id) ?? 0,
       source_count: sourceFeedSet.get(s.id)?.size ?? 0,
       articles,

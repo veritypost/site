@@ -34,6 +34,7 @@ import Spinner from '@/components/admin/Spinner';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import { MODEL_OPTIONS } from '@/lib/newsroomModels';
+import { toSlug } from '../_components/StoryCard';
 
 type Mode = 'general' | 'topic';
 type LookbackKey = '15m' | '1h' | '6h' | '24h' | '3d' | '7d' | '30d';
@@ -1093,7 +1094,7 @@ function StoryCardsList({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
       {stories.map((story) => (
-        <StoryCard
+        <ResearchStoryCard
           key={story.id}
           story={story}
           generatingKeys={generatingKeys}
@@ -1104,7 +1105,7 @@ function StoryCardsList({
   );
 }
 
-function StoryCard({
+function ResearchStoryCard({
   story,
   generatingKeys,
   onGenerate,
@@ -1113,8 +1114,8 @@ function StoryCard({
   generatingKeys: Set<string>;
   onGenerate: (storyId: string, band: AgeBand) => void;
 }) {
-  const bandLabel = (b: AgeBand) =>
-    b === 'adult' ? 'Generate Adult' : b === 'tweens' ? 'Generate Tweens' : 'Generate Kids';
+  const slug = toSlug(story.title);
+  const noSources = story.sources_in_run.length === 0;
 
   const editorHref = (band: AgeBand, articleId: string) =>
     band === 'kids'
@@ -1122,68 +1123,132 @@ function StoryCard({
       : `/admin/story-manager?article=${articleId}`;
 
   return (
-    <div
+    <article
       style={{
-        background: C.bg,
         border: `1px solid ${C.divider}`,
-        borderRadius: 8,
-        padding: S[4],
-        display: 'flex',
-        flexDirection: 'column',
-        gap: S[2],
+        borderRadius: 10,
+        background: C.bg,
+        marginBottom: S[3],
+        overflow: 'hidden',
       }}
     >
-      {/* Header: category > subcategory chips */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: S[1], flexWrap: 'wrap' }}>
-        {story.ai_category ? (
-          <>
-            <Badge variant="neutral" size="xs">{story.ai_category.name}</Badge>
-            {story.ai_subcategory && (
-              <>
-                <span style={{ fontSize: F.xs, color: C.dim }}>›</span>
-                <Badge variant="neutral" size="xs">{story.ai_subcategory.name}</Badge>
-              </>
-            )}
-          </>
-        ) : (
-          <Badge variant="neutral" size="xs">Uncategorized</Badge>
+      {/* Header: headline */}
+      <header
+        style={{
+          padding: `${S[3]}px ${S[4]}px`,
+          display: 'flex',
+          gap: S[3],
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ fontSize: F.md, fontWeight: 600, color: C.ink, lineHeight: 1.35, flex: 1 }}>
+          {story.title}
+        </div>
+        <div style={{ display: 'flex', gap: S[1], flexShrink: 0, alignItems: 'center' }}>
+          {story.formed_in_this_run && (
+            <Badge variant="info" size="xs">New</Badge>
+          )}
+          {!story.formed_in_this_run && (
+            <Badge variant="neutral" size="xs">Extended</Badge>
+          )}
+          {story.is_locked && (
+            <Badge variant="warn" size="xs">Locked</Badge>
+          )}
+        </div>
+      </header>
+
+      {/* Body: category / subcategory / slug + audience buttons */}
+      <div style={{ padding: `0 ${S[4]}px ${S[3]}px` }}>
+        {story.ai_category && (
+          <div style={{ fontSize: F.xs, color: C.muted, marginBottom: 2 }}>
+            {story.ai_category.name}
+          </div>
         )}
+        {story.ai_subcategory && (
+          <div style={{ fontSize: F.xs, color: C.muted, marginBottom: 2 }}>
+            {story.ai_subcategory.name}
+          </div>
+        )}
+
+        {/* Slug + audience actions row */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: S[3],
+            flexWrap: 'wrap',
+            marginTop: S[1],
+          }}
+        >
+          <code
+            style={{
+              fontSize: F.xs,
+              color: C.dim,
+              fontFamily: 'monospace',
+              flex: 1,
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {slug}
+          </code>
+          <div style={{ display: 'flex', gap: S[2], flexShrink: 0, flexWrap: 'wrap' }}>
+            {story.articles_by_band.map((b) => {
+              const key = `${story.id}:${b.band}`;
+              const isGenerating = generatingKeys.has(key);
+              const bandName = b.band === 'adult' ? 'Adults' : b.band === 'tweens' ? 'Tweens' : 'Kids';
+              if (b.state !== 'pending') {
+                return (
+                  <a
+                    key={b.band}
+                    href={editorHref(b.band, b.article_id!)}
+                    style={{
+                      fontSize: F.xs,
+                      color: C.accent,
+                      textDecoration: 'none',
+                      padding: `${S[1]}px ${S[2]}px`,
+                      border: `1px solid ${C.divider}`,
+                      borderRadius: 6,
+                      background: C.card,
+                    }}
+                  >
+                    {bandName} — Edit →
+                  </a>
+                );
+              }
+              return (
+                <Button
+                  key={b.band}
+                  variant="secondary"
+                  size="sm"
+                  disabled={isGenerating || noSources}
+                  title={noSources ? 'No sources to generate from' : undefined}
+                  onClick={() => onGenerate(story.id, b.band)}
+                >
+                  {isGenerating ? 'Generating…' : `[ ${bandName} ]`}
+                </Button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* Story title */}
-      <div style={{ fontSize: F.md, fontWeight: 600, color: C.ink, lineHeight: 1.35 }}>
-        {story.title}
-      </div>
-
-      {/* Slug + badges row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: S[2], flexWrap: 'wrap' }}>
-        <code style={{ fontSize: F.xs, color: C.dim, fontFamily: 'monospace' }}>
-          /{story.slug}
-        </code>
-        {story.formed_in_this_run && (
-          <Badge variant="info" size="xs">New this run</Badge>
-        )}
-        {!story.formed_in_this_run && (
-          <Badge variant="neutral" size="xs">Extended</Badge>
-        )}
-        {story.is_locked && (
-          <Badge variant="warn" size="xs">Locked</Badge>
-        )}
-      </div>
+      {/* Divider */}
+      <div style={{ borderTop: `1px solid ${C.divider}` }} />
 
       {/* Sources from this run */}
-      <div>
-        <div style={{ fontSize: F.xs, color: C.dim, marginBottom: S[1] }}>
-          Sources from this run ({story.sources_in_run.length})
-        </div>
+      <div style={{ padding: `${S[3]}px ${S[4]}px`, fontSize: F.sm, color: C.dim }}>
         {story.sources_in_run.length === 0 ? (
-          <div style={{ fontSize: F.xs, color: C.dim, fontStyle: 'italic' }}>No sources.</div>
+          <span style={{ fontStyle: 'italic' }}>No sources in this run.</span>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: S[1] }}>
             {story.sources_in_run.map((src) => (
-              <div key={src.observation_id}>
+              <div key={src.observation_id} style={{ display: 'flex', gap: S[2], alignItems: 'baseline' }}>
                 {src.outlet && (
-                  <span style={{ fontSize: F.xs, fontWeight: 600, color: C.ink, marginRight: 4 }}>
+                  <span style={{ fontSize: F.xs, fontWeight: 600, color: C.muted, minWidth: 80, flexShrink: 0 }}>
                     {src.outlet}
                   </span>
                 )}
@@ -1191,62 +1256,15 @@ function StoryCard({
                   href={src.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: F.xs, color: C.accent, textDecoration: 'none' }}
+                  style={{ fontSize: F.xs, color: C.ink, textDecoration: 'none', lineHeight: 1.4 }}
                 >
                   {src.title ?? src.url}
                 </a>
-                {src.excerpt && (
-                  <div style={{ fontSize: F.xs, color: C.dim, marginTop: 2, lineHeight: 1.4 }}>
-                    {src.excerpt}
-                  </div>
-                )}
               </div>
             ))}
           </div>
         )}
       </div>
-
-      {/* Generate row — three buttons, one per band. Disabled when the
-          story has zero sources in this run (orphan story) since the
-          generate handler has nothing to feed into the editorial chain. */}
-      <div style={{ display: 'flex', gap: S[2], flexWrap: 'wrap', marginTop: S[1] }}>
-        {story.articles_by_band.map((b) => {
-          const key = `${story.id}:${b.band}`;
-          const isGenerating = generatingKeys.has(key);
-          const noSources = story.sources_in_run.length === 0;
-          if (b.state !== 'pending') {
-            return (
-              <a
-                key={b.band}
-                href={editorHref(b.band, b.article_id!)}
-                style={{
-                  fontSize: F.xs,
-                  color: C.accent,
-                  textDecoration: 'none',
-                  padding: `${S[1]}px ${S[2]}px`,
-                  border: `1px solid ${C.divider}`,
-                  borderRadius: 6,
-                  background: C.card,
-                }}
-              >
-                {b.band === 'adult' ? 'Adult' : b.band === 'tweens' ? 'Tweens' : 'Kids'} — Edit →
-              </a>
-            );
-          }
-          return (
-            <Button
-              key={b.band}
-              variant="secondary"
-              size="sm"
-              disabled={isGenerating || noSources}
-              title={noSources ? 'No sources to generate from' : undefined}
-              onClick={() => onGenerate(story.id, b.band)}
-            >
-              {isGenerating ? 'Generating…' : bandLabel(b.band)}
-            </Button>
-          );
-        })}
-      </div>
-    </div>
+    </article>
   );
 }

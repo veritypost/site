@@ -1,25 +1,5 @@
 'use client';
 
-/**
- * Single audience card on a Story (Adult / Tweens / Kids).
- *
- * Lifecycle states:
- *   idle       — show working headline + [Generate] [Skip]
- *   generating — show humanized step + 'X of N' + progress bar + [Cancel]
- *   generated  — show final headline + [View article] [Skip]
- *   failed     — show humanized error + [Retry] [View run] [Skip]
- *   skipped    — greyed out + [Un-skip]
- *
- * Polling: every 2s while in `generating`. Each card owns its interval;
- * unmount/state-change cleans it up. The per-Story progress bar reads
- * the last entry in pipeline_runs/<id>'s `steps` array (RunDetailResponse)
- * and maps it through PipelineStepLabels.
- *
- * Working headline pre-generation = the first source's title (server passes
- * the joined sources list through props). Falls back to the cluster title
- * if no sources are available, then to a placeholder.
- */
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Button from '@/components/admin/Button';
@@ -33,7 +13,7 @@ import {
   totalSteps,
 } from './PipelineStepLabels';
 
-export type AudienceCardState = 'idle' | 'generating' | 'generated' | 'failed' | 'skipped';
+export type AudienceCardState = 'idle' | 'generating' | 'generated' | 'failed';
 
 export type AudienceCardProps = {
   clusterId: string;
@@ -46,8 +26,6 @@ export type AudienceCardProps = {
   initialErrorType: string | null;
   initialErrorStep: string | null;
   workingHeadline: string;
-  allSourceUrls?: string[];
-  attachAsSourceUrls?: string[];
   selectedModelIdx?: number;
 };
 
@@ -77,7 +55,7 @@ type RunDetailResponse = {
 const POLL_MS = 2000;
 
 const BAND_LABEL: Record<AudienceBand, string> = {
-  adult: 'Adult',
+  adult: 'Adults',
   tweens: 'Tweens',
   kids: 'Kids',
 };
@@ -99,8 +77,6 @@ function AudienceCard(props: AudienceCardProps) {
     initialErrorType,
     initialErrorStep,
     workingHeadline,
-    allSourceUrls,
-    attachAsSourceUrls,
     selectedModelIdx = 0,
   } = props;
 
@@ -132,7 +108,6 @@ function AudienceCard(props: AudienceCardProps) {
       if (!res.ok) return;
       const json = (await res.json().catch(() => null)) as RunDetailResponse | null;
       if (!json?.run) return;
-      // Only apply if we still care about this run id.
       if (pollRunId.current !== runIdToPoll) return;
 
       const lastStep = json.steps && json.steps.length > 0 ? json.steps[json.steps.length - 1] : null;
@@ -141,14 +116,8 @@ function AudienceCard(props: AudienceCardProps) {
       const status = json.run.status;
       if (status === 'completed' || status === 'success') {
         setState('generated');
-        // pipeline_runs has no article_id column — the persist step on
-        // pipeline_costs carries it. Walk steps in reverse for the last
-        // successful one with an article_id.
         const articleStep = json.steps?.findLast((s) => s.success && s.article_id) ?? null;
         setArticleId(articleStep?.article_id ?? null);
-        // The detail endpoint doesn't include slug/title; keep what we
-        // have. Session C's article-page resolves from article_id anyway,
-        // so the View article link below stays correct.
         stopPolling();
       } else if (status === 'failed' || status === 'error') {
         setState('failed');
@@ -165,26 +134,19 @@ function AudienceCard(props: AudienceCardProps) {
     }
   }, [stopPolling]);
 
-  // Lifecycle: while state==='generating' and we have a runId, poll.
   useEffect(() => {
     if (state !== 'generating' || !runId) {
       stopPolling();
       return;
     }
     pollRunId.current = runId;
-    // Fire one immediate read so the UI doesn't stall for 2s.
     void pollOnce(runId);
     pollHandle.current = setInterval(() => { void pollOnce(runId); }, POLL_MS);
     return () => { stopPolling(); };
   }, [state, runId, pollOnce, stopPolling]);
 
-  // Cleanup on unmount.
   useEffect(() => () => { stopPolling(); }, [stopPolling]);
 
-  // Article publish status — read once whenever we land in `generated` with
-  // an articleId, then refresh whenever the operator returns to this tab
-  // (window focus / bfcache restore covers the back-from-editor flow).
-  // Errors are silent — pill falls back to "Generated".
   const fetchArticleStatus = useCallback(async (id: string) => {
     try {
       const res = await fetch(`/api/admin/articles/${id}`);
@@ -218,10 +180,6 @@ function AudienceCard(props: AudienceCardProps) {
   }, [state, articleId, fetchArticleStatus]);
 
   const handleGenerate = useCallback(async () => {
-    if (allSourceUrls !== undefined && allSourceUrls.length === 0) {
-      setActionError('Cluster has no sources to send.');
-      return;
-    }
     setBusy(true);
     setActionError(null);
     try {
@@ -235,8 +193,6 @@ function AudienceCard(props: AudienceCardProps) {
           ...apiAudience,
           provider,
           model,
-          ...(allSourceUrls !== undefined ? { source_urls: allSourceUrls } : {}),
-          ...(attachAsSourceUrls !== undefined ? { attach_as_source_urls: attachAsSourceUrls } : {}),
         }),
       });
       const body = (await res.json().catch(() => ({}))) as {
@@ -257,7 +213,7 @@ function AudienceCard(props: AudienceCardProps) {
     } finally {
       setBusy(false);
     }
-  }, [clusterId, audienceBand, allSourceUrls, attachAsSourceUrls, selectedModelIdx]);
+  }, [clusterId, audienceBand, selectedModelIdx]);
 
   async function handleCancel() {
     if (!runId) return;
@@ -270,7 +226,6 @@ function AudienceCard(props: AudienceCardProps) {
         setActionError(body.error ?? `Cancel returned ${res.status}`);
         return;
       }
-      // Polling tick will move us to idle when status=cancelled lands.
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Network error');
     } finally {
@@ -301,50 +256,6 @@ function AudienceCard(props: AudienceCardProps) {
     }
   }
 
-  async function handleSkip() {
-    setBusy(true);
-    setActionError(null);
-    try {
-      const res = await fetch(`/api/admin/newsroom/clusters/${clusterId}/skip`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ audience_band: audienceBand }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setActionError(body.error ?? `Skip returned ${res.status}`);
-        return;
-      }
-      setState('skipped');
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Network error');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleUnskip() {
-    setBusy(true);
-    setActionError(null);
-    try {
-      const res = await fetch(`/api/admin/newsroom/clusters/${clusterId}/skip`, {
-        method: 'DELETE',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ audience_band: audienceBand }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setActionError(body.error ?? `Un-skip returned ${res.status}`);
-        return;
-      }
-      setState('idle');
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Network error');
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const total = totalSteps(audienceBand);
   const stepIdx = stepIndex(currentStep, audienceBand);
   const progressPct = stepIdx ? Math.min(100, Math.round((stepIdx / total) * 100)) : 0;
@@ -357,9 +268,6 @@ function AudienceCard(props: AudienceCardProps) {
   let pillColor: string;
   if (state === 'idle') {
     pillLabel = 'Pending';
-    pillColor = C.muted;
-  } else if (state === 'skipped') {
-    pillLabel = 'Skipped';
     pillColor = C.muted;
   } else if (state === 'generating') {
     pillLabel = 'Working';
@@ -381,17 +289,14 @@ function AudienceCard(props: AudienceCardProps) {
   return (
     <div
       style={{
-        flex: 1,
-        minWidth: 0,
-        border: `1px solid ${state === 'skipped' ? C.divider : C.border}`,
-        borderRadius: 8,
-        background: state === 'skipped' ? C.card : C.bg,
-        opacity: state === 'skipped' ? 0.55 : 1,
-        padding: `${S[3]}px ${S[4]}px`,
-        display: 'flex',
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        background: C.bg,
+        padding: `${S[2]}px ${S[3]}px`,
+        display: 'inline-flex',
         flexDirection: 'column',
-        gap: S[2],
-        minHeight: 130,
+        gap: S[1],
+        minWidth: 90,
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -401,10 +306,6 @@ function AudienceCard(props: AudienceCardProps) {
         <span style={{ fontSize: F.xs, fontWeight: 700, letterSpacing: 0.5, color: pillColor }}>
           {pillLabel.toUpperCase()}
         </span>
-      </div>
-
-      <div style={{ fontSize: F.base, lineHeight: 1.35, color: C.ink, fontWeight: 500 }}>
-        {headline}
       </div>
 
       {state === 'generating' && (
@@ -434,26 +335,21 @@ function AudienceCard(props: AudienceCardProps) {
       )}
 
       {state === 'failed' && (
-        <div style={{ fontSize: F.sm, color: C.danger }}>
+        <div style={{ fontSize: F.xs, color: C.danger }}>
           {humanizeStep(errorStep) ? `Failed at: ${humanizeStep(errorStep)}.` : 'Failed.'}{' '}
           {humanizeError(errorType)}
         </div>
       )}
 
       {actionError && (
-        <div style={{ fontSize: F.sm, color: C.danger }}>{actionError}</div>
+        <div style={{ fontSize: F.xs, color: C.danger }}>{actionError}</div>
       )}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[2], marginTop: 'auto' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[1], marginTop: 'auto' }}>
         {state === 'idle' && (
-          <>
-            <Button onClick={() => void handleGenerate()} disabled={busy} variant="primary" size="sm">
-              {busy ? 'Starting…' : 'Generate'}
-            </Button>
-            <Button onClick={handleSkip} disabled={busy} variant="ghost" size="sm">
-              Skip
-            </Button>
-          </>
+          <Button onClick={() => void handleGenerate()} disabled={busy} variant="primary" size="sm">
+            {busy ? 'Starting…' : 'Generate'}
+          </Button>
         )}
         {state === 'generating' && (
           <Button onClick={handleCancel} disabled={busy} variant="ghost" size="sm">
@@ -468,12 +364,12 @@ function AudienceCard(props: AudienceCardProps) {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  padding: `${S[1]}px ${S[3]}px`,
+                  padding: `${S[1]}px ${S[2]}px`,
                   border: `1px solid ${C.border}`,
                   borderRadius: 6,
                   textDecoration: 'none',
                   color: C.ink,
-                  fontSize: F.sm,
+                  fontSize: F.xs,
                   fontWeight: 500,
                 }}
               >
@@ -490,21 +386,18 @@ function AudienceCard(props: AudienceCardProps) {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  padding: `${S[1]}px ${S[3]}px`,
+                  padding: `${S[1]}px ${S[2]}px`,
                   border: `1px solid ${C.border}`,
                   borderRadius: 6,
                   textDecoration: 'none',
                   color: C.ink,
-                  fontSize: F.sm,
+                  fontSize: F.xs,
                   fontWeight: 500,
                 }}
               >
                 Edit
               </Link>
             )}
-            <Button onClick={handleSkip} disabled={busy} variant="ghost" size="sm">
-              Skip
-            </Button>
           </>
         )}
         {state === 'failed' && (
@@ -518,27 +411,19 @@ function AudienceCard(props: AudienceCardProps) {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  padding: `${S[1]}px ${S[3]}px`,
+                  padding: `${S[1]}px ${S[2]}px`,
                   border: `1px solid ${C.border}`,
                   borderRadius: 6,
                   textDecoration: 'none',
                   color: C.ink,
-                  fontSize: F.sm,
+                  fontSize: F.xs,
                   fontWeight: 500,
                 }}
               >
                 View run
               </Link>
             )}
-            <Button onClick={handleSkip} disabled={busy} variant="ghost" size="sm">
-              Skip
-            </Button>
           </>
-        )}
-        {state === 'skipped' && (
-          <Button onClick={handleUnskip} disabled={busy} variant="ghost" size="sm">
-            {busy ? 'Restoring…' : 'Un-skip'}
-          </Button>
         )}
       </div>
     </div>
