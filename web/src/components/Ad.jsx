@@ -242,7 +242,7 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
         <img
           src={safeCreativeUrl}
           alt={ad.alt_text || 'Sponsored'}
-          style={{ maxWidth: '100%', display: 'block', borderRadius: 6 }}
+          style={{ maxWidth: '100%', display: 'block', borderRadius: 6, margin: '0 auto' }}
         />
       )}
       {ad.cta_text && (
@@ -260,4 +260,5 @@ const wrapStyle = {
   borderRadius: 10,
   padding: '10px 12px',
   margin: '12px 0',
+  textAlign: 'center',
 };

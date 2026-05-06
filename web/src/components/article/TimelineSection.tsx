@@ -76,7 +76,6 @@ const CONTENT_STYLE: React.CSSProperties = {
 
 const LABEL_STYLE: React.CSSProperties = {
   fontSize: 14,
-  fontWeight: 600,
   lineHeight: 1.3,
   color: 'var(--text-primary, #111)',
   margin: '0 0 4px',

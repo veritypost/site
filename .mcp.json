@@ -5,7 +5,7 @@
       "command": "sh",
       "args": [
         "-c",
-        "set -a; . /Users/veritypost/Desktop/verity-post/.env.supabase-readonly; set +a; exec npx -y @supabase/mcp-server-supabase@latest --read-only --project-ref=fyiwulqphgmoqullmrfn"
+        "set -a; . /Users/veritypost/Desktop/verity-post/.env.supabase-readonly; set +a; exec /opt/homebrew/bin/mcp-server-supabase --read-only --project-ref=fyiwulqphgmoqullmrfn"
       ]
     }
   }

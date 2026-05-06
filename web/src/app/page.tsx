@@ -479,7 +479,14 @@ export default async function HomePage({
         )}
 
         {/* home_below_fold: before footer */}
-        {!fetchFailed && hero && <Ad placement="home_below_fold" page="home" position="below_fold" />}
+        <div style={{ textAlign: 'center', marginBottom: 8, marginTop: 24 }}>
+          <div style={{ fontSize: 10, color: 'var(--dim, #5a5a5a)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+            Advertisement
+          </div>
+          <div style={{ maxWidth: 728, margin: '0 auto' }}>
+            {!fetchFailed && hero && <Ad placement="home_below_fold" page="home" position="below_fold" />}
+          </div>
+        </div>
 
         {!fetchFailed && hero && <HomeFooter />}
 

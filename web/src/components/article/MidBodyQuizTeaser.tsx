@@ -25,7 +25,6 @@ const TEXT_COL_STYLE: React.CSSProperties = {
 
 const HEADLINE_STYLE: React.CSSProperties = {
   fontSize: 14,
-  fontWeight: 600,
   color: 'var(--text-primary, #111)',
   margin: 0,
 };

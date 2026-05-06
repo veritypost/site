@@ -639,7 +639,7 @@ export default function CommentRow({
           )}
 
           {/* Tag chips — visible when any tag is active (you or community) */}
-          {!isDeleted && !editing && !isOwner && canContextTag && (() => {
+          {!isDeleted && !editing && !isOwner && canContextTag && quizPassed !== false && (() => {
             const tc = (k: TagKind): number =>
               k === 'helpful' ? (comment.helpful_count ?? 0)
               : k === 'context' ? ((comment as CommentRowDb & { context_tag_count?: number | null }).context_tag_count ?? 0)

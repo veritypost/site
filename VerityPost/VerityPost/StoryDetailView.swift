@@ -1090,7 +1090,7 @@ struct StoryDetailView: View {
                                 .foregroundColor(VP.accent)
                         }
                         Text(event.eventDate.map { formatDate($0) } ?? "")
-                            .font(.system(.caption, design: .default, weight: .semibold))
+                            .font(.system(.caption, design: .default, weight: .regular))
                             .foregroundColor(VP.dim)
                         Text(event.text ?? event.summary ?? "")
                             .font(.subheadline)
@@ -2662,7 +2662,7 @@ struct StoryDetailView: View {
                     .foregroundColor(VP.accent)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("5 questions waiting at the end")
-                        .font(.system(.footnote, design: .default, weight: .bold))
+                        .font(.system(.footnote, design: .default, weight: .regular))
                         .foregroundColor(VP.text)
                     Text("Pass 3 to join the discussion.")
                         .font(.caption)
