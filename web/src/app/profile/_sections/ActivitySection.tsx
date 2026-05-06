@@ -169,9 +169,6 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
 
   return (
     <div style={{ fontFamily: FONT.sans }}>
-      {!isPro && (
-        <p style={{ margin: `0 0 ${S[3]}px`, fontSize: F.xs, color: C.inkMuted }}>Showing your last 30 days.</p>
-      )}
       <div style={{ display: 'flex', gap: S[1], marginBottom: S[3], flexWrap: 'wrap' }}>
         {filterOpts.map((o) => (
           <button

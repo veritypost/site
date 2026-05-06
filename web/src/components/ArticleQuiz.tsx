@@ -252,12 +252,7 @@ export default function ArticleQuiz({
           }}
         >
           <div style={{ fontWeight: 700, color: C.success, fontSize: 14 }}>
-            {isKid ? 'Quiz passed!' : 'Discussion unlocked'}
-          </div>
-          <div style={{ fontSize: 13, color: C.text, marginTop: 4 }}>
-            {isKid
-              ? 'Great reading! You got it.'
-              : 'You’ve passed the quiz on this article. The discussion is below.'}
+            {isKid ? ‘Quiz passed!’ : ‘Discussion unlocked’}
           </div>
           {/* T141 — give passed-state a forward path. One line, two
               targets: jump to the unlocked thread, or go pick the next
@@ -296,9 +291,6 @@ export default function ArticleQuiz({
           marginTop: 24,
         }}
       >
-        <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 6 }}>
-          Unlock the discussion
-        </div>
         {error && <div style={{ fontSize: 12, color: C.danger, marginBottom: 10 }}>{error}</div>}
         <button
           onClick={startAttempt}
@@ -526,7 +518,7 @@ export default function ArticleQuiz({
                 lineHeight: 1.4,
               }}
             >
-              {correct} of {total}.{' '}The conversation is below.
+              {correct} of {total}.
             </div>
           </div>
         </>

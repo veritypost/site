@@ -39,7 +39,6 @@ export function SignOutSection({ preview }: Props) {
   return (
     <Card
       title="Sign out"
-      description="End this session, or sign out of every device on your account."
     >
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button
