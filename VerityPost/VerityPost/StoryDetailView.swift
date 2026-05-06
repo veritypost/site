@@ -1135,11 +1135,6 @@ struct StoryDetailView: View {
                     .font(.system(.caption2, design: .default, weight: .bold))
                     .tracking(1)
                     .foregroundColor(VP.dim)
-                if quizStage == .answering || quizStage == .submitting {
-                    Text("\(passThreshold) of \(quizQuestions.count) correct to join the discussion")
-                        .font(.caption)
-                        .foregroundColor(VP.soft)
-                }
             }
             Spacer()
             if !quizQuestions.isEmpty {
@@ -1251,8 +1246,8 @@ struct StoryDetailView: View {
         if let r = quizResult {
             VStack(alignment: .leading, spacing: 12) {
                 Text(r.passed
-                     ? "Passed — \(r.correct) of \(r.total). Discussion unlocked."
-                     : "Scored \(r.correct) of \(r.total). Needed \(passThreshold) to pass.")
+                     ? "Discussion unlocked."
+                     : "Not quite — try again.")
                     .font(.headline)
                     .foregroundColor(r.passed ? VP.right : VP.text)
                 if let pct = r.percentile {

@@ -299,9 +299,6 @@ export default function ArticleQuiz({
         <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 6 }}>
           Unlock the discussion
         </div>
-        <div style={{ fontSize: 14, color: C.dim, marginBottom: 14, lineHeight: 1.5 }}>
-          Answer 5 questions about this article. 3 correct unlocks the comment section.
-        </div>
         {error && <div style={{ fontSize: 12, color: C.danger, marginBottom: 10 }}>{error}</div>}
         <button
           onClick={startAttempt}
@@ -556,9 +553,6 @@ export default function ArticleQuiz({
             }}
           >
             {correct} of {total}.
-          </div>
-          <div style={{ fontSize: 14, color: C.dim, marginTop: 4, marginBottom: 14 }}>
-            The bar is 3 to unlock the discussion.
           </div>
 
 

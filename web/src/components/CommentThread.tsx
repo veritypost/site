@@ -1022,7 +1022,7 @@ export default function CommentThread({
         />
       )}
 
-      {currentUserId && canAskExpert && !expertDialogOpen && (
+      {false && currentUserId && canAskExpert && !expertDialogOpen && (
         <button onClick={() => setExpertDialogOpen(true)} style={askExpertBtnStyle}>
           + Ask an Expert
         </button>

@@ -537,7 +537,7 @@ export default function CommentComposer({
         }}
       >
         <div style={{ fontSize: 14, color: 'var(--dim, #888)', lineHeight: 1.5 }}>
-          {hasQuiz ? 'Pass the quiz above to join the discussion.' : 'Comments are locked on this article.'}
+          {hasQuiz ? 'Take the quiz to join the discussion.' : 'Comments are locked on this article.'}
         </div>
       </div>
     );
