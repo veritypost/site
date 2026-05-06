@@ -403,7 +403,7 @@ export default function BookmarksPage() {
 
   if (loading) {
     return (
-      <main style={{ minHeight: '100vh', background: '#fff', padding: '20px 16px 80px' }}>
+      <main style={{ minHeight: '100vh', background: 'var(--bg)', padding: '20px 16px 80px' }}>
         <style>{`
           @keyframes vp-pulse {
             0%, 100% { opacity: 1; }
@@ -477,10 +477,10 @@ export default function BookmarksPage() {
                 fontWeight: 600,
                 color:
                   capCounterTone === 'danger'
-                    ? '#dc2626'
+                    ? 'var(--danger-text, #dc2626)'
                     : capCounterTone === 'amber'
-                      ? '#b45309'
-                      : '#666',
+                      ? 'var(--warn-text, #b45309)'
+                      : 'var(--dim)',
               }}
             >
               {items.length} / {bookmarkCap} bookmarks
@@ -650,8 +650,9 @@ export default function BookmarksPage() {
                         fontSize: 12,
                         padding: '4px 8px',
                         borderRadius: 6,
-                        border: '1px solid #e5e5e5',
-                        background: '#fff',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg)',
+                        minHeight: 44,
                       }}
                     >
                       <option value="">Uncategorised</option>
@@ -669,7 +670,7 @@ export default function BookmarksPage() {
                       background: 'none',
                       border: 'none',
                       fontSize: 12,
-                      color: '#dc2626',
+                      color: 'var(--danger-text, #dc2626)',
                       fontWeight: 600,
                       cursor: deletingIds.has(b.id) ? 'not-allowed' : 'pointer',
                       opacity: deletingIds.has(b.id) ? 0.5 : 1,
@@ -738,8 +739,8 @@ export default function BookmarksPage() {
                     style={{
                       background: 'none',
                       border: 'none',
-                      fontSize: 11,
-                      color: '#666',
+                      fontSize: 12,
+                      color: 'var(--dim)',
                       cursor: 'pointer',
                       padding: 0,
                       fontStyle: 'italic',
@@ -806,8 +807,8 @@ export default function BookmarksPage() {
 
 const btnSolid: CSSProperties = {
   padding: '8px 14px',
-  background: '#111',
-  color: '#fff',
+  background: 'var(--text)',
+  color: 'var(--bg)',
   border: 'none',
   borderRadius: 8,
   fontSize: 12,
@@ -818,8 +819,8 @@ const btnSolid: CSSProperties = {
 const btnGhost: CSSProperties = {
   padding: '8px 14px',
   background: 'transparent',
-  color: '#111',
-  border: '1px solid #e5e5e5',
+  color: 'var(--text)',
+  border: '1px solid var(--border)',
   borderRadius: 8,
   fontSize: 12,
   fontWeight: 600,

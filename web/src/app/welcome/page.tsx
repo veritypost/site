@@ -160,7 +160,8 @@ function GraduationClaim({ token }: { token: string }) {
             placeholder="Email (the one your parent gave us)"
             autoComplete="email"
             style={{
-              padding: 10,
+              padding: '12px 14px',
+              minHeight: 44,
               fontSize: 14,
               border: `1px solid ${C.border}`,
               borderRadius: 8,
@@ -173,7 +174,8 @@ function GraduationClaim({ token }: { token: string }) {
             placeholder="New password (10+ characters)"
             autoComplete="new-password"
             style={{
-              padding: 10,
+              padding: '12px 14px',
+              minHeight: 44,
               fontSize: 14,
               border: `1px solid ${C.border}`,
               borderRadius: 8,
@@ -186,7 +188,8 @@ function GraduationClaim({ token }: { token: string }) {
             placeholder="Confirm password"
             autoComplete="new-password"
             style={{
-              padding: 10,
+              padding: '12px 14px',
+              minHeight: 44,
               fontSize: 14,
               border: `1px solid ${C.border}`,
               borderRadius: 8,
@@ -195,8 +198,8 @@ function GraduationClaim({ token }: { token: string }) {
           {error && (
             <div
               style={{
-                background: '#fee2e2',
-                color: '#991b1b',
+                background: 'var(--danger-bg, #fee2e2)',
+                color: 'var(--danger-text, #991b1b)',
                 padding: 10,
                 borderRadius: 8,
                 fontSize: 13,
@@ -210,6 +213,7 @@ function GraduationClaim({ token }: { token: string }) {
             disabled={busy}
             style={{
               padding: '12px 16px',
+              minHeight: 44,
               fontSize: 15,
               fontWeight: 700,
               background: C.accent,

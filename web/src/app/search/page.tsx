@@ -193,10 +193,10 @@ function SearchPageContent() {
   const filterStyle: CSSProperties = {
     padding: '8px 10px',
     borderRadius: 8,
-    border: '1px solid #e5e5e5',
+    border: '1px solid var(--border)',
     fontSize: 13,
     // F6: removed outline: 'none' so browser default focus ring shows
-    background: '#fff',
+    background: 'var(--bg)',
   };
 
   // F15: skeleton while canView is null (perms not yet hydrated)
@@ -258,8 +258,8 @@ function SearchPageContent() {
               minHeight: 44,
               borderRadius: 10,
               border: 'none',
-              background: q.trim() && !loading ? '#111' : '#ccc',
-              color: '#fff',
+              background: q.trim() && !loading ? 'var(--text)' : 'var(--border)',
+              color: 'var(--bg)',
               fontSize: 14,
               fontWeight: 700,
               cursor: q.trim() && !loading ? 'pointer' : 'default',
@@ -273,7 +273,7 @@ function SearchPageContent() {
       {canAdvanced ? (
         // F12: fieldset/legend wrapping the filter grid
         <fieldset style={{ border: 'none', padding: 0, margin: '0 0 16px 0' }}>
-          <legend style={{ fontSize: 11, color: '#999', marginBottom: 6, fontWeight: 600 }}>Advanced filters</legend>
+          <legend style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 6, fontWeight: 600 }}>Advanced filters</legend>
           <div
             style={{
               display: 'grid',
@@ -340,13 +340,13 @@ function SearchPageContent() {
         !canAdvanced && hasInteracted && (
           <div
             style={{
-              background: '#f7f7f7',
-              border: '1px solid #e5e5e5',
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
               borderRadius: 10,
               padding: '10px 14px',
               marginBottom: 16,
               fontSize: 12,
-              color: '#666',
+              color: 'var(--dim)',
             }}
           >
             {isAuthed === false
@@ -415,19 +415,19 @@ function SearchPageContent() {
             prefetch={false}
             style={{
               display: 'block',
-              background: '#f7f7f7',
-              border: '1px solid #e5e5e5',
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
               borderRadius: 10,
               padding: 14,
               textDecoration: 'none',
-              color: '#111',
+              color: 'var(--text)',
             }}
           >
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{a.title}</div>
             {a.excerpt && (
               <div style={{ fontSize: 13, color: '#444', marginBottom: 6 }}>{a.excerpt}</div>
             )}
-            <div style={{ fontSize: 11, color: '#666' }}>
+            <div style={{ fontSize: 12, color: 'var(--dim)' }}>
               {a.categories?.name}
               {a.categories?.name && a.published_at ? ' · ' : ''}
               {/* F5: hybrid timestamp — relative if <24h, absolute otherwise */}

@@ -30,13 +30,13 @@ export const metadata: Metadata = {
 };
 
 const C = {
-  bg: '#fff',
-  card: '#fff',
-  border: '#e5e5e5',
-  text: '#0a0a0a',
-  dim: '#666',
-  accent: '#0a0a0a',
-  highlight: '#fafafa',
+  bg: 'var(--bg)',
+  card: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  dim: 'var(--dim)',
+  accent: 'var(--accent)',
+  highlight: 'var(--hover)',
 };
 
 type PlanDbRow = {
