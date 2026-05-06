@@ -164,10 +164,6 @@ Web mobile is the product standard. These items bring iOS in line.
   - Permission keys: `settings.account.sessions.revoke`, `settings.account.sessions.revoke_all_other`
   - iOS Kids: not applicable
 
-- 49: **Theme toggle on iOS** — web has Light / System / Dark in `AppearanceSection.tsx`. iOS uses system preference only. Complexity: L — blocked until dark-mode token work is done.
-  - The toggle itself (S): `@AppStorage("vp_theme")` + `preferredColorScheme` override in `VerityPostApp.swift` + new `AppearanceSettingsView` wired into SettingsView hub
-  - **Blocker**: `Theme.swift` has all light-mode hardcoded hex values (`VP.bg = Color.white`, etc.) — dark mode override will work for system controls but custom surfaces stay white. Needs xcassets dark-variant token pass or `@Environment(\.colorScheme)` conditional tokens before this can ship cleanly. Bundle with TODO 1+2 (dark mode) as the same wave.
-  - iOS Kids: shares the same theme — applies automatically once root `preferredColorScheme` is set
 
 - 19: Apply `supabase/migrations/20260503000007_backfill_unknown_sources_to_null.sql` — 4 "Unknown" source rows in prod still render legacy values until it runs
 - 20: Verity Monthly Stripe price: plans.verity_monthly has stripe_price_id=NULL — owner must click Mint at /admin/plans

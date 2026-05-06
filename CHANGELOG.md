@@ -4,6 +4,18 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ---
 
+## 2026-05-06 (continued × 3)
+
+### TODO 49 — iOS theme toggle
+**Files:** `VerityPost/VerityPost/Theme.swift`, `VerityPostApp.swift`, `SettingsView.swift`
+- `Theme.swift`: all ink/surface/border/text static tokens swapped from hardcoded hex to `UIKit` adaptive colors (`Color(UIColor.label)`, `.systemBackground`, `.secondarySystemBackground`, `.separator`, `.tertiaryLabel`, etc.); fixed colors (brand, success, danger, warn, tag chips) unchanged; `SkeletonBar` → `Color(.systemGray5)`; `PillButton` → `Color(.systemBackground)`. Added `import UIKit`.
+- `VerityPostApp.swift`: `@AppStorage("vp_theme")` + `preferredColorScheme` computed property (`"light"` → `.light`, `"dark"` → `.dark`, anything else → `nil`); `.preferredColorScheme(preferredScheme)` applied to `ContentView()`.
+- `SettingsView.swift`: `AppearanceSettingsView` — three-option Light / System / Dark checkmark picker using `SettingsPageShell + SettingsCard`; Appearance `HubRowSpec` added to `preferencesRows` (always visible, no permission gate) with current-value preview text.
+- **iOS Kids:** shares root `preferredColorScheme` — applies automatically.
+- **Web:** already existed via `AppearanceSection.tsx`.
+
+---
+
 ## 2026-05-06 (continued again)
 
 ### TODOs 1+2 — Dark mode: chrome + article text
