@@ -168,5 +168,42 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
   **Note:** `bookmark_collections`, `bookmarks.note.add`, `bookmarks.export` permissions exist — keep them alive, just rename the UI label. Do not drop the schema.
 
+---
+
+## iOS parity — bring iOS up to web mobile standard
+
+Web mobile is the product standard. These items bring iOS in line.
+
+- 45: **Ads on iOS** — `HomeAdSlot` struct exists in `HomeFeedSlots.swift` but decodes the wrong response shape (missing fields) and is not wired into `HomeView.swift`. Article page has zero ad slots. Complexity: M.
+  - Fix `AdPayload` decode in `HomeFeedSlots.swift` to match the `/api/ads/serve` response shape (check `web/src/app/api/ads/serve/route.ts` for exact fields)
+  - Wire `HomeAdSlot` into `HomeView.swift` at the same positions as web: after the hero card (`home_top`), between cards 4–5 (`home_in_feed_1`), between cards 8–9 (`home_in_feed_2`), and below the last card (`home_below_fold`)
+  - Add article-level ad slots in `StoryDetailView.swift` — check web `[slug]/page.tsx` for placement positions
+  - Register impressions via `/api/ads/impression` and clicks via `/api/ads/click`
+  - iOS Kids: not applicable
+
+- 46: **"New since last visit" pill on iOS home feed** — web marks story cards with a "New" badge when `published_at > vp_last_home_visit_at`. iOS has no equivalent. Complexity: S.
+  - Web: `_HomeVisitTimestamp.tsx` writes the timestamp; story cards read it. Check `web/src/app/page.tsx` for exact condition.
+  - iOS: store last-visit timestamp in `UserDefaults` key `vp_last_home_visit_at`. On `HomeView` appear, record current time. On card render, compare `story.publishedAt > lastVisit` and show a "New" badge/pill on the story card.
+  - iOS Kids: not applicable (kids home feed is separate)
+
+- 47: **Advanced search filters on iOS** — `FindView.swift` is keyword-only. Web `/search` supports category, date range, and source publisher filters for `search.advanced` users. Complexity: M.
+  - Add a filter panel / sheet to `FindView.swift` with category picker, date range picker, source field — gated by `search.advanced` permission
+  - The existing `/api/search` route already accepts the filter params (same API web uses)
+  - Permission keys: `search.advanced`, `search.advanced.category`, `search.advanced.date_range`, `search.advanced.source`
+  - iOS Kids: not applicable (kids has no search)
+
+- 48: **Login activity / session revocation on iOS** — web `SessionsSection` shows active sessions with device/browser/IP and a per-session Revoke button. iOS `LoginActivityView` in `SettingsView.swift` shows an audit log only — no live session list, no revoke. Complexity: M.
+  - Expand `LoginActivityView` in `SettingsView.swift` to add a "Active sessions" section above the audit log
+  - Fetch from `/api/account/sessions` (GET) — same endpoint web uses
+  - Each session row shows device, browser, IP, last-seen timestamp + a Revoke button → DELETE `/api/account/sessions/[id]`
+  - "Revoke all other sessions" button at the bottom
+  - Permission keys: `settings.account.sessions.revoke`, `settings.account.sessions.revoke_all_other`
+  - iOS Kids: not applicable
+
+- 49: **Theme toggle on iOS** — web has Light / System / Dark in `AppearanceSection.tsx`. iOS uses system preference only. Complexity: L — blocked until dark-mode token work is done.
+  - The toggle itself (S): `@AppStorage("vp_theme")` + `preferredColorScheme` override in `VerityPostApp.swift` + new `AppearanceSettingsView` wired into SettingsView hub
+  - **Blocker**: `Theme.swift` has all light-mode hardcoded hex values (`VP.bg = Color.white`, etc.) — dark mode override will work for system controls but custom surfaces stay white. Needs xcassets dark-variant token pass or `@Environment(\.colorScheme)` conditional tokens before this can ship cleanly. Bundle with TODO 1+2 (dark mode) as the same wave.
+  - iOS Kids: shares the same theme — applies automatically once root `preferredColorScheme` is set
+
 - 19: Apply `supabase/migrations/20260503000007_backfill_unknown_sources_to_null.sql` — 4 "Unknown" source rows in prod still render legacy values until it runs
 - 20: Verity Monthly Stripe price: plans.verity_monthly has stripe_price_id=NULL — owner must click Mint at /admin/plans
