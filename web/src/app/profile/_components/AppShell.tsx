@@ -403,16 +403,6 @@ export function AppShell({ user, preview, defaultSection = 'you', sections }: Pr
                     </span>
                   ) : null}
                 </div>
-                <p
-                  className="redesign-section-reason"
-                  style={{
-                    color: C.inkMuted,
-                    margin: 0,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {active.reason}
-                </p>
               </header>
               {active.locked ? <LockedSection title={active.title} /> : active.render()}
             </article>

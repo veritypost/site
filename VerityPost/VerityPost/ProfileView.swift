@@ -921,17 +921,12 @@ struct ProfileView: View {
             .foregroundColor(VP.text)
     }
 
-    private func quickLink(label: String, description: String, destination: AnyView) -> some View {
+    private func quickLink(label: String, description: String = "", destination: AnyView) -> some View {
         NavigationLink { destination } label: {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(label)
-                        .font(.system(.subheadline, design: .default, weight: .semibold))
-                        .foregroundColor(VP.text)
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(VP.dim)
-                }
+                Text(label)
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(VP.text)
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption)
