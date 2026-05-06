@@ -483,9 +483,7 @@ export default async function HomePage({
           <div style={{ fontSize: 10, color: 'var(--dim, #5a5a5a)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
             Advertisement
           </div>
-          <div style={{ maxWidth: 728, margin: '0 auto' }}>
-            {!fetchFailed && hero && <Ad placement="home_below_fold" page="home" position="below_fold" />}
-          </div>
+          {!fetchFailed && hero && <Ad placement="home_below_fold" page="home" position="below_fold" />}
         </div>
 
         {!fetchFailed && hero && <HomeFooter />}

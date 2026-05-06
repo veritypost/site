@@ -532,22 +532,6 @@ export default function ArticleQuiz({
               You&rsquo;re in.{' '}
               <span style={{ color: C.dim, fontWeight: 400 }}>The conversation is below.</span>
             </div>
-            {percentile != null && (
-              <div
-                style={{
-                  marginTop: 16,
-                  display: 'inline-block',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: C.dim,
-                  background: 'var(--tab-active-bg, rgba(0,0,0,0.04))',
-                  padding: '5px 12px',
-                  borderRadius: 99,
-                }}
-              >
-                Better than {percentile}% of readers on this article
-              </div>
-            )}
           </div>
         </>
       );
@@ -578,23 +562,6 @@ export default function ArticleQuiz({
             The bar is 3 to unlock the discussion.
           </div>
 
-          {percentile != null && (
-            <div
-              style={{
-                display: 'inline-block',
-                fontSize: 12,
-                fontWeight: 500,
-                color: C.dim,
-                background: 'var(--tab-active-bg, rgba(0,0,0,0.04))',
-                padding: '5px 12px',
-                borderRadius: 99,
-                marginTop: 12,
-                marginBottom: 14,
-              }}
-            >
-              Better than {percentile}% of readers on this article
-            </div>
-          )}
 
           {results?.map((r, i) => (
             <div

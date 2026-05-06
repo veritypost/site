@@ -19,9 +19,6 @@
 
 export const COPY = {
   comments: {
-    mentionPaid: '@mentions are a paid feature — your text will post as plain text.',
-    mentionPaidComposerHint:
-      'Mentions are available on paid plans — your @handle will post as plain text.',
     editWindowExpired: 'You can no longer edit this comment.',
     postFailed: 'Could not post your comment. Try again.',
     deleteFailed: 'Could not delete your comment. Try again.',

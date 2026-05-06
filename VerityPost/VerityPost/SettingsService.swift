@@ -69,7 +69,7 @@ final class SettingsService: ObservableObject {
         cs["require_login"] = isEnabled("require_login", default: true)
         cs["auto_approve"] = isEnabled("auto_approve", default: true)
         cs["allow_replies"] = isEnabled("allow_replies", default: false)
-        cs["max_depth"] = getNumber("comment_max_depth", default: 1)
+        cs["max_depth"] = getNumber("comment_max_depth", default: 2)
         commentSettings = cs
 
         lastFetch = Date()

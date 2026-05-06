@@ -548,11 +548,6 @@ export default function CommentComposer({
 
   return (
     <div style={isReply ? replyContainerStyle : containerStyle}>
-      {showMentionHint && (
-        <div role="note" style={mentionHintStyle}>
-          {COPY.comments.mentionPaid}
-        </div>
-      )}
       <textarea
         ref={textareaRef}
         autoFocus={autoFocus}
@@ -768,9 +763,7 @@ export default function CommentComposer({
       )}
       <div style={footerStyle}>
         <span>
-          {canMention
-            ? isReply ? '' : 'Tip: type @username to mention.'
-            : isReply ? '' : '@mentions are available on paid plans.'}
+          {canMention && !isReply ? 'Tip: type @username to mention.' : ''}
         </span>
         <span style={{ flex: 1 }} />
         {onCancel && (

@@ -1543,10 +1543,10 @@ struct StoryDetailView: View {
         }
     }
 
-    /// Web parity: depth cap matches the iOS-side product decision (3) and
-    /// keeps the render list stable when threads grow long. Beyond depth 3,
-    /// further replies render at depth-3 indent without additional nesting.
-    private static let maxThreadDepth = 3
+    /// Web parity: depth cap matches the iOS-side product decision (2) and
+    /// keeps the render list stable when threads grow long. Beyond depth 2,
+    /// further replies render at depth-2 indent without additional nesting.
+    private static let maxThreadDepth = 2
 
     // MARK: - Mute state (pre-submit banner)
     struct MuteState: Equatable {
@@ -2156,7 +2156,8 @@ struct StoryDetailView: View {
 
                     // Action row: Reply · Edit · Agree · Disagree
                     HStack(spacing: 4) {
-                        if auth.isLoggedIn && muteState == nil {
+                        if auth.isLoggedIn && muteState == nil
+                            && depth < SettingsService.shared.commentNumber("max_depth") {
                             // Disable Reply when:
                             //   - the thread is closed (no new replies)
                             //   - the asker has hit the per-expert chain cap

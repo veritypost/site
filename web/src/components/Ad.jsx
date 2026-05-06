@@ -259,6 +259,7 @@ const wrapStyle = {
   border: '1px solid var(--border, #e5e5e5)',
   borderRadius: 10,
   padding: '10px 12px',
-  margin: '12px 0',
+  margin: '12px auto',
+  maxWidth: 728,
   textAlign: 'center',
 };

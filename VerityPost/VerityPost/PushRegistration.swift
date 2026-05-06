@@ -99,6 +99,30 @@ final class PushRegistration: NSObject, UNUserNotificationCenterDelegate {
     ) {
         completionHandler([.banner, .sound, .badge])
     }
+
+    // Fires when the user taps a notification. Extracts a story slug from the
+    // payload and posts VPOpenStory so ContentView / ArticleRouter can present
+    // the story without a full navigation coordinator.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let info = response.notification.request.content.userInfo
+        let slug = (info["story_slug"] as? String) ?? (info["article_slug"] as? String)
+        if let slug, !slug.isEmpty {
+            NotificationCenter.default.post(
+                name: .vpOpenStory,
+                object: nil,
+                userInfo: ["slug": slug]
+            )
+        }
+        completionHandler()
+    }
+}
+
+extension Notification.Name {
+    static let vpOpenStory = Notification.Name("VPOpenStory")
 }
 
 // UIApplicationDelegate shim so SwiftUI can receive the APNs callback.

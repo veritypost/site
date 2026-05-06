@@ -30,7 +30,7 @@ import Supabase
 //     followers_count / following_count / display_name / bio
 //     — loaded by AuthViewModel.loadUser
 //   - score_tiers — live query, cached per screen
-//   - reading_log / quiz_attempts / comments / bookmarks — activity feed
+//   - reading_log / quiz_attempts / comments — activity feed
 //   - user_achievements + achievements — badge showcase
 //   - comment_votes — per-category upvote tally (milestones tab)
 
@@ -46,7 +46,6 @@ struct ProfileView: View {
     @State private var canViewActivity: Bool = false
     @State private var canViewCategories: Bool = false
     @State private var canViewAchievements: Bool = false
-    @State private var canViewBookmarks: Bool = false
     @State private var canViewActivityFullHistory: Bool = false
     @State private var canViewMessages: Bool = false
     @State private var canViewExpertQueue: Bool = false
@@ -70,12 +69,11 @@ struct ProfileView: View {
     }
     @State private var tab: ProfileTab = .overview
 
-    // Activity filter — All / Articles / Comments / Bookmarks
+    // Activity filter — All / Articles / Comments
     enum ActivityFilter: String, CaseIterable, Identifiable {
         case all = "All"
         case articles = "Articles"
         case comments = "Comments"
-        case bookmarks = "Bookmarks"
         var id: String { rawValue }
     }
     @State private var activityFilter: ActivityFilter = .all
@@ -84,7 +82,6 @@ struct ProfileView: View {
     @State private var activity: [ActivityItem] = []
     @State private var activityLoaded = false
     @State private var activityLoadError = false
-    @State private var bookmarkItems: [BookmarkRow] = []
     @State private var categories: [VPCategory] = []
     @State private var subcategories: [VPSubcategory] = []
     @State private var catStats: [String: CategoryStats] = [:]
@@ -213,7 +210,6 @@ struct ProfileView: View {
             canViewActivityFullHistory = await PermissionService.shared.has("profile.activity.full_history")
             canViewCategories = await PermissionService.shared.has("profile.categories")
             canViewAchievements = await PermissionService.shared.has("profile.achievements")
-            canViewBookmarks = await PermissionService.shared.has("bookmarks.list.view")
             canViewMessages = await PermissionService.shared.has("messages.inbox.view")
             canViewExpertQueue = await PermissionService.shared.has("expert.queue.view")
             canViewFamily = await PermissionService.shared.has("settings.family.view")
@@ -292,7 +288,7 @@ struct ProfileView: View {
             Text("Guest reader")
                 .font(.system(.title3, design: .default, weight: .bold))
                 .foregroundColor(VP.text)
-            Text("Sign in to track reading, quizzes, bookmarks, and achievements.")
+            Text("Sign in to track reading, quizzes, and achievements.")
                 .font(.footnote)
                 .foregroundColor(VP.dim)
                 .multilineTextAlignment(.center)
@@ -1046,7 +1042,7 @@ struct ProfileView: View {
                     VStack(spacing: 10) {
                         emptyState(
                             title: "No activity yet — read an article to get started.",
-                            description: "Read an article, leave a comment, or save a bookmark to see it here."
+                            description: "Read an article or leave a comment to see it here."
                         )
                         Button {
                             auth.pendingHomeJump = true
@@ -1073,8 +1069,7 @@ struct ProfileView: View {
     }
 
     private func combinedActivityAllTypes() -> [ActivityItem] {
-        (activity + bookmarkItems.map { $0.asActivityItem })
-            .sorted { $0.time > $1.time }
+        activity.sorted { $0.time > $1.time }
     }
 
     private func filteredActivityItems() -> [ActivityItem] {
@@ -1082,7 +1077,6 @@ struct ProfileView: View {
         case .all:       return combinedActivityAllTypes()
         case .articles:  return activity.filter { $0.type == .read || $0.type == .quiz }
         case .comments:  return activity.filter { $0.type == .comment }
-        case .bookmarks: return bookmarkItems.map { $0.asActivityItem }
         }
     }
 
@@ -1105,7 +1099,7 @@ struct ProfileView: View {
                         .font(.system(.footnote, design: .default, weight: .medium))
                         .foregroundColor(VP.text)
                         .lineLimit(1)
-                    if (item.type == .comment || item.type == .bookmark), !item.detail.isEmpty {
+                    if item.type == .comment, !item.detail.isEmpty {
                         Text(item.detail)
                             .font(.caption)
                             .foregroundColor(VP.dim)
@@ -1129,19 +1123,17 @@ struct ProfileView: View {
 
     private func activityBadgeLabel(_ t: ActivityItem.ActivityType) -> String {
         switch t {
-        case .read:     return "Read"
-        case .quiz:     return "Quiz"
-        case .comment:  return "Comment"
-        case .bookmark: return "Bookmark"
+        case .read:    return "Read"
+        case .quiz:    return "Quiz"
+        case .comment: return "Comment"
         }
     }
 
     private func activityColor(_ t: ActivityItem.ActivityType) -> Color {
         switch t {
-        case .read:     return VP.readColor
-        case .quiz:     return VP.quizColor
-        case .comment:  return VP.commentColor
-        case .bookmark: return VP.muted
+        case .read:    return VP.readColor
+        case .quiz:    return VP.quizColor
+        case .comment: return VP.commentColor
         }
     }
 
@@ -1593,8 +1585,8 @@ struct ProfileView: View {
             // reading_log + quiz_attempts carry kid_profile_id when the
             // row originated in the kids app — filter out so the parent's
             // adult Activity feed never surfaces their kid's reads or
-            // quizzes. (comments + bookmarks have no kid_profile_id
-            // column; kids don't comment or bookmark.)
+            // quizzes. (comments have no kid_profile_id column;
+            // kids don't comment.)
             async let r: [ReadingLogItem] = client.from("reading_log")
                 .select("id, read_at, completed, articles(title, stories(slug))")
                 .eq("user_id", value: userId)
@@ -1612,15 +1604,9 @@ struct ProfileView: View {
                 .eq("user_id", value: userId)
                 .gte("created_at", value: cutoff)
                 .order("created_at", ascending: false).limit(50).execute().value
-            async let b: [BookmarkJoined] = client.from("bookmarks")
-                .select("id, created_at, notes, articles(title, stories(slug))")
-                .eq("user_id", value: userId)
-                .gte("created_at", value: cutoff)
-                .order("created_at", ascending: false).limit(50).execute().value
             let reads = try await r
             let quizzes_ = try await q
             let comments = try await c
-            let bookmarks = (try? await b) ?? []
 
             var items: [ActivityItem] = []
             for x in reads {
@@ -1653,16 +1639,6 @@ struct ProfileView: View {
             }
             items.sort { $0.time > $1.time }
             activity = items
-
-            bookmarkItems = bookmarks.map {
-                BookmarkRow(
-                    id: "b-\($0.id ?? UUID().uuidString)",
-                    label: $0.articles?.title ?? "Untitled",
-                    slug: $0.articles?.slug,
-                    notes: $0.notes ?? "",
-                    time: $0.createdAt ?? Date.distantPast
-                )
-            }
         } catch {
             Log.d("Load activity error: \(error)")
             activityLoadError = true
@@ -1804,42 +1780,6 @@ struct ProfileView: View {
     }
 }
 
-// MARK: - Bookmark row for Activity's "Bookmarks" filter
-
-private struct BookmarkJoined: Decodable {
-    let id: String?
-    let createdAt: Date?
-    let notes: String?
-    let articles: ArticleJoin?
-    struct ArticleJoin: Decodable {
-        let title: String?
-        let stories: StorySlugRef?
-        var slug: String? { stories?.slug }
-    }
-    enum CodingKeys: String, CodingKey {
-        case id, notes, articles
-        case createdAt = "created_at"
-    }
-}
-
-struct BookmarkRow: Identifiable {
-    let id: String
-    let label: String
-    let slug: String?
-    let notes: String
-    let time: Date
-
-    var asActivityItem: ActivityItem {
-        ActivityItem(
-            id: id,
-            type: .bookmark,
-            label: label,
-            slug: slug,
-            detail: notes,
-            time: time
-        )
-    }
-}
 
 // MARK: - Avatar quick-edit sheet (color + display name)
 //

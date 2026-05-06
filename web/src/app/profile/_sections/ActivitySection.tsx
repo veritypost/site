@@ -1,10 +1,10 @@
-// "Activity" — full reading log, comments, bookmarks. Was a tab on the
+// "Activity" — full reading log and comments. Was a tab on the
 // legacy dashboard; now its own section in the rail. Real DB-backed,
 // filterable, shows empty/error states.
 
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 import type { Tables } from '@/types/database-helpers';
@@ -25,11 +25,8 @@ type ReadingLogJoined = Pick<
 type CommentJoined = Pick<Tables<'comments'>, 'id' | 'body' | 'created_at' | 'article_id'> & {
   articles: ArticleWithSlug;
 };
-type BookmarkJoined = Pick<Tables<'bookmarks'>, 'id' | 'created_at' | 'article_id' | 'notes'> & {
-  articles: ArticleWithSlug;
-};
 
-type Filter = 'all' | 'articles' | 'comments' | 'bookmarks';
+type Filter = 'all' | 'articles' | 'comments';
 
 interface Props {
   authUserId: string | null;
@@ -44,7 +41,6 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [reads, setReads] = useState<ReadingLogJoined[]>([]);
   const [comments, setComments] = useState<CommentJoined[]>([]);
-  const [bookmarks, setBookmarks] = useState<BookmarkJoined[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
 
   const load = useCallback(async () => {
@@ -66,30 +62,22 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
       .select('id, body, created_at, article_id, articles(title, stories(slug))')
       .eq('user_id', authUserId)
       .is('deleted_at', null);
-    const bookmarksQ = supabase
-      .from('bookmarks')
-      .select('id, created_at, article_id, notes, articles(title, stories(slug))')
-      .eq('user_id', authUserId);
 
-    const [r, c, b] = await Promise.all([
+    const [r, c] = await Promise.all([
       (cutoff30 ? readLogQ.gte('created_at', cutoff30) : readLogQ)
         .order('created_at', { ascending: false })
         .limit(100),
       (cutoff30 ? commentsQ.gte('created_at', cutoff30) : commentsQ)
         .order('created_at', { ascending: false })
         .limit(50),
-      (cutoff30 ? bookmarksQ.gte('created_at', cutoff30) : bookmarksQ)
-        .order('created_at', { ascending: false })
-        .limit(50),
     ]);
-    if (r.error || c.error || b.error) {
+    if (r.error || c.error) {
       setError('Could not load your activity. Try again.');
       setLoading(false);
       return;
     }
     setReads((r.data ?? []) as unknown as ReadingLogJoined[]);
     setComments((c.data ?? []) as unknown as CommentJoined[]);
-    setBookmarks((b.data ?? []) as unknown as BookmarkJoined[]);
     setLoading(false);
   }, [authUserId, isPro, preview, supabase]);
 
@@ -135,14 +123,6 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
         slug: string | null;
         body: string;
       }
-    | {
-        kind: 'bookmark';
-        id: string;
-        when: string;
-        title: string;
-        slug: string | null;
-        notes: string | null;
-      }
   > = [];
   if (filter === 'all' || filter === 'articles') {
     for (const r of reads) {
@@ -168,25 +148,13 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
       });
     }
   }
-  if (filter === 'all' || filter === 'bookmarks') {
-    for (const b of bookmarks) {
-      items.push({
-        kind: 'bookmark',
-        id: b.id,
-        when: b.created_at,
-        title: b.articles?.title ?? 'Untitled article',
-        slug: b.articles?.stories?.slug ?? null,
-        notes: b.notes,
-      });
-    }
-  }
   items.sort((a, b) => Date.parse(b.when) - Date.parse(a.when));
 
   if (items.length === 0) {
     return (
       <EmptyState
         title="Nothing here yet"
-        body="Read an article, drop a comment, or bookmark something to start your timeline."
+        body="Read an article or drop a comment to start your timeline."
         cta={{ label: 'Read today’s top stories', href: '/' }}
         variant="full"
       />
@@ -197,7 +165,6 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
     { id: 'all', label: 'All' },
     { id: 'articles', label: 'Reads' },
     { id: 'comments', label: 'Comments' },
-    { id: 'bookmarks', label: 'Bookmarks' },
   ];
 
   return (
@@ -242,17 +209,8 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
             day: 'numeric',
             year: 'numeric',
           });
-          return (
-            <li
-              key={`${it.kind}-${it.id}`}
-              style={{
-                background: C.surfaceRaised,
-                border: `1px solid ${C.border}`,
-                borderRadius: R.lg,
-                padding: S[4],
-                boxShadow: SH.ambient,
-              }}
-            >
+          const cardContent = (
+            <>
               <div
                 style={{
                   display: 'flex',
@@ -273,35 +231,18 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
                 </span>
                 <span style={{ fontSize: F.xs, color: C.inkFaint }}>{when}</span>
               </div>
-              {it.slug ? (
-                <Link
-                  href={`/${it.slug}`}
-                  style={{
-                    fontFamily: FONT.serif,
-                    fontSize: F.md,
-                    fontWeight: 600,
-                    color: C.ink,
-                    textDecoration: 'none',
-                    letterSpacing: '-0.01em',
-                    display: 'block',
-                  }}
-                >
-                  {it.title}
-                </Link>
-              ) : (
-                <span
-                  style={{
-                    fontFamily: FONT.serif,
-                    fontSize: F.md,
-                    fontWeight: 600,
-                    color: C.inkMuted,
-                    letterSpacing: '-0.01em',
-                    display: 'block',
-                  }}
-                >
-                  {it.title}
-                </span>
-              )}
+              <span
+                style={{
+                  fontFamily: FONT.serif,
+                  fontSize: F.md,
+                  fontWeight: 600,
+                  color: it.slug ? C.ink : C.inkMuted,
+                  letterSpacing: '-0.01em',
+                  display: 'block',
+                }}
+              >
+                {it.title}
+              </span>
               {it.kind === 'comment' && it.body ? (
                 <p
                   style={{
@@ -318,11 +259,27 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
                   {it.body}
                 </p>
               ) : null}
-              {it.kind === 'bookmark' && it.notes ? (
-                <p style={{ margin: `${S[1]}px 0 0`, fontSize: F.sm, color: C.inkMuted }}>
-                  {it.notes}
-                </p>
-              ) : null}
+            </>
+          );
+          const cardStyle: React.CSSProperties = {
+            background: C.surfaceRaised,
+            border: `1px solid ${C.border}`,
+            borderRadius: R.lg,
+            padding: S[4],
+            boxShadow: SH.ambient,
+            display: 'block',
+            textDecoration: 'none',
+            color: 'inherit',
+          };
+          return (
+            <li key={`${it.kind}-${it.id}`}>
+              {it.slug ? (
+                <Link href={`/${it.slug}`} style={cardStyle}>
+                  {cardContent}
+                </Link>
+              ) : (
+                <div style={{ ...cardStyle, cursor: 'default' }}>{cardContent}</div>
+              )}
             </li>
           );
         })}
