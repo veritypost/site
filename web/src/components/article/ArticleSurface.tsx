@@ -43,7 +43,7 @@ const PAGE_STYLE: React.CSSProperties = {
 };
 
 const TITLE_STYLE: React.CSSProperties = {
-  fontSize: 32,
+  fontSize: 36,
   fontWeight: 700,
   lineHeight: 1.2,
   margin: '0 0 12px',
@@ -132,7 +132,7 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
       )}
       <h1 style={TITLE_STYLE}>{article.title}</h1>
       {article.subtitle && <p style={SUBTITLE_STYLE}>{article.subtitle}</p>}
-      <p style={{ fontSize: 12, color: 'var(--p-ink-muted)', marginBottom: 16, letterSpacing: '0.03em' }}>
+      <p style={{ fontSize: 13, color: 'var(--p-ink-muted)', marginBottom: 16, letterSpacing: '0.03em' }}>
         Verity Post{article.published_at ? ` · ${new Date(article.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` : ''}
       </p>
       {/* article_header: between title/byline block and body (DECISION #048) */}

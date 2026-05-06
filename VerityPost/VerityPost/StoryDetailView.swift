@@ -203,8 +203,6 @@ struct StoryDetailView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var contentHeight: CGFloat = 1
     @State private var viewportHeight: CGFloat = 1
-    @State private var showQuizTeaser = false
-    @State private var quizTeaserDismissed = false
     @State private var showPassBurst = false
     @State private var pointsDelta: Int? = nil
     @State private var pointsDeltaVisible = false
@@ -720,7 +718,7 @@ struct StoryDetailView: View {
                     return parts.joined(separator: " · ")
                 }()
                 Text(metaLine)
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundColor(VP.dim)
                 Spacer()
                 if canPlayTTS { ttsControls }
@@ -740,13 +738,6 @@ struct StoryDetailView: View {
                                 .foregroundColor(VP.text)
                                 .lineSpacing(5)
                                 .padding(.horizontal, 20)
-                            // Inject the quiz pre-teaser inline at the midpoint
-                            // of the article body. Visibility is gated by the
-                            // half-scroll trigger inside the teaser view itself
-                            // so it never appears above the fold.
-                            if idx == mid && idx > 0 {
-                                quizTeaserCard
-                            }
                         }
                     }
                 }
@@ -2651,47 +2642,6 @@ struct StoryDetailView: View {
         }
     }
 
-    // MARK: - Quiz pre-teaser (inline at ~50% scroll)
-    // Subtle inline card injected partway through the article body that hints
-    // at the quiz at the end. Hidden once the reader passes, dismisses, or
-    // when the discussion tab is already open.
-    @ViewBuilder private var quizTeaserCard: some View {
-        if showQuizTeaser, !userPassedQuiz, !quizTeaserDismissed, canTakeQuiz {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "checklist")
-                    .font(.system(size: VP.Size.lg, weight: .semibold))
-                    .foregroundColor(VP.accent)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("5 questions waiting at the end")
-                        .font(.system(.footnote, design: .default, weight: .regular))
-                        .foregroundColor(VP.text)
-                    Text("Pass 3 to join the discussion.")
-                        .font(.caption)
-                        .foregroundColor(VP.soft)
-                }
-                Spacer()
-                Button {
-                    quizTeaserDismissed = true
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: VP.Size.xs, weight: .semibold))
-                        .foregroundColor(VP.dim)
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Dismiss quiz reminder")
-            }
-            .padding(16)
-            .background(VP.card)
-            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border, lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .transition(reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity))
-        }
-    }
-
     // MARK: - Up Next sheet
     // Slide-in (system .sheet) recommendation list. Loaded once on mount; tap
     // a card to push the next StoryDetailView via the existing
@@ -2776,17 +2726,7 @@ struct StoryDetailView: View {
     // MARK: - Scroll + engagement triggers
     private func handleScrollOffset(_ value: CGFloat) {
         scrollOffset = value
-        // Half-scroll quiz teaser: arms once when the reader crosses 50% of
-        // the scrollable range. Stays armed even if they scroll back so the
-        // card doesn't flicker on every scroll oscillation.
         let scrollable = max(contentHeight - viewportHeight, 1)
-        if !showQuizTeaser, !quizTeaserDismissed, value / scrollable >= 0.5 {
-            if reduceMotion {
-                showQuizTeaser = true
-            } else {
-                withAnimation(.easeOut(duration: 0.3)) { showQuizTeaser = true }
-            }
-        }
         // End-of-article Up Next trigger fires once when the reader reaches
         // ~95% of the body. Skipped until recommendations have loaded so we
         // don't pop an empty sheet.

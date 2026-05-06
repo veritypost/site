@@ -58,7 +58,7 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
           border: '1px solid var(--border, #e5e5e5)',
           borderRadius: 8,
           padding: '0 14px',
-          minHeight: 36,
+          minHeight: 44,
           cursor: 'pointer',
           WebkitTapHighlightColor: 'transparent',
         }}
@@ -113,7 +113,7 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
           border: `1px solid ${bookmarked ? 'var(--accent, #111)' : 'var(--border, #e5e5e5)'}`,
           borderRadius: 8,
           padding: '0 14px',
-          minHeight: 36,
+          minHeight: 44,
           cursor: busy || bookmarked ? 'default' : 'pointer',
           transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',
           WebkitTapHighlightColor: 'transparent',
