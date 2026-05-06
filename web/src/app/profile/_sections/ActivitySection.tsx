@@ -274,7 +274,10 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
           return (
             <li key={`${it.kind}-${it.id}`}>
               {it.slug ? (
-                <Link href={`/${it.slug}`} style={cardStyle}>
+                <Link
+                  href={it.kind === 'comment' ? `/${it.slug}#comment-${it.id}` : `/${it.slug}`}
+                  style={cardStyle}
+                >
                   {cardContent}
                 </Link>
               ) : (

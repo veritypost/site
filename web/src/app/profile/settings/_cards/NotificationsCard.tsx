@@ -38,11 +38,6 @@ const ROWS: { key: ChannelKey; title: string; body: string; alwaysOn?: boolean }
     body: 'Notification bell on the site and apps. The primary channel.',
   },
   {
-    key: 'push',
-    title: 'Mobile push',
-    body: 'Time-sensitive notifications on the iOS app. Web is in-app and email only.',
-  },
-  {
     key: 'email',
     title: 'Security email only',
     body: 'Password reset, email verification, billing receipts, and account-deletion notices. Always on.',

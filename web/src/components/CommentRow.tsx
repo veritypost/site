@@ -330,6 +330,7 @@ export default function CommentRow({
 
   return (
     <div
+      id={`comment-${comment.id}`}
       style={{
         padding: depth === 0 ? '12px 0' : '10px 0',
         borderBottom: depth === 0 && !showExpertChrome ? '1px solid #e5e5e5' : 'none',
