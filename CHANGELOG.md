@@ -6,6 +6,14 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-07 (continued)
 
+### TODO 11 Wave 1 — Parent-check is wildcard, not snapshot
+**File:** `web/src/app/admin/ad-units/[id]/page.tsx`. Commit: `9315a310`.
+- `toggleCat` no longer writes a snapshot of current child subcategory IDs into `targeting_subcategories` when a parent is checked. Parent membership in `targeting_categories` now means "this category and all current and future children" — wildcard semantics.
+- Sub-list render: when a checked parent is expanded, the per-child checkboxes are replaced by an italic caption *"All {cat.name} subcategories targeted (current and future)."* Children remain individually toggleable when the parent is unchecked.
+- Load-time normalization drops any `targeting_subcategories` entries whose parent is already in `targeting_categories`. Legacy rows (parent + child snapshot from the bug) self-heal into the wildcard model on first save.
+- **Wave 1 collapsed to this single fix.** Pre-impl panel discovered the live `serve_ad` Postgres function does not filter on `targeting_categories` / `targeting_subcategories` (or any other `targeting_*` column) — the admin form has been writing to columns the runtime ignores. 4/4 fresh independent reviewers agreed: shipping the JSON→uuid[] migration + GIN indexes, tri-state UX, and "empty=all" banner ahead of the RPC rewrite would be premature. Those items belong in a future "targeting goes live" session that ships column-type change + `serve_ad` RPC rewrite + UI semantics atomically.
+- Cross-platform: web admin only. iOS / iOS Kids n/a.
+
 ### TODO 3 + TODO 38 — Sources inline + drop the desktop side rail
 **Files:** `web/src/components/article/SourcesSection.tsx`, `web/src/app/[slug]/page.tsx`, `web/src/app/globals.css`. Commit: `a9c53cf5`.
 - **TODO 3 — sources moved into the article body.** SourcesSection rewritten as logo-driven rows. Each row is a button showing publisher favicon (Google s2 favicons API at `sz=32`, 16px rendered) + hostname (`bbc.co.uk`, `congress.gov`). Click toggles a panel below with the source's raw headline. Click the headline → opens URL in a new tab with `rel="noopener noreferrer"`. Anon-tease branch unchanged. Component moved out of `timelineSlot` in `[slug]/page.tsx` into `articleSlot`, right after `ArticleActions` — readers see provenance in the same scroll as the body, not in a side rail they often miss.
@@ -49,6 +57,13 @@ Entries are brief — enough for another agent to know what changed and why, and
 - iOS xcodebuild + web typecheck clean throughout.
 
 **Commit:** `8110a917` — 19 files, +4,473 / −79.
+
+### TODO 39 (web half) — Tag-row redesign in CommentRow
+**File:** `web/src/components/CommentRow.tsx`. Commit: `dd73c1ec` (part of the larger WYSIWYG-composer ship — full commit also covers composer, collapsible replies, permalink, quote reply).
+- `helpful` tag promoted to a heart icon in the primary action row (Substack-style, with count). Filled heart when cast, outlined when not.
+- `context` / `cite_needed` / `off_topic` rendered as always-visible inline buttons in the action row — no hidden picker, no `+ Tag` opener, no two-step reveal. Buttons gate on `comments.context_tag` permission + `quizPassed !== false`.
+- Cast state shows count + colored border; uncast shows label + neutral border. Single source of UX truth — no separate "active list" vs "picker list" split.
+- **iOS parity not shipped in this commit** — `StoryDetailView.swift` still uses the old `+ Tag` opens-picker pattern. Tracked in TODO 39 (now iOS-parity-only).
 
 ---
 
