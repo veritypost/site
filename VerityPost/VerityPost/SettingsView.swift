@@ -949,6 +949,14 @@ struct SettingsView: View {
                                kind: .push(AnyView(AccountSettingsView())),
                                onTap: onTap))
             })
+            out.append(HubRowSpec(id: "background",
+                                  keywords: ["background", "credentials", "experience", "firsthand", "expertise", "education", "links"]) { isLast, onTap in
+                AnyView(HubRow(icon: "person.text.rectangle.fill", title: "Background",
+                               subtitle: "Who's writing — civil engineer, lifelong reader, dad of three",
+                               showDivider: !isLast,
+                               kind: .push(AnyView(SettingsBackgroundView())),
+                               onTap: onTap))
+            })
         }
         if canEditEmail {
             out.append(HubRowSpec(id: "email",

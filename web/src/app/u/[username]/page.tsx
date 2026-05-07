@@ -61,7 +61,29 @@ type TargetRow = Pick<
   | 'expert_organization'
   | 'is_verified_public_figure'
   | 'created_at'
+  | 'background_oneline'
+  | 'background_profession'
+  | 'background_years'
+  | 'background_where'
+  | 'background_lived'
+  | 'background_languages'
+  | 'background_lived_public'
 >;
+
+interface BackgroundEducation {
+  school: string;
+  degree: string | null;
+  field: string | null;
+  years: string | null;
+}
+interface BackgroundLink {
+  url: string;
+  label: string | null;
+}
+interface BackgroundTopic {
+  id: string;
+  name: string;
+}
 
 type MeRow = Pick<Tables<'users'>, 'id' | 'frozen_at'>;
 
@@ -98,6 +120,34 @@ const C = {
   accent: 'var(--accent)',
 } as const;
 
+// Auto-linkify plain http(s) URLs inside free-text fields like
+// `background_lived`. The DB CHECK on user_links enforces http(s); this
+// regex matches the same shape. `rel` set per UGC convention.
+const URL_RE = /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g;
+function linkifyText(text: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  URL_RE.lastIndex = 0;
+  while ((m = URL_RE.exec(text)) !== null) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    out.push(
+      <a
+        key={`l${m.index}`}
+        href={m[0]}
+        target="_blank"
+        rel="nofollow noopener noreferrer ugc"
+        style={{ color: 'var(--p-accent, #0b5cff)' }}
+      >
+        {m[0]}
+      </a>
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
 export default function ProfilePage() {
   if (!PUBLIC_PROFILE_ENABLED) {
     return <UnderConstruction surface="public profiles" />;
@@ -126,6 +176,14 @@ export default function ProfilePage() {
   const [isAnon, setIsAnon] = useState<boolean>(false);
   const [checkedAuth, setCheckedAuth] = useState<boolean>(false);
   const [privateProfile, setPrivateProfile] = useState<boolean>(false);
+
+  // Background surface (TODO-50 Piece A read side) — education / links /
+  // topics live in their own tables. Fetched in parallel with the target
+  // row so the section can render without a second round-trip from the
+  // user's perspective.
+  const [bgEducation, setBgEducation] = useState<BackgroundEducation[]>([]);
+  const [bgLinks, setBgLinks] = useState<BackgroundLink[]>([]);
+  const [bgTopics, setBgTopics] = useState<BackgroundTopic[]>([]);
 
   // Block / Report state — both surfaces sit next to Follow + DM. Block
   // gates behind a confirm dialog (irreversible-feeling action even though
@@ -186,7 +244,7 @@ export default function ProfilePage() {
       const { data: targetRow } = await supabase
         .from('public_profiles_v')
         .select(
-          'id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, quizzes_completed_count, comment_count, profile_visibility, show_activity, is_expert, expert_title, expert_organization, is_verified_public_figure, created_at'
+          'id, username, display_name, bio, avatar_url, avatar_color, banner_url, verity_score, followers_count, following_count, quizzes_completed_count, comment_count, profile_visibility, show_activity, is_expert, expert_title, expert_organization, is_verified_public_figure, created_at, background_oneline, background_profession, background_years, background_where, background_lived, background_languages, background_lived_public'
         )
         .eq('username', username.toLowerCase())
         .maybeSingle<TargetRow>();
@@ -213,6 +271,56 @@ export default function ProfilePage() {
         return;
       }
       setTarget(targetRow);
+
+      // Background surface — fetch education, links, topics in parallel.
+      // RLS gates on profile_visibility so private profiles return zero rows.
+      // Topics are returned as category_ids; resolve names via a categories
+      // join in the same fetch.
+      (async () => {
+        const [eduRes, linksRes, topicsRes] = await Promise.all([
+          supabase
+            .from('user_education')
+            .select('school, degree, field, years')
+            .eq('user_id', targetRow.id)
+            .is('deleted_at', null)
+            .order('sort_order', { ascending: true }),
+          supabase
+            .from('user_links')
+            .select('url, label')
+            .eq('user_id', targetRow.id)
+            .is('deleted_at', null)
+            .order('sort_order', { ascending: true }),
+          supabase
+            .from('user_topics_known')
+            .select('categories(id, name)')
+            .eq('user_id', targetRow.id),
+        ]);
+        setBgEducation(((eduRes.data || []) as Array<{
+          school: string;
+          degree: string | null;
+          field: string | null;
+          years: string | null;
+        }>).map((e) => ({
+          school: e.school,
+          degree: e.degree,
+          field: e.field,
+          years: e.years,
+        })));
+        setBgLinks(((linksRes.data || []) as Array<{
+          url: string;
+          label: string | null;
+        }>).map((l) => ({ url: l.url, label: l.label })));
+        const topicsRaw = (topicsRes.data || []) as Array<{
+          categories: { id: string; name: string | null } | null;
+        }>;
+        setBgTopics(
+          topicsRaw
+            .map((row) => row.categories)
+            .filter((c): c is { id: string; name: string | null } => !!c)
+            .map((c) => ({ id: c.id, name: c.name ?? '' }))
+            .filter((t) => t.name.length > 0)
+        );
+      })();
 
       if (user.id !== targetRow.id) {
         const [{ data: f }, { data: b }] = await Promise.all([
@@ -643,6 +751,197 @@ export default function ProfilePage() {
 
         {target.bio && (
           <div style={{ fontSize: 14, color: '#333', marginTop: 10 }}>{target.bio}</div>
+        )}
+
+        {/* Background — self-described context (TODO-50 Piece A read side).
+         *  Shows the typeset one-line byline next to the username area, then
+         *  optional sections (profession+years, where, lived experience,
+         *  education, links, topics, languages). All optional; only
+         *  populated fields render. `lived` gated on background_lived_public.
+         *  Empty-state hint shown only on own profile to invite a fill-in. */}
+        {!(
+          target.background_oneline ||
+          target.background_profession ||
+          target.background_years ||
+          target.background_where ||
+          (target.background_lived && target.background_lived_public) ||
+          target.background_languages ||
+          bgEducation.length > 0 ||
+          bgLinks.length > 0 ||
+          bgTopics.length > 0
+        ) && me?.id === target.id && (
+          <div
+            style={{
+              marginTop: 14,
+              fontFamily: 'var(--font-serif), Georgia, serif',
+              fontStyle: 'italic',
+              fontSize: 13,
+              color: 'var(--p-ink-muted, #52525b)',
+            }}
+          >
+            <a
+              href="/profile/settings#background"
+              style={{ color: 'var(--p-accent, #0b5cff)', textDecoration: 'none' }}
+            >
+              Add a background line to your profile →
+            </a>
+          </div>
+        )}
+        {(target.background_oneline ||
+          target.background_profession ||
+          target.background_years ||
+          target.background_where ||
+          (target.background_lived && target.background_lived_public) ||
+          target.background_languages ||
+          bgEducation.length > 0 ||
+          bgLinks.length > 0 ||
+          bgTopics.length > 0) && (
+          <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
+            {target.background_oneline && (
+              <div
+                style={{
+                  fontFamily: 'var(--font-serif), Georgia, serif',
+                  fontStyle: 'italic',
+                  fontSize: 14,
+                  color: 'var(--p-ink-muted, #52525b)',
+                  letterSpacing: '0.01em',
+                }}
+              >
+                — {target.background_oneline}
+              </div>
+            )}
+
+            {(target.background_profession || target.background_years) && (
+              <div style={{ fontSize: 13, color: '#333' }}>
+                {[target.background_profession, target.background_years]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+            )}
+
+            {target.background_where && (
+              <div style={{ fontSize: 13, color: 'var(--p-ink-muted, #52525b)' }}>
+                {target.background_where}
+              </div>
+            )}
+
+            {target.background_lived && target.background_lived_public && (
+              <div
+                style={{
+                  fontSize: 13,
+                  color: '#333',
+                  paddingLeft: 10,
+                  borderLeft: '2px solid var(--p-divider, #f1f1f3)',
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {linkifyText(target.background_lived)}
+              </div>
+            )}
+
+            {bgEducation.length > 0 && (
+              <div style={{ display: 'grid', gap: 4 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                    color: 'var(--p-ink-faint, #a1a1aa)',
+                  }}
+                >
+                  Education
+                </div>
+                {bgEducation.map((e, i) => {
+                  const meta = [e.degree, e.field, e.years].filter(Boolean).join(' · ');
+                  return (
+                    <div key={i} style={{ fontSize: 13, color: '#333' }}>
+                      <span style={{ fontWeight: 600 }}>{e.school}</span>
+                      {meta && (
+                        <>
+                          {' '}
+                          <span style={{ color: 'var(--p-ink-muted, #52525b)' }}>· {meta}</span>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {bgTopics.length > 0 && (
+              <div style={{ display: 'grid', gap: 6 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                    color: 'var(--p-ink-faint, #a1a1aa)',
+                  }}
+                >
+                  Knows well
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {bgTopics.map((t) => (
+                    <span
+                      key={t.id}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        padding: '3px 9px',
+                        borderRadius: 999,
+                        border: '1px solid var(--p-border, #e4e4e7)',
+                        color: 'var(--p-ink-soft, #27272a)',
+                      }}
+                    >
+                      {t.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {target.background_languages && (
+              <div style={{ fontSize: 13, color: 'var(--p-ink-muted, #52525b)' }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                    color: 'var(--p-ink-faint, #a1a1aa)',
+                    marginRight: 8,
+                  }}
+                >
+                  Languages
+                </span>
+                {target.background_languages}
+              </div>
+            )}
+
+            {bgLinks.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 2 }}>
+                {bgLinks.map((l, i) => (
+                  <a
+                    key={i}
+                    href={l.url}
+                    target="_blank"
+                    rel="nofollow noopener noreferrer ugc"
+                    style={{
+                      fontSize: 13,
+                      color: 'var(--p-accent, #0b5cff)',
+                      textDecoration: 'none',
+                      borderBottom: '1px solid currentColor',
+                      paddingBottom: 1,
+                    }}
+                  >
+                    ↗ {l.label || new URL(l.url).hostname.replace(/^www\./, '')}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Canonical public-profile stat set — matches own profile, iOS

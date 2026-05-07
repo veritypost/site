@@ -65,6 +65,17 @@ export default function CommentComposer({
   const [isEmpty, setIsEmpty] = useState(true);
   const [busy, setBusy] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  // Firsthand self-tag — author asserts at compose time, sent in the POST
+  // payload as `real_world_experience` (≤80 chars CHECK). Persisted on
+  // `comments.real_world_experience`. Single-column model: presence of
+  // trimmed text IS the firsthand claim. Empty + checked → not persisted.
+  const [firsthand, setFirsthand] = useState<boolean>(false);
+  const [firsthandContext, setFirsthandContext] = useState<string>('');
+  // Suggested context pulled from the user's saved profile background line.
+  // Pre-fills only when the user checks firsthand AND hasn't typed anything;
+  // they can edit or clear freely once it appears.
+  const [profileBackgroundOneline, setProfileBackgroundOneline] = useState<string>('');
+  const FIRSTHAND_CONTEXT_LIMIT = 80;
   const [muteState, setMuteState] = useState<MuteState>(null);
   const [canPost, setCanPost] = useState<boolean>(false);
   const [canMention, setCanMention] = useState<boolean>(false);
@@ -93,10 +104,15 @@ export default function CommentComposer({
       if (!user) return;
       const { data } = await supabase
         .from('users')
-        .select('is_banned, is_muted, mute_level, muted_until')
+        .select('is_banned, is_muted, mute_level, muted_until, background_oneline')
         .eq('id', user.id)
         .maybeSingle();
       if (!data) return;
+      // Cache the user's profile background line so the firsthand context
+      // input can pre-fill from it on first toggle.
+      if (typeof data.background_oneline === 'string') {
+        setProfileBackgroundOneline(data.background_oneline);
+      }
       const muteActive =
         !!data.is_muted &&
         (data.mute_level ?? 0) >= 1 &&
@@ -413,6 +429,7 @@ export default function CommentComposer({
       const html = editorRef.current?.innerHTML ?? '';
       const sanitized = sanitizeCommentHtml(html);
       const mentions = await resolveMentions(plainText);
+      const rweCandidate = firsthand ? firsthandContext.trim() : '';
       const res = await fetch('/api/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -421,6 +438,7 @@ export default function CommentComposer({
           body: sanitized || plainText,
           parent_id: parentId,
           mentions,
+          real_world_experience: rweCandidate || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -436,7 +454,10 @@ export default function CommentComposer({
       setBodyText('');
       setIsEmpty(true);
       window.dispatchEvent(new Event('vp:comment-sent'));
-      onPosted?.(data.comment || null);
+      const posted = data.comment || null;
+      setFirsthand(false);
+      setFirsthandContext('');
+      onPosted?.(posted);
       onCancel?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not post');
@@ -566,6 +587,68 @@ export default function CommentComposer({
           </div>
         );
       })()}
+      {firsthand && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginTop: 6,
+            paddingTop: 8,
+            borderTop: '1px solid var(--border, #e5e5e5)',
+            animation: 'vpFadeIn 200ms ease-out',
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              fontFamily: 'var(--font-serif), Georgia, serif',
+              fontStyle: 'italic',
+              fontSize: 12.5,
+              color: 'var(--p-ink-muted, #52525b)',
+              flexShrink: 0,
+              letterSpacing: '0.01em',
+            }}
+          >
+            How do you know?
+          </span>
+          <input
+            type="text"
+            value={firsthandContext}
+            onChange={(e) => setFirsthandContext(e.target.value.slice(0, FIRSTHAND_CONTEXT_LIMIT))}
+            placeholder="e.g. dad of three in Detroit  ·  civil engineer, 30 yrs"
+            maxLength={FIRSTHAND_CONTEXT_LIMIT}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontFamily: 'var(--font-serif), Georgia, serif',
+              fontStyle: 'italic',
+              fontSize: 13,
+              color: 'var(--p-ink, #0a0a0a)',
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              padding: '2px 0',
+              letterSpacing: '0.01em',
+            }}
+          />
+          <span
+            style={{
+              fontFamily: 'var(--font-serif), Georgia, serif',
+              fontStyle: 'italic',
+              fontSize: 11.5,
+              color:
+                firsthandContext.length > FIRSTHAND_CONTEXT_LIMIT - 12
+                  ? 'var(--p-warn, #b45309)'
+                  : 'var(--p-ink-faint, #a1a1aa)',
+              fontVariantNumeric: 'tabular-nums',
+              flexShrink: 0,
+            }}
+          >
+            {FIRSTHAND_CONTEXT_LIMIT - firsthandContext.length}
+          </span>
+        </div>
+      )}
       <div style={footerStyle}>
         {(
           [
@@ -605,6 +688,63 @@ export default function CommentComposer({
           </button>
         ))}
         <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          onClick={() => {
+            setFirsthand((v) => {
+              const next = !v;
+              // Pre-fill from profile background only when toggling on AND
+              // the context input is currently empty. The user can edit or
+              // clear freely from there.
+              if (next && !firsthandContext.trim() && profileBackgroundOneline.trim()) {
+                setFirsthandContext(profileBackgroundOneline.trim().slice(0, FIRSTHAND_CONTEXT_LIMIT));
+              }
+              return next;
+            });
+          }}
+          aria-pressed={firsthand}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 7,
+            background: 'transparent',
+            border: 'none',
+            padding: '4px 6px',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-serif), Georgia, serif',
+            fontStyle: 'italic',
+            fontSize: 12.5,
+            letterSpacing: '0.01em',
+            color: firsthand ? 'var(--p-ink, #0a0a0a)' : 'var(--p-ink-muted, #52525b)',
+            opacity: firsthand ? 1 : 0.78,
+            transition: 'color 140ms ease, opacity 140ms ease',
+          }}
+          onMouseEnter={(e) => { if (!firsthand) e.currentTarget.style.opacity = '1'; }}
+          onMouseLeave={(e) => { if (!firsthand) e.currentTarget.style.opacity = '0.78'; }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: 3,
+              border: '1.5px solid currentColor',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              background: firsthand ? 'currentColor' : 'transparent',
+              transition: 'background 140ms ease',
+            }}
+          >
+            {firsthand && (
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+                <path d="M1.5 4l1.7 1.7L6.5 2.5" stroke="var(--p-bg, #fff)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </span>
+          I know this firsthand
+        </button>
         {onCancel && <button onClick={onCancel} style={cancelBtnStyle}>Cancel</button>}
         <button
           onClick={submit}
@@ -658,6 +798,8 @@ const footerStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
+  rowGap: 8,
+  flexWrap: 'wrap',
   marginTop: 8,
   paddingTop: 10,
   borderTop: '1px solid var(--border, #e5e5e5)',

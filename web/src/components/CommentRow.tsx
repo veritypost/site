@@ -50,6 +50,13 @@ const TAG_META: Record<TagKind, { label: string; color: string; challenge: boole
   off_topic:   { label: 'Off-topic',   color: '#6b7280', challenge: true },
 };
 
+export type CommentFollowup = {
+  id: string;
+  body: string;
+  sort_order: number | null;
+  created_at: string;
+};
+
 export type EnrichedComment = CommentRowDb & {
   users?: CommentUser;
   _your_tags?: Set<TagKind>;
@@ -63,6 +70,10 @@ export type EnrichedComment = CommentRowDb & {
   expert_thread_root_id?: string | null;
   expert_thread_closed_at?: string | null;
   last_reopen_at?: string | null;
+  // TODO-48 author follow-ups — embedded via PostgREST relation
+  // `followups:comment_followups(...)` in CommentThread's select. Optional
+  // because pre-migration cached rows may not carry it.
+  followups?: CommentFollowup[] | null;
 };
 
 interface CommentRowProps {
@@ -254,6 +265,36 @@ export default function CommentRow({
   const [replyOpen, setReplyOpen] = useState<boolean>(false);
   const [editing, setEditing] = useState<boolean>(false);
   const [editBody, setEditBody] = useState<string>(comment.body || '');
+  // Follow-ups (TODO-48) — author-only, cap of 2, immutable. Hydrated via
+  // PostgREST embed in CommentThread's select. Optimistic local append on
+  // post; server is the source of truth on next load.
+  const serverFollowups = (comment.followups || []) as CommentFollowup[];
+  const [followupsLocal, setFollowupsLocal] = useState<CommentFollowup[]>([]);
+  const [followupOpen, setFollowupOpen] = useState<boolean>(false);
+  const [followupText, setFollowupText] = useState<string>('');
+  const [followupBusy, setFollowupBusy] = useState<boolean>(false);
+  const [followupError, setFollowupError] = useState<string>('');
+  const FOLLOWUP_MAX = 2;
+  const FOLLOWUP_CHAR_LIMIT = 280;
+  // Merge server + optimistic local. De-dupe by id; sort by sort_order then
+  // created_at so stable ordering matches the DB UNIQUE (comment_id, sort_order).
+  const followupsMerged: CommentFollowup[] = (() => {
+    const byId = new Map<string, CommentFollowup>();
+    for (const f of serverFollowups) byId.set(f.id, f);
+    for (const f of followupsLocal) byId.set(f.id, f);
+    return [...byId.values()].sort((a, b) => {
+      const sa = a.sort_order ?? 0;
+      const sb = b.sort_order ?? 0;
+      if (sa !== sb) return sa - sb;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+  })();
+  const followups = followupsMerged;
+  // Firsthand self-tag — author self-attests at compose time, persisted as
+  // `comments.real_world_experience` (≤80 chars). Presence of the string
+  // IS the firsthand claim; an empty/NULL value means no claim.
+  const firsthandContext = (comment.real_world_experience || '').trim();
+  const firsthand = firsthandContext.length > 0;
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const [selectedQuote, setSelectedQuote] = useState<string>('');
   const [quoteReplyText, setQuoteReplyText] = useState<string>('');
@@ -327,13 +368,20 @@ export default function CommentRow({
   // (spec §2 — NOT thread-mode-driven). The legacy `comment.is_expert_reply`
   // boolean (set by the expert-queue answer path) still triggers chrome
   // for backward compatibility.
+  //
+  // Launch-phase hide: the chrome (Verified Expert label + green container
+  // tint) and the inline VerifiedBadge are gated to false post-launch.
+  // Underlying data, state, and computation stay alive — flip the flag back
+  // to true to restore. Per locked decision: hide via gates, do not delete.
+  const SHOW_EXPERT_CHROME_ON_COMMENTS = false;
   const authorIsInCategoryExpert = (() => {
     if (!user.is_expert) return false;
     if (!articleCategoryId) return false;
     const set = (verifiedCategoriesByUser || {})[comment.user_id];
     return !!set && set.has(articleCategoryId);
   })();
-  const showExpertChrome = !!comment.is_expert_reply || authorIsInCategoryExpert;
+  const _expertChromeWouldShow = !!comment.is_expert_reply || authorIsInCategoryExpert;
+  const showExpertChrome = SHOW_EXPERT_CHROME_ON_COMMENTS && _expertChromeWouldShow;
   const expertCategoryName: string | null = null; // Category name not threaded down; chip uses generic "Verified Expert".
 
   // Thread-mode plumbing.
@@ -465,7 +513,7 @@ export default function CommentRow({
                 <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--p-ink)' }}>
                   {user.username || 'user'}
                 </span>
-                <VerifiedBadge user={user} />
+                {SHOW_EXPERT_CHROME_ON_COMMENTS && <VerifiedBadge user={user} />}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                 <button
@@ -700,6 +748,313 @@ export default function CommentRow({
             </div>
           )}
 
+          {/* Firsthand self-tag — author-applied note rendered below the
+              body. Unverifiable on purpose; honest framing per TODO-50
+              non-tier-coloring rules. Optional context line follows. */}
+          {!isDeleted && firsthand && (
+            <div
+              style={{
+                marginTop: 8,
+                fontFamily: 'var(--font-serif), Georgia, serif',
+                fontStyle: 'italic',
+                fontSize: 13,
+                lineHeight: 1.45,
+                color: 'var(--p-ink-muted, #52525b)',
+                letterSpacing: '0.01em',
+                animation: 'vpFadeIn 220ms ease-out',
+              }}
+            >
+              — I know this firsthand
+              {firsthandContext && (
+                <>
+                  {' '}
+                  <span style={{ color: 'var(--p-ink-faint, #a1a1aa)' }}>·</span>{' '}
+                  <span style={{ color: 'var(--p-ink, #0a0a0a)', fontStyle: 'italic' }}>
+                    {firsthandContext}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Author follow-ups — pinned beneath the parent comment. OP-only
+              composer. Cap of FOLLOWUP_MAX. Editorial typeset: serif italic
+              label, no chrome boxes, the typographic shift carries the meaning. */}
+          {!isDeleted && (followups.length > 0 || (isOwner && followupOpen) || (isOwner && followups.length < FOLLOWUP_MAX)) && (
+            <div
+              style={{
+                marginTop: 18,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14,
+              }}
+            >
+              {followups.map((f) => {
+                const ageMs = Date.now() - new Date(f.created_at).getTime();
+                const rel =
+                  ageMs < 30_000
+                    ? 'just now'
+                    : ageMs < 3_600_000
+                    ? `${Math.floor(ageMs / 60_000)} min later`
+                    : ageMs < 86_400_000
+                    ? `${Math.floor(ageMs / 3_600_000)} h later`
+                    : `${Math.floor(ageMs / 86_400_000)} d later`;
+                return (
+                  <div
+                    key={f.id}
+                    style={{
+                      animation: 'vpFadeIn 240ms ease-out',
+                      display: 'grid',
+                      gridTemplateColumns: '14px 1fr',
+                      columnGap: 14,
+                    }}
+                  >
+                    <div aria-hidden="true" style={{ position: 'relative' }}>
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: 7,
+                          left: 0,
+                          width: 14,
+                          height: 1,
+                          background: 'var(--p-warn, #b45309)',
+                          opacity: 0.9,
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-serif), Georgia, serif',
+                          fontStyle: 'italic',
+                          fontSize: 13,
+                          fontWeight: 400,
+                          color: 'var(--p-warn, #b45309)',
+                          letterSpacing: '0.01em',
+                          marginBottom: 4,
+                        }}
+                      >
+                        Update,{' '}
+                        <span style={{ opacity: 0.78 }}>{rel}</span>
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-sans), -apple-system, sans-serif',
+                          fontSize: 14,
+                          lineHeight: 1.6,
+                          color: 'var(--p-ink, #0a0a0a)',
+                        }}
+                      >
+                        {f.body}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {isOwner && followupOpen && (
+                <div
+                  style={{
+                    animation: 'vpFadeIn 200ms ease-out',
+                    display: 'grid',
+                    gridTemplateColumns: '14px 1fr',
+                    columnGap: 14,
+                  }}
+                >
+                  <div aria-hidden="true" style={{ position: 'relative' }}>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: 7,
+                        left: 0,
+                        width: 14,
+                        height: 1,
+                        background: 'var(--p-warn, #b45309)',
+                        opacity: 0.9,
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <div
+                      style={{
+                        fontFamily: 'var(--font-serif), Georgia, serif',
+                        fontStyle: 'italic',
+                        fontSize: 13,
+                        fontWeight: 400,
+                        color: 'var(--p-warn, #b45309)',
+                        letterSpacing: '0.01em',
+                        marginBottom: 4,
+                      }}
+                    >
+                      Update
+                    </div>
+                    <textarea
+                      value={followupText}
+                      onChange={(e) => setFollowupText(e.target.value.slice(0, FOLLOWUP_CHAR_LIMIT))}
+                      rows={2}
+                      placeholder="Clarify or correct — this pins beneath your comment and can't be edited."
+                      style={{
+                        width: '100%',
+                        padding: 0,
+                        border: 'none',
+                        fontFamily: 'var(--font-sans), -apple-system, sans-serif',
+                        fontSize: 14,
+                        lineHeight: 1.6,
+                        outline: 'none',
+                        resize: 'none',
+                        background: 'transparent',
+                        color: 'var(--p-ink, #0a0a0a)',
+                        minHeight: 46,
+                      }}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setFollowupOpen(false);
+                          setFollowupText('');
+                        }
+                      }}
+                    />
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 14,
+                        marginTop: 8,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-serif), Georgia, serif',
+                          fontStyle: 'italic',
+                          fontSize: 12,
+                          color:
+                            followupText.length > FOLLOWUP_CHAR_LIMIT - 20
+                              ? 'var(--p-warn, #b45309)'
+                              : 'var(--p-ink-faint, #a1a1aa)',
+                          fontVariantNumeric: 'tabular-nums',
+                          transition: 'color 140ms ease',
+                        }}
+                      >
+                        {FOLLOWUP_CHAR_LIMIT - followupText.length}
+                      </span>
+                      <span style={{ flex: 1 }} />
+                      <button
+                        onClick={() => { setFollowupOpen(false); setFollowupText(''); setFollowupError(''); }}
+                        disabled={followupBusy}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '4px 2px',
+                          fontSize: 12,
+                          color: 'var(--p-ink-muted, #52525b)',
+                          cursor: followupBusy ? 'default' : 'pointer',
+                          opacity: followupBusy ? 0.5 : 1,
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const body = followupText.trim();
+                          if (!body || followupBusy) return;
+                          setFollowupBusy(true);
+                          setFollowupError('');
+                          try {
+                            const res = await fetch(
+                              `/api/comments/${encodeURIComponent(comment.id)}/followups`,
+                              {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ body }),
+                              }
+                            );
+                            const data = await res.json().catch(() => ({}));
+                            if (!res.ok) {
+                              if (res.status === 409) {
+                                setFollowupError(data?.message || 'this comment already has 2 updates.');
+                              } else if (res.status === 403) {
+                                setFollowupError('only the comment author can post follow-ups.');
+                              } else {
+                                setFollowupError(data?.error || 'could not post update.');
+                              }
+                              return;
+                            }
+                            const created = data?.followup;
+                            if (created && created.id) {
+                              setFollowupsLocal((prev) => [...prev, created as CommentFollowup]);
+                            }
+                            setFollowupText('');
+                            setFollowupOpen(false);
+                          } catch {
+                            setFollowupError('could not post update.');
+                          } finally {
+                            setFollowupBusy(false);
+                          }
+                        }}
+                        disabled={!followupText.trim() || followupBusy}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: 999,
+                          border: '1px solid var(--p-warn, #b45309)',
+                          background: followupText.trim() ? 'var(--p-warn, #b45309)' : 'transparent',
+                          color: followupText.trim() ? '#ffffff' : 'var(--p-warn, #b45309)',
+                          fontFamily: 'var(--font-serif), Georgia, serif',
+                          fontStyle: 'italic',
+                          fontSize: 12.5,
+                          fontWeight: 500,
+                          letterSpacing: '0.01em',
+                          cursor: followupText.trim() ? 'pointer' : 'not-allowed',
+                          opacity: followupText.trim() && !followupBusy ? 1 : 0.55,
+                          transition: 'background 140ms ease, opacity 140ms ease',
+                        }}
+                      >
+                        {followupBusy ? 'Posting…' : 'Post update'}
+                      </button>
+                    </div>
+                    {followupError && (
+                      <div
+                        role="alert"
+                        style={{
+                          marginTop: 6,
+                          fontSize: 12,
+                          color: 'var(--p-warn, #b45309)',
+                          fontStyle: 'italic',
+                        }}
+                      >
+                        {followupError}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {isOwner && !followupOpen && followups.length < FOLLOWUP_MAX && (
+                <button
+                  onClick={() => setFollowupOpen(true)}
+                  style={{
+                    fontFamily: 'var(--font-serif), Georgia, serif',
+                    fontStyle: 'italic',
+                    fontSize: 13,
+                    fontWeight: 400,
+                    color: 'var(--p-warn, #b45309)',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '2px 0',
+                    cursor: 'pointer',
+                    alignSelf: 'flex-start',
+                    opacity: 0.78,
+                    letterSpacing: '0.01em',
+                    transition: 'opacity 140ms ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.78')}
+                >
+                  {followups.length === 0 ? 'Add an update' : 'Add another'}
+                </button>
+              )}
+
+            </div>
+          )}
 
           {/* Action row: Reply */}
           {!isDeleted && !editing && (() => {

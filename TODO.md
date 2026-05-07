@@ -208,8 +208,6 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 - 39: Tag button UI after passing quiz is messy — clicking tags on another user's comment has poor UX (button states, picker, feedback). Needs investigation and redesign of the tag interaction in `CommentRow.tsx` and iOS `StoryDetailView.swift`.
 
-- 51: **Comment-load error "Try again" link low affordance** — `CommentThread.tsx:857` renders a "Comments couldn't load · Try again" recovery link styled as plain underlined text. Reads like narrative copy, not an interactive control — users miss it and bounce instead of retrying. Fix: render as a button (or button-styled link) so the affordance is obvious. Independent of TODO 50; this surface stays alive through the voice-model rebuild. Cross-platform: web only (iOS error state in `StoryDetailView.swift` should be spot-checked for the same issue while we're here). Complexity: S.
-
 ---
 
 ## Layout / visual
@@ -257,6 +255,8 @@ Web mobile is the product standard. These items bring iOS in line.
 ## Article generation — prompt rewrite + deferred pipeline items
 
 - 51: **Article generation prompt rewrite to "facts only" voice + deferred non-prompt findings from 4-adversary panel review (2026-05-07).** Owner premise: facts aren't copyrightable (Feist); take facts, strip the source's framing/opinion/outlet-name-drops, write fresh in Verity Post's voice. Goal: legally defensible AND enjoyable to read. Single source-of-truth for the work. Cross-platform: backend pipeline change in `web/`; iOS + Kids iOS receive better articles automatically through the database — no app-side change.
+
+  **PART A SHIPPED 2026-05-07** — all 9 prompt edits landed in `editorial-guide.ts` + the word-count sync in `route.ts:1732`. Allegation Mode carve-out in rule 11 (libel hedge required for uncharged conduct), BAD/GOOD example added, anti-hallucinated-attribution rule, Wikipedia-as-research-aid rule, "alleged"/"reportedly" restored as required hedges, conditional length-band ladder dropped (replaced with fixed 30–50 word target), 250-400 → 250-450 sync, "so what" tightened to attributable mechanism only, cadence + scale comparisons + on-record statements protected as carve-outs under EVERY SENTENCE A FACT. Part B (architectural items: native JSON mode, cache restructure, per-claim provenance, ≥2 sources gate, serialize summary after body, trust signals on AudienceCard, cost hint on model picker, regenerate non-orphan policy, source-headline strip on headline-gen) remains.
 
   **Part A — Prompt-only changes (this is the actual fix; ~45 minutes of edits, all in `web/src/lib/pipeline/editorial-guide.ts` plus a 1-line route.ts touch).**
 

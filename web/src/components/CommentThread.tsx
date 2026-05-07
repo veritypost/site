@@ -211,7 +211,7 @@ export default function CommentThread({
     // ships, threads beyond 50 rows render the top-50 by quality order.
     const { data: rows, error: loadErr } = await supabase
       .from('comments')
-      .select('*')
+      .select('*, followups:comment_followups(id, body, sort_order, created_at)')
       .eq('article_id', articleId)
       .eq('status', 'visible')
       .is('deleted_at', null)
@@ -399,7 +399,7 @@ export default function CommentThread({
           if (payload.new.status && payload.new.status !== 'visible') return;
           const { data: row } = await supabase
             .from('comments')
-            .select('*')
+            .select('*, followups:comment_followups(id, body, sort_order, created_at)')
             .eq('id', payload.new.id)
             .maybeSingle();
           if (cancelled || !row) return;
@@ -447,7 +447,7 @@ export default function CommentThread({
           } else {
             const { data: row } = await supabase
               .from('comments')
-              .select('*')
+              .select('*, followups:comment_followups(id, body, sort_order, created_at)')
               .eq('id', id)
               .maybeSingle();
             if (cancelled || !row) return;
@@ -467,6 +467,54 @@ export default function CommentThread({
               prev.find((c) => c.id === id) ? prev : [...prev, enriched]
             );
           }
+        }
+      )
+      .on(
+        'postgres_changes' as never,
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'comment_followups',
+        },
+        async (payload: { new: { comment_id: string } }) => {
+          const cid = payload.new?.comment_id;
+          if (!cid) return;
+          if (!commentsRef.current.find((c) => c.id === cid)) return;
+          const { data: rows } = await supabase
+            .from('comment_followups')
+            .select('id, body, sort_order, created_at')
+            .eq('comment_id', cid)
+            .order('sort_order', { ascending: true });
+          if (cancelled) return;
+          setComments((prev) =>
+            prev.map((c) =>
+              c.id === cid ? ({ ...c, followups: rows || [] } as CommentWithAuthor) : c
+            )
+          );
+        }
+      )
+      .on(
+        'postgres_changes' as never,
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'comment_followups',
+        },
+        async (payload: { old: { comment_id: string } }) => {
+          const cid = payload.old?.comment_id;
+          if (!cid) return;
+          if (!commentsRef.current.find((c) => c.id === cid)) return;
+          const { data: rows } = await supabase
+            .from('comment_followups')
+            .select('id, body, sort_order, created_at')
+            .eq('comment_id', cid)
+            .order('sort_order', { ascending: true });
+          if (cancelled) return;
+          setComments((prev) =>
+            prev.map((c) =>
+              c.id === cid ? ({ ...c, followups: rows || [] } as CommentWithAuthor) : c
+            )
+          );
         }
       )
       .subscribe();
@@ -804,7 +852,6 @@ export default function CommentThread({
   }
 
   const [sort, setSort] = useState<'top' | 'newest'>('top');
-  const [expertFilter, setExpertFilter] = useState<boolean>(false);
   const [expertDialogOpen, setExpertDialogOpen] = useState<boolean>(false);
   const [expertQuestion, setExpertQuestion] = useState<string>('');
   const [expertSubmitting, setExpertSubmitting] = useState<boolean>(false);
@@ -906,10 +953,7 @@ export default function CommentThread({
   }
 
   const visible = comments.filter((c) => !blockedIds.has(c.user_id));
-  const displayComments = expertFilter
-    ? visible.filter((c) => c.is_expert_question || c.is_expert_reply)
-    : visible;
-  const topsUnsorted = displayComments.filter((c) => !c.parent_id);
+  const topsUnsorted = visible.filter((c) => !c.parent_id);
   const tops = [...topsUnsorted].sort((a, b) => {
     if (sort === 'newest') {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -920,7 +964,7 @@ export default function CommentThread({
     return qB - qA;
   });
   const childrenByParent: Record<string, CommentWithAuthor[]> = {};
-  displayComments
+  visible
     .filter((c) => c.parent_id)
     .forEach((c) => {
       const pid = c.parent_id as string;
@@ -1012,25 +1056,6 @@ export default function CommentThread({
         </div>
       )}
 
-      {visible.some((c) => c.is_expert_reply || c.is_expert_question) && (
-        <button
-          onClick={() => setExpertFilter((v) => !v)}
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            padding: '6px 12px',
-            borderRadius: 6,
-            border: `1px solid ${expertFilter ? 'var(--success-text)' : 'var(--border, #e5e5e5)'}`,
-            background: expertFilter ? 'rgba(34,197,94,0.10)' : 'transparent',
-            color: expertFilter ? 'var(--success-text)' : 'var(--dim, #666)',
-            cursor: 'pointer',
-            marginBottom: 16,
-          }}
-        >
-          {expertFilter ? 'Expert · showing only' : 'Expert'}
-        </button>
-      )}
-
       {currentUserId && quizPassed && (
         <CommentComposer
           articleId={articleId}
@@ -1038,12 +1063,6 @@ export default function CommentThread({
           autoFocus={justRevealed}
           quizPassed={quizPassed}
         />
-      )}
-
-      {false && currentUserId && canAskExpert && !expertDialogOpen && (
-        <button onClick={() => setExpertDialogOpen(true)} style={askExpertBtnStyle}>
-          + Ask an Expert
-        </button>
       )}
 
       {expertDialogOpen && (

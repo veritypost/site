@@ -97,10 +97,29 @@ export async function POST(request) {
   } catch {
     /* malformed JSON falls through to the empty-object validation below */
   }
-  const { article_id, body, parent_id, mentions } = parsed;
+  const { article_id, body, parent_id, mentions, real_world_experience } = parsed;
   if (!article_id || !body) {
     return NextResponse.json(
       { error: 'article_id and body required' },
+      { status: 400, headers: NO_STORE }
+    );
+  }
+
+  // Defense-in-depth — DB CHECK enforces 80 chars, but reject early so
+  // the client gets an actionable error instead of a generic 500.
+  let rweClean = null;
+  if (typeof real_world_experience === 'string') {
+    const trimmed = real_world_experience.trim();
+    if (trimmed.length > 80) {
+      return NextResponse.json(
+        { error: 'real_world_experience exceeds 80 chars' },
+        { status: 400, headers: NO_STORE }
+      );
+    }
+    rweClean = trimmed.length > 0 ? trimmed : null;
+  } else if (real_world_experience !== undefined && real_world_experience !== null) {
+    return NextResponse.json(
+      { error: 'real_world_experience must be a string or null' },
       { status: 400, headers: NO_STORE }
     );
   }
@@ -281,6 +300,7 @@ export async function POST(request) {
     p_body: body,
     p_parent_id: parent_id || null,
     p_mentions: Array.isArray(mentions) ? mentions : [],
+    p_real_world_experience: rweClean,
   });
   if (error) {
     console.error('[comments.POST]', error);

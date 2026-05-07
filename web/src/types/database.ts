@@ -705,13 +705,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fk_ad_impressions_session_id"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "user_sessions"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "fk_ad_impressions_user_id"
             columns: ["user_id"]
             isOneToOne: false
@@ -2873,6 +2866,62 @@ export type Database = {
           },
         ]
       }
+      comment_followups: {
+        Row: {
+          body: string
+          comment_id: string
+          created_at: string
+          id: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          body: string
+          comment_id: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+          user_id: string
+        }
+        Update: {
+          body?: string
+          comment_id?: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_followups_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_followups_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_followups_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_followups_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comment_votes: {
         Row: {
           comment_id: string
@@ -2949,6 +2998,9 @@ export type Database = {
           expert_question_status: string | null
           expert_question_target_id: string | null
           expert_question_target_type: string | null
+          expert_thread_closed_at: string | null
+          expert_thread_closed_by: string | null
+          expert_thread_root_id: string | null
           helpful_count: number
           id: string
           ip_address: string | null
@@ -2957,7 +3009,9 @@ export type Database = {
           is_edited: boolean
           is_expert_question: boolean
           is_expert_reply: boolean
+          is_expert_thread_root: boolean
           is_pinned: boolean
+          last_reopen_at: string | null
           mentions: Json
           metadata: Json
           moderated_at: string | null
@@ -2966,6 +3020,7 @@ export type Database = {
           off_topic_count: number
           parent_id: string | null
           quality_score: number
+          real_world_experience: string | null
           reply_count: number
           root_id: string | null
           status: string
@@ -2998,6 +3053,9 @@ export type Database = {
           expert_question_status?: string | null
           expert_question_target_id?: string | null
           expert_question_target_type?: string | null
+          expert_thread_closed_at?: string | null
+          expert_thread_closed_by?: string | null
+          expert_thread_root_id?: string | null
           helpful_count?: number
           id?: string
           ip_address?: string | null
@@ -3006,7 +3064,9 @@ export type Database = {
           is_edited?: boolean
           is_expert_question?: boolean
           is_expert_reply?: boolean
+          is_expert_thread_root?: boolean
           is_pinned?: boolean
+          last_reopen_at?: string | null
           mentions?: Json
           metadata?: Json
           moderated_at?: string | null
@@ -3015,6 +3075,7 @@ export type Database = {
           off_topic_count?: number
           parent_id?: string | null
           quality_score?: number
+          real_world_experience?: string | null
           reply_count?: number
           root_id?: string | null
           status?: string
@@ -3047,6 +3108,9 @@ export type Database = {
           expert_question_status?: string | null
           expert_question_target_id?: string | null
           expert_question_target_type?: string | null
+          expert_thread_closed_at?: string | null
+          expert_thread_closed_by?: string | null
+          expert_thread_root_id?: string | null
           helpful_count?: number
           id?: string
           ip_address?: string | null
@@ -3055,7 +3119,9 @@ export type Database = {
           is_edited?: boolean
           is_expert_question?: boolean
           is_expert_reply?: boolean
+          is_expert_thread_root?: boolean
           is_pinned?: boolean
+          last_reopen_at?: string | null
           mentions?: Json
           metadata?: Json
           moderated_at?: string | null
@@ -3064,6 +3130,7 @@ export type Database = {
           off_topic_count?: number
           parent_id?: string | null
           quality_score?: number
+          real_world_experience?: string | null
           reply_count?: number
           root_id?: string | null
           status?: string
@@ -3075,6 +3142,34 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "comments_expert_thread_closed_by_fkey"
+            columns: ["expert_thread_closed_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_expert_thread_closed_by_fkey"
+            columns: ["expert_thread_closed_by"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_expert_thread_closed_by_fkey"
+            columns: ["expert_thread_closed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_expert_thread_root_id_fkey"
+            columns: ["expert_thread_root_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "comments_story_id_fkey"
             columns: ["story_id"]
@@ -5613,6 +5708,228 @@ export type Database = {
         }
         Relationships: []
       }
+      events_20260507: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
+      events_20260508: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
       events_default: {
         Row: {
           article_id: string | null
@@ -5773,7 +6090,16 @@ export type Database = {
           full_name: string
           government_id_provided: boolean
           id: string
+          last_quiet_hours_digest_at: string | null
+          mention_quiet_hours_days: number[] | null
+          mention_quiet_hours_end: string | null
+          mention_quiet_hours_start: string | null
+          mention_quota_per_day: number
+          mention_quota_per_post: number
+          notify_push_on_category_arrival: boolean
+          notify_push_on_mention: boolean
           organization: string | null
+          pause_until_indefinite: boolean
           portfolio_urls: string[] | null
           probation_completed: boolean
           probation_ends_at: string | null
@@ -5806,7 +6132,16 @@ export type Database = {
           full_name: string
           government_id_provided?: boolean
           id?: string
+          last_quiet_hours_digest_at?: string | null
+          mention_quiet_hours_days?: number[] | null
+          mention_quiet_hours_end?: string | null
+          mention_quiet_hours_start?: string | null
+          mention_quota_per_day?: number
+          mention_quota_per_post?: number
+          notify_push_on_category_arrival?: boolean
+          notify_push_on_mention?: boolean
           organization?: string | null
+          pause_until_indefinite?: boolean
           portfolio_urls?: string[] | null
           probation_completed?: boolean
           probation_ends_at?: string | null
@@ -5839,7 +6174,16 @@ export type Database = {
           full_name?: string
           government_id_provided?: boolean
           id?: string
+          last_quiet_hours_digest_at?: string | null
+          mention_quiet_hours_days?: number[] | null
+          mention_quiet_hours_end?: string | null
+          mention_quiet_hours_start?: string | null
+          mention_quota_per_day?: number
+          mention_quota_per_post?: number
+          notify_push_on_category_arrival?: boolean
+          notify_push_on_mention?: boolean
           organization?: string | null
+          pause_until_indefinite?: boolean
           portfolio_urls?: string[] | null
           probation_completed?: boolean
           probation_ends_at?: string | null
@@ -6036,6 +6380,93 @@ export type Database = {
           },
         ]
       }
+      expert_mention_post_counters: {
+        Row: {
+          article_id: string
+          count: number
+          expert_user_id: string
+        }
+        Insert: {
+          article_id: string
+          count?: number
+          expert_user_id: string
+        }
+        Update: {
+          article_id?: string
+          count?: number
+          expert_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expert_mention_post_counters_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_mention_post_counters_expert_user_id_fkey"
+            columns: ["expert_user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_mention_post_counters_expert_user_id_fkey"
+            columns: ["expert_user_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_mention_post_counters_expert_user_id_fkey"
+            columns: ["expert_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expert_mention_quota_counters: {
+        Row: {
+          count: number
+          day_utc: string
+          expert_user_id: string
+        }
+        Insert: {
+          count?: number
+          day_utc: string
+          expert_user_id: string
+        }
+        Update: {
+          count?: number
+          day_utc?: string
+          expert_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expert_mention_quota_counters_expert_user_id_fkey"
+            columns: ["expert_user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_mention_quota_counters_expert_user_id_fkey"
+            columns: ["expert_user_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_mention_quota_counters_expert_user_id_fkey"
+            columns: ["expert_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expert_queue_items: {
         Row: {
           answer_comment_id: string | null
@@ -6178,6 +6609,104 @@ export type Database = {
             columns: ["target_expert_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expert_thread_chains: {
+        Row: {
+          asker_reply_count: number
+          asker_user_id: string
+          expert_user_id: string
+          free_pass_granted_at: string | null
+          free_pass_granted_by: string | null
+          thread_root_id: string
+        }
+        Insert: {
+          asker_reply_count?: number
+          asker_user_id: string
+          expert_user_id: string
+          free_pass_granted_at?: string | null
+          free_pass_granted_by?: string | null
+          thread_root_id: string
+        }
+        Update: {
+          asker_reply_count?: number
+          asker_user_id?: string
+          expert_user_id?: string
+          free_pass_granted_at?: string | null
+          free_pass_granted_by?: string | null
+          thread_root_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expert_thread_chains_asker_user_id_fkey"
+            columns: ["asker_user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_thread_chains_asker_user_id_fkey"
+            columns: ["asker_user_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_thread_chains_asker_user_id_fkey"
+            columns: ["asker_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_thread_chains_expert_user_id_fkey"
+            columns: ["expert_user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_thread_chains_expert_user_id_fkey"
+            columns: ["expert_user_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_thread_chains_expert_user_id_fkey"
+            columns: ["expert_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_thread_chains_free_pass_granted_by_fkey"
+            columns: ["free_pass_granted_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_thread_chains_free_pass_granted_by_fkey"
+            columns: ["free_pass_granted_by"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_thread_chains_free_pass_granted_by_fkey"
+            columns: ["free_pass_granted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expert_thread_chains_thread_root_id_fkey"
+            columns: ["thread_root_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
             referencedColumns: ["id"]
           },
         ]
@@ -6689,6 +7218,7 @@ export type Database = {
           articles_imported_count: number
           audience: string
           category_id: string | null
+          content_type: string
           created_at: string
           created_by: string | null
           default_visibility: string
@@ -6721,6 +7251,7 @@ export type Database = {
           articles_imported_count?: number
           audience: string
           category_id?: string | null
+          content_type?: string
           created_at?: string
           created_by?: string | null
           default_visibility?: string
@@ -6753,6 +7284,7 @@ export type Database = {
           articles_imported_count?: number
           audience?: string
           category_id?: string | null
+          content_type?: string
           created_at?: string
           created_by?: string | null
           default_visibility?: string
@@ -10229,6 +10761,8 @@ export type Database = {
         Row: {
           ai_category_id: string | null
           ai_subcategory_id: string | null
+          ai_suggested_headline: string | null
+          ai_suggested_slug: string | null
           created_at: string
           first_seen_at: string | null
           generation_state: string | null
@@ -10246,6 +10780,8 @@ export type Database = {
         Insert: {
           ai_category_id?: string | null
           ai_subcategory_id?: string | null
+          ai_suggested_headline?: string | null
+          ai_suggested_slug?: string | null
           created_at?: string
           first_seen_at?: string | null
           generation_state?: string | null
@@ -10263,6 +10799,8 @@ export type Database = {
         Update: {
           ai_category_id?: string | null
           ai_subcategory_id?: string | null
+          ai_suggested_headline?: string | null
+          ai_suggested_slug?: string | null
           created_at?: string
           first_seen_at?: string | null
           generation_state?: string | null
@@ -11073,6 +11611,122 @@ export type Database = {
           },
         ]
       }
+      user_education: {
+        Row: {
+          created_at: string
+          degree: string | null
+          deleted_at: string | null
+          field: string | null
+          id: string
+          school: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+          years: string | null
+        }
+        Insert: {
+          created_at?: string
+          degree?: string | null
+          deleted_at?: string | null
+          field?: string | null
+          id?: string
+          school: string
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+          years?: string | null
+        }
+        Update: {
+          created_at?: string
+          degree?: string | null
+          deleted_at?: string | null
+          field?: string | null
+          id?: string
+          school?: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+          years?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_education_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_education_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_education_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_links: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          label: string | null
+          sort_order: number
+          updated_at: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          label?: string | null
+          sort_order?: number
+          updated_at?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          label?: string | null
+          sort_order?: number
+          updated_at?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_links_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_links_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_links_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_permission_sets: {
         Row: {
           expires_at: string | null
@@ -11484,6 +12138,53 @@ export type Database = {
           },
         ]
       }
+      user_topics_known: {
+        Row: {
+          category_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_topics_known_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_topics_known_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_topics_known_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_topics_known_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_warnings: {
         Row: {
           action_taken: string
@@ -11580,6 +12281,13 @@ export type Database = {
           att_status: string | null
           avatar_color: string | null
           avatar_url: string | null
+          background_languages: string | null
+          background_lived: string | null
+          background_lived_public: boolean
+          background_oneline: string | null
+          background_profession: string | null
+          background_where: string | null
+          background_years: string | null
           ban_reason: string | null
           banned_at: string | null
           banned_by: string | null
@@ -11684,6 +12392,13 @@ export type Database = {
           att_status?: string | null
           avatar_color?: string | null
           avatar_url?: string | null
+          background_languages?: string | null
+          background_lived?: string | null
+          background_lived_public?: boolean
+          background_oneline?: string | null
+          background_profession?: string | null
+          background_where?: string | null
+          background_years?: string | null
           ban_reason?: string | null
           banned_at?: string | null
           banned_by?: string | null
@@ -11788,6 +12503,13 @@ export type Database = {
           att_status?: string | null
           avatar_color?: string | null
           avatar_url?: string | null
+          background_languages?: string | null
+          background_lived?: string | null
+          background_lived_public?: boolean
+          background_oneline?: string | null
+          background_profession?: string | null
+          background_where?: string | null
+          background_years?: string | null
           ban_reason?: string | null
           banned_at?: string | null
           banned_by?: string | null
@@ -12186,6 +12908,13 @@ export type Database = {
           articles_read_count: number | null
           avatar_color: string | null
           avatar_url: string | null
+          background_languages: string | null
+          background_lived: string | null
+          background_lived_public: boolean | null
+          background_oneline: string | null
+          background_profession: string | null
+          background_where: string | null
+          background_years: string | null
           banner_url: string | null
           bio: string | null
           comment_count: number | null
@@ -12213,6 +12942,13 @@ export type Database = {
           articles_read_count?: number | null
           avatar_color?: string | null
           avatar_url?: string | null
+          background_languages?: string | null
+          background_lived?: string | null
+          background_lived_public?: boolean | null
+          background_oneline?: string | null
+          background_profession?: string | null
+          background_where?: string | null
+          background_years?: string | null
           banner_url?: string | null
           bio?: string | null
           comment_count?: number | null
@@ -12240,6 +12976,13 @@ export type Database = {
           articles_read_count?: number | null
           avatar_color?: string | null
           avatar_url?: string | null
+          background_languages?: string | null
+          background_lived?: string | null
+          background_lived_public?: boolean | null
+          background_oneline?: string | null
+          background_profession?: string | null
+          background_where?: string | null
+          background_years?: string | null
           banner_url?: string | null
           bio?: string | null
           comment_count?: number | null
@@ -12328,8 +13071,13 @@ export type Database = {
       }
     }
     Functions: {
+      _bump_expert_config_version_internal: { Args: never; Returns: undefined }
       _is_in_quiet_hours: {
         Args: { p_at: string; p_end: string; p_start: string }
+        Returns: boolean
+      }
+      _is_in_quiet_hours_v2: {
+        Args: { p_at?: string; p_user_id: string }
         Returns: boolean
       }
       _setting_int: {
@@ -12343,6 +13091,10 @@ export type Database = {
       _user_freeze_allowance: {
         Args: { p_kid_profile_id?: string; p_user_id: string }
         Returns: number
+      }
+      _user_has_permission_or_owner: {
+        Args: { p_key: string; p_user_id: string }
+        Returns: boolean
       }
       _user_is_comment_blocked: {
         Args: { p_user_id: string }
@@ -12477,6 +13229,7 @@ export type Database = {
       }
       billing_unfreeze: { Args: { p_user_id: string }; Returns: Json }
       breaking_news_quota_check: { Args: { p_user_id: string }; Returns: Json }
+      bump_expert_config_version: { Args: never; Returns: undefined }
       bump_perms_global_version: { Args: never; Returns: undefined }
       bump_user_perms_version: {
         Args: { p_user_id: string }
@@ -12490,7 +13243,20 @@ export type Database = {
         Args: { p_article_id: string; p_user_id: string }
         Returns: boolean
       }
+      can_view_comment: { Args: { p_comment_id: string }; Returns: boolean }
       cancel_account_deletion: { Args: { p_user_id: string }; Returns: boolean }
+      check_and_reserve_asker_mention_cap: {
+        Args: {
+          p_is_broadcast: boolean
+          p_n_targets: number
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      check_expert_mention_quota: {
+        Args: { p_article_id: string; p_target_user_ids: string[] }
+        Returns: Json
+      }
       check_rate_limit: {
         Args: { p_key: string; p_max: number; p_window_sec: number }
         Returns: Json
@@ -12605,6 +13371,13 @@ export type Database = {
         Args: { p_queue_item_id: string; p_user_id: string }
         Returns: undefined
       }
+      claim_quiet_hours_digest_candidates: {
+        Args: { p_limit: number }
+        Returns: {
+          deferred_count: number
+          user_id: string
+        }[]
+      }
       cleanup_rate_limit_events: {
         Args: { p_retention_days?: number }
         Returns: number
@@ -12613,6 +13386,18 @@ export type Database = {
       clear_kid_lockout: {
         Args: { p_kid_profile_id: string; p_parent_pin: string }
         Returns: boolean
+      }
+      close_expert_thread: {
+        Args: { p_root_id: string; p_user_id: string }
+        Returns: Json
+      }
+      commit_expert_mentions: {
+        Args: {
+          p_article_id: string
+          p_asker_id: string
+          p_target_user_ids: string[]
+        }
+        Returns: undefined
       }
       complete_email_verification: {
         Args: { p_user_id: string }
@@ -12638,6 +13423,10 @@ export type Database = {
       create_bookmark_collection: {
         Args: { p_description?: string; p_name: string; p_user_id: string }
         Returns: string
+      }
+      create_comment_followup: {
+        Args: { p_body: string; p_comment_id: string }
+        Returns: Json
       }
       create_events_partition_for: {
         Args: { target_date: string }
@@ -12680,6 +13469,10 @@ export type Database = {
       }
       edit_comment: {
         Args: { p_body: string; p_comment_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      ensure_user_timezone: {
+        Args: { p_tz: string; p_uid: string }
         Returns: undefined
       }
       expert_can_see_back_channel: {
@@ -12780,6 +13573,14 @@ export type Database = {
           token: string
         }[]
       }
+      grant_expert_thread_free_pass: {
+        Args: {
+          p_asker_user_id: string
+          p_granting_expert_id: string
+          p_thread_root_id: string
+        }
+        Returns: undefined
+      }
       grant_pro_to_cohort: {
         Args: { p_cohort: string; p_months: number }
         Returns: number
@@ -12869,6 +13670,14 @@ export type Database = {
         Returns: boolean
       }
       kid_visible_bands: { Args: { p_profile_id: string }; Returns: string[] }
+      list_active_experts_for_category: {
+        Args: {
+          p_article_id: string
+          p_asker_id: string
+          p_category_id: string
+        }
+        Returns: string[]
+      }
       lockdown_self: { Args: { p_user_id: string }; Returns: Json }
       log_ad_click: { Args: { p_impression_id: string }; Returns: undefined }
       log_ad_impression: {
@@ -12950,6 +13759,7 @@ export type Database = {
           p_body: string
           p_mentions?: Json
           p_parent_id?: string
+          p_real_world_experience?: string
           p_user_id: string
         }
         Returns: Json
@@ -12957,6 +13767,15 @@ export type Database = {
       post_expert_answer: {
         Args: { p_body: string; p_queue_item_id: string; p_user_id: string }
         Returns: Json
+      }
+      post_expert_thread_reply: {
+        Args: {
+          p_body: string
+          p_expert_user_id: string
+          p_thread_root_id: string
+          p_user_id: string
+        }
+        Returns: string
       }
       post_message: {
         Args: { p_body: string; p_conversation_id: string; p_user_id: string }
@@ -13089,6 +13908,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      reopen_expert_thread: {
+        Args: { p_root_id: string; p_user_id: string }
+        Returns: undefined
+      }
       require_outranks: { Args: { target_user_id: string }; Returns: boolean }
       reserve_cost_or_fail: {
         Args: { p_estimated_usd: number; p_run_id: string }
@@ -13176,6 +13999,27 @@ export type Database = {
           p_session_id: string
         }
         Returns: boolean
+      }
+      set_expert_availability: {
+        Args: {
+          p_expert_app_id: string
+          p_pause_until_indefinite: boolean
+          p_qh_days: number[]
+          p_qh_end: string
+          p_qh_start: string
+          p_vacation_until: string
+        }
+        Returns: undefined
+      }
+      set_expert_mention_quotas: {
+        Args: { p_expert_app_id: string; p_per_day: number; p_per_post: number }
+        Returns: undefined
+      }
+      set_own_education: { Args: { p_entries: Json }; Returns: Json }
+      set_own_links: { Args: { p_entries: Json }; Returns: Json }
+      set_own_topics_known: {
+        Args: { p_category_ids: string[] }
+        Returns: Json
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
@@ -13503,3 +14347,4 @@ export const Constants = {
     },
   },
 } as const
+

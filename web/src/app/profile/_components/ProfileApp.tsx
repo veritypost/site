@@ -20,6 +20,7 @@ import { ActivitySection } from '../_sections/ActivitySection';
 import { BookmarksSection } from '../_sections/BookmarksSection';
 import { CategoriesSectionConnected } from '../_sections/CategoriesSection';
 import { DataSection } from '../_sections/DataSection';
+import { BackgroundSection } from '../_sections/BackgroundSection';
 import { ExpertProfileSection } from '../_sections/ExpertProfileSection';
 import { ExpertQueueSection } from '../_sections/ExpertQueueSection';
 import { IdentitySection } from '../_sections/IdentitySection';
@@ -270,6 +271,14 @@ export function ProfileApp({ defaultSection }: Props) {
           onUserUpdated={setUser}
         />
       ),
+    },
+    {
+      id: 'background',
+      glyph: '✥',
+      title: 'Background',
+      reason: 'A short line that says who you are when you comment — civil engineer, lifelong reader, dad of three.',
+      keywords: ['background', 'credentials', 'experience', 'firsthand', 'expertise'],
+      render: () => <BackgroundSection />,
     },
 
     // ── Library — what you have on Verity Post ────────────────────────────

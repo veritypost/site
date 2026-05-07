@@ -26,6 +26,13 @@ private struct ArticleContentHeightKey: PreferenceKey {
 }
 
 struct StoryDetailView: View {
+    // Launch-phase hide — Verified Expert chrome (label, accent border tint,
+    // VerifiedBadgeView on comments) gated to false post-launch. Underlying
+    // data + computation stay alive; flip back to true to restore. Owner
+    // intent: revisit after launch when the firsthand/credentials surface
+    // is the primary expression of expertise.
+    private static let SHOW_EXPERT_CHROME_ON_COMMENTS = false
+
     let story: Story
     @EnvironmentObject var auth: AuthViewModel
     @ObservedObject private var perms = PermissionStore.shared
@@ -98,6 +105,22 @@ struct StoryDetailView: View {
     // parent comment so the composer can stamp `parent_id` on submit and
     // render an inline "Replying to @user" header with a cancel affordance.
     @State private var replyingTo: VPComment? = nil
+
+    // Firsthand self-tag (web parity, TODO-50). Composer state captured at
+    // compose time and sent in the /api/comments POST payload. Persisted as
+    // `comments.real_world_experience` (≤80 chars CHECK). Read off the row
+    // directly via `comment.realWorldExperience`.
+    @State private var commentFirsthand: Bool = false
+    @State private var commentFirsthandContext: String = ""
+
+    // Author follow-ups (TODO-48). Read off `comment.followups` (embedded
+    // via the comment_followups relation). Local optimistic-add map merges
+    // server rows + just-posted rows for instant feedback before refetch.
+    @State private var followupsLocalAdds: [String: [VPComment.Followup]] = [:]
+    @State private var followupOpenFor: String? = nil
+    @State private var followupText: String = ""
+    @State private var followupBusy: Bool = false
+    @State private var followupError: String = ""
 
     // Cancellable 350ms auto-advance after a quiz option tap. Cancelled on
     // option re-tap, on view disappear, and on stage transition.
@@ -1702,6 +1725,70 @@ struct StoryDetailView: View {
                         .padding(10)
                         .background(Color(.secondarySystemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+
+                    // Firsthand self-tag toggle (web parity).
+                    Button {
+                        commentFirsthand.toggle()
+                        if commentFirsthand {
+                            // Pre-fill from saved profile background only when
+                            // toggling on AND the field is empty.
+                            if commentFirsthandContext.trimmingCharacters(in: .whitespaces).isEmpty,
+                               let saved = auth.currentUser?.backgroundOneline?
+                                .trimmingCharacters(in: .whitespacesAndNewlines),
+                               !saved.isEmpty {
+                                commentFirsthandContext = String(saved.prefix(80))
+                            }
+                        } else {
+                            commentFirsthandContext = ""
+                        }
+                    } label: {
+                        HStack(spacing: 7) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .stroke(commentFirsthand ? VP.text : VP.dim, lineWidth: 1.5)
+                                    .frame(width: 14, height: 14)
+                                if commentFirsthand {
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(VP.text)
+                                        .frame(width: 14, height: 14)
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(VP.bg)
+                                }
+                            }
+                            Text("I know this firsthand")
+                                .font(.system(.footnote, design: .serif).italic())
+                                .foregroundColor(commentFirsthand ? VP.text : VP.dim)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    // Context input — appears when firsthand is checked.
+                    if commentFirsthand {
+                        HStack(spacing: 8) {
+                            Text("How do you know?")
+                                .font(.system(.caption, design: .serif).italic())
+                                .foregroundColor(VP.dim)
+                                .layoutPriority(0)
+                            TextField(
+                                "e.g. dad of three  ·  civil engineer, 30 yrs",
+                                text: $commentFirsthandContext
+                            )
+                            .font(.system(.footnote, design: .serif).italic())
+                            .foregroundColor(VP.text)
+                            .onChange(of: commentFirsthandContext) { _, new in
+                                if new.count > 80 {
+                                    commentFirsthandContext = String(new.prefix(80))
+                                }
+                            }
+                            Text("\(80 - commentFirsthandContext.count)")
+                                .font(.system(.caption2, design: .serif).italic())
+                                .foregroundColor(commentFirsthandContext.count > 68 ? VP.warn : VP.muted)
+                                .monospacedDigit()
+                        }
+                        .padding(.top, 4)
+                    }
+
                     HStack {
                         Spacer()
                         Button {
@@ -2046,7 +2133,9 @@ struct StoryDetailView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(VP.text)
                     }
-                    VerifiedBadgeView(isExpert: u?.isExpert, isVerifiedPublicFigure: u?.isVerifiedPublicFigure)
+                    if Self.SHOW_EXPERT_CHROME_ON_COMMENTS {
+                        VerifiedBadgeView(isExpert: u?.isExpert, isVerifiedPublicFigure: u?.isVerifiedPublicFigure)
+                    }
                     // Section A — inline "Helpful" badge once the comment's
                     // helpful_count crosses the editorial threshold (default
                     // 10, settings-tunable via SettingsService.helpfulBadgeThreshold).
@@ -2124,6 +2213,32 @@ struct StoryDetailView: View {
                 } else {
                     commentBodyText(comment)
                 }
+                // Firsthand self-tag — read off `comments.real_world_experience`.
+                // Presence of the trimmed string IS the firsthand claim;
+                // empty/NULL = no claim (no row renders).
+                if !comment.isDeleted,
+                   let rwe = comment.realWorldExperience?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !rwe.isEmpty {
+                    HStack(spacing: 0) {
+                        Text("— I know this firsthand")
+                            .font(.system(.footnote, design: .serif).italic())
+                            .foregroundColor(VP.dim)
+                        Text(" ")
+                            .font(.system(.footnote, design: .serif).italic())
+                        Text("·")
+                            .font(.system(.footnote, design: .serif).italic())
+                            .foregroundColor(VP.muted)
+                        Text(" ")
+                            .font(.system(.footnote, design: .serif).italic())
+                        Text(rwe)
+                            .font(.system(.footnote, design: .serif).italic())
+                            .foregroundColor(VP.text)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.top, 6)
+                }
+                // Author follow-ups — pinned beneath comment, OP-only composer.
+                followupSection(for: comment, isOwnComment: isOwnComment)
                 if !comment.isDeleted && !isEditing {
                     // Tag chips — always visible when any tag is active (cast or count > 0).
                     // Self-tag blocked by the API (403); we hide for own comments to avoid tease.
@@ -2265,6 +2380,216 @@ struct StoryDetailView: View {
                         Label("Flag for review", systemImage: "flag")
                     }
                 }
+            }
+        }
+    }
+
+    /// Author follow-ups (TODO-48). Read off `comment.followups` (embedded
+    /// from the `comment_followups` relation). Local optimistic adds merge
+    /// with server rows for instant feedback before refetch.
+    @ViewBuilder
+    private func followupSection(for comment: VPComment, isOwnComment: Bool) -> some View {
+        let followups = mergedFollowups(for: comment)
+        let isOpen = followupOpenFor == comment.id
+        let canAdd = isOwnComment && !comment.isDeleted && followups.count < 2
+        if !followups.isEmpty || isOpen || canAdd {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(followups) { f in
+                    HStack(alignment: .top, spacing: 12) {
+                        Rectangle()
+                            .fill(VP.warn.opacity(0.9))
+                            .frame(width: 14, height: 1)
+                            .padding(.top, 7)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Update, \(relativeUpdateLabel(for: f.createdAt))")
+                                .font(.system(.footnote, design: .serif).italic())
+                                .foregroundColor(VP.warn)
+                            Text(f.body)
+                                .font(.system(.subheadline))
+                                .foregroundColor(VP.text)
+                        }
+                    }
+                }
+                if isOpen {
+                    HStack(alignment: .top, spacing: 12) {
+                        Rectangle()
+                            .fill(VP.warn.opacity(0.9))
+                            .frame(width: 14, height: 1)
+                            .padding(.top, 7)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Update")
+                                .font(.system(.footnote, design: .serif).italic())
+                                .foregroundColor(VP.warn)
+                            TextField(
+                                "Clarify or correct — pinned beneath your comment.",
+                                text: $followupText,
+                                axis: .vertical
+                            )
+                            .font(.subheadline)
+                            .foregroundColor(VP.text)
+                            .lineLimit(2...4)
+                            .disabled(followupBusy)
+                            .onChange(of: followupText) { _, new in
+                                if new.count > 280 {
+                                    followupText = String(new.prefix(280))
+                                }
+                            }
+                            HStack(spacing: 14) {
+                                Text("\(280 - followupText.count)")
+                                    .font(.system(.caption, design: .serif).italic())
+                                    .foregroundColor(followupText.count > 260 ? VP.warn : VP.muted)
+                                    .monospacedDigit()
+                                Spacer()
+                                Button {
+                                    followupOpenFor = nil
+                                    followupText = ""
+                                    followupError = ""
+                                } label: {
+                                    Text("Cancel")
+                                        .font(.footnote)
+                                        .foregroundColor(VP.dim)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(followupBusy)
+                                Button {
+                                    Task { await postFollowup(for: comment.id) }
+                                } label: {
+                                    Text(followupBusy ? "Posting…" : "Post update")
+                                        .font(.system(.footnote, design: .serif).italic().weight(.medium))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 5)
+                                        .background(
+                                            Capsule().fill(
+                                                followupText.trimmingCharacters(in: .whitespaces).isEmpty || followupBusy
+                                                    ? VP.warn.opacity(0.4)
+                                                    : VP.warn
+                                            )
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(followupText.trimmingCharacters(in: .whitespaces).isEmpty || followupBusy)
+                            }
+                            if !followupError.isEmpty {
+                                Text(followupError)
+                                    .font(.footnote.italic())
+                                    .foregroundColor(VP.warn)
+                            }
+                        }
+                    }
+                }
+                if canAdd && !isOpen {
+                    Button {
+                        followupOpenFor = comment.id
+                        followupText = ""
+                        followupError = ""
+                    } label: {
+                        Text(followups.isEmpty ? "Add an update" : "Add another")
+                            .font(.system(.footnote, design: .serif).italic())
+                            .foregroundColor(VP.warn)
+                            .opacity(0.78)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.top, 14)
+        } else {
+            EmptyView()
+        }
+    }
+
+    private func relativeUpdateLabel(for date: Date?) -> String {
+        guard let date else { return "just now" }
+        let s = Int(Date().timeIntervalSince(date))
+        if s < 30 { return "just now" }
+        if s < 3600 { return "\(s / 60) min later" }
+        if s < 86_400 { return "\(s / 3600) h later" }
+        return "\(s / 86_400) d later"
+    }
+
+    /// Merge server-side followups (from the comment's embedded relation)
+    /// with locally-added optimistic rows. De-dupe by id; sort by sort_order
+    /// then created_at to mirror the DB UNIQUE (comment_id, sort_order).
+    private func mergedFollowups(for comment: VPComment) -> [VPComment.Followup] {
+        var byId: [String: VPComment.Followup] = [:]
+        for f in (comment.followups ?? []) {
+            byId[f.id] = f
+        }
+        for f in (followupsLocalAdds[comment.id] ?? []) {
+            byId[f.id] = f
+        }
+        return byId.values.sorted { a, b in
+            let sa = a.sortOrder ?? 0
+            let sb = b.sortOrder ?? 0
+            if sa != sb { return sa < sb }
+            let da = a.createdAt ?? .distantPast
+            let db = b.createdAt ?? .distantPast
+            return da < db
+        }
+    }
+
+    /// POST /api/comments/[id]/followups — author-only, cap-of-2 enforced
+    /// server-side. On success, append to followupsLocalAdds for instant
+    /// render; refetch on next comments load reconciles authoritatively.
+    private func postFollowup(for commentId: String) async {
+        let body = followupText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty, !followupBusy else { return }
+        guard let session = try? await client.auth.session else {
+            followupError = "sign in to post an update."
+            return
+        }
+        followupBusy = true
+        defer { followupBusy = false }
+
+        let url = SupabaseManager.shared.siteURL
+            .appendingPathComponent("api/comments/\(commentId)/followups")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        struct Payload: Encodable { let body: String }
+        req.httpBody = try? JSONEncoder().encode(Payload(body: body))
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                followupError = "could not post update."
+                return
+            }
+            if http.statusCode == 200 {
+                struct Resp: Decodable { let followup: VPComment.Followup }
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                if let decoded = try? decoder.decode(Resp.self, from: data) {
+                    await MainActor.run {
+                        var arr = followupsLocalAdds[commentId] ?? []
+                        arr.append(decoded.followup)
+                        followupsLocalAdds[commentId] = arr
+                        followupText = ""
+                        followupOpenFor = nil
+                        followupError = ""
+                    }
+                } else {
+                    await MainActor.run {
+                        followupError = "could not parse server response."
+                    }
+                }
+            } else if http.statusCode == 409 {
+                await MainActor.run {
+                    followupError = "this comment already has 2 updates."
+                }
+            } else if http.statusCode == 403 {
+                await MainActor.run {
+                    followupError = "only the comment author can post follow-ups."
+                }
+            } else {
+                await MainActor.run {
+                    followupError = "could not post update."
+                }
+            }
+        } catch {
+            await MainActor.run {
+                followupError = "could not post update."
             }
         }
     }
@@ -2900,7 +3225,7 @@ struct StoryDetailView: View {
                 // (is_expert_thread_root, expert_thread_root_id,
                 // expert_thread_closed_at, expert_thread_closed_by,
                 // last_reopen_at) so close/reopen + cap affordances render.
-                .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, is_expert_thread_root, expert_thread_root_id, expert_thread_closed_at, expert_thread_closed_by, last_reopen_at, upvote_count, downvote_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions")
+                .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, is_expert_thread_root, expert_thread_root_id, expert_thread_closed_at, expert_thread_closed_by, last_reopen_at, upvote_count, downvote_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions, real_world_experience, comment_followups(id, body, sort_order, created_at)")
                 .eq("article_id", value: story.id)
                 .eq("status", value: "visible")
                 .is("deleted_at", value: nil)
@@ -3157,6 +3482,24 @@ struct StoryDetailView: View {
     // detached unsubscribe hops on both branches.
     // A124 — UPDATE listener added so soft-deleted comments and edited
     // bodies render live without a story re-load.
+    /// Refetch a single comment's follow-ups and merge into its row.
+    /// Called from the realtime followup INSERT/DELETE handlers when the
+    /// affected comment_id is in the locally-visible set.
+    private func refetchFollowups(for commentId: String) async {
+        let rows: [VPComment.Followup] = (try? await client
+            .from("comment_followups")
+            .select("id, body, sort_order, created_at")
+            .eq("comment_id", value: commentId)
+            .order("sort_order", ascending: true)
+            .execute()
+            .value) ?? []
+        await MainActor.run {
+            if let idx = comments.firstIndex(where: { $0.id == commentId }) {
+                comments[idx].followups = rows
+            }
+        }
+    }
+
     private func subscribeToNewComments() async {
         let channel = client.channel("comments-story-\(story.id)")
         let inserts = channel.postgresChange(
@@ -3170,6 +3513,19 @@ struct StoryDetailView: View {
             schema: "public",
             table: "comments",
             filter: "article_id=eq.\(story.id)"
+        )
+        // comment_followups doesn't carry article_id; subscribe broadly and
+        // filter in the handler against the locally-visible comment ids.
+        // INSERT/DELETE both refetch a single comment's followups and merge.
+        let followupInserts = channel.postgresChange(
+            InsertAction.self,
+            schema: "public",
+            table: "comment_followups"
+        )
+        let followupDeletes = channel.postgresChange(
+            DeleteAction.self,
+            schema: "public",
+            table: "comment_followups"
         )
         await channel.subscribe()
         await withTaskCancellationHandler {
@@ -3237,6 +3593,22 @@ struct StoryDetailView: View {
                         if let idx = comments.firstIndex(where: { $0.id == updatedId }) {
                             comments[idx] = refreshed
                         }
+                    }
+                }
+                group.addTask { @MainActor in
+                    for await change in followupInserts {
+                        guard let cidValue = change.record["comment_id"],
+                              case let .string(cid) = cidValue else { continue }
+                        guard comments.contains(where: { $0.id == cid }) else { continue }
+                        await refetchFollowups(for: cid)
+                    }
+                }
+                group.addTask { @MainActor in
+                    for await change in followupDeletes {
+                        guard let cidValue = change.oldRecord["comment_id"],
+                              case let .string(cid) = cidValue else { continue }
+                        guard comments.contains(where: { $0.id == cid }) else { continue }
+                        await refetchFollowups(for: cid)
                     }
                 }
                 await group.waitForAll()
@@ -3741,6 +4113,9 @@ struct StoryDetailView: View {
     /// `author.is_expert AND article.category ∈ author.verified_categories`,
     /// NOT to thread mode."
     private func showsExpertChrome(_ comment: VPComment) -> Bool {
+        // Launch-phase hide (see SHOW_EXPERT_CHROME_ON_COMMENTS). Underlying
+        // computation preserved below for post-launch revival.
+        guard Self.SHOW_EXPERT_CHROME_ON_COMMENTS else { return false }
         guard comment.users?.isExpert == true else { return false }
         guard let articleCat = story.categoryId else { return false }
         let cats = comment.users?.verifiedCategoryIds ?? []
@@ -3762,16 +4137,28 @@ struct StoryDetailView: View {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
-        // POST /api/comments expects { article_id, body, parent_id?, mentions? }.
-        // mentions is empty; free-tier mentions are stripped server-side per D21.
+        // POST /api/comments expects { article_id, body, parent_id?, mentions?,
+        // real_world_experience? }. mentions is empty; free-tier mentions are
+        // stripped server-side per D21. real_world_experience is the
+        // firsthand-context line captured at compose time (≤80 chars,
+        // server validates + DB CHECK enforces).
         struct Payload: Encodable {
             let article_id: String
             let body: String
             let parent_id: String?
+            let real_world_experience: String?
         }
         let parentId = replyingTo?.id
+        let rweCandidate = commentFirsthand
+            ? commentFirsthandContext.trimmingCharacters(in: .whitespacesAndNewlines)
+            : ""
         req.httpBody = try? JSONEncoder().encode(
-            Payload(article_id: story.id, body: body, parent_id: parentId)
+            Payload(
+                article_id: story.id,
+                body: body,
+                parent_id: parentId,
+                real_world_experience: rweCandidate.isEmpty ? nil : rweCandidate
+            )
         )
 
         do {
@@ -3788,6 +4175,10 @@ struct StoryDetailView: View {
                 if let decoded = try? decoder.decode(Resp.self, from: data) {
                     await MainActor.run {
                         comments.insert(decoded.comment, at: 0)
+                        // Reset composer firsthand state — the value is now on
+                        // the server-returned comment row directly.
+                        commentFirsthand = false
+                        commentFirsthandContext = ""
                         commentText = ""
                         replyingTo = nil
                         composerFocused = false

@@ -286,6 +286,68 @@ EVERY SENTENCE A FACT.
   a named position. If a sentence interprets, characterizes,
   predicts, or frames, cut it.
 
+  WHAT "EVERY SENTENCE A FACT" DOES NOT MEAN. The rule strips
+  interpretation and framing — it does not strip the four things
+  below, which carry information rather than judgment:
+
+    1. ON-RECORD STATEMENTS as their own news.
+       A named, on-record quote that is itself a news event
+       (a politician's own remark on their own situation, an
+       agency's formal response, a CEO's press-conference
+       remarks, a court filing, a sworn statement) gets quoted
+       with attribution. The sentence still passes "every
+       sentence a fact" because the FACT is "X said Y on the
+       record." Cut pundit analysis and color quotes — keep
+       statements that themselves move the story.
+
+    2. SCALE COMPARISONS that are factual.
+       "$4.3 billion — the largest such settlement since 2008"
+       is a fact (a measurement against a named prior peak).
+       "$4.3 billion — a stunning sum" is a characterization.
+       Numerical or rank-based comparisons against named prior
+       events are facts and stay. Adjectival reactions to size
+       are framing and go.
+
+    3. CADENCE. Short sentences are facts; rhythm is not
+       framing. A 4-word sentence that states a verified
+       outcome ("The vote was unanimous.") is exactly the
+       compressed factual style this guide asks for. Do not
+       strip a sentence for being short or punchy — strip it
+       only if it interprets.
+
+    4. THE "SO WHAT" SENTENCE — narrowly defined.
+       The article may include ONE "so what" sentence that
+       explains why today's event matters. To pass FACTS ONLY,
+       the "so what" must be one of:
+         (a) a quantitative causal claim with a number
+             ("The strait handles 20% of global oil shipments"),
+             OR
+         (b) an attributable mechanism — a clause sourced to a
+             named on-record speaker or a government/court
+             document ("The settlement releases the agency from
+             further claims, according to the filing").
+       If it is neither — if it is interpretation, prediction,
+       or general background ("This marks a turning point for
+       the industry") — omit it. There is no third "so what"
+       form. When in doubt, omit.
+
+NEVER INVENT ATTRIBUTION.
+  If the corpus does not explicitly identify a primary source
+  for a claim, state the fact flat or omit it. Do not generate
+  "according to," "sources said," "a person familiar with the
+  matter," "officials said," or any similar attribution
+  phrasing unless those exact phrasings appear in the research.
+  Hallucinated attribution is a structural libel risk
+  (St. Amant "purposeful avoidance"). When unsure, drop the
+  attribution clause entirely or omit the sentence.
+
+WIKIPEDIA IS A RESEARCH AID, NOT A CONTENT SOURCE.
+  Do not reproduce or paraphrase Wikipedia prose. Use Wikipedia
+  to find primary sources, then attribute to those primary
+  sources. Wikipedia text is CC-BY-SA — paraphrasing it without
+  attribution would create a license-incompatibility problem
+  the outlet credit rule cannot fix.
+
 ═══════════════════════════════════════════════════════════
 LANGUAGE RULES — VIOLATING ANY IS A FAILURE
 ═══════════════════════════════════════════════════════════
@@ -334,8 +396,25 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
     "according to NBC News" or "CBS News reported" for a fact
     that NBC or CBS merely covered. Outlet credit lives in the
     sources block at the bottom of the article, not inline.
-    Never use weasel words: no "reportedly," no "it is believed,"
-    no "sources say" without specifying who.
+
+    EXAMPLE:
+      BAD:  "CBS News reported the investigation began under Biden."
+      GOOD: "The investigation began during the Biden administration,
+            according to a person familiar with the matter."
+    Strip the outlet, keep the primary-source hedge.
+
+    Generally avoid weasel words ("it is believed," "sources say"
+    without specifying who) — they conceal the source instead of
+    naming it.
+
+    REQUIRED HEDGES — ALLEGATION MODE: When a sentence imputes
+    uncharged conduct, an investigation, or an accusation to a
+    NAMED person, the words "alleged," "allegedly," "reportedly,"
+    or "according to [filing/official]" are REQUIRED, not banned.
+    This carve-out is mandatory for fair-report privilege; without
+    it, stripping the outlet name turns a quote into a defamatory
+    statement of fact. Always pair the allegation with an in-line
+    attribution to a court filing or a named official.
 
 12. No opinion. No advocacy. No framing language. No editorial
     judgment about whether something is good or bad.
@@ -743,13 +822,13 @@ a skimmer the additional facts they need beyond the headline.
 A summary that approaches the article in length is a second
 article, not a deck. Target ~10–12% of body word count.
 
-LENGTH BANDS — SIZE THE SUMMARY TO THE BODY THE ARTICLE WILL BE:
-  Body ~150–250 words → 1–2 sentences (~20–30 words).
-  Body ~250–450 words → 2–3 sentences (~30–50 words).
-  Body ~450+ words   → 3 sentences (~50–70 words).
+LENGTH: 2–3 sentences, 30–50 words. Fixed target. The summary
+call runs in parallel with the body, so it cannot observe the
+body's actual length — conditional bands would be aspirational.
+A consistent 2–3 sentence deck is honest about that constraint.
 
-Hard ceiling: 70 words. The summary never crosses this even
-on long articles — past 70 it stops being a deck.
+Hard ceiling: 70 words. The summary never crosses this — past
+70 it stops being a deck.
 Hard floor: 15 words. A one-clause summary is too thin.
 
 Verity Post adult bodies target 250–450 words, so the typical
@@ -1028,10 +1107,10 @@ The summary sits above the article. Keep it short — a kid who
 reads the summary should still want to read the article.
 Target ~10–12% of body word count.
 
-LENGTH BANDS — SIZE THE SUMMARY TO THE BODY:
-  Body ~150–250 words → 1–2 short sentences (~20–30 words).
-  Body ~250–450 words → 2–3 short sentences (~30–50 words).
-  Body ~450+ words   → 3 short sentences (~50–60 words).
+LENGTH: 2–3 short sentences, 30–50 words. Fixed target. The
+summary call runs in parallel with the body, so length cannot
+adapt to actual body length — a consistent deck is honest about
+the constraint.
 
 Hard ceiling: 60 words for kids — even shorter than adult.
 Hard floor: 15 words.
@@ -1073,10 +1152,10 @@ The summary sits above the article. Keep the deck-to-article
 ratio honest — a summary that approaches the article in length
 is a second article. Target ~10–12% of body word count.
 
-LENGTH BANDS — SIZE THE SUMMARY TO THE BODY:
-  Body ~150–250 words → 1–2 sentences (~20–30 words).
-  Body ~250–450 words → 2–3 sentences (~30–50 words).
-  Body ~450+ words   → 3 sentences (~50–70 words).
+LENGTH: 2–3 sentences, 30–50 words. Fixed target. The summary
+call runs in parallel with the body, so length cannot adapt to
+actual body length — a consistent deck is honest about the
+constraint.
 
 Hard ceiling: 70 words. Hard floor: 15 words.
 

@@ -1729,7 +1729,7 @@ ${catListText}`;
 Return ONLY a valid JSON object:
 {
   "title": "${cleanText(headline)}",
-  "body": "The full article in markdown. Paragraphs separated by \\n\\n. 250-400 words. 100% original language — not rephrased source text.",
+  "body": "The full article in markdown. Paragraphs separated by \\n\\n. 250-450 words. 100% original language — not rephrased source text.",
   "word_count": 300,
   "reading_time_minutes": 1
 }${freeformBlock}

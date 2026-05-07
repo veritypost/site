@@ -60,6 +60,19 @@ struct VPUser: Codable, Identifiable {
     var compedUntil: String?
     var planProvider: String?
 
+    // Background card (TODO-50 piece A). Self-described context shown next
+    // to the username on profile + the firsthand context line on comments.
+    // All optional. Persisted as users.background_* columns + 3 join tables
+    // (user_education, user_links, user_topics_known) — those live in
+    // SettingsBackgroundView's local state, not on this model.
+    var backgroundOneline: String?
+    var backgroundProfession: String?
+    var backgroundYears: String?
+    var backgroundWhere: String?
+    var backgroundLived: String?
+    var backgroundLanguages: String?
+    var backgroundLivedPublic: Bool?
+
     struct AvatarRef: Codable {
         var outer: String?
         var inner: String?
@@ -109,6 +122,13 @@ struct VPUser: Codable, Identifiable {
         case lockedUntil = "locked_until"
         case compedUntil = "comped_until"
         case planProvider = "plan_provider"
+        case backgroundOneline = "background_oneline"
+        case backgroundProfession = "background_profession"
+        case backgroundYears = "background_years"
+        case backgroundWhere = "background_where"
+        case backgroundLived = "background_lived"
+        case backgroundLanguages = "background_languages"
+        case backgroundLivedPublic = "background_lived_public"
     }
 
     /// Backwards-compat accessor — every callsite reads `user.plan`.
@@ -436,6 +456,29 @@ struct VPComment: Codable, Identifiable {
     var mentions: [Mention]?
     var articles: QuizAttempt.StoryRef?
     var users: AuthorRef?
+    /// Author's self-attested "I know this firsthand" context (≤80 chars).
+    /// Persisted on `comments.real_world_experience`. Presence ⇒ firsthand
+    /// claim; NULL/empty ⇒ no claim. Captured at compose time only — comments
+    /// are non-editable, so this is set once on insert.
+    var realWorldExperience: String?
+    /// Author follow-ups (TODO-48). Pinned beneath the parent comment.
+    /// Cap of 2 enforced server-side. Decoded from the embedded
+    /// `comment_followups(id, body, sort_order, created_at)` relation in
+    /// the iOS comment select.
+    var followups: [Followup]?
+
+    struct Followup: Codable, Identifiable {
+        let id: String
+        var body: String
+        var sortOrder: Int?
+        var createdAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case id, body
+            case sortOrder = "sort_order"
+            case createdAt = "created_at"
+        }
+    }
 
     /// True when the row has been soft-deleted server-side. Renderer
     /// should swap the body text for a "[deleted]" tombstone and hide
@@ -515,6 +558,8 @@ struct VPComment: Codable, Identifiable {
         case qualityScore = "quality_score"
         case agreeCount = "agree_count"
         case disagreeCount = "disagree_count"
+        case realWorldExperience = "real_world_experience"
+        case followups = "comment_followups"
     }
 }
 

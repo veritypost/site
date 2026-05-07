@@ -126,7 +126,7 @@ export function ExpertApplyForm({ preview, onSubmitted }: Props) {
         }
         throw new Error((data as { error?: string }).error ?? 'Could not submit.');
       }
-      toast.success('Application submitted. We review within 5 business days.');
+      toast.success('Application submitted.');
       onSubmitted?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Submit failed.');
