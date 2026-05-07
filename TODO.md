@@ -138,8 +138,6 @@
   - Expand/collapse: each source row is a button showing the logo; click toggles a visible raw headline below it; click the headline → new tab
   - Tease state (no subscription) and anon state remain as-is — just re-skin the layout
   - Note: "Unknown" display bug (TODO 26) is a data issue — backfill migration (TODO 19) must run first; code fallback logic is already correct
-- 4: ~~Back to home button~~ — navigation already handles this; closed.
-
 **iOS**
 
 **Security / RBAC — fix these before granting owner-mode to any second user**
@@ -224,14 +222,6 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 ---
 
-## Bookmarks → Follow (story subscription)
-
-- 43: Copy sweep done — "Bookmark" → "Follow" shipped across web + iOS. Schema untouched.
-
-  Story-update surfacing (Activity badge / push notification) — skipped for now.
-
----
-
 ## iOS parity — bring iOS up to web mobile standard
 
 Web mobile is the product standard. These items bring iOS in line.
@@ -251,11 +241,17 @@ Web mobile is the product standard. These items bring iOS in line.
 
 
 
+---
+
+## Owner action items
+
 - 19: Apply `supabase/migrations/20260503000007_backfill_unknown_sources_to_null.sql` — 4 "Unknown" source rows in prod still render legacy values until it runs
 - 20: Verity Monthly Stripe price: plans.verity_monthly has stripe_price_id=NULL — owner must click Mint at /admin/plans
-- 48: **OP-only comment follow-ups — SHIPPED 2026-05-07** (commit `8110a917`). Comments stay non-editable, but the author can append up to 2 short notes pinned beneath the parent. Built end-to-end despite originally being deferred past TODO-50 v1. New `comment_followups` table (cap-of-2 trigger enforced + UNIQUE (comment_id, sort_order) + FOR UPDATE on parent in the RPC); SQLSTATE `VP001` on cap-hit for stable error-code detection. `can_view_comment` SECURITY DEFINER helper centralizes the parent-visibility predicate that mirrors `comments_select`. New `/api/comments/[id]/followups` route (POST + DELETE). Italic-serif "Update" pinned beneath parent on web + iOS, optimistic local merge on post. Realtime channel on INSERT/DELETE so other viewers see updates land within ~1s without refresh. `supabase_realtime` publication updated to include `comments` AND `comment_followups` (existing comments realtime had been silently failing because the publication was never extended).
 
-  **Why deferred:** Adds visual density on top of an already feature-rich comment surface (line + citation + Response). Doubles moderation load — mods triage parent and miss the follow-up payload. Lets one author dominate a thread visually, working against the egalitarian frame. Easiest of the four surfaces to add later if missed. Revisit after the voice model ships and we have data on whether the design needs amendment affordances.
+---
+
+## Open copy / direction questions
+
 - 49: **HomeFooter anon end-of-feed copy** — placeholder pitch shipped 2026-05-07 in `web/src/app/_HomeFooter.tsx`; owner rejected wording as too scarcity-flavored. Constraints: no "today" framing (articles aren't date-bound), no gate/scarcity tone, no closed-beta "invite" jargon. Open question: what should the end-of-anon-home-feed sell — the quiz, the Verity Score, the discussion, the brand idea? Revisit when owner has a direction.
 
 ---
