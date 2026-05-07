@@ -8,6 +8,12 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 import { isSafeAdUrl } from '@/lib/adUrlValidation';
 
+// Targeting columns moved to the unified `ad_targets` table; the legacy
+// jsonb columns (targeting_categories, targeting_subcategories,
+// targeting_cohorts, targeting_countries, targeting_platforms) are no
+// longer accepted here. `targeting_plans` stays for plan-tier gating.
+// `ad_targets` is handled separately (after the main update, via the
+// replace_ad_targets RPC) and is NOT in ALLOWED.
 const ALLOWED = [
   'name',
   'advertiser_name',
@@ -21,12 +27,7 @@ const ALLOWED = [
   'click_url',
   'alt_text',
   'cta_text',
-  'targeting_categories',
-  'targeting_subcategories',
-  'targeting_cohorts',
-  'targeting_countries',
   'targeting_plans',
-  'targeting_platforms',
   'frequency_cap_per_user',
   'frequency_cap_per_session',
   'start_date',
@@ -108,6 +109,33 @@ export async function PATCH(request, { params }) {
       route: 'admin.ad_units.id',
       fallbackStatus: 400,
     });
+
+  // Targeting rows go through the replace_ad_targets RPC (atomic
+  // replace-all for this ad unit). The RPC enforces the admin auth
+  // check + 500-target cap; reject malformed input here so we don't
+  // round-trip a clearly bad body.
+  if (Array.isArray(b.ad_targets)) {
+    const cleaned = [];
+    for (const t of b.ad_targets) {
+      if (!t || typeof t !== 'object') continue;
+      const target_type = t.target_type;
+      const target_id = t.target_id;
+      const mode = t.mode === 'exclude' ? 'exclude' : 'include';
+      if (!['category', 'subcategory', 'article'].includes(target_type)) continue;
+      if (typeof target_id !== 'string' || target_id.length < 8) continue;
+      cleaned.push({ target_type, target_id, mode });
+    }
+    const { error: tgtErr } = await service.rpc('replace_ad_targets', {
+      p_unit: params.id,
+      p_targets: cleaned,
+    });
+    if (tgtErr)
+      return safeErrorResponse(NextResponse, tgtErr, {
+        route: 'admin.ad_units.id.targets',
+        fallbackStatus: 400,
+      });
+  }
+
   // Approval-status changes get a distinct verb — they're the
   // policy-bearing branch (rank-guarded above) and reviewers will want
   // them surfaced separately from generic creative edits.
@@ -116,7 +144,7 @@ export async function PATCH(request, { params }) {
     targetTable: 'ad_units',
     targetId: params.id,
     oldValue: prior ?? null,
-    newValue: update,
+    newValue: { ...update, ...(Array.isArray(b.ad_targets) ? { ad_targets: b.ad_targets } : {}) },
   });
   return NextResponse.json({ ok: true });
 }

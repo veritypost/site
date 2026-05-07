@@ -94,7 +94,6 @@ export async function POST(request) {
       click_url: b.click_url || null,
       alt_text: b.alt_text || null,
       cta_text: b.cta_text || null,
-      targeting_categories: b.targeting_categories || null,
       frequency_cap_per_user: b.frequency_cap_per_user || null,
       frequency_cap_per_session: b.frequency_cap_per_session || null,
       start_date: b.start_date || null,

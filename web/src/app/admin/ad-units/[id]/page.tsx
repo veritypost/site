@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ADMIN_ROLES } from '@/lib/roles';
@@ -22,16 +22,17 @@ type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'slug' | 'parent_id'>
 const NETWORKS = ['direct', 'house', 'google_adsense', 'google_ads', 'amazon', 'other'];
 const AD_FORMATS = ['banner', 'interstitial', 'video', 'native'];
 const APPROVAL_STATUSES = ['pending', 'approved', 'rejected'];
-const PLAN_OPTIONS = ['free', 'verity_plus'];
-const PLATFORM_OPTIONS = ['web', 'ios'];
+// Plan tiers from `plans.tier`. `verity_plus` was a stale form value that
+// matched no row and silently targeted nothing.
+const PLAN_OPTIONS = ['free', 'verity', 'verity_pro', 'verity_family'];
+
+type TargetType = 'category' | 'subcategory' | 'article';
+type TargetMode = 'include' | 'exclude';
+type AdTarget = { target_type: TargetType; target_id: string; mode: TargetMode };
 
 type FormState = Partial<AdUnit> & {
-  targeting_categories: string[];
-  targeting_subcategories: string[];
   targeting_plans: string[];
-  targeting_platforms: string[];
-  targeting_countries: string[];
-  targeting_cohorts: string[];
+  adTargets: AdTarget[];
 };
 
 function parseJsonArray(val: unknown): string[] {
@@ -56,13 +57,13 @@ function AdUnitTargetingInner() {
   const [unit, setUnit] = useState<AdUnit | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+  const [articleTitleCache, setArticleTitleCache] = useState<Record<string, string>>({});
+  const [articleQuery, setArticleQuery] = useState('');
+  const [articleResults, setArticleResults] = useState<Array<{ id: string; title: string }>>([]);
+  const [articleSearching, setArticleSearching] = useState(false);
   const [form, setForm] = useState<FormState>({
-    targeting_categories: [],
-    targeting_subcategories: [],
     targeting_plans: [],
-    targeting_platforms: [],
-    targeting_countries: [],
-    targeting_cohorts: [],
+    adTargets: [],
   });
 
   useEffect(() => {
@@ -76,9 +77,10 @@ function AdUnitTargetingInner() {
       if (!ok) { router.push('/'); return; }
       setAuthorized(true);
 
-      const [unitRes, catsRes] = await Promise.all([
+      const [unitRes, catsRes, targetsRes] = await Promise.all([
         supabase.from('ad_units').select('*').eq('id', params.id).single(),
-        supabase.from('categories').select('id, name, slug, parent_id').order('name'),
+        supabase.from('categories').select('id, name, slug, parent_id').is('deleted_at', null).order('name'),
+        supabase.from('ad_targets').select('target_type, target_id, mode').eq('ad_unit_id', params.id),
       ]);
 
       if (unitRes.error || !unitRes.data) {
@@ -90,30 +92,38 @@ function AdUnitTargetingInner() {
       setUnit(u);
       setCategories(catsRes.data || []);
 
-      const targetCats = parseJsonArray(u.targeting_categories);
-      const rawSubs = parseJsonArray(u.targeting_subcategories);
-      // Drop any subcategory whose parent is already targeted as a wildcard —
-      // legacy rows snapshotted child IDs at parent-check time, which the UI no
-      // longer does. The wildcard parent is the single source of truth.
-      const wildcardParents = new Set(targetCats);
-      const subParentLookup = new Map((catsRes.data || []).map((c) => [c.id, c.parent_id]));
-      const targetSubs = rawSubs.filter((subId) => {
-        const parentId = subParentLookup.get(subId);
-        return !parentId || !wildcardParents.has(parentId);
-      });
-      // Pre-expand any parent categories that have targeting set on them or their children
+      const targets: AdTarget[] = (targetsRes.data || []).map((t) => ({
+        target_type: t.target_type as TargetType,
+        target_id: t.target_id,
+        mode: t.mode as TargetMode,
+      }));
+
+      // Pre-expand categories that have either parent-level or child-level
+      // targeting set, so the operator sees their selections without clicking.
       const expanded = new Set<string>();
-      for (const id of targetCats) expanded.add(id);
+      for (const t of targets) {
+        if (t.target_type === 'category') expanded.add(t.target_id);
+        if (t.target_type === 'subcategory') {
+          const sub = (catsRes.data || []).find((c) => c.id === t.target_id);
+          if (sub?.parent_id) expanded.add(sub.parent_id);
+        }
+      }
       setExpandedCats(expanded);
+
+      // Fetch titles for any articles already targeted, so they render with
+      // a label instead of a bare UUID in the selected list.
+      const articleIds = targets.filter((t) => t.target_type === 'article').map((t) => t.target_id);
+      if (articleIds.length) {
+        const { data: arts } = await supabase.from('articles').select('id, title').in('id', articleIds);
+        const cache: Record<string, string> = {};
+        for (const a of arts || []) cache[a.id] = a.title;
+        setArticleTitleCache(cache);
+      }
 
       setForm({
         ...u,
-        targeting_categories: targetCats,
-        targeting_subcategories: targetSubs,
         targeting_plans: parseJsonArray(u.targeting_plans),
-        targeting_platforms: parseJsonArray(u.targeting_platforms),
-        targeting_countries: (parseJsonArray(u.targeting_countries)).join('\n'),
-        targeting_cohorts: (parseJsonArray(u.targeting_cohorts)).join('\n'),
+        adTargets: targets,
       } as unknown as FormState);
 
       setLoading(false);
@@ -124,24 +134,26 @@ function AdUnitTargetingInner() {
   const topLevelCats = categories.filter((c) => !c.parent_id);
   const subCatsOf = (parentId: string) => categories.filter((c) => c.parent_id === parentId);
 
-  const toggleCat = (catId: string) => {
-    const cur = new Set(form.targeting_categories);
-    if (cur.has(catId)) {
-      cur.delete(catId);
-      setExpandedCats((prev) => { const next = new Set(prev); next.delete(catId); return next; });
-    } else {
-      // Parent-checked = wildcard for this category and all current and future
-      // children; do not snapshot child IDs into targeting_subcategories.
-      cur.add(catId);
-      setExpandedCats((prev) => new Set([...prev, catId]));
-    }
-    setForm({ ...form, targeting_categories: Array.from(cur) });
+  const isTargeted = (target_type: TargetType, target_id: string) =>
+    form.adTargets.some((t) => t.target_type === target_type && t.target_id === target_id && t.mode === 'include');
+
+  const toggleTarget = (target_type: TargetType, target_id: string) => {
+    setForm((f) => {
+      const exists = f.adTargets.some(
+        (t) => t.target_type === target_type && t.target_id === target_id && t.mode === 'include',
+      );
+      const adTargets = exists
+        ? f.adTargets.filter((t) => !(t.target_type === target_type && t.target_id === target_id && t.mode === 'include'))
+        : [...f.adTargets, { target_type, target_id, mode: 'include' as const }];
+      return { ...f, adTargets };
+    });
   };
 
-  const toggleSub = (subId: string) => {
-    const cur = new Set(form.targeting_subcategories);
-    if (cur.has(subId)) cur.delete(subId); else cur.add(subId);
-    setForm({ ...form, targeting_subcategories: Array.from(cur) });
+  const toggleCategoryTarget = (catId: string) => {
+    toggleTarget('category', catId);
+    if (!isTargeted('category', catId)) {
+      setExpandedCats((prev) => new Set([...prev, catId]));
+    }
   };
 
   const toggleCatExpand = (catId: string, e: React.MouseEvent) => {
@@ -153,19 +165,62 @@ function AdUnitTargetingInner() {
     });
   };
 
-  const toggleChip = (field: 'targeting_plans' | 'targeting_platforms', val: string) => {
+  const toggleChip = (field: 'targeting_plans', val: string) => {
     const cur = new Set(form[field] as string[]);
     if (cur.has(val)) cur.delete(val); else cur.add(val);
     setForm({ ...form, [field]: Array.from(cur) });
   };
+
+  const addArticleTarget = (article: { id: string; title: string }) => {
+    if (isTargeted('article', article.id)) return;
+    setArticleTitleCache((c) => ({ ...c, [article.id]: article.title }));
+    setForm((f) => ({
+      ...f,
+      adTargets: [...f.adTargets, { target_type: 'article', target_id: article.id, mode: 'include' }],
+    }));
+    setArticleQuery('');
+    setArticleResults([]);
+  };
+
+  const removeArticleTarget = (articleId: string) => {
+    setForm((f) => ({
+      ...f,
+      adTargets: f.adTargets.filter((t) => !(t.target_type === 'article' && t.target_id === articleId)),
+    }));
+  };
+
+  // Debounced article search. 300ms window; cleared when query empties.
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    const q = articleQuery.trim();
+    if (!q) {
+      setArticleResults([]);
+      setArticleSearching(false);
+      return;
+    }
+    setArticleSearching(true);
+    searchTimerRef.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from('articles')
+        .select('id, title')
+        .ilike('title', `%${q}%`)
+        .order('published_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .limit(25);
+      setArticleResults(data || []);
+      setArticleSearching(false);
+    }, 300);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [articleQuery, supabase]);
 
   const save = async () => {
     if (!unit) return;
     setError('');
     setSaving(true);
     try {
-      const countriesRaw = (form.targeting_countries as unknown as string) || '';
-      const cohortsRaw = (form.targeting_cohorts as unknown as string) || '';
       const body: Record<string, unknown> = {
         name: form.name,
         advertiser_name: form.advertiser_name || null,
@@ -182,16 +237,8 @@ function AdUnitTargetingInner() {
         weight: form.weight ?? 100,
         approval_status: form.approval_status,
         is_active: form.is_active,
-        targeting_categories: form.targeting_categories.length ? form.targeting_categories : null,
-        targeting_subcategories: form.targeting_subcategories.length ? form.targeting_subcategories : null,
-        targeting_plans: (form.targeting_plans as string[]).length ? form.targeting_plans : null,
-        targeting_platforms: (form.targeting_platforms as string[]).length ? form.targeting_platforms : null,
-        targeting_countries: countriesRaw.trim()
-          ? countriesRaw.split('\n').map((s: string) => s.trim()).filter(Boolean)
-          : null,
-        targeting_cohorts: cohortsRaw.trim()
-          ? cohortsRaw.split('\n').map((s: string) => s.trim()).filter(Boolean)
-          : null,
+        targeting_plans: form.targeting_plans.length ? form.targeting_plans : null,
+        ad_targets: form.adTargets,
       };
       const res = await fetch(`/api/admin/ad-units/${unit.id}`, {
         method: 'PATCH',
@@ -226,8 +273,7 @@ function AdUnitTargetingInner() {
   }
   if (!authorized || !unit) return null;
 
-  const countriesVal = (form.targeting_countries as unknown as string) ?? '';
-  const cohortsVal = (form.targeting_cohorts as unknown as string) ?? '';
+  const articleTargets = form.adTargets.filter((t) => t.target_type === 'article' && t.mode === 'include');
 
   return (
     <Page>
@@ -335,6 +381,10 @@ function AdUnitTargetingInner() {
       {/* Targeting */}
       <PageSection title="Targeting">
 
+        <div style={{ marginBottom: S[3], padding: S[2], background: C.bg, border: `1px solid ${C.divider}`, borderRadius: 6, fontSize: F.xs, color: C.dim }}>
+          Empty targeting = serve everywhere. Add a category, subcategory, or specific article to narrow.
+        </div>
+
         {/* Plans */}
         <div style={{ marginBottom: S[4] }}>
           <Lbl label="Plans (empty = all plans)">
@@ -343,7 +393,7 @@ function AdUnitTargetingInner() {
                 <Chip
                   key={p}
                   label={p}
-                  active={(form.targeting_plans as string[]).includes(p)}
+                  active={form.targeting_plans.includes(p)}
                   onClick={() => toggleChip('targeting_plans', p)}
                 />
               ))}
@@ -351,139 +401,165 @@ function AdUnitTargetingInner() {
           </Lbl>
         </div>
 
-        {/* Platforms */}
+        {/* Categories &amp; subcategories */}
         <div style={{ marginBottom: S[4] }}>
-          <Lbl label="Platforms (empty = all platforms)">
-            <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap', marginTop: S[1] }}>
-              {PLATFORM_OPTIONS.map((p) => (
-                <Chip
-                  key={p}
-                  label={p}
-                  active={(form.targeting_platforms as string[]).includes(p)}
-                  onClick={() => toggleChip('targeting_platforms', p)}
-                />
-              ))}
+          <Lbl label="Categories &amp; subcategories">
+            <div style={{
+              marginTop: S[1], border: `1px solid ${C.divider}`, borderRadius: 8,
+              maxHeight: 400, overflowY: 'auto',
+            }}>
+              {topLevelCats.length === 0 && (
+                <div style={{ padding: S[3], color: C.dim, fontSize: F.sm }}>No categories available.</div>
+              )}
+              {topLevelCats.map((cat) => {
+                const subs = subCatsOf(cat.id);
+                const catSelected = isTargeted('category', cat.id);
+                const isExpanded = expandedCats.has(cat.id);
+                return (
+                  <div key={cat.id}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: S[2],
+                      padding: `${S[2]}px ${S[3]}px`,
+                      borderBottom: `1px solid ${C.divider}`,
+                      background: catSelected ? C.hover : C.bg,
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={catSelected}
+                        onChange={() => toggleCategoryTarget(cat.id)}
+                        style={{ width: 14, height: 14, cursor: 'pointer', flexShrink: 0 }}
+                      />
+                      <span
+                        style={{ fontSize: F.sm, fontWeight: 600, color: C.ink, flex: 1, cursor: 'pointer' }}
+                        onClick={() => toggleCategoryTarget(cat.id)}
+                      >
+                        {cat.name}
+                      </span>
+                      {subs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => toggleCatExpand(cat.id, e)}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: C.dim, fontSize: F.xs, padding: `0 ${S[1]}px`,
+                            font: 'inherit',
+                          }}
+                        >
+                          {isExpanded ? '▲' : '▼'} {subs.length}
+                        </button>
+                      )}
+                    </div>
+                    {isExpanded && (catSelected ? (
+                      <div style={{
+                        padding: `${S[2]}px ${S[3]}px ${S[2]}px ${S[6]}px`,
+                        borderBottom: `1px solid ${C.divider}`,
+                        color: C.dim, fontSize: F.xs, fontStyle: 'italic',
+                      }}>
+                        All {cat.name} subcategories targeted (current and future).
+                      </div>
+                    ) : subs.map((sub) => {
+                      const subSelected = isTargeted('subcategory', sub.id);
+                      return (
+                        <div
+                          key={sub.id}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: S[2],
+                            padding: `${S[1]}px ${S[3]}px ${S[1]}px ${S[6]}px`,
+                            borderBottom: `1px solid ${C.divider}`,
+                            background: subSelected ? C.hover : C.bg,
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={subSelected}
+                            onChange={() => toggleTarget('subcategory', sub.id)}
+                            style={{ width: 13, height: 13, cursor: 'pointer', flexShrink: 0 }}
+                          />
+                          <span
+                            style={{ fontSize: F.sm, color: C.soft, cursor: 'pointer' }}
+                            onClick={() => toggleTarget('subcategory', sub.id)}
+                          >
+                            {sub.name}
+                          </span>
+                        </div>
+                      );
+                    }))}
+                  </div>
+                );
+              })}
             </div>
           </Lbl>
         </div>
 
-        {/* Countries */}
-        <div style={{ marginBottom: S[4] }}>
-          <Lbl label="Countries (one ISO-2 code per line, empty = all countries)">
-            <Textarea
-              rows={3}
-              value={countriesVal}
-              onChange={(e) => setForm({ ...form, targeting_countries: e.target.value as unknown as string[] })}
-              placeholder={'US\nCA\nGB'}
-            />
-          </Lbl>
-        </div>
-
-        {/* Cohorts */}
-        <div style={{ marginBottom: S[4] }}>
-          <Lbl label="Cohorts (one tag per line, empty = all cohorts)">
-            <Textarea
-              rows={3}
-              value={cohortsVal}
-              onChange={(e) => setForm({ ...form, targeting_cohorts: e.target.value as unknown as string[] })}
-              placeholder={'power_reader\nnews_junkie'}
-            />
-          </Lbl>
-        </div>
-
-        {/* Category tree */}
-        <Lbl label="Categories &amp; subcategories (empty = all categories)">
-          <div style={{
-            marginTop: S[1], border: `1px solid ${C.divider}`, borderRadius: 8,
-            maxHeight: 400, overflowY: 'auto',
-          }}>
-            {topLevelCats.length === 0 && (
-              <div style={{ padding: S[3], color: C.dim, fontSize: F.sm }}>No categories available.</div>
-            )}
-            {topLevelCats.map((cat) => {
-              const subs = subCatsOf(cat.id);
-              const catSelected = form.targeting_categories.includes(cat.id);
-              const isExpanded = expandedCats.has(cat.id);
-              return (
-                <div key={cat.id}>
-                  <div style={{
+        {/* Specific articles */}
+        <div>
+          <Lbl label="Specific articles (optional)">
+            {articleTargets.length > 0 && (
+              <div style={{ marginTop: S[1], display: 'flex', flexDirection: 'column', gap: S[1] }}>
+                {articleTargets.map((t) => (
+                  <div key={t.target_id} style={{
                     display: 'flex', alignItems: 'center', gap: S[2],
-                    padding: `${S[2]}px ${S[3]}px`,
-                    borderBottom: `1px solid ${C.divider}`,
-                    background: catSelected ? C.hover : C.bg,
+                    padding: `${S[1]}px ${S[2]}px`, background: C.hover,
+                    border: `1px solid ${C.divider}`, borderRadius: 6,
                   }}>
-                    <input
-                      type="checkbox"
-                      checked={catSelected}
-                      onChange={() => toggleCat(cat.id)}
-                      style={{ width: 14, height: 14, cursor: 'pointer', flexShrink: 0 }}
-                    />
-                    <span
-                      style={{ fontSize: F.sm, fontWeight: 600, color: C.ink, flex: 1, cursor: 'pointer' }}
-                      onClick={() => toggleCat(cat.id)}
-                    >
-                      {cat.name}
+                    <span style={{ flex: 1, fontSize: F.sm, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {articleTitleCache[t.target_id] || t.target_id}
                     </span>
-                    {subs.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={(e) => toggleCatExpand(cat.id, e)}
-                        style={{
-                          background: 'none', border: 'none', cursor: 'pointer',
-                          color: C.dim, fontSize: F.xs, padding: `0 ${S[1]}px`,
-                          font: 'inherit',
-                        }}
-                      >
-                        {isExpanded ? '▲' : '▼'} {subs.length}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeArticleTarget(t.target_id)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: C.dim, fontSize: F.xs, font: 'inherit',
+                      }}
+                    >Remove</button>
                   </div>
-                  {isExpanded && (catSelected ? (
-                    <div style={{
-                      padding: `${S[2]}px ${S[3]}px ${S[2]}px ${S[6]}px`,
-                      borderBottom: `1px solid ${C.divider}`,
-                      color: C.dim, fontSize: F.xs, fontStyle: 'italic',
-                    }}>
-                      All {cat.name} subcategories targeted (current and future).
-                    </div>
-                  ) : subs.map((sub) => {
-                    const subSelected = form.targeting_subcategories.includes(sub.id);
+                ))}
+              </div>
+            )}
+            <div style={{ marginTop: S[2], position: 'relative' }}>
+              <TextInput
+                value={articleQuery}
+                placeholder="Search articles by title…"
+                onChange={(e) => setArticleQuery(e.target.value)}
+              />
+              {articleQuery.trim() && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                  marginTop: S[1], maxHeight: 320, overflowY: 'auto',
+                  background: C.bg, border: `1px solid ${C.divider}`, borderRadius: 6,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                }}>
+                  {articleSearching && (
+                    <div style={{ padding: S[2], color: C.dim, fontSize: F.xs }}>Searching…</div>
+                  )}
+                  {!articleSearching && articleResults.length === 0 && (
+                    <div style={{ padding: S[2], color: C.dim, fontSize: F.xs }}>No matches.</div>
+                  )}
+                  {articleResults.map((a) => {
+                    const already = isTargeted('article', a.id);
                     return (
                       <div
-                        key={sub.id}
+                        key={a.id}
+                        onClick={() => !already && addArticleTarget(a)}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: S[2],
-                          padding: `${S[1]}px ${S[3]}px ${S[1]}px ${S[6]}px`,
+                          padding: `${S[1]}px ${S[2]}px`,
                           borderBottom: `1px solid ${C.divider}`,
-                          background: subSelected ? C.hover : C.bg,
+                          fontSize: F.sm, color: already ? C.dim : C.ink,
+                          cursor: already ? 'default' : 'pointer',
+                          background: 'transparent',
                         }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={subSelected}
-                          onChange={() => toggleSub(sub.id)}
-                          style={{ width: 13, height: 13, cursor: 'pointer', flexShrink: 0 }}
-                        />
-                        <span
-                          style={{ fontSize: F.sm, color: C.soft, cursor: 'pointer' }}
-                          onClick={() => toggleSub(sub.id)}
-                        >
-                          {sub.name}
-                        </span>
+                        {a.title}{already ? ' · already targeted' : ''}
                       </div>
                     );
-                  }))}
+                  })}
                 </div>
-              );
-            })}
-          </div>
-          {(form.targeting_categories.length > 0 || form.targeting_subcategories.length > 0) && (
-            <div style={{ marginTop: S[1], fontSize: F.xs, color: C.dim }}>
-              {form.targeting_categories.length} categor{form.targeting_categories.length === 1 ? 'y' : 'ies'},
-              {' '}{form.targeting_subcategories.length} subcategor{form.targeting_subcategories.length === 1 ? 'y' : 'ies'} selected
+              )}
             </div>
-          )}
-        </Lbl>
+          </Lbl>
+        </div>
+
       </PageSection>
     </Page>
   );

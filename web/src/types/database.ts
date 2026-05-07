@@ -805,6 +805,38 @@ export type Database = {
         }
         Relationships: []
       }
+      ad_targets: {
+        Row: {
+          ad_unit_id: string
+          created_at: string
+          mode: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          ad_unit_id: string
+          created_at?: string
+          mode?: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          ad_unit_id?: string
+          created_at?: string
+          mode?: string
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_targets_ad_unit_id_fkey"
+            columns: ["ad_unit_id"]
+            isOneToOne: false
+            referencedRelation: "ad_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ad_units: {
         Row: {
           ad_format: string
@@ -13910,6 +13942,10 @@ export type Database = {
       }
       reopen_expert_thread: {
         Args: { p_root_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      replace_ad_targets: {
+        Args: { p_targets: Json; p_unit: string }
         Returns: undefined
       }
       require_outranks: { Args: { target_user_id: string }; Returns: boolean }
