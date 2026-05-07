@@ -123,7 +123,12 @@ export default async function RootLayout({ children }) {
             hydrates. 'system' (or unset) leaves data-theme absent, letting the
             CSS media query govern. try/catch guards private-browsing contexts
             where localStorage throws. */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `(function(){try{var p=localStorage.getItem('vp_theme');if(p==='dark')document.documentElement.setAttribute('data-theme','dark');else if(p==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();` }} />
+        {/* suppressHydrationWarning: browsers strip the `nonce` attribute
+            from the DOM after parsing (HTML spec security behaviour), so
+            React's hydration sees `nonce=""` on the parsed element vs the
+            real value in vDOM and emits a false mismatch. The rendered
+            HTML carries the correct nonce; only the reconciler is fooled. */}
+        <script suppressHydrationWarning nonce={nonce} dangerouslySetInnerHTML={{ __html: `(function(){try{var p=localStorage.getItem('vp_theme');if(p==='dark')document.documentElement.setAttribute('data-theme','dark');else if(p==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();` }} />
       </head>
       <body
         style={{

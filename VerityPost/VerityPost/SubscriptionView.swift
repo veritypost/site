@@ -476,7 +476,7 @@ struct SubscriptionView: View {
         switch plan {
         case "free":
             return [
-                "Read up to 5 articles per month",
+                "Unlimited reading",
                 "Take quizzes, join discussions",
                 "Follow up to 10 stories",
                 "One breaking-news alert per day",
@@ -485,12 +485,11 @@ struct SubscriptionView: View {
         case "verity":
             return [
                 "Everything in Free",
-                "Unlimited reading",
+                "Ad-free",
                 "Unlimited story follows + collections",
                 "Direct messages, follows, mentions",
                 "Advanced search + filters",
                 "Listen to articles (TTS)",
-                "Ad-free",
                 "Ask an Expert",
                 "Weekly recap quizzes",
                 "Shareable profile card"

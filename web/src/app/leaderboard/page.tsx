@@ -776,16 +776,34 @@ function LeaderboardPageContent() {
             <ErrorState message={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
           )}
           {!loading && !loadError && visibleUsers.length === 0 && (
-            <div style={{ padding: 30, textAlign: 'center' }}>
+            <div style={{ padding: '24px 20px', textAlign: 'center' }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-                No results
+                {!me ? 'Leaderboard is warming up' : 'No results'}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 12, lineHeight: 1.5 }}>
-                {activeTab === 'Rising Stars'
+              <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 14, lineHeight: 1.5 }}>
+                {!me
+                  ? 'No readers have earned points yet. Sign in to follow along — your reads, quizzes, and contributions will rank you here.'
+                  : activeTab === 'Rising Stars'
                   ? 'No new accounts in the past 30 days.'
                   : 'No one has earned points with these filters yet.'}
               </div>
-              {activeCat && (
+              {!me ? (
+                <a
+                  href="/signup"
+                  style={{
+                    display: 'inline-block',
+                    padding: '10px 24px',
+                    background: 'var(--accent)',
+                    color: 'var(--bg)',
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Create free account
+                </a>
+              ) : activeCat ? (
                 <button
                   onClick={() => {
                     setActiveCat(null);
@@ -805,7 +823,7 @@ function LeaderboardPageContent() {
                 >
                   Clear filters
                 </button>
-              )}
+              ) : null}
             </div>
           )}
           {/* Anon view: top-3 visible (matches the iOS pattern + the
@@ -813,7 +831,7 @@ function LeaderboardPageContent() {
               Rows 4+ render blurred behind a sign-up CTA so anon visitors
               know there's more to see. Previously every row rendered
               blurred, which contradicted the comment and the spec. */}
-          {!me && (
+          {!me && visibleUsers.length > 0 && (
             <p style={{ fontSize: 13, color: 'var(--dim)', marginBottom: 12, textAlign: 'center' }}>
               Top readers by Verity Score — sign in to see the full ranking.
             </p>

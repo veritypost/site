@@ -131,3 +131,5 @@ temp/
 # and local prototypes must not enter version control.
 Ongoing Projects/
 new home layout.md
+web/_vp-shoot-*.mjs
+screenshots/

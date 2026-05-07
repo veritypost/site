@@ -97,87 +97,11 @@ export default function ArticleReaderTabs({ articleSlot, timelineSlot, engagemen
         </div>
       )}
 
-      <style>{`
-        /* ── Desktop (≥1024px): 75/25 flex split ── */
-        [data-reader-tabstrip] { display: none; }
-        [data-reader-body] {
-          display: flex;
-          align-items: flex-start;
-          gap: 40px;
-          max-width: 1280px;
-          margin: 0 auto;
-          padding: 0 40px;
-        }
-        [data-reader-main] { flex: 75; min-width: 0; }
-        [data-reader-engagement] {
-          max-width: 1280px;
-          margin: 0 auto;
-          padding: 0 40px;
-        }
-        [data-reader-panel="timeline"] {
-          flex: 25;
-          min-width: 0;
-          align-self: flex-start;
-          position: sticky;
-          top: 80px;
-          max-height: calc(100vh - 100px);
-          overflow-y: auto;
-          padding: 32px 0;
-        }
-        /* Collapse the top gap on the first section in the rail so it
-           aligns with the article body's 32px top padding. */
-        [data-reader-panel="timeline"] > section:first-child { margin-top: 0; }
-
-        /* ── Mobile / tablet (<1024px): tab UI ── */
-        @media (max-width: 1023px) {
-          [data-reader-tabstrip] {
-            display: flex;
-            gap: 4px;
-            max-width: 680px;
-            margin: 0 auto;
-            padding: 12px 20px 0;
-            border-bottom: 1px solid var(--p-border);
-          }
-          [data-reader-tabstrip] button {
-            flex: 1;
-            background: transparent;
-            border: 0;
-            border-bottom: 2px solid transparent;
-            padding: 10px 8px;
-            font: inherit;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--p-ink-muted);
-            cursor: pointer;
-            margin-bottom: -1px;
-            white-space: nowrap;
-            min-height: 44px;
-          }
-          [data-reader-tabstrip] button[data-active="true"] {
-            color: var(--p-ink);
-            border-bottom-color: var(--p-ink);
-          }
-          [data-reader-tabstrip] button:focus-visible {
-            outline: 2px solid var(--p-accent);
-            outline-offset: -2px;
-            border-radius: 4px;
-          }
-          [data-reader-body] { display: block; max-width: none; margin: 0; padding: 0; }
-          [data-reader-main] { display: block; flex: none; }
-          [data-reader-engagement] { max-width: none; margin: 0; padding: 0; }
-          [data-reader-panel="timeline"] {
-            position: static;
-            flex: none;
-            max-height: none;
-            overflow-y: visible;
-            padding: 0;
-          }
-          [data-reader-panel="timeline"] > section:first-child { margin-top: 40px; }
-          [data-reader-tabs][data-active-tab="article"] [data-reader-panel]:not([data-reader-panel="article"]) { display: none; }
-          [data-reader-tabs][data-active-tab="timeline"] [data-reader-panel]:not([data-reader-panel="timeline"]) { display: none; }
-          [data-reader-tabs][data-active-tab="engagement"] [data-reader-panel]:not([data-reader-panel="engagement"]) { display: none; }
-        }
-      `}</style>
+      {/* Reader-tab CSS lives in globals.css (T222 precedent). Inline
+          <style> in this client component triggered intermittent
+          hydration text-content mismatches on the static template
+          literal — moving to a real stylesheet eliminates the
+          reconciler hop. Selectors are scoped to [data-reader-*]. */}
     </div>
   );
 }

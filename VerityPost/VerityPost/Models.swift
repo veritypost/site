@@ -462,6 +462,10 @@ struct VPComment: Codable, Identifiable {
         var avatarColor: String?
         var avatarUrl: String?
         var avatar: VPUser.AvatarRef?
+        /// Author's overall Verity Score. Surfaced in the avatar tap card on
+        /// the comment thread (signed-in viewers only). Mirrors the web
+        /// `users.verity_score` plumbing in CommentThread.tsx.
+        var verityScore: Int?
         /// EXPERT_THREADS Wave 5 — author's verified expert categories.
         /// Distinctive expert reply chrome attaches when
         /// `isExpert == true AND article.categoryId ∈ verifiedCategoryIds`,
@@ -476,6 +480,7 @@ struct VPComment: Codable, Identifiable {
             case isVerifiedPublicFigure = "is_verified_public_figure"
             case avatarColor = "avatar_color"
             case avatarUrl = "avatar_url"
+            case verityScore = "verity_score"
             case verifiedCategoryIds = "verified_category_ids"
         }
     }

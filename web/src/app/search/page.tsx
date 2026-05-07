@@ -24,7 +24,7 @@ import ErrorState from '@/components/ErrorState';
 // Free-tier basic keyword search is unguarded from the client's perspective
 // (the API accepts anon callers and returns title-only results).
 
-type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name'>;
+type CategoryRow = Pick<Tables<'categories'>, 'id' | 'name' | 'slug'>;
 
 type ArticleHit = Pick<Tables<'articles'>, 'id' | 'title' | 'excerpt' | 'published_at'> & {
   stories: { slug: string } | null;
@@ -107,7 +107,7 @@ function SearchPageContent() {
 
       const { data: cats } = await supabase
         .from('categories')
-        .select('id, name')
+        .select('id, name, slug')
         .eq('is_kids_safe', false)
         .is('parent_id', null)
         .order('name');
@@ -400,10 +400,43 @@ function SearchPageContent() {
         {results.length > 0 ? `${results.length} result${results.length === 1 ? '' : 's'}` : null}
       </div>
 
-      {/* F30: pre-search blank state */}
+      {/* F30: pre-search blank state — keyword prompt + category quick-chips
+          so the page isn't a dead end when a user lands without a query. */}
       {!q && !loading && (
-        <div style={{ padding: '32px 0', textAlign: 'center', color: '#666', fontSize: 13 }}>
-          Search Verity Post articles by keyword.
+        <div style={{ padding: '24px 0 8px', textAlign: 'center' }}>
+          <div style={{ color: '#666', fontSize: 13, marginBottom: 18 }}>
+            Search by keyword, or jump into a section.
+          </div>
+          {categories.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 6,
+                justifyContent: 'center',
+                maxWidth: 560,
+                margin: '0 auto',
+              }}
+            >
+              {categories.slice(0, 10).map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/?cat=${c.slug}`}
+                  style={{
+                    padding: '7px 14px',
+                    borderRadius: 999,
+                    border: '1px solid var(--border)',
+                    background: 'var(--card)',
+                    color: 'var(--text)',
+                    fontSize: 13,
+                    textDecoration: 'none',
+                  }}
+                >
+                  {c.name}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -225,10 +225,10 @@ export default async function PricingPage() {
           name="Free"
           price="$0"
           pricePeriod=""
-          blurb="Read up to 5 articles per month."
+          blurb="Read every article. Take the quiz. Join the discussion."
           features={[
             'One reader',
-            'Daily article cap (~5/mo)',
+            'Unlimited reading',
             'Take quizzes, join discussions',
             '10 bookmarks',
             'One breaking-news alert per day',
@@ -241,14 +241,13 @@ export default async function PricingPage() {
           name="Verity"
           price={formatCents(verityPriceCents)}
           pricePeriod="/mo"
-          blurb="Unlimited reading for one adult."
+          blurb="Ad-free, with audio, social, and Ask an Expert."
           features={[
             'Everything in Free',
-            'Unlimited reading',
+            'Ad-free',
             'Unlimited bookmarks + collections',
             'Direct messages, follows, mentions',
             'Listen to articles (TTS)',
-            'Ad-free',
             'Ask an Expert',
             'Weekly recap quizzes',
           ]}
@@ -272,7 +271,7 @@ export default async function PricingPage() {
             'Kid expert sessions (COPPA-safe)',
             'Parent dashboard + parental controls',
           ]}
-          cta="Available on iOS →"
+          cta="Available on iOS"
           ctaHref="/kids-app"
           footer="Purchased through the iOS app."
         />

@@ -104,6 +104,11 @@ export default function CommentThread({
   const commentsRef = useRef<CommentWithAuthor[]>([]);
   const mountedRef = useRef<boolean>(true);
   const [authorScores, setAuthorScores] = useState<Record<string, number>>({});
+  // Author overall Verity Score, keyed by user_id. Same gate as authorScores —
+  // populated only when the viewer has comments.score.view_subcategory. Drives
+  // the "Verity Score: N" line in the avatar hover/tap card alongside the
+  // subcategory score.
+  const [authorOverallScores, setAuthorOverallScores] = useState<Record<string, number>>({});
   const [yourTags, setYourTags] = useState<Map<string, Set<TagKind>>>(new Map());
   // Threshold above which the inline "Helpful" badge is shown next to
   // the author. Pulled from /api/settings/public; falls back to 10 on
@@ -287,17 +292,30 @@ export default function CommentThread({
       });
       setViewerIsSupervisor(!!sup);
     }
-    if (canViewScore && articleCategoryId && userIds.length > 0) {
-      const { data: s } = await supabase
-        .from('category_scores')
-        .select('user_id, score')
-        .eq('category_id', articleCategoryId)
-        .in('user_id', userIds);
-      const map: Record<string, number> = {};
-      (s || []).forEach((r) => {
-        if (r.user_id != null && r.score != null) map[r.user_id] = r.score;
+    // Score data is fetched for any signed-in viewer (free + paid). Anon
+    // viewers don't get the avatar score card, so we skip the round-trip.
+    if (currentUserId && articleCategoryId && userIds.length > 0) {
+      const [subRes, overallRes] = await Promise.all([
+        supabase
+          .from('category_scores')
+          .select('user_id, score')
+          .eq('category_id', articleCategoryId)
+          .in('user_id', userIds),
+        supabase
+          .from('users')
+          .select('id, verity_score')
+          .in('id', userIds),
+      ]);
+      const subMap: Record<string, number> = {};
+      (subRes.data || []).forEach((r) => {
+        if (r.user_id != null && r.score != null) subMap[r.user_id] = r.score;
       });
-      setAuthorScores(map);
+      setAuthorScores(subMap);
+      const overallMap: Record<string, number> = {};
+      (overallRes.data || []).forEach((r) => {
+        if (r.id != null && r.verity_score != null) overallMap[r.id] = r.verity_score;
+      });
+      setAuthorOverallScores(overallMap);
     }
 
     // EXPERT_THREADS Wave 4b — fetch thread-state (verified categories +
@@ -785,7 +803,7 @@ export default function CommentThread({
     enrich().catch((err) => console.error('enrich failed:', err));
   }
 
-  const [sort, setSort] = useState<'top' | 'newest'>('newest');
+  const [sort, setSort] = useState<'top' | 'newest'>('top');
   const [expertFilter, setExpertFilter] = useState<boolean>(false);
   const [expertDialogOpen, setExpertDialogOpen] = useState<boolean>(false);
   const [expertQuestion, setExpertQuestion] = useState<string>('');
@@ -922,6 +940,8 @@ export default function CommentThread({
         replies={kids as ReactNode[]}
         currentUserId={currentUserId}
         authorCategoryScore={canViewScore ? authorScores[c.user_id] : null}
+        authorOverallScore={currentUserId ? authorOverallScores[c.user_id] : null}
+        canViewScore={!!currentUserId}
         articleId={articleId}
         articleCategoryId={articleCategoryId}
         verifiedCategoriesByUser={verifiedCategoriesByUser}

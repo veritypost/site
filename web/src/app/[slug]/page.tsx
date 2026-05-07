@@ -22,6 +22,7 @@ import { incrementViewCount } from '@/lib/counters';
 import { getAnonReadCount } from '@/lib/anonReadCounter';
 import { RegistrationWallProvider } from '@/components/RegistrationWall';
 import ArticleSurface from '@/components/article/ArticleSurface';
+import MidBodyQuizTeaser from '@/components/article/MidBodyQuizTeaser';
 import ArticleReaderTabs from '@/components/article/ArticleReaderTabs';
 import TimelineSection from '@/components/article/TimelineSection';
 import SourcesSection from '@/components/article/SourcesSection';
@@ -342,6 +343,15 @@ export default async function ArticleSlugPage({
                 articleId={article.id}
                 currentUserId={user?.id ?? null}
               />
+            )}
+            {/* End-of-body quiz teaser. Renders only for non-COPPA published
+                articles that have a quiz the viewer hasn't passed yet. On
+                mobile the engagement zone lives behind a tab, so this gives
+                readers an in-flow signal that there's a quiz waiting; on
+                desktop it sits just above the engagement zone as a smooth-
+                scroll bridge. */}
+            {!isCoppa && hasQuiz && !initialPassed && (article.status === 'published' || canEdit || isOwnerModeViewer) && (
+              <MidBodyQuizTeaser hasQuiz={hasQuiz} quizPassed={initialPassed} />
             )}
             {/* AnonArticleCtaBanner removed — the locked quiz card in the
                 engagement zone is the single signup nudge for anon. */}

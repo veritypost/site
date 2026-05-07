@@ -1,10 +1,16 @@
-// Server-rendered category sidebar for the desktop home. Reads the same
-// `categories` rows the rest of the page already fetches; groups them
-// into parent + subs and renders a fixed 208px rail pinned to the
-// viewport's left edge so the feed below stays viewport-centered.
-// Hidden below 1280px so the centered 880px feed never collides with
-// the rail.
+'use client';
 
+// Category sidebar for the desktop home. Reads the same `categories` rows
+// the rest of the page already fetches; groups them into parent + subs and
+// renders a fixed 208px rail pinned to the viewport's left edge so the feed
+// below stays viewport-centered. Hidden below 1280px so the centered 880px
+// feed never collides with the rail.
+//
+// Parents render collapsed by default. Subs reveal when the viewer clicks
+// the row's chevron, or automatically when the parent contains the active
+// (URL-filtered) subcategory.
+
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   HOME_COLORS as C,
@@ -158,46 +164,107 @@ function SidebarSection({
   active?: boolean;
   activeSubSlug?: string | null;
 }) {
+  // Auto-expand the parent that contains the currently-active sub so the
+  // viewer's location is always visible without an extra click. All other
+  // parents stay collapsed until the viewer toggles them.
+  const containsActiveSub = !!activeSubSlug && subs.some((s) => s.slug === activeSubSlug);
+  const [expanded, setExpanded] = useState(containsActiveSub);
+  const hasSubs = subs.length > 0;
+
   return (
-    <div style={{ marginBottom: 18 }}>
-      <Link
-        href={href}
-        aria-current={active ? 'page' : undefined}
+    <div style={{ marginBottom: 14 }}>
+      <div
         style={{
-          display: 'block',
-          textDecoration: 'none',
-          fontFamily: serifStack,
-          fontSize: 15,
-          fontWeight: active ? 700 : 600,
-          color: active ? C.text : C.soft,
-          letterSpacing: '-0.005em',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
           paddingTop: 4,
           paddingBottom: 4,
         }}
       >
-        {name}
-      </Link>
-      {subs.map((s) => {
-        const subActive = !!s.slug && s.slug === activeSubSlug;
-        return (
-          <Link
-            key={s.href}
-            href={s.href}
-            aria-current={subActive ? 'page' : undefined}
+        <Link
+          href={href}
+          aria-current={active ? 'page' : undefined}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: 'block',
+            textDecoration: 'none',
+            fontFamily: serifStack,
+            fontSize: 15,
+            fontWeight: active ? 700 : 600,
+            color: active ? C.text : C.soft,
+            letterSpacing: '-0.005em',
+          }}
+        >
+          {name}
+        </Link>
+        {hasSubs && (
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-label={expanded ? `Collapse ${name}` : `Expand ${name}`}
+            onClick={() => setExpanded((v) => !v)}
             style={{
-              display: 'block',
-              textDecoration: 'none',
-              fontSize: 12,
-              fontWeight: subActive ? 700 : 400,
-              color: subActive ? C.text : C.muted,
-              paddingTop: 5,
-              paddingBottom: 5,
+              flexShrink: 0,
+              width: 24,
+              height: 24,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              color: C.muted,
+              borderRadius: 4,
             }}
           >
-            {s.name}
-          </Link>
-        );
-      })}
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              style={{
+                transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                transition: 'transform 140ms ease-out',
+              }}
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        )}
+      </div>
+      {hasSubs && expanded && (
+        <div style={{ paddingLeft: 2 }}>
+          {subs.map((s) => {
+            const subActive = !!s.slug && s.slug === activeSubSlug;
+            return (
+              <Link
+                key={s.href}
+                href={s.href}
+                aria-current={subActive ? 'page' : undefined}
+                style={{
+                  display: 'block',
+                  textDecoration: 'none',
+                  fontSize: 12,
+                  fontWeight: subActive ? 700 : 400,
+                  color: subActive ? C.text : C.muted,
+                  paddingTop: 5,
+                  paddingBottom: 5,
+                }}
+              >
+                {s.name}
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

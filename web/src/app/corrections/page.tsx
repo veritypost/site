@@ -29,10 +29,15 @@ export const dynamic = 'force-dynamic';
 interface CorrectionRow {
   id: string;
   title: string | null;
-  slug: string | null;
   retraction_reason: string | null;
   unpublished_at: string | null;
-  verified_by_user: { username: string | null; display_name: string | null } | null;
+  verified_by: string | null;
+}
+
+interface ReviewerProfile {
+  id: string;
+  username: string | null;
+  display_name: string | null;
 }
 
 function monthKey(iso: string | null): string {
@@ -51,15 +56,32 @@ function formatDate(iso: string | null): string {
 
 export default async function CorrectionsPage() {
   const supabase = createClient();
+  // Anon SSR client can't read the `users` table directly (RLS), so reviewer
+  // names come from `public_profiles_v` in a follow-up batched fetch keyed
+  // off `articles.verified_by`.
   const { data, error } = await supabase
     .from('articles')
-    .select(
-      'id, title, slug, retraction_reason, unpublished_at, verified_by_user:users!fk_articles_verified_by(username, display_name)',
-    )
+    .select('id, title, retraction_reason, unpublished_at, verified_by')
     .or('retraction_reason.not.is.null,unpublished_at.not.is.null')
     .order('unpublished_at', { ascending: false, nullsFirst: false })
     .limit(100)
     .returns<CorrectionRow[]>();
+
+  // Resolve reviewer profiles for the unique verified_by ids found above.
+  const reviewerIds = Array.from(
+    new Set((data ?? []).map((r) => r.verified_by).filter((v): v is string => !!v)),
+  );
+  const reviewers: Record<string, ReviewerProfile> = {};
+  if (reviewerIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('public_profiles_v')
+      .select('id, username, display_name')
+      .in('id', reviewerIds)
+      .returns<ReviewerProfile[]>();
+    profiles?.forEach((p) => {
+      reviewers[p.id] = p;
+    });
+  }
 
   // Group by month for readability.
   const groups: Record<string, CorrectionRow[]> = {};
@@ -181,11 +203,11 @@ export default async function CorrectionsPage() {
                         }}
                       >
                         <span>{formatDate(row.unpublished_at)}</span>
-                        {row.verified_by_user?.display_name && (
+                        {row.verified_by && reviewers[row.verified_by]?.display_name && (
                           <span>
                             Reviewed by{' '}
                             <span style={{ color: '#555', fontWeight: 600 }}>
-                              {row.verified_by_user.display_name}
+                              {reviewers[row.verified_by]!.display_name}
                             </span>
                           </span>
                         )}

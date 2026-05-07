@@ -618,6 +618,25 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             {topBarActive && <HomeSectionsMenu />}
+            {/* Anon-only top-bar entrance. Quiet, type-link only — same scale
+                as the wordmark, no closed-beta scarcity language. The /login
+                page itself surfaces both the OTP form and the invite/access
+                request paths, so anon viewers reach every door from one link. */}
+            {authLoaded && !loggedIn && (
+              <a
+                href="/login"
+                style={{
+                  fontFamily: 'Source Serif 4, var(--font-source-serif), Georgia, serif',
+                  fontStyle: 'italic',
+                  fontSize: 14,
+                  color: C.text,
+                  textDecoration: 'none',
+                  padding: '4px 8px',
+                }}
+              >
+                sign in
+              </a>
+            )}
             <ThemeToggle />
           </div>
         </header>

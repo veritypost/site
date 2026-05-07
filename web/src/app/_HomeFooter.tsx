@@ -105,5 +105,29 @@ export default function HomeFooter() {
     return null;
   }
 
-  return null;
+  // Anon end-of-feed pitch. The home is wall-free and the article feed isn't
+  // date-bound; the pitch sells what an account gets you (quiz, score,
+  // comments) rather than gating access. Mirrors the article-page anon
+  // "Earn the discussion" framing.
+  return (
+    <footer style={footerStyle}>
+      <p
+        style={{
+          fontFamily: serifStack,
+          fontSize: 16,
+          lineHeight: 1.5,
+          color: C.soft,
+          margin: '0 auto',
+          maxWidth: 520,
+        }}
+      >
+        Every article on Verity Post has a five-question comprehension quiz. Pass one and you can join the discussion, follow the story, and earn a Verity Score.
+      </p>
+      <p style={{ margin: '16px 0 0' }}>
+        <Link href="/signup" style={linkStyle}>
+          create a free account &rarr;
+        </Link>
+      </p>
+    </footer>
+  );
 }

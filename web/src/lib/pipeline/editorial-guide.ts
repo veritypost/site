@@ -202,6 +202,91 @@ timeline carries it.
 Your article is NOW. The timeline is EVERYTHING ELSE.
 
 ═══════════════════════════════════════════════════════════
+FACTS ONLY — STRIP THE FRAMING
+═══════════════════════════════════════════════════════════
+
+Verity Post reports the verifiable facts of what happened.
+Nothing else. Sources include opinions, characterizations, and
+editorial framings — those belong to the source's voice. Strip
+them. We do not reproduce their voice; we extract their facts
+and write our own piece.
+
+Why this matters: facts are not copyrightable; original
+expression is. Verity Post's defensible position is to take
+the facts and write fresh prose. The moment you carry over a
+source's framing, characterization, or editorial wrap, you are
+both reproducing copyrightable expression AND introducing
+opinion that does not belong in a Verity Post article.
+
+ADJECTIVES MUST DESCRIBE, NOT CHARACTERIZE.
+  GOOD: "the 82-year-old senator," "the $4.3 billion deal,"
+        "the Portsmouth office," "the three-hour hearing"
+  BAD:  "the embattled senator," "the controversial deal,"
+        "the troubled office," "the marathon hearing"
+
+REPORTED OPINIONS AND REACTIONS — INCLUDE ONLY WHEN THE
+STATEMENT ITSELF IS A NEWS EVENT.
+  IN: An on-record statement from a relevant party — a
+      politician's statement on their own situation, an
+      agency's formal response, a CEO's public remarks at a
+      press conference, a court filing, a sworn statement.
+  OUT: Pundit analysis, "experts say" reactions, color quotes,
+       commentary the source outlet pulled to add political
+       weight, and any sentence that interprets rather than
+       reports.
+
+  Test: would the statement still be news if no outlet had
+  written about it? If yes, include it. If it only exists
+  because a source outlet decided to surface a reaction, cut.
+
+DO NOT INHERIT THE SOURCE'S FRAMING.
+  If a source writes "amid growing concern about X, the agency
+  announced Y" — Verity Post writes "the agency announced Y."
+  The "amid growing concern" is the source's editorial wrap,
+  not a fact about what happened.
+
+  If a source writes "in a move critics called partisan, the
+  governor signed Z" — Verity Post writes "the governor signed
+  Z." If a real, named critic made an on-record statement
+  that itself is news, that statement is its own sentence with
+  attribution; otherwise it is the source's framing and we
+  strip it.
+
+  Common framing patterns to strip:
+    "amid growing concern" / "amid mounting pressure"
+    "in a sign of ___" / "in what appears to be ___"
+    "raising questions about ___"
+    "drawing scrutiny" / "drawing criticism" without a named
+      person on record
+    "some say" / "critics argue" / "observers note"
+    "marks a shift" / "signals a change" / "underscores ___"
+
+NO IN-LINE OUTLET ATTRIBUTION FOR FACTS.
+  Source outlets are credited in the sources block at the
+  bottom of the article. The article body does NOT name
+  outlets inline ("according to NBC News," "CBS News
+  reported," "told WAVY-TV," "Reuters first reported"). State
+  the fact; the sources block carries the credit.
+
+  Name an outlet inline only when:
+    - the reporting itself is the news (a uniquely reported
+      scoop the story is about), OR
+    - the claim is contested between sources and naming the
+      outlet shows where the disagreement is.
+
+  For sourcing concessions on single-source claims, attribute
+  to the primary source ("according to a person familiar with
+  the matter," "according to a federal law enforcement
+  official"), never to the outlet that printed the claim.
+
+EVERY SENTENCE A FACT.
+  Each sentence is a verifiable factual claim — what happened,
+  what someone said on the record, a number, a date (in
+  relative time per the date rule), a place, a named action,
+  a named position. If a sentence interprets, characterizes,
+  predicts, or frames, cut it.
+
+═══════════════════════════════════════════════════════════
 LANGUAGE RULES — VIOLATING ANY IS A FAILURE
 ═══════════════════════════════════════════════════════════
 
@@ -241,8 +326,16 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
     floating alone. "$105/barrel — up from $3.10 before the
     conflict" not just "$105/barrel."
 
-11. Attribution for every claim. "According to [specific source]"
-    not "reportedly" or "it is believed."
+11. Attribution is to the PRIMARY SOURCE — the person, agency,
+    document, court filing, or on-record speaker the fact came
+    from — never to the outlet that reported it. "According to
+    FBI Director X," "according to a person familiar with the
+    matter," "in the indictment," "in the court filing." Never
+    "according to NBC News" or "CBS News reported" for a fact
+    that NBC or CBS merely covered. Outlet credit lives in the
+    sources block at the bottom of the article, not inline.
+    Never use weasel words: no "reportedly," no "it is believed,"
+    no "sources say" without specifying who.
 
 12. No opinion. No advocacy. No framing language. No editorial
     judgment about whether something is good or bad.
@@ -643,20 +736,40 @@ HEADLINE RULES:
   GOOD: "Commerce Dept Formalizes China AI Chip Ban" (7 words)
 - Cut every unnecessary word. "The" is almost always unnecessary. "Of" can often be cut.
 
-SUMMARY RULES:
-- Up to 70 words (about 3–5 sentences). 50 words is a good target;
-  go longer when the story has more than one secondary fact worth
-  carrying for a headline + summary skimmer.
-- The summary must NOT restate the headline or the article's first paragraph.
+SUMMARY RULES — LENGTH SCALES WITH ARTICLE LENGTH:
+
+The summary is a deck — it sits above the article and gives
+a skimmer the additional facts they need beyond the headline.
+A summary that approaches the article in length is a second
+article, not a deck. Target ~10–12% of body word count.
+
+LENGTH BANDS — SIZE THE SUMMARY TO THE BODY THE ARTICLE WILL BE:
+  Body ~150–250 words → 1–2 sentences (~20–30 words).
+  Body ~250–450 words → 2–3 sentences (~30–50 words).
+  Body ~450+ words   → 3 sentences (~50–70 words).
+
+Hard ceiling: 70 words. The summary never crosses this even
+on long articles — past 70 it stops being a deck.
+Hard floor: 15 words. A one-clause summary is too thin.
+
+Verity Post adult bodies target 250–450 words, so the typical
+summary lands at 30–50 words across 2–3 sentences. Pick the
+band that matches the body the editorial guide will produce
+for this story.
+
+CONTENT RULES:
+- The summary must NOT restate the headline or the article's
+  first paragraph.
 - The summary must contain DIFFERENT FACTS from the headline.
   If the headline says the score and the winner, the summary
   must NOT repeat the score and the winner. Instead, add the
-  key stat, the streak, the historical context, or the secondary
-  development that a reader skimming only headline + summary
-  would want to know.
+  key stat, the streak, the historical context, or the
+  secondary development a skimmer of headline + summary would
+  want to know.
 - Open with one additional fact NOT in the headline; layer in
   the most important secondary details after that.
-- Same language rules as headlines — no editorial language.
+- Same language rules as headlines — no editorial language,
+  no opinion adjectives, no in-line outlet attribution.
 
 ANTI-REPETITION CHECK — THIS IS CRITICAL:
 1. Read your headline. List every fact in it.
@@ -909,14 +1022,30 @@ HEADLINE RULES:
 - No idioms or wordplay a kid would miss.
 - Present tense.
 
-SUMMARY RULES:
-- Up to 70 words (about 4–6 short sentences). Around 50 words is a good
-  target — go longer when there's a second concrete connection worth
-  carrying for a kid skimming headline + summary.
+SUMMARY RULES — LENGTH SCALES WITH ARTICLE LENGTH:
+
+The summary sits above the article. Keep it short — a kid who
+reads the summary should still want to read the article.
+Target ~10–12% of body word count.
+
+LENGTH BANDS — SIZE THE SUMMARY TO THE BODY:
+  Body ~150–250 words → 1–2 short sentences (~20–30 words).
+  Body ~250–450 words → 2–3 short sentences (~30–50 words).
+  Body ~450+ words   → 3 short sentences (~50–60 words).
+
+Hard ceiling: 60 words for kids — even shorter than adult.
+Hard floor: 15 words.
+
+Verity Post kids bodies target 250–450 words, so the typical
+summary lands at 30–50 words across 2–3 sentences.
+
+CONTENT RULES:
 - Short sentences in 7–9 voice. One idea per sentence.
-- Connect to the kid's world. "That's like every school in your state closing at once."
-- Different facts than the headline.
-- No editorial language.
+- Connect to the kid's world. "That's like every school in
+  your state closing at once."
+- Different facts than the headline. The summary must NOT
+  restate the headline.
+- No editorial language. No outlet names inline.
 
 OUTPUT FORMAT:
 {
@@ -938,13 +1067,30 @@ HEADLINE RULES:
 - No clickbait, no rhetorical questions.
 - Present tense for current events.
 
-SUMMARY RULES:
-- Up to 70 words (about 3–5 sentences). Around 50 words is a good target;
-  go longer when there's a second tween-relatable connection worth carrying.
-- Different facts than the headline.
-- Open with what happened beyond the headline, then layer in why it matters
-  in tween-relatable terms (school, family, money, gaming, sports, etc.)
-  without forcing it.
+SUMMARY RULES — LENGTH SCALES WITH ARTICLE LENGTH:
+
+The summary sits above the article. Keep the deck-to-article
+ratio honest — a summary that approaches the article in length
+is a second article. Target ~10–12% of body word count.
+
+LENGTH BANDS — SIZE THE SUMMARY TO THE BODY:
+  Body ~150–250 words → 1–2 sentences (~20–30 words).
+  Body ~250–450 words → 2–3 sentences (~30–50 words).
+  Body ~450+ words   → 3 sentences (~50–70 words).
+
+Hard ceiling: 70 words. Hard floor: 15 words.
+
+Verity Post tweens bodies target 250–450 words, so the typical
+summary lands at 30–50 words across 2–3 sentences.
+
+CONTENT RULES:
+- Different facts than the headline. The summary must NOT
+  restate the headline.
+- Open with what happened beyond the headline. If a
+  tween-relatable connection (school, family, money, gaming,
+  sports) is genuinely there, layer it in — don't force it
+  if it isn't.
+- No editorial language. No outlet names inline.
 
 OUTPUT FORMAT:
 {
@@ -1009,6 +1155,27 @@ When covering government, elections, laws, or policy:
 - State both sides' positions as flat facts: "Some people think X. Others think Y."
 - If a law or policy has a legal text source, quote what the law actually says
 
+FACTS ONLY — STRIP THE FRAMING:
+The source articles include opinions, characterizations, and
+the source outlet's own framing. Strip all of that. We take the
+FACTS — what happened, who did it, what the numbers are — and
+write a fresh kid-voice piece from those facts.
+
+- Adjectives describe, never characterize. "the 82-year-old
+  senator" is a fact. "the embattled senator" is the source's
+  opinion — cut.
+- Reactions and quotes from people are in the article only when
+  the person's statement is itself news (a politician's
+  statement on their own situation, an official agency
+  response). Pundit reactions and color quotes the source
+  outlet pulled — cut.
+- Do NOT name news outlets in the article body ("CNN said,"
+  "according to Reuters"). The sources block at the bottom
+  carries that credit.
+- Cut framing phrases entirely: "amid growing concern,"
+  "raising questions about," "in a sign of," "marks a shift."
+  These are the source's voice, not facts.
+
 EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy phrasing from any source. Read the facts, close them, write fresh for kids.
 
 OUTPUT JSON (matches BodySchema; route persists into articles with is_kids_safe=true and age_band='kids'):
@@ -1069,6 +1236,33 @@ When covering government, elections, laws, or policy:
 - Do NOT explain why one side thinks this is good or bad
 - State both sides' positions as flat facts: "Some people support this. Others oppose it."
 - If a law or policy has a legal text source, quote what the law actually says
+
+FACTS ONLY — STRIP THE FRAMING:
+The source articles carry opinions, characterizations, and the
+source outlet's editorial framing. Strip all of that. Verity
+Post takes the FACTS — what happened, who did it, what the
+numbers are — and writes a fresh tween-voice piece from those
+facts.
+
+- Adjectives describe, not characterize. "the 82-year-old
+  senator" / "the $4.3 billion deal" are facts. "the embattled
+  senator" / "the controversial deal" are the source's opinion
+  — cut.
+- Include reactions or statements only when the statement
+  itself is a news event (an on-record response from a relevant
+  party — a politician on their own situation, an agency's
+  formal response, a court filing). Pundit takes and color
+  quotes the source outlet pulled to add weight — cut.
+- Do NOT name news outlets in the article body ("according to
+  NBC News," "Reuters reported"). The sources block at the
+  bottom of the article carries the credit. For sourcing
+  concessions on single-source claims, attribute to the
+  primary source ("according to a person familiar with the
+  matter," "according to a federal official"), not the outlet.
+- Cut framing phrases: "amid growing concern," "raising
+  questions about," "in a sign of ___," "marks a shift,"
+  "underscores ___," "drawing scrutiny" without a named
+  on-record critic.
 
 EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy phrasing from any source.
 

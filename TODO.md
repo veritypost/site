@@ -27,6 +27,100 @@
 
 ---
 
+## Comment voice model — Real-world Experience lines + kill expert queue
+
+- 50: **Real-world Experience comment lines + kill the Ask-an-Expert queue.** Replace the existing single-claimer "Ask an Expert" queue with a flat comment surface where every commenter can optionally write a one-line self-described context, rendered as em-dash byline below their comment. NO checkmarks, NO badges, NO tier coloring — every commenter looks visually identical regardless of verification. Verified contributors get two non-chrome capabilities: citations (link to a source) and Responses (longer-form contribution rendered in a sidebar next to the article body, not in the comment column). Complexity 4/5 — dedicated multi-session work. Cross-platform: web + iOS adult. Kids: n/a (`kid_expert_sessions` unchanged).
+
+  **Composer behavior:**
+  - Body field is primary (the comment).
+  - Below body: small `+ Add context` link, tap to reveal single-line input (≤80 chars). Empty by default — never a pre-shown blank slot (creates status anxiety for the unaffiliated).
+  - Placeholder copy MUST lead with lived experience: `e.g., dad of three in Detroit — or — civil engineer, 30 yrs`. The dual example is the entire egalitarian promise — get this string wrong and the regular-commenter persona quietly bounces.
+  - Guardrails: 80-char hard cap, no URLs, no contact info, basic profanity filter. Sensitive-claim soft-confirm on death/victim/family wording (Post button shows: *"By posting, you confirm this is true"*). Separate "report this line" affordance distinct from "report this comment."
+
+  **Comment render:**
+  - Body first, then em-dash byline below if line was written. Always shown when filled — never tap-to-expand (hiding written context defeats the purpose).
+  - No chrome difference between commenters. The retired millwright's byline sits at identical visual weight to the epidemiologist's.
+  - Citation (verified-only, on category-matched articles): small `↗ hostname` link icon below the byline. Renders scannably so lurkers can spot evidence in a long thread.
+  - Small `?` next to byline explains category-mismatch silence on tap: *"Citations appear on articles in your verified categories."* No error chrome, no scolding.
+
+  **Responses (verified-only, separate surface):**
+  - Longer-form contribution rendered in a sidebar/rail next to article body. NOT in the comment column.
+  - Entry trigger: when a verified contributor's comment exceeds ~400 chars, composer prompts: *"This looks like a Response — publish it next to the article?"* with one-tap promotion.
+  - New `responses` table (separate from `comments`). Different lifecycle, different moderation surface. Schema TBD during spec doc.
+
+  **Daily-pull replacement for killed queue:**
+  - Verified contributors get a lightweight homepage section: *"In your areas this week — N new stories."* No claim mechanic. Just a feed of category-matched articles. Replaces the demand-pull the queue used to provide without re-creating single-claimer hierarchy. Without this, citations + Responses alone are too heavy to bring power users back daily — flagged as the single biggest retention risk.
+
+  **Verification model (internal):**
+  - Per-user, scoped to verified categories. Citation + Response affordance surfaces only when article's PRIMARY category matches a user's verified category (strict primary-only — no secondary-tag leakage; pediatrician's affordance must not appear on an abortion-policy story tagged "Healthcare").
+  - Async — user posts immediately as self-attested (no citation/Response affordance), upgrades when admin reviews evidence.
+  - Evidence levels (doc / employer / community-vouched / self-attested) stay as INTERNAL metadata only — never surfaced to readers. Binary "has affordance / does not" is the only reader-visible distinction.
+
+  **DB changes:**
+  - Drop 9 expert columns from `comments`: `is_expert_question`, `expert_question_target_type/id/status`, `is_expert_reply`, `is_expert_thread_root`, `expert_thread_root_id`, `expert_thread_closed_at/by`, `last_reopen_at`.
+  - Drop 2 expert columns from `users`: `is_expert`, `expert_title` (legacy flags superseded by per-category credential lookups).
+  - Drop 4 zero-row tables: `expert_queue_items`, `expert_thread_chains`, `expert_mention_quota_counters`, `expert_mention_post_counters`.
+  - Archive `expert_discussions` (3 real rows) to JSON, then drop the table — do NOT migrate into `comments` (would muddy new model with old-shape data).
+  - Repurpose `expert_applications` + `expert_application_categories` as the credential store (no rename needed; semantics shift to per-category verification).
+  - Add `comments.real_world_experience text` (CHECK length ≤ 80, nullable).
+  - Add `responses` table (schema TBD).
+  - Rewrite 4 RLS policies on `comments` BEFORE dropping expert columns. FK chain order matters: drop queue tables → drop comment columns → rewrite policies. Single atomic migration.
+  - Remove orphan permission keys: `expert.queue.view`, expert mention permission keys, any `expert.*` keys not reused for credential review.
+  - Remove kill switch + tunable rows from `settings`/`plan_features`: `features.expert_threads_enabled`, edit-swap mentions behavior, visual giveaway, cache TTL, default quotas, close-thread cooldown. The whole `expert_threads` config surface goes away.
+
+  **Code surface to remove (web):**
+  - `web/src/app/expert-queue/` — entire route. URL behavior: 404 to article home, no transitional copy (per no-user-facing-timelines rule).
+  - `web/src/app/api/expert/queue/*`, `/api/expert/ask`, `/api/expert/back-channel`, `/api/expert/availability`, `/api/expert/quotas`, `/api/expert/quota-status`, `/api/expert/timezone`, `/api/expert/vacation`, `/api/expert/picker`, `/api/expert/threads-config` (kill-switch endpoint, becomes orphan).
+  - `/api/comments/expert-thread-state` — kill.
+  - Cron `/api/cron/flag-expert-reverifications` — kill.
+  - `CommentThread.tsx` — remove expert filter toggle, expert dialog, `{false &&` dead button gate at line 1043, expert-chrome branches.
+  - `CommentRow.tsx` — remove `is_expert_reply` chrome, `Verified Expert` labels, blurred-paywall expert response state (also fixes long-standing false-paywall promise).
+  - `CommentComposer.tsx` — remove expert mention picker / `@expert_<name>` autocomplete + the rate-limit error string. Add `+ Add context` field.
+  - `web/src/components/VerifiedBadge.tsx` — drop or repurpose (no badges in new model).
+  - `profile/_sections/PublicProfileSection.tsx` — remove expert badge + `expert_title` display from public profile (no badges in new model).
+  - `admin/system/page.tsx` — remove expert kill switch + 6 tunable controls (becomes dead UI when settings rows are dropped).
+
+  **Code surface to repurpose:**
+  - `web/src/lib/expertConfig.ts` — repurpose for credential config; cache invalidation pattern reusable.
+  - `/api/expert/apply` → credential submission (rename optional; semantics shift to per-category credential).
+  - `/api/admin/expert/applications/*` → credential review UI.
+  - `profile/_sections/ExpertProfileSection.tsx` → `CredentialsSection.tsx`.
+  - `profile/_sections/ExpertApplyForm.tsx` → `CredentialApplyForm.tsx`. Remove the user-facing timeline string `"We review within 5 business days"` (line 129) — violates no-user-facing-timelines rule.
+  - `admin/expert-sessions/page.tsx` — repurpose for credential review (kid sessions stay separate; this surface is adult-side only).
+
+  **iOS adult (`VerityPost/`):**
+  - `StoryDetailView.swift` — comment composer adds Real-world Experience field; comment render adds em-dash byline + citation affordance.
+  - `ProfileView.swift` — credentials list section (replaces expert profile section).
+  - `SignupView.swift` — optional credential step.
+  - Remove `ExpertQueueView.swift`.
+  - `Models.swift` — drop `isExpert`, `expertTitle` from `VPUser`; add credentials array.
+
+  **Kids (`VerityPostKids/`):** untouched. `kid_expert_sessions` stays as-is. Kids comments are 13+ gated and do not carry credentials.
+
+  **Community guidelines policy text needed before launch (separate from UI):**
+  - Lines describe expertise or lived experience, NOT political/tribal identity. Allowed: `civil engineer, 30 yrs`, `lifelong reader, NTSB reports`, `Vietnam, infantry, '68-'70`. Disallowed: `lifelong Trump voter`, `BLM organizer`, `Zionist`, `ex-Mormon`.
+  - No personally identifying combinations. Allowed: `civil engineer, Caltrans, 30 yrs`. Disallowed: `Sarah Chen, GS-14, Pentagon E-ring`.
+
+  **Verified persona walkthrough notes (from panels):**
+  - Single highest-risk persona: regular-commenter-no-credentials ("Tom"). Protected entirely by placeholder copy. Get the string right.
+  - Single biggest retention risk: verified-contributor power-user loop. Citations + Responses alone are heavy actions; the daily-pull "in your areas this week" feed is the lightweight hook that makes the loop work.
+  - Lurker trust signal in the absence of badges: citation presence. Must render scannably (link icon + clean hostname).
+
+  **Cut from v1:** Comment follow-ups (TODO 48 — deferred, see below). All four surfaces (line + citation + Response + follow-up) is too dense for v1; follow-ups are easiest to add later.
+
+  **Implementation sequence (rough — full spec doc still to be written):**
+  1. DB migration: drop expert tables/columns, add `real_world_experience`, repurpose `expert_applications`. Atomic.
+  2. Composer + render in `CommentComposer.tsx` / `CommentRow.tsx` / `CommentThread.tsx` (web first).
+  3. Citation affordance + category-match logic.
+  4. Responses table + sidebar render + 400-char promotion trigger.
+  5. Daily-pull "in your areas this week" homepage section.
+  6. Profile credentials section (web + iOS).
+  7. iOS parity pass.
+  8. Community guidelines policy text + sensitive-claim soft-confirm.
+  9. Old `/expert-queue` route → 404.
+
+---
+
 ## Needs your decision before anything can move
 
 **Article reader**
@@ -114,6 +208,8 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 - 39: Tag button UI after passing quiz is messy — clicking tags on another user's comment has poor UX (button states, picker, feedback). Needs investigation and redesign of the tag interaction in `CommentRow.tsx` and iOS `StoryDetailView.swift`.
 
+- 51: **Comment-load error "Try again" link low affordance** — `CommentThread.tsx:857` renders a "Comments couldn't load · Try again" recovery link styled as plain underlined text. Reads like narrative copy, not an interactive control — users miss it and bounce instead of retrying. Fix: render as a button (or button-styled link) so the affordance is obvious. Independent of TODO 50; this surface stays alive through the voice-model rebuild. Cross-platform: web only (iOS error state in `StoryDetailView.swift` should be spot-checked for the same issue while we're here). Complexity: S.
+
 ---
 
 ## Layout / visual
@@ -151,3 +247,81 @@ Web mobile is the product standard. These items bring iOS in line.
 
 - 19: Apply `supabase/migrations/20260503000007_backfill_unknown_sources_to_null.sql` — 4 "Unknown" source rows in prod still render legacy values until it runs
 - 20: Verity Monthly Stripe price: plans.verity_monthly has stripe_price_id=NULL — owner must click Mint at /admin/plans
+- 48: **OP-only comment follow-ups — DEFERRED past v1 of the comment voice model (TODO 50).** Comments stay non-editable, but the comment author can append up to 2 short follow-up notes that pin underneath their original comment. Use case: clarifications/corrections without rewriting history. Needs DB column or new `comment_followups` table (cap of 2 enforced server-side), follow-up composer in `CommentRow.tsx` visible only to OP, render pinned beneath the parent comment. Cross-platform: web + iOS adult (kids n/a — comments quiz-gated to 13+).
+
+  **Why deferred:** Adds visual density on top of an already feature-rich comment surface (line + citation + Response). Doubles moderation load — mods triage parent and miss the follow-up payload. Lets one author dominate a thread visually, working against the egalitarian frame. Easiest of the four surfaces to add later if missed. Revisit after the voice model ships and we have data on whether the design needs amendment affordances.
+- 49: **HomeFooter anon end-of-feed copy** — placeholder pitch shipped 2026-05-07 in `web/src/app/_HomeFooter.tsx`; owner rejected wording as too scarcity-flavored. Constraints: no "today" framing (articles aren't date-bound), no gate/scarcity tone, no closed-beta "invite" jargon. Open question: what should the end-of-anon-home-feed sell — the quiz, the Verity Score, the discussion, the brand idea? Revisit when owner has a direction.
+
+---
+
+## Article generation — prompt rewrite + deferred pipeline items
+
+- 51: **Article generation prompt rewrite to "facts only" voice + deferred non-prompt findings from 4-adversary panel review (2026-05-07).** Owner premise: facts aren't copyrightable (Feist); take facts, strip the source's framing/opinion/outlet-name-drops, write fresh in Verity Post's voice. Goal: legally defensible AND enjoyable to read. Single source-of-truth for the work. Cross-platform: backend pipeline change in `web/`; iOS + Kids iOS receive better articles automatically through the database — no app-side change.
+
+  **Part A — Prompt-only changes (this is the actual fix; ~45 minutes of edits, all in `web/src/lib/pipeline/editorial-guide.ts` plus a 1-line route.ts touch).**
+
+  *Already shipped locally (7 edits, 2026-05-07):*
+  - New "FACTS ONLY — STRIP THE FRAMING" section added to `EDITORIAL_GUIDE` (~line 205): adjectives describe-not-characterize, reported opinions only when statement IS a news event, don't inherit source framing, no in-line outlet attribution, every sentence a fact.
+  - Rule 11 rewritten (~line 329): attribution is to the PRIMARY SOURCE (person/agency/document), not the outlet that reported it. Outlet credit lives in sources block.
+  - SUMMARY RULES in `HEADLINE_PROMPT`, `KIDS_HEADLINE_PROMPT`, `TWEENS_HEADLINE_PROMPT` replaced with dynamic length bands (~10-12% of body word count).
+  - FACTS ONLY mirror sections added to `KIDS_ARTICLE_PROMPT` and `TWEENS_ARTICLE_PROMPT`.
+
+  *Pending (panel surfaced, not yet edited):*
+  - **Allegation Mode carve-out** — when a sentence imputes uncharged conduct to a named person, mandatory in-line attribution to a court filing / named official + mandatory hedging ("alleged," "according to court filings"). Critical libel fix — current strip-outlet rule destroys fair-report privilege on this content category. Both lawyers flagged independently.
+  - **Resolve "so what" vs FACTS ONLY contradiction** — line 96 still requires a "so what" sentence; new FACTS ONLY block says cut anything that interprets/predicts/frames. Redefine so-what as "attributable mechanism — must cite a named source or quantitative causal claim, or omit." Keeps it required, makes it consistent.
+  - **Disambiguate rule 11 with explicit example** — *"BAD: 'CBS News reported the investigation began under Biden.' GOOD: 'The investigation began during the Biden administration, according to a person familiar with the matter.' Strip the outlet, keep the primary-source hedge."* Stops model dropping both.
+  - **Protect cadence + scale comparisons + on-record official statements** inside the FACTS ONLY block. One-liner each. Without this the model over-cuts (Jay Jones-class statements) and collapses to monotone declaratives.
+  - **Drop the conditional length-band ladder** in summary rules — replace with one fixed target (~30-50 words, 2-3 sentences). The summary call runs in parallel with the body so it can't observe actual body length; conditional bands are aspirational. Honest is better.
+  - **Sync 250-400 vs 250-450 word count** — change `route.ts:1732` from "250-400" to "250-450" so body user-turn matches `EDITORIAL_GUIDE`. One-line fix.
+  - **Anti-hallucinated-attribution rule** — add to FACTS ONLY: *"Never invent attribution phrasing. If the corpus does not explicitly identify a primary source for a claim, state the fact flat or omit it. Do not generate 'according to' / 'sources said' / 'a person familiar' unless those exact phrasings appear in the research."* Closes a structural libel risk (St. Amant "purposeful avoidance") without pipeline change.
+  - **Wikipedia as research-aid rule** — *"Wikipedia is a research aid, not a content source. Do not reproduce or paraphrase Wikipedia prose. Use Wikipedia to find primary sources, then attribute to those."* Closes CC-BY-SA exposure without pipeline change.
+  - **Restore "alleged" / "reportedly" as required hedges for uncharged conduct** — current rule 11 bans them as weasel words; libel doctrine requires them. Carve out: required when the underlying claim is an investigation, accusation, or uncharged conduct against a named person.
+
+  *Worked example (Lucas FBI search story) is in conversation history 2026-05-07 — shows ~370-word original collapsed to ~210-word "after" with all source-outlet name-drops, characterizations, pundit reactions, and editorial framings stripped.*
+
+  **Part B — Non-prompt findings from the panel (DEFERRED — none affect what articles read like; these are reliability, cost, legal-architecture, and operator-UX items).**
+
+  *None of these are launch-blocking. None change the article output. They are real but separate work.*
+
+  - **Native JSON mode** — pipeline currently asks the model to "return JSON" and parses free text via `extractJSON()` (route.ts:1650, 1755). Both providers have built-in modes (Anthropic forced tool-use, OpenAI `response_format: json_schema`). Eliminates JSON drift. Affects ~10 call sites in `route.ts` + `call-model.ts`.
+  - **Cache restructuring** — Anthropic 5m ephemeral cache lives on `EDITORIAL_GUIDE` (system block), but `composeSystemPrompt()` in `prompt-overrides.ts` appends category-specific text + admin overrides INTO the cached block, busting cache on every call. Move category appends + overrides to a second uncached system block. ~5-10× cost reduction on Anthropic generation steps.
+  - **Per-claim source provenance** — body writer receives a corpus blob and guesses which fact came from which source; "according to a person familiar with the matter" is sometimes invented. Real libel risk (St. Amant purposeful avoidance / Lanham Act fabricated sourcing). Fix: research/extraction step tags each fact with source, document type, attribution form, named-person status, allegation-flag; body writer attributes from tags not guesses. The Part A "anti-hallucinated-attribution" prompt rule patches half of this; only per-claim provenance closes it fully.
+  - **≥2 sources required** — pipeline allows generating from a single outlet. Single-source generation is the case copyright plaintiffs actually win (hot-news misappropriation, selection-and-arrangement compilation theory). Gate at `/api/admin/pipeline/generate` to refuse clusters with <2 outlets unless ≥1 primary document (court filing, agency statement, .gov / press release URL) is present.
+  - **Serialize summary AFTER body** — currently headline + summary + categorization run in parallel with body, so the summary writer can't see the body. Required if we ever want a TRUE dynamic-length summary; not required for the prompt-only "fixed target" we shipped in Part A. Defer until the prompt-only summary proves insufficient.
+  - **Trust signals on AudienceCard** — pipeline already stores `articles.plagiarism_status`, `articles.needs_manual_review`, source-grounding scores. UI doesn't surface any of it on the success state. Operator can't see which articles need closer review. Pure UI work in `AudienceCard.tsx`.
+  - **Cost hint on model picker** — dropdown shows "Claude Opus 4.7" etc. but not "$5–15 per article." 100× cost delta vs Haiku is invisible. Operator can blow $300/day on accidental Opus session. Add `costPerArticle` field to `MODEL_OPTIONS` in `newsroomModels.ts`, render badge in the Select on `admin/newsroom/page.tsx`.
+  - **Regenerate doesn't orphan operator hand-edits** — Retry currently creates a fresh `articles` row, stranding any hand-edits the operator made on the prior row with no warning. Either reuse `article_id` on retry (UPDATE in `persist_generated_article` RPC) or surface a confirm modal before replacing.
+  - **Source headline not visible during headline generation** — model is given full source articles including their headlines, then asked to generate a Verity Post headline. Risk of close paraphrase (headlines have been held copyrightable in some jurisdictions, Meltwater UK). Strip source headlines from corpus passed to headline-generation step.
+
+  **Why these were deferred:** owner asked specifically for the prompt fix; the architectural items don't change what articles read like. Each can ship independently in its own session — none gates another except per-claim provenance is the keystone for the deeper libel posture (and is ~3 days of focused work touching the corpus contract every downstream step reads from).
+
+  **Adversary-panel context (for future readers picking this up):** 4-agent independent review on 2026-05-07 — copyright lawyer, defamation/libel lawyer, editorial/readability critic, prompt-engineering pressure-tester. Convergent finding: the copyright-driven strip-outlet rules WORSEN libel exposure on uncharged-allegation stories unless paired with Allegation Mode carve-out (Part A item 1). Libel lawyer's framing: *"chasing a copyright ghost and walked straight into a libel buzzsaw."* Part A items 1, 7, 9 (Allegation Mode + anti-hallucination + restore hedges) close the libel hole that the already-shipped 7 edits opened.
+
+---
+
+## Kids public web — daily article teaser site
+
+- 52: **Public kids site at veritypostforkids.com — one free article a day, signup CTA.** Owner wants a fun, engaging public front door for the kids product. The full experience stays in the iOS app (streaks, badges, expert Q&A, leaderboards); web is intentionally limited — just enough to let people *see what it's like*. Currently kids web is redirect-only (`web/middleware.js:444-454` sends anon visitors to `/kids-app` waitlist). This replaces that with an actual destination. Cross-platform: web only — iOS Kids and iOS Adult untouched.
+
+  **Locked decisions (owner, 2026-05-07):**
+  - **Domain:** separate registration `veritypostforkids.com` (not subdomain, not /kids on main). Owner accepts ~$15/yr + DNS wiring + zero starting domain authority.
+  - **Article shape on web:** full kids article text + illustration, free, no signup wall, with a single quiz question below carrying "sign in to save your score" copy.
+  - **Signup CTA:** smart-split — iOS visitors → App Store (`com.veritypost.kids`), Android/desktop → existing `/kids-app` email waitlist.
+
+  **Open questions — need owner discussion before any spec work:**
+  - COPPA on web: "sign in to save your score" implies *some* identity flow on a kids-directed domain, which is the riskiest part of the whole idea. Pair-code-on-web mints a kid JWT in a browser (rebuilds COPPA compliance on a new surface). Cookie-only local score is safer but quiet. Hard redirect to app for sign-in is safest. Decide before designing.
+  - Cannibalization vs app retention: full article + quiz feedback on web is a complete loop for ages 7-10. Risk that web becomes "good enough" and app installs/retention drop. Open whether to gate the *result* (score/streak/correctness) behind sign-in while keeping the read free.
+  - Daily-return mechanic: kids email is out of scope (`project_email_notifications_scope.md` — security-only). Bring-them-back levers without email: PWA install prompt, "tomorrow's story is about ___" teaser line, bookmark nudge.
+  - SEO/AdSense: kids site can't run AdSense (Google Families Policy bans ads on sites primarily directed at children under 13). Decide: index for "kids news" organic traffic + waitlist signups, or noindex and treat as funnel-only.
+  - Daily article source: articles already exist in DB with `kids_summary` + `is_kids_safe` + `age_band`. Decide auto-rotate from eligible pool vs admin-curated daily pick.
+  - Page architecture for fun: above-fold hero, illustration style (single house illustrator vs stock vs none), mascot Y/N, quiz interaction (instant feedback + celebration vs reveal-and-handoff).
+  - Adult-vs-kid mode collision: parent-with-child-watching is the most likely viewer; the page has to feel kid-energy enough for the kid and credible enough for the parent on one surface.
+
+  **What's already in place (don't rebuild):**
+  - `articles.kids_summary`, `articles.is_kids_safe`, `articles.age_band` columns populated on existing kids articles
+  - `/kids-app` parent-directed waitlist landing page with honeypot, opens_at min-time guard, sanitized utm_source attribution
+  - `/api/kids-waitlist` email capture endpoint
+  - `/privacy/kids` COPPA-specific privacy notice page (would need updating to cover the new public-reading surface)
+  - Middleware redirect for `/kids` and `/kids/*` — the *redirect* goes away or becomes the new destination depending on domain decision
+
+  **Brainstorm only.** No spec work, no panels, no code until owner says go.

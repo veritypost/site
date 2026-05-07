@@ -96,20 +96,6 @@ export default function ContactPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#ffffff', padding: '20px' }}>
       <div style={{ maxWidth: 640, margin: '0 auto' }}>
-        <a
-          href="/"
-          style={{
-            display: 'inline-block',
-            fontSize: 13,
-            fontWeight: 600,
-            color: '#666666',
-            textDecoration: 'none',
-            marginBottom: 16,
-          }}
-        >
-          Back to home
-        </a>
-
         <h1
           style={{
             fontSize: 28,

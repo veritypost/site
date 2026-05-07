@@ -118,6 +118,16 @@ struct StoryDetailView: View {
     @State private var mentionSuggestions: [VPUser] = []
     @State private var mentionSearchTask: Task<Void, Never>?
 
+    // Avatar score card popover. Mirrors web CommentRow's avatar hover/tap
+    // card: tap any commenter's avatar to see their Verity Score, this
+    // article's category score, and a profile link. Only signed-in viewers
+    // (free + paid) see the card; anon viewers fall through to the existing
+    // username-tap → profile path.
+    @State private var avatarCardUserId: String? = nil
+    /// `category_scores.score` per author, scoped to the current article's
+    /// category. Loaded in lockstep with the comment fetch.
+    @State private var authorCategoryScores: [String: Int] = [:]
+
     // EXPERT_THREADS Wave 5 — `@expert` picker + thread-mode state.
     // Picker fires when the user types `@expert` (broadcast trigger) or
     // `@expert_<partial>`. Mirrors web CommentComposer.tsx Wave 4b.
@@ -1991,12 +2001,7 @@ struct StoryDetailView: View {
         let isOwnComment = comment.userId != nil && comment.userId == auth.currentUser?.id
         let isEditing = editingCommentId == comment.id
         return HStack(alignment: .top, spacing: 10) {
-            AvatarView(
-                outerHex: u?.avatar?.outer ?? u?.avatarColor,
-                innerHex: u?.avatar?.inner,
-                initials: initials,
-                size: 32
-            )
+            avatarWithScoreCard(for: comment, initials: initials)
             VStack(alignment: .leading, spacing: 4) {
                 if comment.isPinned == true {
                     Text("Pinned as Article Context")
@@ -2261,6 +2266,51 @@ struct StoryDetailView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// Avatar with a tap-to-open Verity Score card. Anon viewers fall through
+    /// to a plain (non-tappable) AvatarView — no card surfaces for them, so
+    /// the existing username-tap → profile path stays the only interaction.
+    /// Mirrors web `AvatarWithScoreCard` in `CommentRow.tsx`.
+    @ViewBuilder
+    private func avatarWithScoreCard(for comment: VPComment, initials: String) -> some View {
+        let u = comment.users
+        let plainAvatar = AvatarView(
+            outerHex: u?.avatar?.outer ?? u?.avatarColor,
+            innerHex: u?.avatar?.inner,
+            initials: initials,
+            size: 32
+        )
+        if let uid = comment.userId, auth.currentUser?.id != nil {
+            let isShowing = Binding<Bool>(
+                get: { avatarCardUserId == uid },
+                set: { newVal in
+                    if newVal {
+                        avatarCardUserId = uid
+                    } else if avatarCardUserId == uid {
+                        avatarCardUserId = nil
+                    }
+                }
+            )
+            Button {
+                avatarCardUserId = uid
+            } label: {
+                plainAvatar
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: isShowing, arrowEdge: .top) {
+                AvatarScoreCard(
+                    username: u?.username,
+                    verityScore: u?.verityScore,
+                    categoryScore: authorCategoryScores[uid],
+                    onProfileTap: { avatarCardUserId = nil }
+                )
+                .environmentObject(auth)
+                .presentationCompactAdaptation(.popover)
+            }
+        } else {
+            plainAvatar
         }
     }
 
@@ -2864,7 +2914,7 @@ struct StoryDetailView: View {
             if !authorIds.isEmpty,
                let authors: [VPComment.AuthorRef] = try? await client
                    .from("public_profiles_v")
-                   .select("id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure")
+                   .select("id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure, verity_score")
                    .in("id", values: authorIds)
                    .execute()
                    .value {
@@ -2916,6 +2966,33 @@ struct StoryDetailView: View {
                         authorById[uid] = existing
                     }
                 }
+            }
+            // Avatar score card: per-author category score for THIS article's
+            // category. Mirrors web CommentThread.tsx category_scores fetch.
+            // Skipped for anon viewers (no avatar card surfaces for them) and
+            // when the article's category isn't known yet.
+            if auth.currentUser?.id != nil,
+               let catId = story.categoryId,
+               !authorIds.isEmpty {
+                struct CatScoreRow: Decodable {
+                    let userId: String?
+                    let score: Int?
+                    enum CodingKeys: String, CodingKey {
+                        case userId = "user_id"
+                        case score
+                    }
+                }
+                let scoreRows: [CatScoreRow] = (try? await client
+                    .from("category_scores")
+                    .select("user_id, score")
+                    .eq("category_id", value: catId)
+                    .in("user_id", values: authorIds)
+                    .execute().value) ?? []
+                var byUser: [String: Int] = [:]
+                for row in scoreRows {
+                    if let uid = row.userId, let s = row.score { byUser[uid] = s }
+                }
+                authorCategoryScores = byUser
             }
             timeline = t
             sources = s
@@ -3111,7 +3188,7 @@ struct StoryDetailView: View {
                         if let uid = fresh.userId,
                            let author: VPComment.AuthorRef = try? await client
                                .from("public_profiles_v")
-                               .select("id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure")
+                               .select("id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure, verity_score")
                                .eq("id", value: uid)
                                .single()
                                .execute()
@@ -3150,7 +3227,7 @@ struct StoryDetailView: View {
                         } else if let uid = refreshed.userId,
                                   let author: VPComment.AuthorRef = try? await client
                                       .from("public_profiles_v")
-                                      .select("id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure")
+                                      .select("id, username, avatar_url, avatar_color, is_expert, is_verified_public_figure, verity_score")
                                       .eq("id", value: uid)
                                       .single()
                                       .execute()
@@ -4244,5 +4321,66 @@ private struct RegistrationSheetView: View {
         .padding(28)
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
+    }
+}
+
+// MARK: - Avatar score card popover
+//
+// Mirrors web CommentRow's avatar hover/tap card. Shown to signed-in viewers
+// (free + paid) when they tap a commenter's avatar in the discussion. The card
+// surfaces the author's overall Verity Score and their score in this article's
+// category, plus a NavigationLink push to the public profile.
+private struct AvatarScoreCard: View {
+    let username: String?
+    let verityScore: Int?
+    let categoryScore: Int?
+    /// Called when the viewer taps "View profile" — the parent dismisses the
+    /// popover so the navigation push doesn't race the popover's own dismiss.
+    var onProfileTap: () -> Void
+    @EnvironmentObject var auth: AuthViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(username.map { "@\($0)" } ?? "Reader")
+                .font(.system(.title3, design: .serif, weight: .bold))
+                .foregroundColor(VP.text)
+            scoreRow(label: "Verity Score", value: verityScore)
+            scoreRow(label: "Category score", value: categoryScore)
+            if let uname = username {
+                Divider().padding(.top, 2)
+                NavigationLink {
+                    PublicProfileView(username: uname).environmentObject(auth)
+                } label: {
+                    HStack {
+                        Text("View profile")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundColor(VP.text)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(VP.dim)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded { onProfileTap() })
+            }
+        }
+        .padding(14)
+        .frame(minWidth: 232)
+    }
+
+    @ViewBuilder
+    private func scoreRow(label: String, value: Int?) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .font(.caption)
+                .foregroundColor(VP.dim)
+            Spacer()
+            Text(value.map(String.init) ?? "—")
+                .font(.system(.title3, weight: .bold))
+                .monospacedDigit()
+                .foregroundColor(VP.text)
+        }
     }
 }

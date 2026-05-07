@@ -3,7 +3,9 @@
 type MidBodyQuizTeaserProps = {
   hasQuiz: boolean;
   quizPassed: boolean;
-  onScrollToQuiz: () => void;
+  /** ID of the quiz anchor to scroll to. Defaults to the engagement zone's
+   *  `article-quiz` id used by `ArticleEngagementZone`. */
+  scrollTargetId?: string;
 };
 
 const CARD_STYLE: React.CSSProperties = {
@@ -49,17 +51,25 @@ const BUTTON_STYLE: React.CSSProperties = {
   whiteSpace: 'nowrap' as const,
 };
 
-export default function MidBodyQuizTeaser({ hasQuiz, quizPassed, onScrollToQuiz }: MidBodyQuizTeaserProps) {
+export default function MidBodyQuizTeaser({ hasQuiz, quizPassed, scrollTargetId = 'article-quiz' }: MidBodyQuizTeaserProps) {
   if (!hasQuiz || quizPassed) return null;
+
+  const handleClick = () => {
+    if (typeof window === 'undefined') return;
+    const target = document.getElementById(scrollTargetId);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   return (
     <div style={CARD_STYLE}>
       <div style={TEXT_COL_STYLE}>
-        <p style={HEADLINE_STYLE}>📋 5 questions · Test your understanding</p>
+        <p style={HEADLINE_STYLE}>5 questions · Test your understanding</p>
         <span style={SUBLINE_STYLE}>Pass the quiz to join the discussion</span>
       </div>
-      <button style={BUTTON_STYLE} onClick={onScrollToQuiz}>
-        Take the quiz →
+      <button style={BUTTON_STYLE} onClick={handleClick} type="button">
+        Take the quiz
       </button>
     </div>
   );

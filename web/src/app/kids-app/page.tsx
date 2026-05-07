@@ -84,7 +84,7 @@ export default function KidsAppLanding() {
           {BRAND_KIDS_NAME}
         </h1>
         <p style={{ fontSize: '16px', color: '#666666', lineHeight: 1.6, margin: '0 0 32px' }}>
-          A separate iOS app for kid readers. Parents create profiles from their {BRAND_NAME}
+          A separate iOS app for kid readers. Parents create profiles from their {BRAND_NAME}{' '}
           account; kids read, quiz, and earn streaks on their own device.
         </p>
 

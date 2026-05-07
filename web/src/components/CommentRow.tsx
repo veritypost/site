@@ -71,6 +71,8 @@ interface CommentRowProps {
   currentUserId?: string | null;
   currentUserVerified?: boolean;
   authorCategoryScore?: number | null;
+  authorOverallScore?: number | null;
+  canViewScore?: boolean;
   articleId: string;
   viewerIsSupervisor?: boolean;
   helpfulThreshold?: number;
@@ -224,6 +226,8 @@ export default function CommentRow({
   currentUserId,
   currentUserVerified = true,
   authorCategoryScore,
+  authorOverallScore,
+  canViewScore = false,
   articleId,
   viewerIsSupervisor = false,
   helpfulThreshold = 10,
@@ -249,7 +253,6 @@ export default function CommentRow({
 }: CommentRowProps) {
   const [replyOpen, setReplyOpen] = useState<boolean>(false);
   const [editing, setEditing] = useState<boolean>(false);
-  const [scoreHovered, setScoreHovered] = useState<boolean>(false);
   const [editBody, setEditBody] = useState<string>(comment.body || '');
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const [selectedQuote, setSelectedQuote] = useState<string>('');
@@ -425,15 +428,13 @@ export default function CommentRow({
         </div>
       )}
       <div style={{ display: 'flex', gap: 12 }}>
-        {user.username ? (
-          <a href={`/u/${user.username}`} style={{ flexShrink: 0, display: 'block', textDecoration: 'none' }}>
-            <Avatar user={user} size={36} />
-          </a>
-        ) : (
-          <span style={{ flexShrink: 0, display: 'block' }}>
-            <Avatar user={user} size={36} />
-          </span>
-        )}
+        <AvatarWithScoreCard
+          user={user}
+          canViewScore={canViewScore}
+          subcategoryScore={authorCategoryScore ?? null}
+          overallScore={authorOverallScore ?? null}
+        />
+
         <div
           style={{
             flex: 1,
@@ -491,26 +492,6 @@ export default function CommentRow({
                     }}
                   >
                     {(comment.quality_score ?? 0) > 0 ? '+' : ''}{comment.quality_score}
-                  </span>
-                )}
-                {authorCategoryScore != null && (
-                  <span
-                    onMouseEnter={() => setScoreHovered(true)}
-                    onMouseLeave={() => setScoreHovered(false)}
-                    title="Verity Score in this category"
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      padding: '1px 6px',
-                      borderRadius: 10,
-                      background: scoreHovered ? 'rgba(17,17,17,0.08)' : 'transparent',
-                      color: scoreHovered ? 'var(--p-ink-muted)' : 'transparent',
-                      cursor: 'default',
-                      transition: 'background 150ms, color 150ms',
-                      userSelect: 'none',
-                    }}
-                  >
-                    VS {authorCategoryScore}
                   </span>
                 )}
               </div>
@@ -1097,5 +1078,233 @@ function MenuItem({ children, onClick, danger }: MenuItemProps) {
     >
       {children}
     </button>
+  );
+}
+
+function ScorePopoverRow({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'baseline',
+        justifyContent: 'space-between',
+        gap: 16,
+        padding: '4px 0',
+      }}
+    >
+      <span style={{ fontSize: 12, color: 'var(--p-ink-muted, #71717a)' }}>{label}</span>
+      <span
+        style={{
+          fontVariantNumeric: 'tabular-nums',
+          fontSize: 18,
+          fontWeight: 700,
+          letterSpacing: '-0.01em',
+          color: 'var(--p-ink, #111)',
+        }}
+      >
+        {value != null ? value : '—'}
+      </span>
+    </div>
+  );
+}
+
+// Avatar with optional Verity Score popover. Anon viewers (canViewScore=false)
+// keep the plain avatar→profile link. Signed-in viewers see a small card on
+// desktop hover or mobile tap with subcategory + overall scores and a profile
+// link. The card is dismissed on outside click, Escape, or scroll.
+function AvatarWithScoreCard({
+  user,
+  canViewScore,
+  subcategoryScore,
+  overallScore,
+}: {
+  user: CommentUser;
+  canViewScore: boolean;
+  subcategoryScore: number | null;
+  overallScore: number | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  // Anon / no-perm viewers: keep the original behaviour exactly.
+  if (!canViewScore) {
+    if (user.username) {
+      return (
+        <a
+          href={`/u/${user.username}`}
+          style={{ flexShrink: 0, display: 'block', textDecoration: 'none' }}
+        >
+          <Avatar user={user} size={36} />
+        </a>
+      );
+    }
+    return (
+      <span style={{ flexShrink: 0, display: 'block' }}>
+        <Avatar user={user} size={36} />
+      </span>
+    );
+  }
+
+  const scheduleClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setOpen(false), 350);
+  };
+  const cancelClose = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+
+  const openOnHover = () => {
+    cancelClose();
+    setOpen(true);
+  };
+
+  return (
+    <div
+      ref={wrapRef}
+      style={{
+        flexShrink: 0,
+        position: 'relative',
+        // Don't stretch to the flex row's full height — without this the
+        // wrapper grows to encompass the comment body + replies, and
+        // `top: 100%` on the popover lands below the entire comment block
+        // instead of directly under the avatar.
+        alignSelf: 'flex-start',
+        // Inline-block keeps the wrapper sized to the avatar (36×36) and
+        // makes the relative-positioned popover anchor against that box.
+        display: 'inline-block',
+        // height pin matches the avatar's intrinsic size so vertical-align
+        // quirks (line-height of inline children) can't add a few extra
+        // pixels under the button before `top: 100%` is computed.
+        height: 36,
+      }}
+      onMouseEnter={openOnHover}
+      onMouseLeave={scheduleClose}
+    >
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={user.username ? `${user.username} — Verity Score card` : 'User card'}
+        onMouseEnter={openOnHover}
+        onMouseLeave={scheduleClose}
+        onFocus={openOnHover}
+        onBlur={scheduleClose}
+        onClick={(e) => {
+          e.preventDefault();
+          setOpen((v) => !v);
+        }}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          cursor: 'pointer',
+          display: 'block',
+          lineHeight: 0,
+        }}
+      >
+        <Avatar user={user} size={36} />
+      </button>
+      {open && (
+        <div
+          role="dialog"
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+          style={{
+            position: 'absolute',
+            // Sits flush with the bottom of the avatar (no gap) so the
+            // cursor doesn't have to cross dead space to reach the card.
+            top: '100%',
+            left: 0,
+            zIndex: 50,
+            minWidth: 232,
+            background: 'var(--card, #ffffff)',
+            border: '1px solid var(--border, #e5e5e5)',
+            borderRadius: 12,
+            padding: '14px 16px 10px',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)',
+            fontSize: 13,
+            color: 'var(--p-ink, #111)',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'var(--font-source-serif), Georgia, "Times New Roman", serif',
+              fontSize: 17,
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
+              marginBottom: 10,
+              color: 'var(--p-ink, #111)',
+            }}
+          >
+            {user.username ? `@${user.username}` : 'Reader'}
+          </div>
+          <ScorePopoverRow label="Verity Score" value={overallScore} />
+          <ScorePopoverRow label="Category score" value={subcategoryScore} />
+          <div
+            aria-hidden="true"
+            style={{
+              height: 1,
+              background: 'var(--border, #e5e5e5)',
+              margin: '10px -16px 6px',
+            }}
+          />
+          {user.username && (
+            <a
+              href={`/u/${user.username}`}
+              className="vp-avatar-card-link"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                color: 'var(--p-ink, #111)',
+                textDecoration: 'none',
+                fontSize: 13,
+                fontWeight: 500,
+                padding: '6px 0',
+                borderRadius: 6,
+              }}
+            >
+              <span>View profile</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                style={{ flexShrink: 0, opacity: 0.55 }}
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </a>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

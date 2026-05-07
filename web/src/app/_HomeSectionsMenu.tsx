@@ -293,7 +293,7 @@ export default function HomeSectionsMenu() {
           cursor: 'pointer',
         }}
       >
-        index
+        sections
       </button>
       {open && mounted && createPortal(
         <div className="vp-home-sections-overlay-root">
@@ -433,7 +433,7 @@ export default function HomeSectionsMenu() {
 
                   <AllRow active={isHomeActive} onNavigate={close} />
 
-                  {parents.map((p, i) => {
+                  {parents.map((p) => {
                     const subs = subsByParent.get(p.id) ?? [];
                     const parentActive = activeCatSlug === p.slug;
                     return (
@@ -441,7 +441,6 @@ export default function HomeSectionsMenu() {
                         key={p.id}
                         name={p.name}
                         slug={p.slug}
-                        index={String(i + 1).padStart(2, '0')}
                         expanded={expanded.has(p.id)}
                         parentActive={parentActive}
                         activeSubSlug={parentActive ? activeSubSlug : null}
@@ -661,9 +660,7 @@ function AllRow({ active, onNavigate }: { active: boolean; onNavigate: () => voi
         onClick={onNavigate}
         aria-current={active ? 'page' : undefined}
         style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          justifyContent: 'space-between',
+          display: 'block',
           padding: '16px 0',
           textDecoration: 'none',
         }}
@@ -679,16 +676,6 @@ function AllRow({ active, onNavigate }: { active: boolean; onNavigate: () => voi
         >
           Home
         </span>
-        <span
-          style={{
-            fontFamily: MONO_STACK,
-            fontSize: 10,
-            color: C.dim,
-            letterSpacing: '0.05em',
-          }}
-        >
-          00
-        </span>
       </Link>
     </div>
   );
@@ -697,7 +684,6 @@ function AllRow({ active, onNavigate }: { active: boolean; onNavigate: () => voi
 function CategoryRow({
   name,
   slug,
-  index,
   expanded,
   parentActive,
   activeSubSlug,
@@ -707,7 +693,6 @@ function CategoryRow({
 }: {
   name: string;
   slug: string;
-  index: string;
   expanded: boolean;
   parentActive: boolean;
   activeSubSlug: string | null;
@@ -717,29 +702,17 @@ function CategoryRow({
 }) {
   const hasSubs = subs.length > 0;
   const rowChildren = (
-    <>
-      <span
-        style={{
-          fontFamily: serifStack,
-          fontSize: 22,
-          fontWeight: expanded || parentActive ? 600 : 500,
-          color: C.text,
-          letterSpacing: '-0.015em',
-        }}
-      >
-        {name}
-      </span>
-      <span
-        style={{
-          fontFamily: MONO_STACK,
-          fontSize: 10,
-          color: C.dim,
-          letterSpacing: '0.05em',
-        }}
-      >
-        {index}
-      </span>
-    </>
+    <span
+      style={{
+        fontFamily: serifStack,
+        fontSize: 22,
+        fontWeight: expanded || parentActive ? 600 : 500,
+        color: C.text,
+        letterSpacing: '-0.015em',
+      }}
+    >
+      {name}
+    </span>
   );
   return (
     <div style={{ borderBottom: `1px solid ${C.rule}` }}>
