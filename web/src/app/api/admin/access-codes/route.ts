@@ -60,6 +60,8 @@ export async function POST(request: Request) {
     code,
     description: typeof body.description === 'string' ? body.description.trim() || null : null,
     type: 'referral' as const,
+    tier: 'owner' as const,
+    owner_user_id: actor.id,
     grants_plan_id: body.grants_plan_id || null,
     grants_role_id: body.grants_role_id || null,
     max_uses: maxUses,
