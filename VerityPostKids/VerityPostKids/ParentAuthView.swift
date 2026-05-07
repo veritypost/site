@@ -53,6 +53,19 @@ struct ParentAuthView: View {
 
     private var emailStepView: some View {
         VStack(spacing: 28) {
+            HStack {
+                Button { dismiss() } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(.body, weight: .semibold))
+                        .foregroundStyle(K.tealDark)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+                Spacer()
+            }
+
             VStack(spacing: 10) {
                 ZStack {
                     Circle()

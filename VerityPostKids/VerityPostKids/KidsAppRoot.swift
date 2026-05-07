@@ -66,7 +66,7 @@ struct KidsAppRoot: View {
                     .environmentObject(auth)
                     .transition(.opacity)
             } else {
-                PairCodeView()
+                RoleChoiceView()
                     .environmentObject(auth)
                     .transition(.opacity)
             }
