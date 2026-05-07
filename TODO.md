@@ -137,18 +137,16 @@
 - 9: Owner-mode bypass writes have no audit-log marker. Decision: which table to write to, and which writes to cover (all, or only high-blast-radius ones)?
 
 **Ad targeting**
-- 11: **Ad targeting — main bundle SHIPPED 2026-05-07** (commits `9315a310` + `fcf52c70`). Operators can now plug specific ads into any category, subcategory, or article via the unified `ad_targets` table. Schema is forward-compatible — future target types (platform, country, cohort, story-collection) plug in by extending the CHECK constraint and the `serve_ad` resolver, no new DDL on this table.
+- 11: **Ad targeting — SHIPPED 2026-05-07** (commits `9315a310` + `fcf52c70` + `91fc2933`). Operators can plug specific ads into any category, subcategory, or article via the unified `ad_targets` table; can exclude specific subcategories under a wildcard parent (tri-state UI); can flight ads via `start_date` / `end_date`; can preview reach (Check reach button) before saving. Targeted-vs-run-of-site reporting is unblocked via `category_id` on `ad_impressions`. Schema is forward-compatible: future target types (platform, country, cohort, story-collection) plug in by extending the CHECK constraint and the `serve_ad` resolver — no new DDL on `ad_targets`.
 
-  **Still pending — independent polish items:**
-  - **Surface `start_date` / `end_date` in the admin form.** Columns exist; form at `admin/ad-units/[id]/page.tsx` doesn't render them; direct deals are always flighted.
-  - **"Check reach" button next to Save.** New `/api/admin/ad-units/estimate-reach` endpoint that runs the same predicate `serve_ad` runs and returns eligible-articles + page-views over the last 7 days. Click-driven (no auto-recompute on toggle).
-  - **Drop or rename `category_top` / `category_in_feed_1` placement rows** to `feed_top` / `feed_in_feed_1`. Once targeting lives on the ad, category-named placements are double-bookkeeping. Update render sites in `web/src/app/category/[id]/page.js:538-575` + `admin/ads/preview/page.tsx:20`.
-  - **Log `category_id` on `ad_impressions` + `ad_clicks`.** Without this, "Politics-targeted vs run-of-site performance" is unanswerable. Add the column + update insert sites in `/api/ads/impression` + `/api/ads/click`.
-  - **Cleanup migration** to drop the dead jsonb columns on `ad_units`: `targeting_categories`, `targeting_subcategories`, `targeting_platforms`, `targeting_countries`, `targeting_cohorts`. Held back this session to avoid a deploy window where running code references columns that no longer exist; safe to drop once the new code is in production.
-  - **Tri-state UI for exclusion.** Schema supports `mode='exclude'` already; UI currently only writes `'include'`. Future UX pass adds an exclude affordance on the existing tree (parent on + child off = exclude that subcategory) and on the article picker.
+  **Tail item — defer to next pass:**
+  - **Cleanup migration** to drop the now-dead jsonb columns on `ad_units`: `targeting_categories`, `targeting_subcategories`, `targeting_platforms`, `targeting_countries`, `targeting_cohorts`. Code stopped reading and writing these in `fcf52c70`. Held back so production has a deploy where the new code is verified live; once owner confirms, run a single migration: drop the 5 columns + regenerate `database.ts` + grep for any lingering references.
+
+  **Skipped (premise didn't hold):**
+  - Rename `category_top` / `category_in_feed_1` placements to `feed_top` / `feed_in_feed_1`. Investigation showed these names already describe their *surface* (top of category page; in-feed slot 1), not their targeting — the same pattern as `home_top` / `article_header`. Renaming would lose surface info without freeing real bookkeeping.
 
   **Deferred (out of scope until requested):**
-  - Platform / country / cohort targeting — would require `serve_ad` signature change to accept platform (UA-derived), country (GeoIP), and cohort (user-derived) context. No advertiser asking yet; build when there's demand.
+  - Platform / country / cohort targeting — `serve_ad` signature would need platform (UA-derived), country (GeoIP), and cohort (user-derived) context. No advertiser asking yet.
   - Reusable "Audiences" resource — premature with one operator + a handful of advertisers.
   - Frequency-cap per target — caps stay per-ad-unit; revisit if an advertiser asks to cap impressions per category.
 
