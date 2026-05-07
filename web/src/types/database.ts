@@ -600,6 +600,7 @@ export type Database = {
           article_id: string | null
           bid_cents: number | null
           campaign_id: string | null
+          category_id: string | null
           clicked_at: string | null
           country_code: string | null
           created_at: string
@@ -627,6 +628,7 @@ export type Database = {
           article_id?: string | null
           bid_cents?: number | null
           campaign_id?: string | null
+          category_id?: string | null
           clicked_at?: string | null
           country_code?: string | null
           created_at?: string
@@ -654,6 +656,7 @@ export type Database = {
           article_id?: string | null
           bid_cents?: number | null
           campaign_id?: string | null
+          category_id?: string | null
           clicked_at?: string | null
           country_code?: string | null
           created_at?: string
@@ -865,12 +868,7 @@ export type Database = {
           name: string
           placement_id: string
           start_date: string | null
-          targeting_categories: Json | null
-          targeting_cohorts: Json | null
-          targeting_countries: Json | null
           targeting_plans: Json | null
-          targeting_platforms: Json | null
-          targeting_subcategories: Json | null
           total_budget_cents: number | null
           updated_at: string
           weight: number
@@ -902,12 +900,7 @@ export type Database = {
           name: string
           placement_id: string
           start_date?: string | null
-          targeting_categories?: Json | null
-          targeting_cohorts?: Json | null
-          targeting_countries?: Json | null
           targeting_plans?: Json | null
-          targeting_platforms?: Json | null
-          targeting_subcategories?: Json | null
           total_budget_cents?: number | null
           updated_at?: string
           weight?: number
@@ -939,12 +932,7 @@ export type Database = {
           name?: string
           placement_id?: string
           start_date?: string | null
-          targeting_categories?: Json | null
-          targeting_cohorts?: Json | null
-          targeting_countries?: Json | null
           targeting_plans?: Json | null
-          targeting_platforms?: Json | null
-          targeting_subcategories?: Json | null
           total_budget_cents?: number | null
           updated_at?: string
           weight?: number
@@ -13506,6 +13494,10 @@ export type Database = {
       ensure_user_timezone: {
         Args: { p_tz: string; p_uid: string }
         Returns: undefined
+      }
+      estimate_targeting_reach: {
+        Args: { p_days?: number; p_targets: Json }
+        Returns: Json
       }
       expert_can_see_back_channel: {
         Args: { p_user_id: string }

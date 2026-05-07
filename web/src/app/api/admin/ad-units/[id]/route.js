@@ -8,12 +8,10 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 import { isSafeAdUrl } from '@/lib/adUrlValidation';
 
-// Targeting columns moved to the unified `ad_targets` table; the legacy
-// jsonb columns (targeting_categories, targeting_subcategories,
-// targeting_cohorts, targeting_countries, targeting_platforms) are no
-// longer accepted here. `targeting_plans` stays for plan-tier gating.
-// `ad_targets` is handled separately (after the main update, via the
-// replace_ad_targets RPC) and is NOT in ALLOWED.
+// Category / subcategory / article targeting lives in the `ad_targets`
+// table and is replaced atomically via the `replace_ad_targets` RPC
+// (called below, after the main update — NOT in ALLOWED). `targeting_plans`
+// stays as a jsonb column on `ad_units` for plan-tier gating.
 const ALLOWED = [
   'name',
   'advertiser_name',
