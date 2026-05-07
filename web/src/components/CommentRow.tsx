@@ -274,7 +274,7 @@ export default function CommentRow({
   const [followupText, setFollowupText] = useState<string>('');
   const [followupBusy, setFollowupBusy] = useState<boolean>(false);
   const [followupError, setFollowupError] = useState<string>('');
-  const FOLLOWUP_MAX = 2;
+  const FOLLOWUP_MAX = 3;
   const FOLLOWUP_CHAR_LIMIT = 280;
   // Merge server + optimistic local. De-dupe by id; sort by sort_order then
   // created_at so stable ordering matches the DB UNIQUE (comment_id, sort_order).
@@ -971,7 +971,7 @@ export default function CommentRow({
                             const data = await res.json().catch(() => ({}));
                             if (!res.ok) {
                               if (res.status === 409) {
-                                setFollowupError(data?.message || 'this comment already has 2 updates.');
+                                setFollowupError(data?.message || 'this comment already has 3 updates.');
                               } else if (res.status === 403) {
                                 setFollowupError('only the comment author can post follow-ups.');
                               } else {

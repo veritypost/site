@@ -2391,7 +2391,7 @@ struct StoryDetailView: View {
     private func followupSection(for comment: VPComment, isOwnComment: Bool) -> some View {
         let followups = mergedFollowups(for: comment)
         let isOpen = followupOpenFor == comment.id
-        let canAdd = isOwnComment && !comment.isDeleted && followups.count < 2
+        let canAdd = isOwnComment && !comment.isDeleted && followups.count < 3
         if !followups.isEmpty || isOpen || canAdd {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(followups) { f in
@@ -2576,7 +2576,7 @@ struct StoryDetailView: View {
                 }
             } else if http.statusCode == 409 {
                 await MainActor.run {
-                    followupError = "this comment already has 2 updates."
+                    followupError = "this comment already has 3 updates."
                 }
             } else if http.statusCode == 403 {
                 await MainActor.run {

@@ -64,7 +64,7 @@ export async function POST(request, { params }) {
     const msg = (error.message || '').toLowerCase();
     if (code === 'VP001' || msg.includes('cap of 2 reached')) {
       return NextResponse.json(
-        { error: 'followup_cap_hit', message: 'this comment already has 2 updates.' },
+        { error: 'followup_cap_hit', message: 'this comment already has 3 updates.' },
         { status: 409, headers: NO_STORE }
       );
     }

@@ -74,6 +74,7 @@ interface EducationEntry {
 interface CategoryOption {
   id: string;
   name: string;
+  parent_id: string | null;
 }
 
 const OPTIONAL_FIELDS: OptionalFieldDef[] = [
@@ -237,8 +238,7 @@ export function BackgroundCard() {
           .eq('user_id', uid),
         supabase
           .from('categories')
-          .select('id, name')
-          .is('parent_id', null)
+          .select('id, name, parent_id')
           .order('name', { ascending: true }),
       ]);
 
@@ -290,7 +290,11 @@ export function BackgroundCard() {
         links: fieldHasValue(loaded, 'links'),
       });
       setTopicOptions(
-        (catsRes.data || []).map((c) => ({ id: c.id, name: c.name ?? '' }))
+        (catsRes.data || []).map((c) => ({
+          id: c.id,
+          name: c.name ?? '',
+          parent_id: c.parent_id,
+        }))
       );
       setLoading(false);
     })();
@@ -300,6 +304,20 @@ export function BackgroundCard() {
   }, [supabase]);
 
   const dirty = JSON.stringify(doc) !== initialRef.current;
+  // Saving requires the primary one-line byline. The "save fully empty"
+  // case still works (you can clear oneLine + everything else and save —
+  // initialRef tracks dirtiness, so the empty state is reachable).
+  const hasOptionalContent =
+    !!doc.profession.trim() ||
+    !!doc.years.trim() ||
+    !!doc.lived.trim() ||
+    !!doc.where.trim() ||
+    !!doc.languages.trim() ||
+    doc.topics.length > 0 ||
+    doc.education.some((e) => e.school.trim()) ||
+    doc.links.some((l) => l.url.trim());
+  const onelineMissing = hasOptionalContent && !doc.oneLine.trim();
+  const canSave = dirty && !saving && !onelineMissing;
   const oneLineRemaining = ONE_LINE_LIMIT - doc.oneLine.length;
 
   function update<K extends keyof BackgroundDoc>(key: K, value: BackgroundDoc[K]) {
@@ -431,18 +449,25 @@ export function BackgroundCard() {
       title="Background"
       description="A short line says who’s writing when you comment. Share anything else that fits — every field is optional and you can skip whatever you want."
       footer={
-        <button
-          type="button"
-          disabled={!dirty || saving}
-          onClick={onSave}
-          style={{
-            ...buttonPrimaryStyle,
-            opacity: dirty && !saving ? 1 : 0.55,
-            cursor: dirty && !saving ? 'pointer' : 'not-allowed',
-          }}
-        >
-          {saving ? 'Saving…' : 'Save changes'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {onelineMissing && (
+            <span style={{ fontSize: F.xs, color: C.warn, fontStyle: 'italic' }}>
+              Add a one-line summary to save the rest.
+            </span>
+          )}
+          <button
+            type="button"
+            disabled={!canSave}
+            onClick={onSave}
+            style={{
+              ...buttonPrimaryStyle,
+              opacity: canSave ? 1 : 0.55,
+              cursor: canSave ? 'pointer' : 'not-allowed',
+            }}
+          >
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
       }
     >
       <div style={{ display: 'grid', gap: S[5] }}>
@@ -860,45 +885,66 @@ export function BackgroundCard() {
                         );
                       }
                       if (f.kind === 'topics') {
+                        // Group: each top-level (parent_id === null) gets its
+                        // own row with the parent chip + its subs alongside.
+                        // Each chip toggles independently. Users can pick
+                        // "Health" alone OR drill to "Pediatric Cardiology"
+                        // OR both — server stores category_ids flatly.
+                        const topLevels = topicOptions.filter((t) => !t.parent_id);
+                        const subsByParent = topicOptions.reduce<Record<string, CategoryOption[]>>((acc, t) => {
+                          if (t.parent_id) {
+                            (acc[t.parent_id] ||= []).push(t);
+                          }
+                          return acc;
+                        }, {});
+                        const renderChip = (topic: CategoryOption, isParent: boolean) => {
+                          const selected = doc.topics.includes(topic.id);
+                          return (
+                            <button
+                              key={topic.id}
+                              type="button"
+                              onClick={() => toggleTopic(topic.id)}
+                              aria-pressed={selected}
+                              style={{
+                                fontSize: F.xs,
+                                fontWeight: isParent ? 700 : 500,
+                                padding: '5px 11px',
+                                borderRadius: R.pill,
+                                cursor: 'pointer',
+                                transition: 'all 120ms ease',
+                                border: selected
+                                  ? `1px solid ${C.ink}`
+                                  : `1px solid ${C.border}`,
+                                background: selected ? C.ink : 'transparent',
+                                color: selected ? C.bg : (isParent ? C.ink : C.inkMuted),
+                              }}
+                            >
+                              {selected ? '✓ ' : ''}{topic.name}
+                            </button>
+                          );
+                        };
                         return (
-                          <div
-                            id={id}
-                            style={{
-                              display: 'flex',
-                              flexWrap: 'wrap',
-                              gap: 6,
-                              padding: '4px 0',
-                            }}
-                          >
-                            {topicOptions.length === 0 && (
+                          <div id={id} style={{ display: 'grid', gap: 14, padding: '4px 0' }}>
+                            {topLevels.length === 0 && (
                               <div style={{ fontSize: F.xs, fontStyle: 'italic', color: C.inkFaint }}>
                                 No topics available yet.
                               </div>
                             )}
-                            {topicOptions.map((topic) => {
-                              const selected = doc.topics.includes(topic.id);
+                            {topLevels.map((parent) => {
+                              const subs = subsByParent[parent.id] || [];
                               return (
-                                <button
-                                  key={topic.id}
-                                  type="button"
-                                  onClick={() => toggleTopic(topic.id)}
-                                  aria-pressed={selected}
-                                  style={{
-                                    fontSize: F.xs,
-                                    fontWeight: 600,
-                                    padding: '5px 11px',
-                                    borderRadius: R.pill,
-                                    cursor: 'pointer',
-                                    transition: 'all 120ms ease',
-                                    border: selected
-                                      ? `1px solid ${C.ink}`
-                                      : `1px solid ${C.border}`,
-                                    background: selected ? C.ink : 'transparent',
-                                    color: selected ? C.bg : C.inkSoft,
-                                  }}
+                                <div
+                                  key={parent.id}
+                                  style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}
                                 >
-                                  {selected ? '✓ ' : ''}{topic.name}
-                                </button>
+                                  {renderChip(parent, true)}
+                                  {subs.length > 0 && (
+                                    <span style={{ fontSize: F.xs, color: C.inkFaint, padding: '0 4px' }}>
+                                      ›
+                                    </span>
+                                  )}
+                                  {subs.map((sub) => renderChip(sub, false))}
+                                </div>
                               );
                             })}
                           </div>

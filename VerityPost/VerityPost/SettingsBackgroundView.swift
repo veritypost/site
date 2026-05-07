@@ -45,6 +45,7 @@ private struct LinkEntry: Identifiable, Equatable {
 private struct TopicOption: Identifiable, Equatable {
     let id: String
     let name: String
+    let parentId: String?
 }
 
 private enum SectionKey: String, CaseIterable {
@@ -149,10 +150,10 @@ struct SettingsBackgroundView: View {
                     } else {
                         Text("Save")
                             .font(.system(.subheadline, weight: .semibold))
-                            .foregroundColor(isDirty ? VP.accent : VP.dim)
+                            .foregroundColor(canSave ? VP.accent : VP.dim)
                     }
                 }
-                .disabled(!isDirty || saving)
+                .disabled(!canSave)
             }
         }
         .overlay(alignment: .bottom) {
@@ -215,6 +216,11 @@ struct SettingsBackgroundView: View {
             Text("Lived experience or expertise. Not political identity. 80 characters.")
                 .font(.caption2)
                 .foregroundColor(VP.muted)
+            if onelineMissing {
+                Text("Add a one-line summary to save the rest.")
+                    .font(.caption2.italic())
+                    .foregroundColor(VP.warn)
+            }
         }
     }
 
@@ -425,32 +431,53 @@ struct SettingsBackgroundView: View {
     }
 
     private var topicsEditor: some View {
-        Group {
-            if topicOptions.isEmpty {
+        let topLevels = topicOptions.filter { $0.parentId == nil }
+        let subsByParent = Dictionary(grouping: topicOptions.filter { $0.parentId != nil }) { $0.parentId ?? "" }
+        return Group {
+            if topLevels.isEmpty {
                 Text("No topics available yet.")
                     .font(.caption.italic())
                     .foregroundColor(VP.muted)
             } else {
-                FlexibleStack(spacing: 6, lineSpacing: 6) {
-                    ForEach(topicOptions) { topic in
-                        let selected = topics.contains(topic.id)
-                        Button {
-                            if selected { topics.remove(topic.id) } else { topics.insert(topic.id) }
-                        } label: {
-                            Text(selected ? "✓ \(topic.name)" : topic.name)
-                                .font(.system(.caption, weight: .semibold))
-                                .padding(.horizontal, 11)
-                                .padding(.vertical, 5)
-                                .background(selected ? VP.text : Color.clear)
-                                .foregroundColor(selected ? VP.bg : VP.text)
-                                .overlay(Capsule().strokeBorder(selected ? VP.text : VP.border))
-                                .clipShape(Capsule())
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(topLevels) { parent in
+                        let subs = subsByParent[parent.id] ?? []
+                        FlexibleStack(spacing: 6, lineSpacing: 6) {
+                            topicChip(parent, isParent: true)
+                            if !subs.isEmpty {
+                                Text("›")
+                                    .font(.caption)
+                                    .foregroundColor(VP.muted)
+                            }
+                            ForEach(subs) { sub in
+                                topicChip(sub, isParent: false)
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func topicChip(_ topic: TopicOption, isParent: Bool) -> some View {
+        let selected = topics.contains(topic.id)
+        Button {
+            if selected { topics.remove(topic.id) } else { topics.insert(topic.id) }
+        } label: {
+            Text(selected ? "✓ \(topic.name)" : topic.name)
+                .font(.system(.caption, weight: isParent ? .bold : .medium))
+                .padding(.horizontal, 11)
+                .padding(.vertical, 5)
+                .background(selected ? VP.text : Color.clear)
+                .foregroundColor(
+                    selected ? VP.bg
+                    : (isParent ? VP.text : VP.dim)
+                )
+                .overlay(Capsule().strokeBorder(selected ? VP.text : VP.border))
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private var linksEditor: some View {
@@ -632,6 +659,27 @@ struct SettingsBackgroundView: View {
 
     private var isDirty: Bool { snapshotString != initialSnapshot }
 
+    /// Saving requires the primary "one line" byline whenever any optional
+    /// field has content — keeps the public byline coherent. Fully-empty
+    /// state is still reachable (clearing everything → dirty → onelineMissing
+    /// false → save enabled).
+    private var hasOptionalContent: Bool {
+        !profession.trimmingCharacters(in: .whitespaces).isEmpty
+            || !years.trimmingCharacters(in: .whitespaces).isEmpty
+            || !lived.trimmingCharacters(in: .whitespaces).isEmpty
+            || !whereBased.trimmingCharacters(in: .whitespaces).isEmpty
+            || !languages.trimmingCharacters(in: .whitespaces).isEmpty
+            || !topics.isEmpty
+            || education.contains { !$0.school.trimmingCharacters(in: .whitespaces).isEmpty }
+            || links.contains { !$0.url.trimmingCharacters(in: .whitespaces).isEmpty }
+    }
+    private var onelineMissing: Bool {
+        hasOptionalContent && oneLine.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+    private var canSave: Bool {
+        isDirty && !saving && !onelineMissing
+    }
+
     private func loadInitial() async {
         guard let uid = auth.currentUser?.id else {
             await MainActor.run { loading = false }
@@ -680,8 +728,7 @@ struct SettingsBackgroundView: View {
             .value) ?? []
         async let catRows: [DBCategory] = (try? await client
             .from("categories")
-            .select("id, name")
-            .is("parent_id", value: nil)
+            .select("id, name, parent_id")
             .order("name", ascending: true)
             .execute()
             .value) ?? []
@@ -705,7 +752,7 @@ struct SettingsBackgroundView: View {
             }
             links = linkList.map { LinkEntry(url: $0.url ?? "", label: $0.label ?? "") }
             topics = Set(topicList.map { $0.category_id })
-            topicOptions = catList.map { TopicOption(id: $0.id, name: $0.name ?? "") }
+            topicOptions = catList.map { TopicOption(id: $0.id, name: $0.name ?? "", parentId: $0.parent_id) }
             loading = false
             loadFailed = didFail
             initialSnapshot = snapshotString
@@ -811,6 +858,7 @@ private struct DBTopic: Decodable {
 private struct DBCategory: Decodable {
     var id: String
     var name: String?
+    var parent_id: String?
 }
 
 // MARK: - FlexibleStack (chip-tray that wraps lines)
