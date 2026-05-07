@@ -18,6 +18,12 @@ import type { Tables } from '@/types/database-helpers';
 
 type AdUnit = Tables<'ad_units'>;
 type Category = Pick<Tables<'categories'>, 'id' | 'name' | 'slug' | 'parent_id'>;
+type AdCampaign = Pick<
+  Tables<'ad_campaigns'>,
+  'id' | 'name' | 'status' | 'start_date' | 'end_date'
+  | 'total_budget_cents' | 'daily_budget_cents' | 'spent_cents'
+  | 'total_impressions' | 'total_clicks' | 'pricing_model'
+>;
 
 const NETWORKS = ['direct', 'house', 'google_adsense', 'google_ads', 'amazon', 'other'];
 const AD_FORMATS = ['banner', 'interstitial', 'video', 'native'];
@@ -76,6 +82,7 @@ function AdUnitTargetingInner() {
   const [perfDays, setPerfDays] = useState(30);
   const [perf, setPerf] = useState<PerfData | null>(null);
   const [perfLoading, setPerfLoading] = useState(false);
+  const [campaign, setCampaign] = useState<AdCampaign | null>(null);
   const [form, setForm] = useState<FormState>({
     targeting_plans: [],
     adTargets: [],
@@ -106,6 +113,15 @@ function AdUnitTargetingInner() {
       const u = unitRes.data;
       setUnit(u);
       setCategories(catsRes.data || []);
+
+      if (u.campaign_id) {
+        const { data: c } = await supabase
+          .from('ad_campaigns')
+          .select('id, name, status, start_date, end_date, total_budget_cents, daily_budget_cents, spent_cents, total_impressions, total_clicks, pricing_model')
+          .eq('id', u.campaign_id)
+          .maybeSingle();
+        if (c) setCampaign(c as AdCampaign);
+      }
 
       const targets: AdTarget[] = (targetsRes.data || []).map((t) => ({
         target_type: t.target_type as TargetType,
@@ -478,6 +494,9 @@ function AdUnitTargetingInner() {
         )}
       </PageSection>
 
+      {/* Campaign pacing — only renders when this unit belongs to a campaign */}
+      {campaign && <CampaignPacing campaign={campaign} />}
+
       {/* Basic fields */}
       <PageSection title="Creative &amp; settings">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: S[3] }}>
@@ -797,6 +816,79 @@ function TriStateCheckbox({
       onChange={onChange}
       style={style}
     />
+  );
+}
+
+function CampaignPacing({ campaign }: { campaign: AdCampaign }) {
+  const totalBudget = (campaign.total_budget_cents ?? 0) / 100;
+  const spent = (campaign.spent_cents ?? 0) / 100;
+  const dailyBudget = campaign.daily_budget_cents ? campaign.daily_budget_cents / 100 : null;
+  const pctSpent = totalBudget > 0 ? Math.min(1, spent / totalBudget) : 0;
+
+  // Elapsed fraction of the campaign window. Both ends required;
+  // open-ended campaigns get no pacing comparison (we report spend
+  // only). Clamped to 0..1 so stale or pre-start dates don't lie.
+  let elapsed: number | null = null;
+  if (campaign.start_date && campaign.end_date) {
+    const start = new Date(campaign.start_date).getTime();
+    const end = new Date(campaign.end_date).getTime();
+    const now = Date.now();
+    if (end > start) elapsed = Math.max(0, Math.min(1, (now - start) / (end - start)));
+  }
+
+  let pacingLabel = 'No pacing comparison';
+  let pacingColor: string = C.dim;
+  if (elapsed !== null && totalBudget > 0) {
+    const variance = pctSpent - elapsed;
+    if (variance < -0.25)      { pacingLabel = `Behind pace (${Math.round(Math.abs(variance) * 100)}% under)`; pacingColor = C.danger; }
+    else if (variance < -0.10) { pacingLabel = `Slightly behind (${Math.round(Math.abs(variance) * 100)}% under)`; pacingColor = C.warn ?? C.dim; }
+    else if (variance > 0.25)  { pacingLabel = `Ahead of pace (${Math.round(variance * 100)}% over)`; pacingColor = C.danger; }
+    else if (variance > 0.10)  { pacingLabel = `Slightly ahead (${Math.round(variance * 100)}% over)`; pacingColor = C.warn ?? C.dim; }
+    else                       { pacingLabel = 'On track'; pacingColor = C.success ?? C.accent; }
+  }
+
+  return (
+    <PageSection title="Campaign pacing" description={campaign.name + (campaign.status ? ' · ' + campaign.status : '')}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: S[3], marginBottom: S[3] }}>
+        <Tile label="Spent" value={`$${spent.toFixed(2)}`} />
+        <Tile label="Budget" value={totalBudget > 0 ? `$${totalBudget.toFixed(2)}` : '—'} />
+        <Tile label="Daily cap" value={dailyBudget !== null ? `$${dailyBudget.toFixed(2)}` : '—'} />
+        <Tile label="Pacing" value={pacingLabel} />
+      </div>
+
+      {totalBudget > 0 && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: F.xs, color: C.dim, marginBottom: 4 }}>
+            <span>Spent {Math.round(pctSpent * 100)}%</span>
+            {elapsed !== null && <span>Time elapsed {Math.round(elapsed * 100)}%</span>}
+          </div>
+          <div style={{ position: 'relative', height: 8, background: C.divider, borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{
+              position: 'absolute', left: 0, top: 0, bottom: 0,
+              width: `${pctSpent * 100}%`, background: pacingColor, transition: 'width 200ms ease',
+            }} />
+            {elapsed !== null && (
+              <div style={{
+                position: 'absolute', top: -2, bottom: -2,
+                left: `calc(${elapsed * 100}% - 1px)`,
+                width: 2, background: C.ink,
+              }} title="Time elapsed marker" />
+            )}
+          </div>
+          {elapsed !== null && (
+            <div style={{ fontSize: F.xs, color: C.dim, marginTop: S[1] }}>
+              The vertical line marks where pacing should be based on time elapsed in the campaign window.
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ marginTop: S[3], fontSize: F.xs, color: C.dim, lineHeight: 1.5 }}>
+        Lifetime impressions: <strong style={{ color: C.ink }}>{(campaign.total_impressions ?? 0).toLocaleString()}</strong>
+        {' · '}clicks: <strong style={{ color: C.ink }}>{(campaign.total_clicks ?? 0).toLocaleString()}</strong>
+        {campaign.pricing_model && <> {' · '}pricing: <strong style={{ color: C.ink }}>{campaign.pricing_model}</strong></>}
+      </div>
+    </PageSection>
   );
 }
 
