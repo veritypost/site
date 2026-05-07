@@ -100,15 +100,23 @@ export default function ArticleEngagementZone({
             Create free account
           </a>
         </div>
-      ) : (
-        <CommentThread
-          articleId={articleId}
-          articleCategoryId={articleCategoryId}
-          currentUserId={currentUserId}
-          quizPassed={hasQuiz ? hasPassed : true}
-          justRevealed={justPassedThisSession}
-        />
-      )}
+      ) : (!hasQuiz || hasPassed) ? (
+        <>
+          <div style={{
+            borderTop: '1px solid var(--border)',
+            marginTop: 40,
+            paddingTop: 32,
+          }}>
+            <CommentThread
+              articleId={articleId}
+              articleCategoryId={articleCategoryId}
+              currentUserId={currentUserId}
+              quizPassed={true}
+              justRevealed={justPassedThisSession}
+            />
+          </div>
+        </>
+      ) : null}
     </section>
   );
 }

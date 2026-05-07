@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import Avatar from './Avatar';
 import VerifiedBadge from './VerifiedBadge';
 import CommentComposer from './CommentComposer';
@@ -117,6 +117,43 @@ const EXPERT_TOKEN_RENDER_RE =
 const ANY_MENTION_RENDER_RE =
   /(?<![a-zA-Z0-9_])(@expert(?:_[a-zA-Z0-9_]{2,30})?(?![a-zA-Z0-9_])|@[a-zA-Z0-9_]{2,30})/g;
 
+// Detect HTML-formatted bodies (from the WYSIWYG composer).
+function isHtmlBody(body: string): boolean {
+  return /<(strong|em|del|code)\b/i.test(body);
+}
+
+// Strip any tag that isn't one of our safe elements (no attributes allowed).
+function sanitizeDisplayHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, (tag) => {
+    const t = tag.toLowerCase().replace(/\s+/g, '').trim();
+    if (/^<(strong|em|del|code|blockquote)>$/.test(t)) return tag;
+    if (/^<\/(strong|em|del|code|blockquote)>$/.test(t)) return tag;
+    if (t === '<br>' || t === '<br/>') return '<br>';
+    return '';
+  });
+}
+
+// Inline markdown — *bold*, _italic_, ~strike~, `code`.
+// Intentionally conservative: no nesting, max 500 chars per span, no newlines inside.
+const FORMAT_RE = /(\*([^*\n]{1,500})\*|_([^_\n]{1,500})_|~([^~\n]{1,500})~|`([^`\n]{1,500})`)/g;
+function applyFormatting(text: string, baseKey: string | number): ReactNode[] {
+  FORMAT_RE.lastIndex = 0;
+  const out: ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = FORMAT_RE.exec(text)) !== null) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const k = `${baseKey}-f${m.index}`;
+    if (m[2] !== undefined)      out.push(<strong key={k} style={{ fontWeight: 700 }}>{m[2]}</strong>);
+    else if (m[3] !== undefined) out.push(<em key={k} style={{ fontStyle: 'italic', fontWeight: 'inherit' }}>{m[3]}</em>);
+    else if (m[4] !== undefined) out.push(<span key={k} style={{ textDecoration: 'line-through' }}>{m[4]}</span>);
+    else if (m[5] !== undefined) out.push(<code key={k} style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.88em', background: 'rgba(0,0,0,0.06)', borderRadius: 3, padding: '1px 5px' }}>{m[5]}</code>);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
 function renderBody(
   body: string,
   mentions: Mention[] = [],
@@ -128,7 +165,7 @@ function renderBody(
   for (const match of body.matchAll(ANY_MENTION_RENDER_RE)) {
     const [full] = match;
     const idx = match.index ?? 0;
-    if (idx > lastIndex) parts.push(body.slice(lastIndex, idx));
+    if (idx > lastIndex) parts.push(...applyFormatting(body.slice(lastIndex, idx), lastIndex));
 
     // Expert token branch.
     EXPERT_TOKEN_RENDER_RE.lastIndex = 0;
@@ -177,7 +214,7 @@ function renderBody(
     }
     lastIndex = idx + full.length;
   }
-  if (lastIndex < body.length) parts.push(body.slice(lastIndex));
+  if (lastIndex < body.length) parts.push(...applyFormatting(body.slice(lastIndex), lastIndex));
   return parts;
 }
 
@@ -212,12 +249,17 @@ export default function CommentRow({
 }: CommentRowProps) {
   const [replyOpen, setReplyOpen] = useState<boolean>(false);
   const [editing, setEditing] = useState<boolean>(false);
+  const [scoreHovered, setScoreHovered] = useState<boolean>(false);
   const [editBody, setEditBody] = useState<string>(comment.body || '');
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
+  const [selectedQuote, setSelectedQuote] = useState<string>('');
+  const [quoteReplyText, setQuoteReplyText] = useState<string>('');
+  const [copiedLink, setCopiedLink] = useState<boolean>(false);
+  const [repliesOpen, setRepliesOpen] = useState<boolean>(false);
+  const bodyRef = useRef<HTMLElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState<string>('');
   const [commentMaxDepth, setCommentMaxDepth] = useState<number>(2);
-  const [tagPickerOpen, setTagPickerOpen] = useState(false);
   // EXPERT_THREADS Wave 4b — close-thread cooldown countdown. Set when
   // the close RPC returns 429 wait_for_cooldown; ticks down to 0 then
   // re-enables the button. Cleared on successful close.
@@ -325,20 +367,49 @@ export default function CommentRow({
       setBusy('');
     }
   }
+  function handleBodyMouseUp() {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !bodyRef.current) { setSelectedQuote(''); return; }
+    if (!bodyRef.current.contains(sel.anchorNode)) { setSelectedQuote(''); return; }
+    setSelectedQuote(sel.toString().trim());
+  }
+
+  function copyLink() {
+    const url = `${window.location.origin}${window.location.pathname}#comment-${comment.id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 1500);
+    }).catch(() => {});
+  }
+
   const mentions = (Array.isArray(comment.mentions) ? comment.mentions : []) as Mention[];
   const commentDepth = comment.thread_depth ?? depth;
+  const yours = comment._your_tags ?? new Set<TagKind>();
+  const helpfulCount = comment.helpful_count ?? 0;
+  const isHelpfulTagged = yours.has('helpful');
+  function tagCount(k: TagKind): number {
+    if (k === 'context') return (comment as CommentRowDb & { context_tag_count?: number | null }).context_tag_count ?? 0;
+    if (k === 'cite_needed') return comment.cite_needed_count ?? 0;
+    return comment.off_topic_count ?? 0;
+  }
 
   return (
     <div
       id={`comment-${comment.id}`}
       style={{
-        padding: depth === 0 ? '12px 0' : '10px 0',
-        borderBottom: depth === 0 && !showExpertChrome ? '1px solid #e5e5e5' : 'none',
+        ...(depth === 0 && !showExpertChrome ? {
+          paddingTop: 28,
+          paddingBottom: 24,
+          borderBottom: '1px solid var(--border, #e5e5e5)',
+        } : depth > 0 && !showExpertChrome ? {
+          paddingTop: 16,
+          paddingBottom: 4,
+        } : {}),
         ...(showExpertChrome ? {
           background: '#f0faf4',
           borderLeft: '3px solid var(--success-text)',
           borderRadius: '0 8px 8px 0',
-          padding: depth > 0 ? '14px 16px' : '14px 16px',
+          padding: '14px 16px',
           marginTop: 4,
           marginBottom: 4,
         } : {}),
@@ -356,20 +427,20 @@ export default function CommentRow({
       <div style={{ display: 'flex', gap: 12 }}>
         {user.username ? (
           <a href={`/u/${user.username}`} style={{ flexShrink: 0, display: 'block', textDecoration: 'none' }}>
-            <Avatar user={user} size={32} />
+            <Avatar user={user} size={36} />
           </a>
         ) : (
           <span style={{ flexShrink: 0, display: 'block' }}>
-            <Avatar user={user} size={32} />
+            <Avatar user={user} size={36} />
           </span>
         )}
         <div
           style={{
             flex: 1,
             minWidth: 0,
-            ...(depth > 0 ? {
-              paddingLeft: 12,
-              ...(!showExpertChrome ? { borderLeft: '2px solid #e0e0e0' } : {}),
+            ...(depth > 0 && !showExpertChrome ? {
+              paddingLeft: 14,
+              borderLeft: '2px solid var(--border, #e5e5e5)',
             } : {}),
           }}
         >
@@ -387,63 +458,62 @@ export default function CommentRow({
                 : `Verified Expert${expertCategoryName ? ` · ${expertCategoryName}` : (user.expert_title ? ` · ${user.expert_title}` : '')}`}
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--p-ink)' }}>
-              {user.username || 'user'}
-            </span>
-            <VerifiedBadge user={user} />
-            {(comment.helpful_count ?? 0) >= helpfulThreshold && (
-              <span
-                title={`Marked helpful by ${comment.helpful_count} readers`}
-                style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  padding: '1px 6px',
-                  borderRadius: 4,
-                  background: 'rgba(22,163,74,0.12)',
-                  color: 'var(--success-text)',
-                }}
-              >
-                Helpful
-              </span>
-            )}
-            {authorCategoryScore != null && (
-              <span
-                title="Verity Score in this category"
-                style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  padding: '1px 6px',
-                  borderRadius: 10,
-                  background: 'rgba(17,17,17,0.08)',
-                  color: 'var(--p-ink)',
-                }}
-              >
-                VS {authorCategoryScore}
-              </span>
-            )}
-            <span style={{ fontSize: 12, color: '#ccc', margin: '0 4px' }}>&middot;</span>
-              <span style={{ fontSize: 12, color: '#999', fontWeight: 400 }}>
-                {timeAgo(comment.created_at)}
-                {comment.is_edited ? ' · edited' : ''}
-              </span>
-              {(comment.quality_score ?? 0) !== 0 && (
-                <>
-                  <span style={{ fontSize: 12, color: '#ccc', margin: '0 2px' }}>&middot;</span>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--p-ink)' }}>
+                  {user.username || 'user'}
+                </span>
+                <VerifiedBadge user={user} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <button
+                  onClick={copyLink}
+                  title="Copy link to comment"
+                  style={{
+                    background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                    fontSize: 12, lineHeight: 1,
+                    color: copiedLink ? 'var(--success-text, #16a34a)' : 'var(--p-ink-dim, #71717a)',
+                    fontFamily: 'inherit',
+                    transition: 'color 100ms',
+                  }}
+                >
+                  {copiedLink ? 'Copied!' : `${timeAgo(comment.created_at)}${comment.is_edited ? ' · edited' : ''}`}
+                </button>
+                {(comment.quality_score ?? 0) !== 0 && (
                   <span
                     title="Community quality signal"
                     style={{
                       fontSize: 11,
-                      fontWeight: 600,
+                      fontWeight: 700,
                       color: (comment.quality_score ?? 0) > 0 ? 'var(--success-text)' : '#b94040',
                       fontVariantNumeric: 'tabular-nums',
                     }}
                   >
                     {(comment.quality_score ?? 0) > 0 ? '+' : ''}{comment.quality_score}
                   </span>
-                </>
-              )}
+                )}
+                {authorCategoryScore != null && (
+                  <span
+                    onMouseEnter={() => setScoreHovered(true)}
+                    onMouseLeave={() => setScoreHovered(false)}
+                    title="Verity Score in this category"
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: '1px 6px',
+                      borderRadius: 10,
+                      background: scoreHovered ? 'rgba(17,17,17,0.08)' : 'transparent',
+                      color: scoreHovered ? 'var(--p-ink-muted)' : 'transparent',
+                      cursor: 'default',
+                      transition: 'background 150ms, color 150ms',
+                      userSelect: 'none',
+                    }}
+                  >
+                    VS {authorCategoryScore}
+                  </span>
+                )}
+              </div>
             </div>
             {/* context menu — header row */}
             {!isDeleted && !editing && hasMenuItems && (
@@ -613,15 +683,28 @@ export default function CommentRow({
           ) : (
             <div
               style={{
-                fontSize: 15,
-                lineHeight: 1.65,
+                fontSize: 16,
+                lineHeight: 1.75,
                 color: 'var(--p-ink)',
+                letterSpacing: '-0.01em',
+                marginBottom: 2,
                 filter: blurred ? 'blur(6px)' : 'none',
                 userSelect: blurred ? 'none' : 'auto',
                 pointerEvents: blurred ? 'none' : 'auto',
               }}
             >
-              {renderBody(comment.body || '', mentions, inertVisualGiveaway)}
+              {isHtmlBody(comment.body || '') ? (
+                <span
+                  ref={bodyRef as React.Ref<HTMLSpanElement>}
+                  className="vp-comment-html"
+                  onMouseUp={handleBodyMouseUp}
+                  dangerouslySetInnerHTML={{ __html: sanitizeDisplayHtml(comment.body || '') }}
+                />
+              ) : (
+                <span ref={bodyRef as React.Ref<HTMLSpanElement>} onMouseUp={handleBodyMouseUp}>
+                  {renderBody(comment.body || '', mentions, inertVisualGiveaway)}
+                </span>
+              )}
             </div>
           )}
           {blurred && (
@@ -636,86 +719,6 @@ export default function CommentRow({
             </div>
           )}
 
-          {/* Tag chips — visible when any tag is active (you or community) */}
-          {!isDeleted && !editing && !isOwner && canContextTag && quizPassed !== false && (() => {
-            const tc = (k: TagKind): number =>
-              k === 'helpful' ? (comment.helpful_count ?? 0)
-              : k === 'context' ? ((comment as CommentRowDb & { context_tag_count?: number | null }).context_tag_count ?? 0)
-              : k === 'cite_needed' ? (comment.cite_needed_count ?? 0)
-              : (comment.off_topic_count ?? 0);
-            const yours = comment._your_tags ?? new Set<TagKind>();
-            const activeTags = tagKinds.filter(k => yours.has(k) || tc(k) > 0);
-            const inactiveTags = tagKinds.filter(k => !yours.has(k) && tc(k) === 0);
-            if (activeTags.length === 0 && !tagPickerOpen) return (
-              <div style={{ marginTop: 8 }}>
-                <button
-                  onClick={() => setTagPickerOpen(true)}
-                  style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px dashed var(--p-border)', background: 'transparent', color: 'var(--p-ink-faint)', cursor: 'pointer', lineHeight: 1.6 }}
-                >
-                  + Tag
-                </button>
-              </div>
-            );
-            return (
-              <div style={{ marginTop: 8, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-                {activeTags.map(k => {
-                  const meta = TAG_META[k];
-                  const active = yours.has(k);
-                  return (
-                    <button
-                      key={k}
-                      onClick={() => doTag(k)}
-                      disabled={!!busy}
-                      style={{
-                        fontSize: 11,
-                        fontWeight: active ? 600 : 500,
-                        padding: '2px 8px',
-                        borderRadius: 5,
-                        border: `1px solid ${active ? meta.color : 'var(--p-border)'}`,
-                        background: active ? `${meta.color}18` : 'transparent',
-                        color: active ? meta.color : 'var(--p-ink-muted)',
-                        cursor: 'pointer',
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      {meta.label}
-                    </button>
-                  );
-                })}
-                {inactiveTags.length > 0 && (
-                  <button
-                    onClick={() => setTagPickerOpen(v => !v)}
-                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px dashed var(--p-border)', background: 'transparent', color: 'var(--p-ink-faint)', cursor: 'pointer', lineHeight: 1.6 }}
-                  >
-                    {tagPickerOpen ? '−' : '+'}
-                  </button>
-                )}
-                {tagPickerOpen && inactiveTags.map(k => {
-                  const meta = TAG_META[k];
-                  return (
-                    <button
-                      key={k}
-                      onClick={() => { doTag(k); setTagPickerOpen(false); }}
-                      disabled={!!busy}
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 500,
-                        padding: '2px 8px',
-                        borderRadius: 5,
-                        border: '1px dashed var(--p-border)',
-                        background: 'transparent',
-                        color: 'var(--p-ink-muted)',
-                        cursor: 'pointer',
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      {meta.label}
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })()}
 
           {/* Action row: Reply */}
           {!isDeleted && !editing && (() => {
@@ -796,23 +799,79 @@ export default function CommentRow({
                         : undefined
                   }
                   style={{
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: 600,
-                    padding: '4px 10px',
-                    borderRadius: 6,
-                    minHeight: 44,
-                    border: 'none',
+                    padding: '5px 12px',
+                    borderRadius: 20,
+                    minHeight: 32,
+                    border: '1px solid var(--border, #e5e5e5)',
                     background: 'transparent',
                     color: replyDisabled ? 'var(--p-ink-faint)' : 'var(--p-ink-muted)',
                     cursor: replyDisabled ? 'default' : 'pointer',
                     touchAction: 'manipulation',
+                    letterSpacing: '-0.01em',
                   }}
                 >
                   Reply
                 </button>
               ) : null;
             return (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 6, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
+                  {/* Helpful heart — primary social signal, always visible to non-owners */}
+                  {!isOwner && canContextTag && quizPassed !== false && (
+                    <button
+                      onClick={() => doTag('helpful')}
+                      disabled={!!busy}
+                      title={isHelpfulTagged ? 'Remove helpful mark' : 'Mark as helpful'}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 13,
+                        fontWeight: isHelpfulTagged ? 700 : 500,
+                        padding: '5px 12px',
+                        borderRadius: 20,
+                        minHeight: 32,
+                        border: `1px solid ${isHelpfulTagged ? 'var(--success-text, #16a34a)' : 'var(--border, #e5e5e5)'}`,
+                        background: isHelpfulTagged ? 'rgba(22,163,74,0.08)' : 'transparent',
+                        color: isHelpfulTagged ? 'var(--success-text, #16a34a)' : 'var(--p-ink-muted, #888)',
+                        cursor: busy ? 'default' : 'pointer',
+                        transition: 'border-color 120ms, background 120ms, color 120ms',
+                        letterSpacing: '-0.01em',
+                        touchAction: 'manipulation',
+                        WebkitTapHighlightColor: 'transparent',
+                      }}
+                    >
+                      <span style={{ fontSize: 14, lineHeight: 1 }}>{isHelpfulTagged ? '♥' : '♡'}</span>
+                      <span>{helpfulCount > 0 ? String(helpfulCount) : 'Helpful'}</span>
+                    </button>
+                  )}
+                  {/* Quote reply — appears when reader has selected text in this comment's body */}
+                  {selectedQuote && canReply && !replyOpen && (
+                    <button
+                      onClick={() => {
+                        setQuoteReplyText(selectedQuote);
+                        setSelectedQuote('');
+                        window.getSelection()?.removeAllRanges();
+                        setReplyOpen(true);
+                      }}
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 500,
+                        padding: '5px 12px',
+                        borderRadius: 20,
+                        minHeight: 32,
+                        border: '1px solid var(--border, #e5e5e5)',
+                        background: 'transparent',
+                        color: 'var(--p-ink-muted, #888)',
+                        cursor: 'pointer',
+                        letterSpacing: '-0.01em',
+                        touchAction: 'manipulation',
+                      }}
+                    >
+                      Quote reply
+                    </button>
+                  )}
                   {replyButton}
                   {askerRepliesLeft != null && askerRepliesLeft > 0 && (
                     <span
@@ -930,6 +989,61 @@ export default function CommentRow({
                       Conversation complete with @{user.username || 'expert'} — they can grant another reply if you have a follow-up.
                     </span>
                   )}
+                  {/* Context / Cite needed / Off-topic tag buttons — inline, always visible to non-owners */}
+                  {!isOwner && canContextTag && quizPassed !== false && tagKinds.filter(k => k !== 'helpful').map(k => {
+                    const meta = TAG_META[k];
+                    const active = yours.has(k);
+                    const count = tagCount(k);
+                    return (
+                      <button
+                        key={k}
+                        onClick={() => doTag(k)}
+                        disabled={!!busy}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: active ? 700 : 400,
+                          padding: '5px 12px',
+                          borderRadius: 20,
+                          minHeight: 32,
+                          border: `1px solid ${active ? meta.color : 'var(--border, #e5e5e5)'}`,
+                          background: active ? `${meta.color}15` : 'transparent',
+                          color: active ? meta.color : 'var(--p-ink-faint, #bbb)',
+                          cursor: busy ? 'default' : 'pointer',
+                          letterSpacing: '-0.01em',
+                          touchAction: 'manipulation',
+                          WebkitTapHighlightColor: 'transparent',
+                          transition: 'border-color 120ms, background 120ms, color 120ms',
+                        }}
+                      >
+                        {meta.label}{count > 0 ? ` ${count}` : ''}
+                      </button>
+                    );
+                  })}
+                  {/* Reply thread toggle — lives in the action row, same as all other toggles */}
+                  {depth === 0 && replies.length > 0 && (
+                    <button
+                      onClick={() => setRepliesOpen(v => !v)}
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 500,
+                        padding: '5px 12px',
+                        borderRadius: 20,
+                        minHeight: 32,
+                        border: '1px solid var(--border, #e5e5e5)',
+                        background: repliesOpen ? 'var(--card, #f5f5f5)' : 'transparent',
+                        color: 'var(--p-ink-muted, #888)',
+                        cursor: 'pointer',
+                        letterSpacing: '-0.01em',
+                        touchAction: 'manipulation',
+                        WebkitTapHighlightColor: 'transparent',
+                        transition: 'background 120ms',
+                      }}
+                    >
+                      {repliesOpen
+                        ? 'Hide replies'
+                        : `${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
+                    </button>
+                  )}
               </div>
             );
           })()}
@@ -941,15 +1055,17 @@ export default function CommentRow({
                 parentId={comment.id}
                 onPosted={(c) => {
                   setReplyOpen(false);
+                  setQuoteReplyText('');
                   onReplied?.(c);
                 }}
-                onCancel={() => setReplyOpen(false)}
-                autoFocus
+                onCancel={() => { setReplyOpen(false); setQuoteReplyText(''); }}
+                autoFocus={!quoteReplyText}
+                prefillQuote={quoteReplyText || undefined}
               />
             </div>
           )}
 
-          {replies.map((r) => r)}
+          {repliesOpen && replies.map((r, i) => <React.Fragment key={i}>{r}</React.Fragment>)}
         </div>
       </div>
     </div>

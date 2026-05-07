@@ -964,27 +964,25 @@ export default function CommentThread({
           paddingBottom: 12,
           borderBottom: '1px solid #e5e5e5',
         }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text, #1a1a1a)' }}>
               {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
             </span>
-            <span style={{ fontSize: 11, color: 'var(--dim, #5a5a5a)', fontWeight: 500 }}>· quiz-verified</span>
           </div>
-          <div style={{ display: 'flex', gap: 2 }}>
+          <div style={{ display: 'flex', gap: 4 }}>
             {(['top', 'newest'] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setSort(s)}
                 style={{
                   fontSize: 12,
-                  fontWeight: 500,
-                  color: sort === s ? 'var(--text, #1a1a1a)' : 'var(--dim, #999)',
-                  background: sort === s ? 'rgba(17,17,17,0.07)' : 'transparent',
+                  fontWeight: 600,
+                  color: sort === s ? 'var(--bg, #fff)' : 'var(--dim, #999)',
+                  background: sort === s ? 'var(--text, #111)' : 'transparent',
                   border: 'none',
-                  borderRadius: 6,
+                  borderRadius: 20,
                   cursor: 'pointer',
-                  padding: '4px 10px',
-                  minHeight: 30,
+                  padding: '5px 12px',
                 }}
               >
                 {s === 'top' ? 'Top' : 'Newest'}
@@ -1013,7 +1011,7 @@ export default function CommentThread({
         </button>
       )}
 
-      {currentUserId && (
+      {currentUserId && quizPassed && (
         <CommentComposer
           articleId={articleId}
           onPosted={handlePosted}
@@ -1442,9 +1440,12 @@ export default function CommentThread({
         // T11 — when the article has same-category siblings, the story
         // page passes them in via `emptyStateExtra` so the passed-but-
         // alone reader has an editorial follow-up rather than a dead end.
-        <div style={{ padding: '24px 0' }}>
-          <div style={{ fontSize: 14, color: 'var(--dim, #666)' }}>
-            No one has joined this discussion yet.
+        <div style={{ padding: '8px 0 32px' }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text, #111)', letterSpacing: '-0.01em', marginBottom: 6 }}>
+            Be the first.
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--dim, #666)', lineHeight: 1.5 }}>
+            You read it. You passed. Your take belongs here.
           </div>
           {emptyStateExtra && <div style={{ marginTop: 24, textAlign: 'left' }}>{emptyStateExtra}</div>}
         </div>

@@ -349,7 +349,7 @@ export default async function ArticleSlugPage({
         }
         timelineSlot={
           <>
-            <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} showTease={false} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
+            <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} showTease={false} articleCountReached={anonReadCount >= WALL_THRESHOLD} currentArticleId={article.id} />
             <SourcesSection sources={!isAnon ? sources : []} showTease={false} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
             {/* article_rail: sticky right-rail ad on desktop (non-COPPA articles only) */}
             {!isCoppa && <Ad placement="article_rail" page="article" position="rail" articleId={article.id} />}

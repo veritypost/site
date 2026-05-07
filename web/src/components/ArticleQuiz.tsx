@@ -282,15 +282,34 @@ export default function ArticleQuiz({
 
   if (stage === 'idle' || stage === 'loading-start') {
     return (
-      <div
-        style={{
-          background: C.card,
-          border: `1px solid ${C.border}`,
-          borderRadius: 12,
-          padding: '18px 20px',
-          marginTop: 24,
-        }}
-      >
+      <div style={{
+        background: 'var(--bg)',
+        border: `1px solid ${C.border}`,
+        borderRadius: 14,
+        padding: '28px 28px 24px',
+        marginTop: 40,
+        boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+      }}>
+        <div style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase' as const,
+          color: C.dim,
+          marginBottom: 14,
+        }}>
+          Quiz
+        </div>
+        <div style={{
+          fontSize: 22,
+          fontWeight: 700,
+          color: C.text,
+          lineHeight: 1.25,
+          letterSpacing: '-0.02em',
+          marginBottom: 24,
+        }}>
+          How well did you follow the story?
+        </div>
         {error && <div style={{ fontSize: 12, color: C.danger, marginBottom: 10 }}>{error}</div>}
         <button
           onClick={startAttempt}
@@ -298,16 +317,17 @@ export default function ArticleQuiz({
           style={{
             display: 'block',
             width: '100%',
-            padding: '13px 20px',
+            padding: '15px 20px',
             borderRadius: 10,
             border: 'none',
             background: C.accent,
             color: 'var(--bg)',
-            fontSize: 15,
+            fontSize: 16,
             fontWeight: 700,
             cursor: stage === 'loading-start' ? 'default' : 'pointer',
             opacity: stage === 'loading-start' ? 0.6 : 1,
             fontFamily: 'inherit',
+            letterSpacing: '-0.01em',
           }}
         >
           {stage === 'loading-start' ? 'Loading…' : 'Take the quiz'}

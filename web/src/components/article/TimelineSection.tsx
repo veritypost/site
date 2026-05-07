@@ -36,15 +36,15 @@ const SPINE_STYLE: React.CSSProperties = {
 
 const EVENT_STYLE: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '80px 1px 1fr',
-  gap: '0 16px',
+  gridTemplateColumns: '80px 20px 1fr',
+  gap: '0 12px',
   position: 'relative' as const,
 };
 
 const DATE_STYLE: React.CSSProperties = {
   fontSize: 12,
   color: 'var(--p-ink-muted)',
-  paddingTop: 2,
+  paddingTop: 5,
   textAlign: 'right' as const,
   whiteSpace: 'nowrap' as const,
 };
@@ -56,12 +56,12 @@ const DOT_COL_STYLE: React.CSSProperties = {
 };
 
 const DOT_STYLE: React.CSSProperties = {
-  width: 8,
-  height: 8,
+  width: 7,
+  height: 7,
   borderRadius: '50%',
-  background: 'var(--p-ink)',
+  background: 'var(--p-border)',
   flexShrink: 0,
-  marginTop: 4,
+  marginTop: 6,
 };
 
 const LINE_STYLE: React.CSSProperties = {
@@ -77,9 +77,22 @@ const CONTENT_STYLE: React.CSSProperties = {
 
 const LABEL_STYLE: React.CSSProperties = {
   fontSize: 14,
-  lineHeight: 1.3,
+  lineHeight: 1.4,
   color: 'var(--p-ink)',
   margin: '0 0 4px',
+};
+
+const NOW_BADGE_STYLE: React.CSSProperties = {
+  display: 'inline-block',
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase' as const,
+  color: 'var(--p-accent)',
+  border: '1px solid var(--p-accent)',
+  padding: '1px 5px',
+  borderRadius: 4,
+  marginBottom: 5,
 };
 
 interface TimelineSectionProps {
@@ -87,9 +100,10 @@ interface TimelineSectionProps {
   storySlug?: string;
   showTease?: boolean;
   articleCountReached?: boolean;
+  currentArticleId?: string;
 }
 
-export default function TimelineSection({ events, storySlug, showTease = false, articleCountReached = false }: TimelineSectionProps) {
+export default function TimelineSection({ events, storySlug, showTease = false, articleCountReached = false, currentArticleId }: TimelineSectionProps) {
   const { openWall } = useRegistrationWall();
 
   if (!events.length && !showTease) return null;
@@ -132,7 +146,8 @@ export default function TimelineSection({ events, storySlug, showTease = false, 
                 width: 10,
                 height: 10,
                 background: 'var(--p-accent)',
-                boxShadow: '0 0 0 2px var(--p-accent)',
+                boxShadow: '0 0 0 2px #fff, 0 0 0 4px var(--p-accent)',
+                marginTop: 5,
               }
             : DOT_STYLE;
 
@@ -140,15 +155,11 @@ export default function TimelineSection({ events, storySlug, showTease = false, 
             <div key={ev.id} style={EVENT_STYLE}>
               <div style={DATE_STYLE}>{((ev.metadata as Record<string, unknown> | null)?.date_display as string | undefined) || formatTimelineDate(ev.event_date)}</div>
               <div style={DOT_COL_STYLE}>
-                {isNow && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--p-accent)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                    NOW
-                  </span>
-                )}
                 <div style={dotStyle} />
                 {i < sorted.length - 1 && <div style={LINE_STYLE} />}
               </div>
               <div style={CONTENT_STYLE}>
+                {isNow && <span style={NOW_BADGE_STYLE}>Now</span>}
                 {ev.type === 'article' && storySlug && ev.linked_article_id ? (
                   <p style={LABEL_STYLE}>
                     <a
@@ -161,19 +172,15 @@ export default function TimelineSection({ events, storySlug, showTease = false, 
                 ) : (
                   <p style={LABEL_STYLE}>{ev.event_label}</p>
                 )}
-                {isNow && ev.type === 'article' && (
+                {isNow && ev.type === 'article' && ev.linked_article_id !== currentArticleId && (
                   ev.linked_article_id && storySlug ? (
                     <a
                       href={`/${storySlug}?a=${ev.linked_article_id}`}
-                      style={{ fontSize: 11, color: 'var(--p-accent)', marginTop: 4, display: 'block', textDecoration: 'none' }}
+                      style={{ fontSize: 13, fontWeight: 500, color: 'var(--p-accent)', marginTop: 2, display: 'inline-block', textDecoration: 'none' }}
                     >
-                      ↗ Read this coverage
+                      Read this coverage
                     </a>
-                  ) : (
-                    <span style={{ fontSize: 11, color: 'var(--p-accent)', marginTop: 4, display: 'block' }}>
-                      ↗ Read this coverage
-                    </span>
-                  )
+                  ) : null
                 )}
               </div>
             </div>
