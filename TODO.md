@@ -137,28 +137,22 @@
 - 9: Owner-mode bypass writes have no audit-log marker. Decision: which table to write to, and which writes to cover (all, or only high-blast-radius ones)?
 
 **Ad targeting**
-- 11: **Ad targeting refinement — refine, don't rebuild.** Category + subcategory targeting columns + admin form already exist; tooling is incomplete and the runtime does not yet enforce. Article-level targeting + reusable Audiences resource: deferred until an advertiser asks.
+- 11: **Ad targeting — main bundle SHIPPED 2026-05-07** (commits `9315a310` + `fcf52c70`). Operators can now plug specific ads into any category, subcategory, or article via the unified `ad_targets` table. Schema is forward-compatible — future target types (platform, country, cohort, story-collection) plug in by extending the CHECK constraint and the `serve_ad` resolver, no new DDL on this table.
 
-  **Critical premise (verified 2026-05-07 via `pg_get_functiondef`):** the live `serve_ad` Postgres function does NOT filter on `targeting_categories`, `targeting_subcategories`, `targeting_plans`, `targeting_platforms`, `targeting_countries`, or `targeting_cohorts`. It only checks placement, tier, dates, frequency caps. The admin form has been writing to columns the runtime ignores. 0 rows in `ad_units` populate any of these targeting columns. So most "refinement" items design UI on top of an enforcement engine that doesn't exist yet — they need to ship together with the RPC rewrite, not before it.
+  **Still pending — independent polish items:**
+  - **Surface `start_date` / `end_date` in the admin form.** Columns exist; form at `admin/ad-units/[id]/page.tsx` doesn't render them; direct deals are always flighted.
+  - **"Check reach" button next to Save.** New `/api/admin/ad-units/estimate-reach` endpoint that runs the same predicate `serve_ad` runs and returns eligible-articles + page-views over the last 7 days. Click-driven (no auto-recompute on toggle).
+  - **Drop or rename `category_top` / `category_in_feed_1` placement rows** to `feed_top` / `feed_in_feed_1`. Once targeting lives on the ad, category-named placements are double-bookkeeping. Update render sites in `web/src/app/category/[id]/page.js:538-575` + `admin/ads/preview/page.tsx:20`.
+  - **Log `category_id` on `ad_impressions` + `ad_clicks`.** Without this, "Politics-targeted vs run-of-site performance" is unanswerable. Add the column + update insert sites in `/api/ads/impression` + `/api/ads/click`.
+  - **Cleanup migration** to drop the dead jsonb columns on `ad_units`: `targeting_categories`, `targeting_subcategories`, `targeting_platforms`, `targeting_countries`, `targeting_cohorts`. Held back this session to avoid a deploy window where running code references columns that no longer exist; safe to drop once the new code is in production.
+  - **Tri-state UI for exclusion.** Schema supports `mode='exclude'` already; UI currently only writes `'include'`. Future UX pass adds an exclude affordance on the existing tree (parent on + child off = exclude that subcategory) and on the article picker.
 
-  **Item 1 — SHIPPED 2026-05-07** (commit `9315a310`). `toggleCat` parent-check is now wildcard semantics, not a child-ID snapshot. Render shows "All X subcategories targeted (current and future)" caption when parent is checked. Load-time normalization heals legacy snapshot rows.
+  **Deferred (out of scope until requested):**
+  - Platform / country / cohort targeting — would require `serve_ad` signature change to accept platform (UA-derived), country (GeoIP), and cohort (user-derived) context. No advertiser asking yet; build when there's demand.
+  - Reusable "Audiences" resource — premature with one operator + a handful of advertisers.
+  - Frequency-cap per target — caps stay per-ad-unit; revisit if an advertiser asks to cap impressions per category.
 
-  **Pending — bundle into one "targeting goes live" session (must ship atomically):**
-  2. **Convert `targeting_categories` + `targeting_subcategories` from JSON to `uuid[]`.** Add GIN indexes. Single migration via `mcp__supabase__apply_migration`.
-  3. **Rewrite `serve_ad` RPC body** to actually filter on the targeting columns: `targeting_categories && ARRAY[$cat_id]`, parent-wildcard via category parentage join, optional exclude predicate. Same migration as #2.
-  4. **Tri-state on the existing tree** — parent on + child off = exclude. Adds `excluded_subcategories uuid[]`. Requires `ref.indeterminate` JS for parent-row visual when some children are excluded. UI ships in the same session as #2 + #3 so semantics + storage + render align.
-  5. **Empty = all banner** — only ship if it adds signal beyond the existing per-field `(empty = all X)` labels. Adversary review flagged it as redundant; revisit when targeting is live.
-  6. **Regenerate `database.ts` + audit `parseJsonArray` callers** post-migration.
-
-  **Pending — independent items, can ship in any order:**
-  7. **Surface `start_date` / `end_date` in the admin form.** Columns exist; form at `admin/ad-units/[id]/page.tsx` doesn't render them; direct deals are always flighted.
-  8. **"Check reach" button next to Save.** New `/api/admin/ad-units/estimate-reach` endpoint returns eligible-articles + page-views over the last 7 days. Best built once #3 is live so the estimate matches what the RPC actually serves.
-  9. **Drop or rename `category_top` / `category_in_feed_1` placement rows** to `feed_top` / `feed_in_feed_1`. Once targeting lives on the ad, category-named placements are double-bookkeeping. Update render sites in `web/src/app/category/[id]/page.js:538-575` + `admin/ads/preview/page.tsx:20`.
-  10. **Log `category_id` on `ad_impressions` + `ad_clicks`.** Without this, "Politics-targeted vs run-of-site performance" is unanswerable. Add the column + update insert sites in `/api/ads/impression` + `/api/ads/click`.
-
-  **Deferred (out of scope):** article-level targeting (separate `ad_targets` join table, only when an advertiser asks), reusable Audiences resource (premature — Verity has one operator + a handful of advertisers).
-
-  **Cross-platform:** web admin + serve runtime only. iOS / iOS Kids n/a (consume `serve_ad` JSON output, no targeting fields surface client-side).
+  **Cross-platform:** web admin + serve runtime only. iOS / iOS Kids consume `serve_ad` JSON output unchanged.
 
 ---
 
