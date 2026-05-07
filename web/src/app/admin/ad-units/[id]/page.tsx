@@ -91,7 +91,16 @@ function AdUnitTargetingInner() {
       setCategories(catsRes.data || []);
 
       const targetCats = parseJsonArray(u.targeting_categories);
-      const targetSubs = parseJsonArray(u.targeting_subcategories);
+      const rawSubs = parseJsonArray(u.targeting_subcategories);
+      // Drop any subcategory whose parent is already targeted as a wildcard —
+      // legacy rows snapshotted child IDs at parent-check time, which the UI no
+      // longer does. The wildcard parent is the single source of truth.
+      const wildcardParents = new Set(targetCats);
+      const subParentLookup = new Map((catsRes.data || []).map((c) => [c.id, c.parent_id]));
+      const targetSubs = rawSubs.filter((subId) => {
+        const parentId = subParentLookup.get(subId);
+        return !parentId || !wildcardParents.has(parentId);
+      });
       // Pre-expand any parent categories that have targeting set on them or their children
       const expanded = new Set<string>();
       for (const id of targetCats) expanded.add(id);
@@ -116,21 +125,17 @@ function AdUnitTargetingInner() {
   const subCatsOf = (parentId: string) => categories.filter((c) => c.parent_id === parentId);
 
   const toggleCat = (catId: string) => {
-    const subs = subCatsOf(catId).map((s) => s.id);
     const cur = new Set(form.targeting_categories);
-    const curSubs = new Set(form.targeting_subcategories);
     if (cur.has(catId)) {
       cur.delete(catId);
-      subs.forEach((s) => curSubs.delete(s));
-      // Collapse when deselecting
       setExpandedCats((prev) => { const next = new Set(prev); next.delete(catId); return next; });
     } else {
+      // Parent-checked = wildcard for this category and all current and future
+      // children; do not snapshot child IDs into targeting_subcategories.
       cur.add(catId);
-      subs.forEach((s) => curSubs.add(s));
-      // Expand when selecting
       setExpandedCats((prev) => new Set([...prev, catId]));
     }
-    setForm({ ...form, targeting_categories: Array.from(cur), targeting_subcategories: Array.from(curSubs) });
+    setForm({ ...form, targeting_categories: Array.from(cur) });
   };
 
   const toggleSub = (subId: string) => {
@@ -433,7 +438,15 @@ function AdUnitTargetingInner() {
                       </button>
                     )}
                   </div>
-                  {isExpanded && subs.map((sub) => {
+                  {isExpanded && (catSelected ? (
+                    <div style={{
+                      padding: `${S[2]}px ${S[3]}px ${S[2]}px ${S[6]}px`,
+                      borderBottom: `1px solid ${C.divider}`,
+                      color: C.dim, fontSize: F.xs, fontStyle: 'italic',
+                    }}>
+                      All {cat.name} subcategories targeted (current and future).
+                    </div>
+                  ) : subs.map((sub) => {
                     const subSelected = form.targeting_subcategories.includes(sub.id);
                     return (
                       <div
@@ -459,7 +472,7 @@ function AdUnitTargetingInner() {
                         </span>
                       </div>
                     );
-                  })}
+                  }))}
                 </div>
               );
             })}
