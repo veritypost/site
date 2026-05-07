@@ -30,6 +30,16 @@ type TargetType = 'category' | 'subcategory' | 'article';
 type TargetMode = 'include' | 'exclude';
 type AdTarget = { target_type: TargetType; target_id: string; mode: TargetMode };
 
+type PerfData = {
+  days: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  revenue_cents: number;
+  by_category: Array<{ category_id: string; category_name: string | null; impressions: number; clicks: number }>;
+  daily: Array<{ date: string; impressions: number; clicks: number }>;
+};
+
 type FormState = Partial<AdUnit> & {
   targeting_plans: string[];
   adTargets: AdTarget[];
@@ -63,6 +73,9 @@ function AdUnitTargetingInner() {
   const [articleSearching, setArticleSearching] = useState(false);
   const [reach, setReach] = useState<{ eligible: number; total: number; days: number } | null>(null);
   const [reachLoading, setReachLoading] = useState(false);
+  const [perfDays, setPerfDays] = useState(30);
+  const [perf, setPerf] = useState<PerfData | null>(null);
+  const [perfLoading, setPerfLoading] = useState(false);
   const [form, setForm] = useState<FormState>({
     targeting_plans: [],
     adTargets: [],
@@ -242,6 +255,23 @@ function AdUnitTargetingInner() {
     }));
   };
 
+  // Performance loader. Fires on mount + when the period selector changes.
+  useEffect(() => {
+    if (!unit) return;
+    let cancelled = false;
+    setPerfLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/ad-units/${unit.id}/performance?days=${perfDays}`);
+        const d = await res.json().catch(() => null);
+        if (!cancelled && res.ok && d) setPerf(d as PerfData);
+      } finally {
+        if (!cancelled) setPerfLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [unit, perfDays]);
+
   // Debounced article search. 300ms window; cleared when query empties.
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -376,6 +406,77 @@ function AdUnitTargetingInner() {
           color: C.danger, fontSize: F.sm,
         }}>{error}</div>
       )}
+
+      {/* Performance */}
+      <PageSection
+        title="Performance"
+        aside={
+          <div style={{ display: 'flex', gap: S[1] }}>
+            {[7, 30, 90].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setPerfDays(d)}
+                style={{
+                  padding: `${S[1]}px ${S[2]}px`, borderRadius: 6, fontSize: F.xs,
+                  fontWeight: 600, font: 'inherit', cursor: 'pointer',
+                  border: `1px solid ${perfDays === d ? C.accent : C.divider}`,
+                  background: perfDays === d ? C.accent : 'transparent',
+                  color: perfDays === d ? '#fff' : C.soft,
+                }}
+              >{d}d</button>
+            ))}
+          </div>
+        }
+      >
+        {perfLoading && !perf ? (
+          <div style={{ padding: S[3], color: C.dim, fontSize: F.sm }}><Spinner /> Loading…</div>
+        ) : perf ? (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: S[3], marginBottom: S[4] }}>
+              <Tile label="Impressions" value={perf.impressions.toLocaleString()} />
+              <Tile label="Clicks"      value={perf.clicks.toLocaleString()} />
+              <Tile label="CTR"         value={`${(perf.ctr * 100).toFixed(2)}%`} />
+              <Tile label="Revenue"     value={`$${(perf.revenue_cents / 100).toFixed(2)}`} />
+            </div>
+            {perf.impressions === 0 ? (
+              <div style={{ padding: S[3], textAlign: 'center', color: C.dim, fontSize: F.sm, border: `1px dashed ${C.divider}`, borderRadius: 8 }}>
+                No impressions in the last {perf.days} days. Save the ad and let it serve before checking back here.
+              </div>
+            ) : (
+              <>
+                {perf.by_category.length > 0 && (
+                  <div style={{ marginBottom: S[3] }}>
+                    <div style={{ fontSize: F.xs, fontWeight: 600, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: S[1] }}>
+                      Top categories
+                    </div>
+                    <div style={{ border: `1px solid ${C.divider}`, borderRadius: 8 }}>
+                      {perf.by_category.slice(0, 8).map((c, i) => {
+                        const cCtr = c.impressions > 0 ? (c.clicks / c.impressions) * 100 : 0;
+                        return (
+                          <div key={c.category_id} style={{
+                            display: 'flex', gap: S[2], padding: `${S[2]}px ${S[3]}px`,
+                            borderBottom: i === Math.min(perf.by_category.length, 8) - 1 ? 'none' : `1px solid ${C.divider}`,
+                            fontSize: F.sm,
+                          }}>
+                            <span style={{ flex: 1, color: C.ink }}>{c.category_name || c.category_id}</span>
+                            <span style={{ width: 80, textAlign: 'right', color: C.soft, fontVariantNumeric: 'tabular-nums' }}>{c.impressions.toLocaleString()} imp</span>
+                            <span style={{ width: 64, textAlign: 'right', color: C.soft, fontVariantNumeric: 'tabular-nums' }}>{c.clicks.toLocaleString()} clk</span>
+                            <span style={{ width: 56, textAlign: 'right', color: C.dim, fontVariantNumeric: 'tabular-nums' }}>{cCtr.toFixed(2)}%</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {perf.daily.length > 1 && <DailySparkline daily={perf.daily} />}
+              </>
+            )}
+          </>
+        ) : (
+          <div style={{ padding: S[3], color: C.dim, fontSize: F.sm }}>No performance data yet.</div>
+        )}
+      </PageSection>
 
       {/* Basic fields */}
       <PageSection title="Creative &amp; settings">
@@ -696,6 +797,41 @@ function TriStateCheckbox({
       onChange={onChange}
       style={style}
     />
+  );
+}
+
+function Tile({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{
+      padding: `${S[3]}px ${S[3]}px`, border: `1px solid ${C.divider}`,
+      borderRadius: 8, background: C.bg,
+    }}>
+      <div style={{ fontSize: F.xs, fontWeight: 600, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+      <div style={{ fontSize: F.lg, fontWeight: 700, color: C.ink, marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+    </div>
+  );
+}
+
+function DailySparkline({ daily }: { daily: Array<{ date: string; impressions: number; clicks: number }> }) {
+  const max = Math.max(1, ...daily.map((d) => d.impressions));
+  return (
+    <div>
+      <div style={{ fontSize: F.xs, fontWeight: 600, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: S[1] }}>
+        Impressions per day
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 48, padding: `0 ${S[1]}px`, border: `1px solid ${C.divider}`, borderRadius: 8 }}>
+        {daily.map((d) => {
+          const h = Math.max(2, Math.round((d.impressions / max) * 44));
+          return (
+            <div
+              key={d.date}
+              title={`${d.date}: ${d.impressions} imp · ${d.clicks} clk`}
+              style={{ flex: 1, height: h, background: C.accent, opacity: d.impressions === 0 ? 0.15 : 0.85, borderRadius: 2, minWidth: 2 }}
+            />
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
