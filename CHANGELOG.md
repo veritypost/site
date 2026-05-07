@@ -6,6 +6,16 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-07 (continued)
 
+### Daily impression cap on ad units
+**Files:** `web/src/app/admin/ad-units/[id]/page.tsx`, `web/src/app/api/admin/ad-units/[id]/route.js`, `web/src/types/database.ts`. Commit: `3ad9dd24`. **DB:** `ad_units_daily_impression_cap` migration (new column + `serve_ad` rewrite).
+- Common direct-buy ask: "stop after N impressions per day." The existing freq caps were per-user / per-session only — there was no ad-unit-wide daily ceiling.
+- New `ad_units.daily_impression_cap int` (NULL = no cap). `serve_ad` adds one COUNT against today's impressions for the unit; same access pattern as the existing freq caps. Admin form has a NumberInput in the Creative & settings grid; treats 0 as "no cap" and sends NULL on save. PATCH ALLOWED list updated. Types regenerated.
+
+### Placement utilization badge + creative thumbnails
+**File:** `web/src/app/admin/ad-placements/page.tsx`. Commit: `d00bb77b`. Pure UI.
+- Placement list shows an active+approved unit count per placement (warn-tinted "0 ads" badge when empty so it jumps out). Counts come from a single GET `/api/admin/ad-units` aggregated client-side; refresh on unit save / delete.
+- Each unit row in the right pane shows a 48×32 thumbnail of `creative_url` (cover-fit, dashed-border fallback for HTML-only ads).
+
 ### Campaign pacing block on the ad-unit page
 **File:** `web/src/app/admin/ad-units/[id]/page.tsx`. Commit: `6c42ea53`. **DB:** none — uses existing `ad_campaigns` columns.
 - Renders a "Campaign pacing" section between Performance and Creative & settings only when the unit has a `campaign_id`. Four tiles (Spent / Budget / Daily cap / Pacing status). Spend-progress bar with a vertical marker at the time-elapsed-fraction in the campaign window so the operator can eyeball variance. Pacing buckets: on-track within ±10%, slightly off 10–25%, off >25%. Open-ended campaigns (no end_date) skip the pacing comparison.
