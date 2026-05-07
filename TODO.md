@@ -136,21 +136,6 @@
 - 8: Client-side permissions.js short-circuit bypasses kid-protective UI gates when owner is in a kid session. Decision: check for active_kid context inside the short-circuit (a), or invalidate the cache on kid-session enter/exit (b)?
 - 9: Owner-mode bypass writes have no audit-log marker. Decision: which table to write to, and which writes to cover (all, or only high-blast-radius ones)?
 
-**Ad targeting**
-- 11: **Ad targeting — SHIPPED 2026-05-07** (commits `9315a310` + `fcf52c70` + `91fc2933`). Operators can plug specific ads into any category, subcategory, or article via the unified `ad_targets` table; can exclude specific subcategories under a wildcard parent (tri-state UI); can flight ads via `start_date` / `end_date`; can preview reach (Check reach button) before saving. Targeted-vs-run-of-site reporting is unblocked via `category_id` on `ad_impressions`. Schema is forward-compatible: future target types (platform, country, cohort, story-collection) plug in by extending the CHECK constraint and the `serve_ad` resolver — no new DDL on `ad_targets`.
-
-  **Tail item — defer to next pass:**
-  - **Cleanup migration** to drop the now-dead jsonb columns on `ad_units`: `targeting_categories`, `targeting_subcategories`, `targeting_platforms`, `targeting_countries`, `targeting_cohorts`. Code stopped reading and writing these in `fcf52c70`. Held back so production has a deploy where the new code is verified live; once owner confirms, run a single migration: drop the 5 columns + regenerate `database.ts` + grep for any lingering references.
-
-  **Skipped (premise didn't hold):**
-  - Rename `category_top` / `category_in_feed_1` placements to `feed_top` / `feed_in_feed_1`. Investigation showed these names already describe their *surface* (top of category page; in-feed slot 1), not their targeting — the same pattern as `home_top` / `article_header`. Renaming would lose surface info without freeing real bookkeeping.
-
-  **Deferred (out of scope until requested):**
-  - Platform / country / cohort targeting — `serve_ad` signature would need platform (UA-derived), country (GeoIP), and cohort (user-derived) context. No advertiser asking yet.
-  - Reusable "Audiences" resource — premature with one operator + a handful of advertisers.
-  - Frequency-cap per target — caps stay per-ad-unit; revisit if an advertiser asks to cap impressions per category.
-
-  **Cross-platform:** web admin + serve runtime only. iOS / iOS Kids consume `serve_ad` JSON output unchanged.
 
 ---
 

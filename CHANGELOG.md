@@ -6,6 +6,12 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-07 (continued)
 
+### TODO 11 cleanup — drop dead targeting jsonb columns
+**Files:** `web/src/types/database.ts`, `web/src/app/api/admin/ad-units/[id]/route.js`. Commit: `7dc30203`. **DB migration:** `drop_dead_targeting_columns_on_ad_units` via `mcp__supabase__apply_migration`.
+- Dropped five jsonb columns from `ad_units` that had been read-and-write dead since the unified `ad_targets` ship in `fcf52c70`: `targeting_categories`, `targeting_subcategories`, `targeting_platforms`, `targeting_countries`, `targeting_cohorts`. Verified zero references across `web/src`, `VerityPost`, `VerityPostKids` before dropping.
+- Regenerated `database.ts`. Stale comment in the PATCH route trimmed.
+- **TODO 11 closed.**
+
 ### TODO 11 polish — schedule, tri-state exclusion, reach estimator, category logging
 **Files:** `web/src/app/admin/ad-units/[id]/page.tsx`, `web/src/components/admin/TextInput.jsx`, `web/types/admin-components.d.ts`, new `web/src/app/api/admin/ad-units/[id]/estimate-reach/route.js`. Commit: `91fc2933`. **DB migrations:** `ad_impressions_category_id` (new column + `log_ad_impression` rewrite) and `estimate_targeting_reach_rpc` (new function), both applied via `mcp__supabase__apply_migration`.
 - **Schedule fields** — `start_date` / `end_date` columns now render in the admin form as native date inputs in a new "Schedule" PageSection between Creative and Targeting. `null` = no bound. `TextInput` accepts `date` / `datetime-local` (JSDoc + `.d.ts` widened).
