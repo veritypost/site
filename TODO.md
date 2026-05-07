@@ -131,15 +131,6 @@
 
 ## Needs your decision before anything can move
 
-**Article reader**
-- 3: Move Sources block out of `timelineSlot` and into the main article body, after `ArticleActions`. Redesign the display: show publisher favicon/logo instead of text title. Interaction: clicking a logo expands/reveals the raw source headline (`s.title`); clicking that headline opens the source URL in a new tab (`target="_blank" rel="noopener noreferrer"`). Do not navigate inside the app — user must land outside so they can return cleanly.
-  - Move: `web/src/app/[slug]/page.tsx:355` — remove `<SourcesSection>` from `timelineSlot`, add it after `<ArticleActions>` (line 347)
-  - Favicon: fetch via `https://www.google.com/s2/favicons?domain={hostname}&sz=32` using `hostFromUrl(s.url)` already in `SourcesSection.tsx:114`
-  - Expand/collapse: each source row is a button showing the logo; click toggles a visible raw headline below it; click the headline → new tab
-  - Tease state (no subscription) and anon state remain as-is — just re-skin the layout
-  - Note: "Unknown" display bug (TODO 26) is a data issue — backfill migration (TODO 19) must run first; code fallback logic is already correct
-**iOS**
-
 **Security / RBAC — fix these before granting owner-mode to any second user**
 - 7: Any admin with scope_override permission can self-grant admin.owner_mode through the permissions UI. Decision: hard-deny that key on grant (a), introduce a separate assign permission (b), or restrict the whole permissions surface to owner-mode holders only (c)?
 - 8: Client-side permissions.js short-circuit bypasses kid-protective UI gates when owner is in a kid session. Decision: check for active_kid context inside the short-circuit (a), or invalidate the cache on kid-session enter/exit (b)?
@@ -213,12 +204,6 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 ## Comments / tagging
 
 - 39: Tag button UI after passing quiz is messy — clicking tags on another user's comment has poor UX (button states, picker, feedback). Needs investigation and redesign of the tag interaction in `CommentRow.tsx` and iOS `StoryDetailView.swift`.
-
----
-
-## Layout / visual
-
-- 38: Article page desktop layout feels off-center — `ArticleReaderTabs.tsx` uses a 75/25 flex split (`flex: 75` article column + `flex: 25` sticky timeline rail, `max-width: 1280px` container). The article body is capped at 680px inside the left column, so on a wide screen the text sits left-heavy with the timeline rail on the right and dead space outside. Decision needed: (a) keep 75/25 sidebar but tighten max-width so dead space shrinks, (b) move timeline above/below the article body and drop the rail, (c) make timeline a slide-in drawer/overlay on desktop instead of a persistent column. This is connected to TODO 3 (sources moving out of the timeline slot into the article body) — layout decision should be made together.
 
 ---
 
