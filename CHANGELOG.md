@@ -6,6 +6,11 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-07 (continued)
 
+### Campaign pacing block on the ad-unit page
+**File:** `web/src/app/admin/ad-units/[id]/page.tsx`. Commit: `6c42ea53`. **DB:** none — uses existing `ad_campaigns` columns.
+- Renders a "Campaign pacing" section between Performance and Creative & settings only when the unit has a `campaign_id`. Four tiles (Spent / Budget / Daily cap / Pacing status). Spend-progress bar with a vertical marker at the time-elapsed-fraction in the campaign window so the operator can eyeball variance. Pacing buckets: on-track within ±10%, slightly off 10–25%, off >25%. Open-ended campaigns (no end_date) skip the pacing comparison.
+- Lifetime impressions / clicks / pricing model in the footer line.
+
 ### Ad-unit performance panel
 **Files:** `web/src/app/admin/ad-units/[id]/page.tsx`, new `web/src/app/api/admin/ad-units/[id]/performance/route.js`. Commit: `b4da9f6e`. **DB:** `ad_unit_performance` RPC via `mcp__supabase__apply_migration`.
 - Closes the asymmetry the targeting work created — operators could configure deeply but never see what happened. Performance is now the first section on `/admin/ad-units/<id>`.
