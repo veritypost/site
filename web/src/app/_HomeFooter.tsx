@@ -125,7 +125,7 @@ export default function HomeFooter() {
       </p>
       <p style={{ margin: '16px 0 0' }}>
         <Link href="/signup" style={linkStyle}>
-          create a free account &rarr;
+          create your account &rarr;
         </Link>
       </p>
     </footer>

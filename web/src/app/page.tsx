@@ -33,6 +33,7 @@ import {
 } from './_homeShared';
 import HomeBreakingStrip from './_HomeBreakingStrip';
 import HomeFooter from './_HomeFooter';
+import HomeJoinPrompt from './_HomeJoinPrompt';
 import HomeFetchFailed from './_HomeFetchFailed';
 import HomeVisitTimestamp from './_HomeVisitTimestamp';
 import HomeSidebar from './_HomeSidebar';
@@ -495,6 +496,11 @@ export default async function HomePage({
                 {idx === 4 && (
                   <Ad placement="home_in_feed_1" page="home" position="in_feed_1" />
                 )}
+                {/* anon-only mid-feed conversion prompt — sits between
+                    home_in_feed_1 (idx 4) and home_in_feed_2 (idx 8) so the
+                    supporting list breaks up with editorial serif, not just
+                    consecutive ad slots. Hidden for logged-in viewers. */}
+                {idx === 6 && <HomeJoinPrompt />}
                 {/* home_in_feed_2: between cards 8 and 9 (idx 7→8 boundary) */}
                 {idx === 8 && (
                   <Ad placement="home_in_feed_2" page="home" position="in_feed_2" />
