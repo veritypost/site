@@ -9,7 +9,7 @@ import { ADMIN_C, F, S } from '../../lib/adminPalette';
  * border) — actual error copy lives on the surrounding <Field>.
  *
  * @param {object} props
- * @param {'text'|'email'|'url'|'search'|'password'|'tel'} [props.type='text']
+ * @param {'text'|'email'|'url'|'search'|'password'|'tel'|'date'|'datetime-local'} [props.type='text']
  * @param {boolean} [props.error=false]
  * @param {'sm'|'md'} [props.size='md']
  * @param {React.ReactNode} [props.leftAddon] Rendered inside the input border, left side.

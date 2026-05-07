@@ -61,6 +61,8 @@ function AdUnitTargetingInner() {
   const [articleQuery, setArticleQuery] = useState('');
   const [articleResults, setArticleResults] = useState<Array<{ id: string; title: string }>>([]);
   const [articleSearching, setArticleSearching] = useState(false);
+  const [reach, setReach] = useState<{ eligible: number; total: number; days: number } | null>(null);
+  const [reachLoading, setReachLoading] = useState(false);
   const [form, setForm] = useState<FormState>({
     targeting_plans: [],
     adTargets: [],
@@ -134,8 +136,10 @@ function AdUnitTargetingInner() {
   const topLevelCats = categories.filter((c) => !c.parent_id);
   const subCatsOf = (parentId: string) => categories.filter((c) => c.parent_id === parentId);
 
-  const isTargeted = (target_type: TargetType, target_id: string) =>
-    form.adTargets.some((t) => t.target_type === target_type && t.target_id === target_id && t.mode === 'include');
+  const hasTarget = (target_type: TargetType, target_id: string, mode: TargetMode) =>
+    form.adTargets.some((t) => t.target_type === target_type && t.target_id === target_id && t.mode === mode);
+
+  const isTargeted = (target_type: TargetType, target_id: string) => hasTarget(target_type, target_id, 'include');
 
   const toggleTarget = (target_type: TargetType, target_id: string) => {
     setForm((f) => {
@@ -150,10 +154,59 @@ function AdUnitTargetingInner() {
   };
 
   const toggleCategoryTarget = (catId: string) => {
-    toggleTarget('category', catId);
-    if (!isTargeted('category', catId)) {
+    const wasIncluded = hasTarget('category', catId, 'include');
+    setForm((f) => {
+      if (wasIncluded) {
+        // Removing the parent wildcard. Strip any subcategory excludes for
+        // this parent's children — they only made sense under the wildcard
+        // and would be orphan rows otherwise.
+        const childSubIds = new Set(subCatsOf(catId).map((s) => s.id));
+        return {
+          ...f,
+          adTargets: f.adTargets.filter((t) =>
+            !(t.target_type === 'category' && t.target_id === catId && t.mode === 'include')
+            && !(t.target_type === 'subcategory' && childSubIds.has(t.target_id) && t.mode === 'exclude'),
+          ),
+        };
+      }
+      return {
+        ...f,
+        adTargets: [...f.adTargets, { target_type: 'category', target_id: catId, mode: 'include' }],
+      };
+    });
+    if (!wasIncluded) {
       setExpandedCats((prev) => new Set([...prev, catId]));
     }
+  };
+
+  // Subcategory click semantics depend on parent state:
+  //   parent included → toggle the sub's exclude row (parent + sub-excluded = "all category except this")
+  //   parent not included → toggle the sub's include row (standard pinpoint)
+  const toggleSubcategoryTarget = (sub: Category) => {
+    const parentId = sub.parent_id;
+    const parentIncluded = parentId ? hasTarget('category', parentId, 'include') : false;
+    setForm((f) => {
+      if (parentIncluded) {
+        const isExcluded = f.adTargets.some(
+          (t) => t.target_type === 'subcategory' && t.target_id === sub.id && t.mode === 'exclude',
+        );
+        return {
+          ...f,
+          adTargets: isExcluded
+            ? f.adTargets.filter((t) => !(t.target_type === 'subcategory' && t.target_id === sub.id && t.mode === 'exclude'))
+            : [...f.adTargets, { target_type: 'subcategory', target_id: sub.id, mode: 'exclude' }],
+        };
+      }
+      const isIncluded = f.adTargets.some(
+        (t) => t.target_type === 'subcategory' && t.target_id === sub.id && t.mode === 'include',
+      );
+      return {
+        ...f,
+        adTargets: isIncluded
+          ? f.adTargets.filter((t) => !(t.target_type === 'subcategory' && t.target_id === sub.id && t.mode === 'include'))
+          : [...f.adTargets, { target_type: 'subcategory', target_id: sub.id, mode: 'include' }],
+      };
+    });
   };
 
   const toggleCatExpand = (catId: string, e: React.MouseEvent) => {
@@ -216,6 +269,32 @@ function AdUnitTargetingInner() {
     };
   }, [articleQuery, supabase]);
 
+  const checkReach = async () => {
+    if (!unit) return;
+    setReachLoading(true);
+    try {
+      const res = await fetch(`/api/admin/ad-units/${unit.id}/estimate-reach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ad_targets: form.adTargets }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        push({ message: d?.error || 'Reach estimate failed', variant: 'danger' });
+        return;
+      }
+      setReach({
+        eligible: Number(d?.eligible_articles ?? 0),
+        total: Number(d?.total_articles ?? 0),
+        days: Number(d?.days ?? 7),
+      });
+    } catch (err) {
+      push({ message: (err as Error)?.message || 'Reach estimate failed', variant: 'danger' });
+    } finally {
+      setReachLoading(false);
+    }
+  };
+
   const save = async () => {
     if (!unit) return;
     setError('');
@@ -237,6 +316,8 @@ function AdUnitTargetingInner() {
         weight: form.weight ?? 100,
         approval_status: form.approval_status,
         is_active: form.is_active,
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
         targeting_plans: form.targeting_plans.length ? form.targeting_plans : null,
         ad_targets: form.adTargets,
       };
@@ -378,11 +459,31 @@ function AdUnitTargetingInner() {
         </div>
       </PageSection>
 
+      {/* Schedule */}
+      <PageSection title="Schedule">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: S[3] }}>
+          <Lbl label="Starts (empty = always)">
+            <TextInput
+              type="date"
+              value={(form.start_date ?? '').slice(0, 10)}
+              onChange={(e) => setForm({ ...form, start_date: e.target.value || null })}
+            />
+          </Lbl>
+          <Lbl label="Ends (empty = no end)">
+            <TextInput
+              type="date"
+              value={(form.end_date ?? '').slice(0, 10)}
+              onChange={(e) => setForm({ ...form, end_date: e.target.value || null })}
+            />
+          </Lbl>
+        </div>
+      </PageSection>
+
       {/* Targeting */}
       <PageSection title="Targeting">
 
-        <div style={{ marginBottom: S[3], padding: S[2], background: C.bg, border: `1px solid ${C.divider}`, borderRadius: 6, fontSize: F.xs, color: C.dim }}>
-          Empty targeting = serve everywhere. Add a category, subcategory, or specific article to narrow.
+        <div style={{ marginBottom: S[3], padding: S[2], background: C.bg, border: `1px solid ${C.divider}`, borderRadius: 6, fontSize: F.xs, color: C.dim, lineHeight: 1.5 }}>
+          Empty targeting = serve everywhere. Check a category to target it (and all current and future subcategories). Under a checked category, uncheck individual subcategories to exclude them.
         </div>
 
         {/* Plans */}
@@ -413,7 +514,8 @@ function AdUnitTargetingInner() {
               )}
               {topLevelCats.map((cat) => {
                 const subs = subCatsOf(cat.id);
-                const catSelected = isTargeted('category', cat.id);
+                const catIncluded = hasTarget('category', cat.id, 'include');
+                const anyChildExcluded = catIncluded && subs.some((s) => hasTarget('subcategory', s.id, 'exclude'));
                 const isExpanded = expandedCats.has(cat.id);
                 return (
                   <div key={cat.id}>
@@ -421,11 +523,11 @@ function AdUnitTargetingInner() {
                       display: 'flex', alignItems: 'center', gap: S[2],
                       padding: `${S[2]}px ${S[3]}px`,
                       borderBottom: `1px solid ${C.divider}`,
-                      background: catSelected ? C.hover : C.bg,
+                      background: catIncluded ? C.hover : C.bg,
                     }}>
-                      <input
-                        type="checkbox"
-                        checked={catSelected}
+                      <TriStateCheckbox
+                        checked={catIncluded}
+                        indeterminate={anyChildExcluded}
                         onChange={() => toggleCategoryTarget(cat.id)}
                         style={{ width: 14, height: 14, cursor: 'pointer', flexShrink: 0 }}
                       />
@@ -449,16 +551,12 @@ function AdUnitTargetingInner() {
                         </button>
                       )}
                     </div>
-                    {isExpanded && (catSelected ? (
-                      <div style={{
-                        padding: `${S[2]}px ${S[3]}px ${S[2]}px ${S[6]}px`,
-                        borderBottom: `1px solid ${C.divider}`,
-                        color: C.dim, fontSize: F.xs, fontStyle: 'italic',
-                      }}>
-                        All {cat.name} subcategories targeted (current and future).
-                      </div>
-                    ) : subs.map((sub) => {
-                      const subSelected = isTargeted('subcategory', sub.id);
+                    {isExpanded && subs.map((sub) => {
+                      const subIncluded = hasTarget('subcategory', sub.id, 'include');
+                      const subExcluded = catIncluded && hasTarget('subcategory', sub.id, 'exclude');
+                      // Visually: under a checked parent, sub is checked unless explicitly excluded.
+                      // Outside a checked parent, sub is checked only when explicitly included.
+                      const visualChecked = catIncluded ? !subExcluded : subIncluded;
                       return (
                         <div
                           key={sub.id}
@@ -466,24 +564,24 @@ function AdUnitTargetingInner() {
                             display: 'flex', alignItems: 'center', gap: S[2],
                             padding: `${S[1]}px ${S[3]}px ${S[1]}px ${S[6]}px`,
                             borderBottom: `1px solid ${C.divider}`,
-                            background: subSelected ? C.hover : C.bg,
+                            background: subExcluded ? 'var(--danger-bg, transparent)' : visualChecked ? C.hover : C.bg,
                           }}
                         >
                           <input
                             type="checkbox"
-                            checked={subSelected}
-                            onChange={() => toggleTarget('subcategory', sub.id)}
+                            checked={visualChecked}
+                            onChange={() => toggleSubcategoryTarget(sub)}
                             style={{ width: 13, height: 13, cursor: 'pointer', flexShrink: 0 }}
                           />
                           <span
-                            style={{ fontSize: F.sm, color: C.soft, cursor: 'pointer' }}
-                            onClick={() => toggleTarget('subcategory', sub.id)}
+                            style={{ fontSize: F.sm, color: subExcluded ? C.danger : C.soft, cursor: 'pointer' }}
+                            onClick={() => toggleSubcategoryTarget(sub)}
                           >
-                            {sub.name}
+                            {sub.name}{subExcluded ? ' · excluded' : ''}
                           </span>
                         </div>
                       );
-                    }))}
+                    })}
                   </div>
                 );
               })}
@@ -492,7 +590,7 @@ function AdUnitTargetingInner() {
         </div>
 
         {/* Specific articles */}
-        <div>
+        <div style={{ marginBottom: S[4] }}>
           <Lbl label="Specific articles (optional)">
             {articleTargets.length > 0 && (
               <div style={{ marginTop: S[1], display: 'flex', flexDirection: 'column', gap: S[1] }}>
@@ -560,8 +658,44 @@ function AdUnitTargetingInner() {
           </Lbl>
         </div>
 
+        {/* Reach estimator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: S[3], paddingTop: S[2], borderTop: `1px solid ${C.divider}` }}>
+          <Button variant="ghost" loading={reachLoading} onClick={checkReach}>Check reach</Button>
+          {reach && (
+            <span style={{ fontSize: F.sm, color: C.dim }}>
+              Eligible on <strong style={{ color: C.ink }}>{reach.eligible}</strong> of {reach.total} articles published in the last {reach.days} days.
+              {reach.eligible === 0 && reach.total > 0 && (
+                <span style={{ color: C.danger, marginLeft: S[2] }}> No matches — this ad won&apos;t serve.</span>
+              )}
+            </span>
+          )}
+        </div>
+
       </PageSection>
     </Page>
+  );
+}
+
+// Native checkbox can't render an indeterminate state through the
+// `checked` prop alone — it has to be set on the DOM element after
+// mount. The ref callback fires on every commit (including Strict
+// Mode's second render), so the DOM stays in sync with state.
+function TriStateCheckbox({
+  checked, indeterminate, onChange, style,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  onChange: () => void;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <input
+      type="checkbox"
+      checked={checked}
+      ref={(el) => { if (el) el.indeterminate = indeterminate; }}
+      onChange={onChange}
+      style={style}
+    />
   );
 }
 

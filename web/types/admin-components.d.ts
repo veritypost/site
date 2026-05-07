@@ -60,7 +60,7 @@ declare module '@/components/admin/Button' {
 
 declare module '@/components/admin/TextInput' {
   export interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'type'> {
-    type?: 'text' | 'email' | 'url' | 'search' | 'password' | 'tel';
+    type?: 'text' | 'email' | 'url' | 'search' | 'password' | 'tel' | 'date' | 'datetime-local';
     error?: boolean;
     size?: 'sm' | 'md';
     leftAddon?: React.ReactNode;
