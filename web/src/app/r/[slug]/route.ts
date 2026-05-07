@@ -33,7 +33,7 @@ export const runtime = 'nodejs';
 
 // Accepts usernames (3-20 chars, a-z0-9 with underscores) and the legacy
 // 8-12 char alphanumeric random codes. Both patterns fit within this range.
-const SLUG_RE = /^[a-z0-9_]{3,20}$/;
+const SLUG_RE = /^[a-z0-9_-]{3,24}$/;
 
 function redirectToSignup(siteUrl: string): NextResponse {
   // 302 (not 307) — no body, no cookies on miss path.

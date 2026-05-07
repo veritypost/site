@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, withDestructiveAction, recordAdminAction } from '@/lib/adminMutation';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { generateWordCode } from '@/lib/wordCode';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -43,8 +44,8 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => ({}))) as Body;
 
-  const rawCode = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
-  const code = rawCode || ('VP' + Math.random().toString(36).substring(2, 8).toUpperCase());
+  const rawCode = typeof body.code === 'string' ? body.code.trim().toLowerCase() : '';
+  const code = rawCode || generateWordCode();
 
   const maxUses = body.max_uses === undefined || body.max_uses === null
     ? null
