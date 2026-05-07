@@ -447,7 +447,7 @@ export function BackgroundCard() {
   return (
     <Card
       title="Background"
-      description="A short line says who’s writing when you comment. Share anything else that fits — every field is optional and you can skip whatever you want."
+      description="A short line saying who’s writing is the only required bit. Everything else is optional — share whatever fits, skip whatever doesn’t."
       footer={
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {onelineMissing && (

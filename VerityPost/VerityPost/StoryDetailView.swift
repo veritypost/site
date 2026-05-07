@@ -2394,14 +2394,16 @@ struct StoryDetailView: View {
         let canAdd = isOwnComment && !comment.isDeleted && followups.count < 3
         if !followups.isEmpty || isOpen || canAdd {
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(followups) { f in
+                ForEach(Array(followups.enumerated()), id: \.element.id) { idx, f in
                     HStack(alignment: .top, spacing: 12) {
                         Rectangle()
                             .fill(VP.warn.opacity(0.9))
                             .frame(width: 14, height: 1)
                             .padding(.top, 7)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Update, \(relativeUpdateLabel(for: f.createdAt))")
+                            Text(followups.count > 1
+                                ? "Update \(idx + 1) of \(followups.count), \(relativeUpdateLabel(for: f.createdAt))"
+                                : "Update, \(relativeUpdateLabel(for: f.createdAt))")
                                 .font(.system(.footnote, design: .serif).italic())
                                 .foregroundColor(VP.warn)
                             Text(f.body)

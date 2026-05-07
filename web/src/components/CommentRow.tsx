@@ -789,7 +789,7 @@ export default function CommentRow({
                 gap: 14,
               }}
             >
-              {followups.map((f) => {
+              {followups.map((f, idx) => {
                 const ageMs = Date.now() - new Date(f.created_at).getTime();
                 const rel =
                   ageMs < 30_000
@@ -834,7 +834,7 @@ export default function CommentRow({
                           marginBottom: 4,
                         }}
                       >
-                        Update,{' '}
+                        Update{followups.length > 1 ? ` ${idx + 1} of ${followups.length}` : ''},{' '}
                         <span style={{ opacity: 0.78 }}>{rel}</span>
                       </div>
                       <div

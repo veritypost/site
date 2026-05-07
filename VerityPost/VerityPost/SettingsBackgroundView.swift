@@ -179,7 +179,7 @@ struct SettingsBackgroundView: View {
             Text("Who’s writing?")
                 .font(.system(.title3, design: .serif).weight(.semibold))
                 .foregroundColor(VP.text)
-            Text("A short line says who you are when you comment. Share anything else that fits — every field is optional and you can skip whatever you want.")
+            Text("A short line saying who you are is the only required bit. Everything else is optional — share whatever fits, skip whatever doesn’t.")
                 .font(.footnote)
                 .foregroundColor(VP.dim)
         }
