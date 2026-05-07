@@ -79,7 +79,7 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
     e.preventDefault();
     const slug = inviteCode.trim().toLowerCase();
     if (!slug) return;
-    router.push(`/r/${slug}`);
+    window.location.href = `/r/${slug}`;
   };
 
   const submitEmail = async (e: FormEvent) => {
