@@ -344,6 +344,11 @@ export default async function ArticleSlugPage({
                 currentUserId={user?.id ?? null}
               />
             )}
+            {/* Sources block — moved out of the timeline rail per TODO-3.
+                Lives inside the article body so readers see provenance in
+                the same scroll, not in a side rail they often miss.
+                Logo-driven rows with click-to-expand headlines. */}
+            <SourcesSection sources={!isAnon ? sources : []} showTease={false} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
             {/* End-of-body quiz teaser. Renders only for non-COPPA published
                 articles that have a quiz the viewer hasn't passed yet. On
                 mobile the engagement zone lives behind a tab, so this gives
@@ -360,8 +365,9 @@ export default async function ArticleSlugPage({
         timelineSlot={
           <>
             <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} showTease={false} articleCountReached={anonReadCount >= WALL_THRESHOLD} currentArticleId={article.id} />
-            <SourcesSection sources={!isAnon ? sources : []} showTease={false} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
-            {/* article_rail: sticky right-rail ad on desktop (non-COPPA articles only) */}
+            {/* article_rail: ad slot — was sticky right-rail on desktop;
+                with the rail dropped (TODO-38) it now flows below the
+                timeline on desktop and inside the Timeline tab on mobile. */}
             {!isCoppa && <Ad placement="article_rail" page="article" position="rail" articleId={article.id} />}
           </>
         }

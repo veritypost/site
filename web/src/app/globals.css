@@ -544,30 +544,28 @@ body {
    a hydration text-content mismatch on the static template literal
    (T222 precedent). Selectors are scoped to [data-reader-*] which
    only appears inside that component. */
+/* Desktop reader layout — single column. The 75/25 split + sticky
+   right rail was killed (TODO-38) because the article body capped at
+   680px inside a 75% column left a wide page off-center. Sources moved
+   inline into the body (TODO-3); the timeline now flows below the
+   article instead of a side rail. Mobile tab UI is preserved below. */
 [data-reader-tabstrip] { display: none; }
 [data-reader-body] {
-  display: flex;
-  align-items: flex-start;
-  gap: 40px;
-  max-width: 1280px;
+  display: block;
+  max-width: 760px;
   margin: 0 auto;
   padding: 0 40px;
 }
-[data-reader-main] { flex: 75; min-width: 0; }
+[data-reader-main] { display: block; min-width: 0; }
 [data-reader-engagement] {
-  max-width: 1280px;
+  max-width: 760px;
   margin: 0 auto;
   padding: 0 40px;
 }
 [data-reader-panel="timeline"] {
-  flex: 25;
-  min-width: 0;
-  align-self: flex-start;
-  position: sticky;
-  top: 80px;
-  max-height: calc(100vh - 100px);
-  overflow-y: auto;
-  padding: 32px 0;
+  display: block;
+  margin-top: 40px;
+  padding: 0;
 }
 [data-reader-panel="timeline"] > section:first-child { margin-top: 0; }
 
