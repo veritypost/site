@@ -6,6 +6,13 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-07 (continued)
 
+### Ad-unit performance panel
+**Files:** `web/src/app/admin/ad-units/[id]/page.tsx`, new `web/src/app/api/admin/ad-units/[id]/performance/route.js`. Commit: `b4da9f6e`. **DB:** `ad_unit_performance` RPC via `mcp__supabase__apply_migration`.
+- Closes the asymmetry the targeting work created — operators could configure deeply but never see what happened. Performance is now the first section on `/admin/ad-units/<id>`.
+- New `ad_unit_performance(p_unit_id uuid, p_days int)` RPC aggregates `ad_impressions` directly (`is_clicked` + `revenue_cents` are on the row — no join with `ad_clicks` needed). Excludes `is_bot=true` rows. Returns impressions / clicks / CTR / revenue, per-category breakdown, and a per-day series. Admin-only.
+- New GET `/api/admin/ad-units/[id]/performance?days=N` (admin.ads.view, 60/min limit, days clamped 1–365 default 30).
+- UI: 7 / 30 / 90 day selector in the section header, four headline tiles, top-8 category table with per-category CTR, daily impressions sparkline. Auto-loads on mount and on period change with race-cancel; empty-state copy when there are no impressions yet.
+
 ### TODO 11 cleanup — drop dead targeting jsonb columns
 **Files:** `web/src/types/database.ts`, `web/src/app/api/admin/ad-units/[id]/route.js`. Commit: `7dc30203`. **DB migration:** `drop_dead_targeting_columns_on_ad_units` via `mcp__supabase__apply_migration`.
 - Dropped five jsonb columns from `ad_units` that had been read-and-write dead since the unified `ad_targets` ship in `fcf52c70`: `targeting_categories`, `targeting_subcategories`, `targeting_platforms`, `targeting_countries`, `targeting_cohorts`. Verified zero references across `web/src`, `VerityPost`, `VerityPostKids` before dropping.
