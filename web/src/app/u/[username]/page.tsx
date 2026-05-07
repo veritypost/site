@@ -780,7 +780,7 @@ export default function ProfilePage() {
             }}
           >
             <a
-              href="/profile/settings#background"
+              href="/profile/settings?section=background"
               style={{ color: 'var(--p-accent, #0b5cff)', textDecoration: 'none' }}
             >
               Add a background line to your profile →
@@ -878,9 +878,31 @@ export default function ProfilePage() {
                     letterSpacing: '0.05em',
                     textTransform: 'uppercase',
                     color: 'var(--p-ink-faint, #a1a1aa)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
                   }}
                 >
                   Knows well
+                  <span
+                    title="Topics this person says they know well — self-described, helps readers spot relevant expertise."
+                    aria-label="Topics this person says they know well — self-described, helps readers spot relevant expertise."
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 13,
+                      height: 13,
+                      borderRadius: '50%',
+                      border: '1px solid var(--p-border, #e4e4e7)',
+                      fontSize: 9,
+                      fontWeight: 700,
+                      color: 'var(--p-ink-faint, #a1a1aa)',
+                      cursor: 'help',
+                    }}
+                  >
+                    ?
+                  </span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {bgTopics.map((t) => (

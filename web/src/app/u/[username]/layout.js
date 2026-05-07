@@ -17,7 +17,7 @@ export async function generateMetadata({ params }) {
   // falls into the !target branch below for the noindex metadata.
   const { data: target } = await supabase
     .from('public_profiles_v')
-    .select('username, display_name, bio, profile_visibility')
+    .select('username, display_name, bio, profile_visibility, background_oneline')
     .eq('username', username)
     .maybeSingle();
 
@@ -39,10 +39,19 @@ export async function generateMetadata({ params }) {
 
   const base = getSiteUrl();
   const name = target.display_name || target.username;
-  const title = `${name} on Verity Post`;
+  // Title gets the byline appended when set so search/social previews lead
+  // with who's writing — "Sarah K. — civil engineer, 30 yrs · Verity Post".
+  const oneline = target.background_oneline?.trim();
+  const title = oneline
+    ? `${name} — ${oneline} · Verity Post`
+    : `${name} on Verity Post`;
+  // Description prefers the byline + bio; falls back to byline-only, then
+  // bio-only, then a generic blurb.
+  const descParts = [oneline, target.bio?.slice(0, 160)].filter(Boolean);
   const description =
-    target.bio?.slice(0, 160) ||
-    `View ${target.username}'s Verity Post profile — quiz-gated news discussion.`;
+    descParts.length > 0
+      ? descParts.join(' — ').slice(0, 200)
+      : `View ${target.username}'s Verity Post profile — quiz-gated news discussion.`;
   const path = `/u/${username}`;
   const ogImage = { url: `${base}/card/${username}/opengraph-image`, alt: `${name} profile card` };
 
