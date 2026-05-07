@@ -50,6 +50,10 @@ function PlacementsInner() {
   const [authorized, setAuthorized] = useState(false);
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [units, setUnits] = useState<AdUnit[]>([]);
+  // Per-placement utilization counts (active + approved). Loaded once
+  // alongside placements so the list can show "0 units" / "3 units"
+  // at-a-glance without expanding every placement.
+  const [unitCounts, setUnitCounts] = useState<Record<string, number>>({});
   const [selected, setSelected] = useState<Placement | null>(null);
   const [placementEditing, setPlacementEditing] = useState<'new' | Placement | null>(null);
   const [placementForm, setPlacementForm] = useState<PlacementForm>({});
@@ -76,10 +80,23 @@ function PlacementsInner() {
   }, []);
 
   async function loadPlacements() {
-    const res = await fetch('/api/admin/ad-placements');
-    const d = await res.json().catch(() => ({}));
-    if (res.ok) setPlacements(d.placements || []);
-    else push({ message: d?.error || 'Failed to load placements', variant: 'danger' });
+    const [pRes, uRes] = await Promise.all([
+      fetch('/api/admin/ad-placements'),
+      fetch('/api/admin/ad-units'),
+    ]);
+    const pd = await pRes.json().catch(() => ({}));
+    if (pRes.ok) setPlacements(pd.placements || []);
+    else push({ message: pd?.error || 'Failed to load placements', variant: 'danger' });
+    const ud = await uRes.json().catch(() => ({}));
+    if (uRes.ok) {
+      const counts: Record<string, number> = {};
+      for (const u of (ud.units || []) as AdUnit[]) {
+        if (u.is_active && u.approval_status === 'approved' && u.placement_id) {
+          counts[u.placement_id] = (counts[u.placement_id] || 0) + 1;
+        }
+      }
+      setUnitCounts(counts);
+    }
   }
   async function loadUnits(placementId: string) {
     const res = await fetch(`/api/admin/ad-units?placement_id=${placementId}`);
@@ -187,6 +204,7 @@ function PlacementsInner() {
       push({ message: isNew ? 'Ad unit created' : 'Ad unit updated', variant: 'success' });
       setUnitEditing(null);
       if (selected) await loadUnits(selected.id);
+      await loadPlacements();
     } catch (err) {
       const msg = (err as Error)?.message || 'Save failed';
       setError(msg);
@@ -211,6 +229,7 @@ function PlacementsInner() {
         if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d?.error || 'Delete failed'); }
         push({ message: 'Ad unit deleted', variant: 'success' });
         if (selected) await loadUnits(selected.id);
+        await loadPlacements();
       },
     });
   };
@@ -264,6 +283,7 @@ function PlacementsInner() {
               )}
               {placements.map((p) => {
                 const isSel = selected?.id === p.id;
+                const count = unitCounts[p.id] || 0;
                 return (
                   <button
                     key={p.id}
@@ -273,12 +293,18 @@ function PlacementsInner() {
                       border: `1px solid ${isSel ? C.accent : C.divider}`,
                       background: isSel ? C.hover : C.bg,
                       cursor: 'pointer', font: 'inherit', color: C.ink, width: '100%',
+                      display: 'flex', alignItems: 'center', gap: S[2],
                     }}
                   >
-                    <div style={{ fontSize: F.base, fontWeight: 600 }}>{p.display_name || p.name}</div>
-                    <div style={{ fontSize: F.xs, color: C.dim }}>
-                      {p.page} · {p.position} · {p.placement_type}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: F.base, fontWeight: 600 }}>{p.display_name || p.name}</div>
+                      <div style={{ fontSize: F.xs, color: C.dim }}>
+                        {p.page} · {p.position} · {p.placement_type}
+                      </div>
                     </div>
+                    <Badge size="xs" variant={count === 0 ? 'warn' : 'success'}>
+                      {count} {count === 1 ? 'ad' : 'ads'}
+                    </Badge>
                   </button>
                 );
               })}
@@ -325,6 +351,26 @@ function PlacementsInner() {
                         padding: `${S[2]}px ${S[3]}px`, borderRadius: 8,
                         border: `1px solid ${C.divider}`, background: C.bg,
                       }}>
+                        {u.creative_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={u.creative_url}
+                            alt=""
+                            style={{
+                              width: 48, height: 32, objectFit: 'cover',
+                              borderRadius: 4, border: `1px solid ${C.divider}`,
+                              background: C.hover, flexShrink: 0,
+                            }}
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+                          />
+                        ) : (
+                          <div style={{
+                            width: 48, height: 32, borderRadius: 4,
+                            border: `1px dashed ${C.divider}`, background: C.bg,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: F.xs, color: C.dim, flexShrink: 0,
+                          }}>HTML</div>
+                        )}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: F.base, fontWeight: 600 }}>{u.name}</div>
                           <div style={{ fontSize: F.xs, color: C.dim }}>
