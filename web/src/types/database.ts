@@ -858,6 +858,7 @@ export type Database = {
           creative_url: string | null
           cta_text: string | null
           daily_budget_cents: number | null
+          daily_impression_cap: number | null
           end_date: string | null
           frequency_cap_per_session: number | null
           frequency_cap_per_user: number | null
@@ -890,6 +891,7 @@ export type Database = {
           creative_url?: string | null
           cta_text?: string | null
           daily_budget_cents?: number | null
+          daily_impression_cap?: number | null
           end_date?: string | null
           frequency_cap_per_session?: number | null
           frequency_cap_per_user?: number | null
@@ -922,6 +924,7 @@ export type Database = {
           creative_url?: string | null
           cta_text?: string | null
           daily_budget_cents?: number | null
+          daily_impression_cap?: number | null
           end_date?: string | null
           frequency_cap_per_session?: number | null
           frequency_cap_per_user?: number | null
@@ -13126,6 +13129,10 @@ export type Database = {
       _user_tier_or_anon: { Args: { p_user_id: string }; Returns: string }
       ack_email_batch: { Args: { p_rows: Json }; Returns: undefined }
       ack_push_batch: { Args: { p_rows: Json }; Returns: undefined }
+      ad_unit_performance: {
+        Args: { p_days?: number; p_unit_id: string }
+        Returns: Json
+      }
       admin_apply_dob_correction: {
         Args: {
           p_decision: string

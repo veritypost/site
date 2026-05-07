@@ -360,6 +360,8 @@ function AdUnitTargetingInner() {
         frequency_cap_per_user: form.frequency_cap_per_user ?? null,
         frequency_cap_per_session: form.frequency_cap_per_session ?? null,
         weight: form.weight ?? 100,
+        // Treat 0 as "no cap" — same convention the form uses for the freq caps
+        daily_impression_cap: form.daily_impression_cap && form.daily_impression_cap > 0 ? form.daily_impression_cap : null,
         approval_status: form.approval_status,
         is_active: form.is_active,
         start_date: form.start_date || null,
@@ -541,6 +543,12 @@ function AdUnitTargetingInner() {
             <NumberInput
               value={form.frequency_cap_per_session ?? 0}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, frequency_cap_per_session: Number(e.target.value) || 0 })}
+            />
+          </Lbl>
+          <Lbl label="Daily cap (impressions, 0 = none)">
+            <NumberInput
+              value={form.daily_impression_cap ?? 0}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, daily_impression_cap: Number(e.target.value) || 0 })}
             />
           </Lbl>
           <Lbl label="Weight">

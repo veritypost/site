@@ -28,6 +28,7 @@ const ALLOWED = [
   'targeting_plans',
   'frequency_cap_per_user',
   'frequency_cap_per_session',
+  'daily_impression_cap',
   'start_date',
   'end_date',
   'weight',
