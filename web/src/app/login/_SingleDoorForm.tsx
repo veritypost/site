@@ -41,6 +41,9 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
   const [sentEmail, setSentEmail] = useState('');
   const [emailFocused, setEmailFocused] = useState(false);
   const [codeFocused, setCodeFocused] = useState(false);
+  const [showInviteEntry, setShowInviteEntry] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteCodeFocused, setInviteCodeFocused] = useState(false);
   // Resend cooldown (30 s)
   const [resendCooldown, setResendCooldown] = useState(0);
   const resendTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -71,6 +74,13 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
       });
     }, 1000);
   }
+
+  const submitInviteCode = (e: FormEvent) => {
+    e.preventDefault();
+    const slug = inviteCode.trim().toLowerCase();
+    if (!slug) return;
+    router.push(`/r/${slug}`);
+  };
 
   const submitEmail = async (e: FormEvent) => {
     e.preventDefault();
@@ -291,12 +301,67 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
           <a href="/privacy" style={{ color: C.accent, fontWeight: 600 }}>Privacy Policy</a>.
         </p>
 
-        <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 20, marginBottom: 8 }}>
-          Don't have an account?{' '}
-          <a href="/request-access" style={{ color: C.accent, fontWeight: 600 }}>
-            Request access →
-          </a>
+        <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 20, marginBottom: showInviteEntry ? 12 : 8 }}>
+          Have an invite code?{' '}
+          <button
+            type="button"
+            onClick={() => setShowInviteEntry((v) => !v)}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              color: C.accent,
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            {showInviteEntry ? 'Cancel' : 'Enter it →'}
+          </button>
         </p>
+
+        {showInviteEntry && (
+          <form onSubmit={submitInviteCode} style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="text"
+                aria-label="Invite code"
+                placeholder="Invite code"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value.replace(/\s/g, ''))}
+                onFocus={() => setInviteCodeFocused(true)}
+                onBlur={() => setInviteCodeFocused(false)}
+                autoCapitalize="none"
+                spellCheck={false}
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus
+                style={{ ...fieldStyle(inviteCodeFocused), flex: 1 }}
+              />
+              <button
+                type="submit"
+                disabled={!inviteCode.trim()}
+                style={{
+                  ...btnPrimary(!!inviteCode.trim()),
+                  width: 'auto',
+                  padding: '13px 18px',
+                  flexShrink: 0,
+                }}
+              >
+                Go
+              </button>
+            </div>
+          </form>
+        )}
+
+        {!showInviteEntry && (
+          <p style={{ fontSize: 13, color: C.dim, textAlign: 'center', marginTop: 0, marginBottom: 8 }}>
+            No invite?{' '}
+            <a href="/request-access" style={{ color: C.accent, fontWeight: 600 }}>
+              Request access →
+            </a>
+          </p>
+        )}
 
         {OAUTH_ENABLED && (
           <div style={{ marginTop: 20, borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>

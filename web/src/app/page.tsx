@@ -447,6 +447,19 @@ export default async function HomePage({
           />
         )}
 
+        {/* Second-tier 2-up row — gives the eye a visual carrot for
+            "what to read next" right after the hero, instead of dropping
+            straight into a vertical list. Only renders when there are at
+            least 2 supporting stories to fill it. Collapses to a single
+            column on narrow viewports. */}
+        {!fetchFailed && supporting.length >= 2 && (
+          <TwoUpRow
+            stories={supporting.slice(0, 2)}
+            categoryById={categoryById}
+            isNewStory={isNewStory}
+          />
+        )}
+
         {/* home_top — after hero so editorial content leads; "Advertisement" label required per DECISION #050 */}
         <div style={{ textAlign: 'center', marginBottom: 8, marginTop: 24 }}>
           <div style={{ fontSize: 10, color: 'var(--dim, #5a5a5a)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
@@ -455,9 +468,9 @@ export default async function HomePage({
           <Ad placement="home_top" page="home" position="top" />
         </div>
 
-        {!fetchFailed && supporting.length > 0 && (
+        {!fetchFailed && supporting.length > 2 && (
           <section aria-label="Supporting stories" style={{ marginTop: 56 }}>
-            {supporting.map((story, idx) => (
+            {supporting.slice(2).map((story, idx) => (
               <Fragment key={story.id}>
                 {idx > 0 && <div role="presentation" aria-hidden="true" style={hairlineStyle} />}
                 {/* home_in_feed_1: between cards 4 and 5 (idx 3→4 boundary) */}
@@ -617,7 +630,7 @@ function Hero({
               background: bg,
               marginLeft: -20,
               marginRight: -20,
-              padding: '48px 20px 40px',
+              padding: 'clamp(28px, 6vw, 48px) clamp(20px, 4vw, 24px) clamp(24px, 5vw, 40px)',
             }}
           >
             <div style={{ maxWidth: 680, margin: '0 auto' }}>
@@ -673,9 +686,9 @@ function Hero({
               <h2
                 style={{
                   fontFamily: serifStack,
-                  fontSize: 'clamp(28px, 5.5vw, 40px)',
+                  fontSize: 'clamp(24px, 5vw, 40px)',
                   fontWeight: 700,
-                  lineHeight: 1.1,
+                  lineHeight: 1.15,
                   letterSpacing: '-0.02em',
                   margin: 0,
                   color: heroTitleColor,
@@ -687,11 +700,15 @@ function Hero({
                 <p
                   style={{
                     fontFamily: serifStack,
-                    fontSize: 19,
+                    fontSize: 'clamp(15px, 3.4vw, 19px)',
                     lineHeight: 1.45,
                     color: 'var(--hero-excerpt, rgba(255,255,255,0.80))',
-                    margin: '16px 0 0',
+                    margin: '12px 0 0',
                     fontWeight: 400,
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 4,
+                    WebkitBoxOrient: 'vertical',
                   }}
                 >
                   {story.excerpt}
@@ -720,7 +737,7 @@ function Hero({
               background: bg,
               marginLeft: -20,
               marginRight: -20,
-              padding: '48px 20px 40px',
+              padding: 'clamp(28px, 6vw, 48px) clamp(20px, 4vw, 24px) clamp(24px, 5vw, 40px)',
             }}
           >
             <div style={{ maxWidth: 680, margin: '0 auto' }}>
@@ -776,9 +793,9 @@ function Hero({
               <h2
                 style={{
                   fontFamily: serifStack,
-                  fontSize: 'clamp(28px, 5.5vw, 40px)',
+                  fontSize: 'clamp(24px, 5vw, 40px)',
                   fontWeight: 700,
-                  lineHeight: 1.1,
+                  lineHeight: 1.15,
                   letterSpacing: '-0.02em',
                   margin: 0,
                   color: heroTitleColor,
@@ -790,11 +807,15 @@ function Hero({
                 <p
                   style={{
                     fontFamily: serifStack,
-                    fontSize: 19,
+                    fontSize: 'clamp(15px, 3.4vw, 19px)',
                     lineHeight: 1.45,
                     color: 'var(--hero-excerpt, rgba(255,255,255,0.80))',
-                    margin: '16px 0 0',
+                    margin: '12px 0 0',
                     fontWeight: 400,
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 4,
+                    WebkitBoxOrient: 'vertical',
                   }}
                 >
                   {story.excerpt}
@@ -813,6 +834,158 @@ function Hero({
               </p>
             </div>
           </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
+// Second-tier row directly under the hero. Two stories, side-by-side on
+// desktop, stacked on narrow viewports. Vertical hairline divider
+// between cards mirrors the horizontal hairlines used further down so
+// the page rhythm stays consistent. Uses pure CSS for the responsive
+// collapse — server-rendered, no client island.
+function TwoUpRow({
+  stories,
+  categoryById,
+  isNewStory,
+}: {
+  stories: HomeStory[];
+  categoryById: Record<string, CategoryRow>;
+  isNewStory: (story: HomeStory) => boolean;
+}) {
+  if (stories.length < 2) return null;
+  return (
+    <section
+      aria-label="Featured stories"
+      style={{
+        marginTop: 32,
+        paddingTop: 28,
+        borderTop: `1px solid ${C.rule}`,
+      }}
+    >
+      <div className="vp-twoup-grid">
+        {stories.slice(0, 2).map((story, idx) => (
+          <div
+            key={story.id}
+            className={idx === 0 ? 'vp-twoup-cell vp-twoup-cell--first' : 'vp-twoup-cell'}
+          >
+            <TwoUpCard
+              story={story}
+              category={story.category_id ? categoryById[story.category_id] : undefined}
+              isNew={isNewStory(story)}
+            />
+          </div>
+        ))}
+      </div>
+      <style>{`
+        .vp-twoup-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0;
+        }
+        .vp-twoup-cell {
+          padding: 0 0 0 28px;
+          border-left: 1px solid ${C.rule};
+        }
+        .vp-twoup-cell--first {
+          padding: 0 28px 0 0;
+          border-left: 0;
+        }
+        @media (max-width: 640px) {
+          .vp-twoup-grid {
+            grid-template-columns: 1fr;
+            gap: 24px;
+          }
+          .vp-twoup-cell,
+          .vp-twoup-cell--first {
+            padding: 0;
+            border-left: 0;
+          }
+          .vp-twoup-cell + .vp-twoup-cell {
+            padding-top: 24px;
+            border-top: 1px solid ${C.rule};
+          }
+        }
+      `}</style>
+    </section>
+  );
+}
+
+function TwoUpCard({
+  story,
+  category,
+  isNew,
+}: {
+  story: HomeStory;
+  category: CategoryRow | undefined;
+  isNew: boolean;
+}) {
+  const inner = (
+    <>
+      <div
+        style={{
+          marginBottom: 8,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+        }}
+      >
+        {story.stories?.lifecycle_status && (
+          <LifecyclePill status={story.stories.lifecycle_status} />
+        )}
+        <Eyebrow category={category} />
+        {isNew && <NewPill />}
+      </div>
+      <h3
+        style={{
+          fontFamily: serifStack,
+          fontSize: 20,
+          fontWeight: 700,
+          lineHeight: 1.2,
+          letterSpacing: '-0.01em',
+          margin: 0,
+          color: C.text,
+        }}
+      >
+        {story.title}
+      </h3>
+      {story.excerpt && (
+        <p
+          style={{
+            fontFamily: serifStack,
+            fontSize: 14,
+            lineHeight: 1.5,
+            color: C.soft,
+            margin: '8px 0 0',
+            fontWeight: 400,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            maxHeight: '3.15em',
+          }}
+        >
+          {story.excerpt}
+        </p>
+      )}
+      <MetaLine story={story} />
+    </>
+  );
+  return (
+    <article>
+      {story.stories?.slug ? (
+        <Link
+          href={`/${story.stories.slug}`}
+          aria-label={story.title}
+          style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+        >
+          {inner}
+        </Link>
+      ) : (
+        <div style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+          {inner}
         </div>
       )}
     </article>

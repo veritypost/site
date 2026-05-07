@@ -17,7 +17,7 @@ const STEPS = [
   {
     n: '2',
     label: 'we take a look',
-    sub: 'we usually respond within a day or two.',
+    sub: 'we’ll email you when you’re in.',
   },
   {
     n: '3',

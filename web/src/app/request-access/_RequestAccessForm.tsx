@@ -89,7 +89,7 @@ export default function RequestAccessForm() {
           got it.
         </h1>
         <p style={{ fontSize: 14, color: C.dim, margin: '0 0 24px 0', lineHeight: 1.55 }}>
-          we&rsquo;ll take a look and email you when you&rsquo;re in. usually within a day or two.
+          we&rsquo;ll take a look and email you when you&rsquo;re in.
         </p>
         <a
           href="/login"

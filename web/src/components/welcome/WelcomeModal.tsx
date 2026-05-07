@@ -16,6 +16,7 @@ const C = {
 const USERNAME_RE = /^[a-z0-9_]+$/;
 
 type AvailState = 'idle' | 'checking' | 'available' | 'taken' | 'error';
+type Step = 'username' | 'share';
 
 interface Props {
   /** Path to redirect after username is saved. */
@@ -23,10 +24,13 @@ interface Props {
 }
 
 export default function WelcomeModal({ nextPath }: Props) {
+  const [step, setStep] = useState<Step>('username');
+  const [savedUsername, setSavedUsername] = useState('');
   const [username, setUsername] = useState('');
   const [avail, setAvail] = useState<AvailState>('idle');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const checkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -93,8 +97,8 @@ export default function WelcomeModal({ nextPath }: Props) {
         setSaveError(json.error || 'Could not save username. Try again.');
         return;
       }
-      // Success — navigate to destination.
-      window.location.href = nextPath || '/';
+      setSavedUsername(val);
+      setStep('share');
     } catch {
       setSaveError('Network issue. Try again.');
     } finally {
@@ -147,6 +151,91 @@ export default function WelcomeModal({ nextPath }: Props) {
     boxSizing: 'border-box',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   };
+
+  const inviteUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/r/${savedUsername}`
+    : `https://veritypost.com/r/${savedUsername}`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  };
+
+  if (step === 'share') {
+    return (
+      <div style={overlayStyle} role="dialog" aria-modal="true" aria-label="Invite a friend">
+        <div style={cardStyle}>
+          <div style={{ fontSize: '20px', fontWeight: 800, color: C.accent, letterSpacing: '-0.5px', marginBottom: '24px' }}>
+            verity post
+          </div>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, color: C.text, margin: '0 0 8px 0' }}>
+            invite someone.
+          </h1>
+          <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px 0', lineHeight: 1.55 }}>
+            this is your personal invite link. anyone who signs up through it gets in, and you'll see who joined.
+          </p>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '12px 14px',
+              background: C.bg,
+              border: `1.5px solid ${C.border}`,
+              borderRadius: 10,
+              marginBottom: 16,
+              fontFamily: 'ui-monospace, monospace',
+              fontSize: 13,
+              color: C.text,
+              wordBreak: 'break-all',
+            }}
+          >
+            <span style={{ flex: 1 }}>{inviteUrl}</span>
+            <button
+              type="button"
+              onClick={handleCopy}
+              style={{
+                flexShrink: 0,
+                background: 'none',
+                border: `1px solid ${C.border}`,
+                borderRadius: 6,
+                padding: '4px 10px',
+                fontSize: 12,
+                fontWeight: 600,
+                color: copied ? C.success : C.accent,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => { window.location.href = nextPath || '/'; }}
+            style={{
+              width: '100%',
+              padding: '13px',
+              fontSize: '15px',
+              fontWeight: 600,
+              color: '#fff',
+              backgroundColor: C.accent,
+              border: 'none',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              minHeight: '44px',
+            }}
+          >
+            Start reading →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={overlayStyle} role="dialog" aria-modal="true" aria-label="Pick a username">
