@@ -312,9 +312,22 @@ export default function AccessAdmin() {
       sortable: false,
       align: 'right' as const,
       render: (c: AccessCode) => (
-        <Button size="sm" variant="secondary" onClick={(e: React.MouseEvent) => { e.stopPropagation(); openEditExpiry(c); }}>
-          Edit expiry
-        </Button>
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              const url = `${window.location.origin}/r/${c.code}`;
+              navigator.clipboard.writeText(url).catch(() => {});
+            }}
+          >
+            Copy link
+          </Button>
+          <Button size="sm" variant="secondary" onClick={(e: React.MouseEvent) => { e.stopPropagation(); openEditExpiry(c); }}>
+            Edit expiry
+          </Button>
+        </div>
       ),
     },
   ];
@@ -457,7 +470,7 @@ export default function AccessAdmin() {
         open={showCreate}
         onClose={() => { setShowCreate(false); setForm(EMPTY_FORM); }}
         title="New access code"
-        description="Blank code auto-generates a VP-prefixed slug."
+        description="Leave code blank to auto-generate a word-pair (e.g. amber-tide)."
         width="md"
         footer={
           <>
@@ -481,8 +494,8 @@ export default function AccessAdmin() {
             <TextInput
               value={form.code}
               onChange={(e) => setForm({ ...form, code: e.target.value })}
-              placeholder="e.g. VP123ABC"
-              style={{ textTransform: 'uppercase', fontFamily: 'ui-monospace, monospace', fontWeight: 600 }}
+              placeholder="e.g. swift-fox"
+              style={{ fontFamily: 'ui-monospace, monospace', fontWeight: 600 }}
             />
           </Field>
         </div>
