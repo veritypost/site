@@ -25,7 +25,10 @@ const ALLOWED_FIELDS = new Set([
 export async function PATCH(request, { params }) {
   let actor;
   try {
-    actor = await requirePermission('admin.permissions.set.edit');
+    // TODO 7 — editing or deleting permission catalog rows is owner-only
+    // until tiered admin roles exist. Catalog edits can elevate other
+    // admins, so the gate has to match the strongest permission it touches.
+    actor = await requirePermission('admin.owner_mode');
   } catch (err) {
     if (err.status) {
       console.error('[admin.permissions.[id].permission]', err?.message || err);
@@ -94,7 +97,10 @@ export async function PATCH(request, { params }) {
 export async function DELETE(_request, { params }) {
   let actor;
   try {
-    actor = await requirePermission('admin.permissions.set.edit');
+    // TODO 7 — editing or deleting permission catalog rows is owner-only
+    // until tiered admin roles exist. Catalog edits can elevate other
+    // admins, so the gate has to match the strongest permission it touches.
+    actor = await requirePermission('admin.owner_mode');
   } catch (err) {
     if (err.status) {
       console.error('[admin.permissions.[id].permission]', err?.message || err);

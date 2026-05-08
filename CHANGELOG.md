@@ -6,6 +6,26 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### Security — TODO 7: lock permission-management surfaces to owner_mode
+**Files:** seven `route.js` files under `web/src/app/api/admin/permissions/`, `web/src/app/api/admin/permission-sets/`, and `web/src/app/api/admin/users/[id]/permissions/`. Closes the privilege-escalation path TODO 7 named.
+
+**The hole:** any admin holding `admin.permissions.scope_override` (or `admin.permissions.set.edit` / `admin.permissions.assign_to_user` / `admin.permissions.assign_to_plan` / `admin.permissions.assign_to_role`) could promote themselves — or anyone else — to `admin.owner_mode` through the existing admin UI. The granular permission keys were intended for delegated admin tiers but were strong enough to mint the highest tier.
+
+**Fix:** all 7 permission-management write endpoints now require `admin.owner_mode`:
+- `POST /api/admin/permissions` (catalog row create)
+- `PATCH/DELETE /api/admin/permissions/[id]` (catalog row edit/delete)
+- `POST/DELETE /api/admin/permissions/user-grants` (grant/revoke set to user)
+- `POST /api/admin/permission-sets` (create permission set)
+- `POST/DELETE /api/admin/permission-sets/members` (add/remove keys to set)
+- `POST /api/admin/permission-sets/plan-wiring` (wire set to plan)
+- `POST /api/admin/permission-sets/role-wiring` (wire set to role)
+- `PATCH/DELETE /api/admin/permission-sets/[id]` (edit/delete set)
+- `POST /api/admin/users/[id]/permissions` (per-user override + assign_set/remove_set — the exact route TODO 7 named)
+
+Owner is the only user with these keys today (verified via MCP), so the change is a no-op for current usage. It becomes a real guardrail the moment a non-owner admin is onboarded — they'll be unable to escalate themselves regardless of which lower-tier permission they hold. View / read endpoints (e.g. `admin.permissions.catalog.view`) untouched. UI buttons aren't hidden — clicking them by a non-owner just gets a clean 403 toast.
+
+**Future:** when tiered admin roles are introduced (e.g. a `superadmin` who can grant most things but not `owner_mode`), the gates can relax with a "you can't grant a permission you don't have yourself" check at the data layer.
+
 ### Pipeline — backward source hydration at generate-time
 **Files:** `web/src/app/api/admin/pipeline/generate/route.ts`. Closes the "older related coverage gets missed" gap that the 24h ingest window opens.
 

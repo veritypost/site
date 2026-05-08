@@ -12,7 +12,9 @@ import { recordAdminAction } from '@/lib/adminMutation';
 export async function POST(request) {
   let actor;
   try {
-    actor = await requirePermission('admin.permissions.assign_to_plan');
+    // TODO 7 — wiring permission sets to plans is owner-only until
+    // tiered admin roles exist.
+    actor = await requirePermission('admin.owner_mode');
   } catch (err) {
     if (err.status) {
       console.error('[admin.permission-sets.plan-wiring.permission]', err?.message || err);

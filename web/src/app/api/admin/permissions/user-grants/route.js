@@ -15,7 +15,11 @@ import { recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
 export async function POST(request) {
   let actor;
   try {
-    actor = await requirePermission('admin.permissions.assign_to_user');
+    // TODO 7 — granting/revoking permission sets is owner-only until tiered
+    // admin roles are introduced. Master-key bypass on `admin.owner_mode`
+    // means owner can still call this; non-owner admins (when they exist)
+    // cannot self-grant their way up.
+    actor = await requirePermission('admin.owner_mode');
   } catch (err) {
     if (err.status) {
       console.error('[admin.permissions.user-grants.permission]', err?.message || err);
@@ -83,7 +87,11 @@ export async function POST(request) {
 export async function DELETE(request) {
   let actor;
   try {
-    actor = await requirePermission('admin.permissions.assign_to_user');
+    // TODO 7 — granting/revoking permission sets is owner-only until tiered
+    // admin roles are introduced. Master-key bypass on `admin.owner_mode`
+    // means owner can still call this; non-owner admins (when they exist)
+    // cannot self-grant their way up.
+    actor = await requirePermission('admin.owner_mode');
   } catch (err) {
     if (err.status) {
       console.error('[admin.permissions.user-grants.permission]', err?.message || err);

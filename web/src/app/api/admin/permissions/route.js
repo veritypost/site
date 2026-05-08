@@ -16,7 +16,11 @@ import { KEY_SLUG_RE, KEY_SLUG_ERROR } from '@/lib/adminValidation';
 export async function POST(request) {
   let actor;
   try {
-    actor = await requirePermission('admin.permissions.set.edit');
+    // TODO 7 — editing the permission catalog is owner-only until tiered
+    // admin roles are introduced. Anyone able to edit the catalog can add
+    // owner_mode to a set that other admins already hold, so the catalog
+    // gate has to match the strongest permission it can mint.
+    actor = await requirePermission('admin.owner_mode');
   } catch (err) {
     if (err.status) {
       console.error('[admin.permissions.permission]', err?.message || err);

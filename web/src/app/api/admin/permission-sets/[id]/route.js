@@ -16,7 +16,8 @@ const ALLOWED_FIELDS = new Set(['display_name', 'description', 'is_active']);
 export async function PATCH(request, { params }) {
   let actor;
   try {
-    actor = await requirePermission('admin.permissions.set.edit');
+    // TODO 7 — owner-only until tiered admin roles exist.
+    actor = await requirePermission('admin.owner_mode');
   } catch (err) {
     if (err.status) {
       console.error('[admin.permission-sets.[id].permission]', err?.message || err);
@@ -74,7 +75,8 @@ export async function PATCH(request, { params }) {
 export async function DELETE(_request, { params }) {
   let actor;
   try {
-    actor = await requirePermission('admin.permissions.set.edit');
+    // TODO 7 — owner-only until tiered admin roles exist.
+    actor = await requirePermission('admin.owner_mode');
   } catch (err) {
     if (err.status) {
       console.error('[admin.permission-sets.[id].permission]', err?.message || err);

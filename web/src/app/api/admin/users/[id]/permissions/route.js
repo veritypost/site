@@ -74,7 +74,13 @@ export async function POST(request, { params }) {
   // Auth gate. requirePermission throws on unauthenticated or permission denied.
   let actor;
   try {
-    actor = await requirePermission('admin.permissions.scope_override');
+    // TODO 7 — per-user permission overrides are owner-only until tiered
+    // admin roles exist. Previously gated on `admin.permissions.scope_override`,
+    // which let any holder of that key escalate themselves (or another user)
+    // to `admin.owner_mode` via the `assign_set` action. Locking to owner_mode
+    // closes the privilege-escalation path until a non-owner admin tier is
+    // formally introduced with its own bounded grant authority.
+    actor = await requirePermission('admin.owner_mode');
   } catch (err) {
     if (err.status) {
       {

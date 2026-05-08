@@ -15,7 +15,10 @@ import { recordAdminAction } from '@/lib/adminMutation';
 export async function POST(request) {
   let actor;
   try {
-    actor = await requirePermission('admin.permissions.set.edit');
+    // TODO 7 — adding/removing keys to a permission set is owner-only
+    // until tiered admin roles exist (set membership can elevate other
+    // admins via existing held sets).
+    actor = await requirePermission('admin.owner_mode');
   } catch (err) {
     if (err.status) {
       console.error('[admin.permission-sets.members.permission]', err?.message || err);
@@ -72,7 +75,10 @@ export async function POST(request) {
 export async function DELETE(request) {
   let actor;
   try {
-    actor = await requirePermission('admin.permissions.set.edit');
+    // TODO 7 — adding/removing keys to a permission set is owner-only
+    // until tiered admin roles exist (set membership can elevate other
+    // admins via existing held sets).
+    actor = await requirePermission('admin.owner_mode');
   } catch (err) {
     if (err.status) {
       console.error('[admin.permission-sets.members.permission]', err?.message || err);

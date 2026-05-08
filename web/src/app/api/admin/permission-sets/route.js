@@ -14,7 +14,8 @@ import { KEY_SLUG_RE, KEY_SLUG_ERROR } from '@/lib/adminValidation';
 export async function POST(request) {
   let actor;
   try {
-    actor = await requirePermission('admin.permissions.set.edit');
+    // TODO 7 — owner-only until tiered admin roles exist.
+    actor = await requirePermission('admin.owner_mode');
   } catch (err) {
     if (err.status) {
       console.error('[admin.permission-sets.permission]', err?.message || err);
