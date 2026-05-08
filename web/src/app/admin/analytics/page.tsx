@@ -69,10 +69,13 @@ function AnalyticsInner() {
         .filter((n): n is string => typeof n === 'string');
       if (!profile || (!roleNames.includes('owner') && !roleNames.includes('admin'))) { router.push('/'); return; }
 
+      // Counts exclude soft-deleted rows so the dashboard reflects
+      // active state, not historical totals. reading_log has no
+      // deleted_at column, so it counts straight.
       const [userRes, storyRes, commentRes, readingRes] = await Promise.all([
-        supabase.from('users').select('id', { count: 'exact', head: true }),
-        supabase.from('articles').select('id', { count: 'exact', head: true }),
-        supabase.from('comments').select('id', { count: 'exact', head: true }),
+        supabase.from('users').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+        supabase.from('articles').select('id', { count: 'exact', head: true }).is('deleted_at', null),
+        supabase.from('comments').select('id', { count: 'exact', head: true }).is('deleted_at', null),
         supabase.from('reading_log').select('id', { count: 'exact', head: true }),
       ]);
       setTotalUsers(userRes.count || 0);
@@ -83,6 +86,7 @@ function AnalyticsInner() {
       const { data: storiesData } = await supabase
         .from('articles')
         .select('id, title, view_count, comment_count')
+        .is('deleted_at', null)
         .order('view_count', { ascending: false })
         .limit(10);
       setTopStories((storiesData || []) as ArticleRow[]);
