@@ -22,16 +22,19 @@ export default function ShareButton() {
     <button
       onClick={handleCopy}
       style={{
+        // Match BookmarkButton + the article-page button family (14/600/10r)
+        // since these two sit side-by-side in the ArticleActions row.
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,
-        fontSize: 13,
-        fontWeight: 500,
+        fontSize: 14,
+        fontWeight: 600,
+        letterSpacing: '-0.005em',
         color: copyFailed ? 'var(--danger, #dc2626)' : copied ? '#fff' : 'var(--text, #1a1a1a)',
         background: copyFailed ? 'transparent' : copied ? 'var(--accent)' : 'transparent',
         border: `1px solid ${copyFailed ? 'var(--danger, #dc2626)' : copied ? 'var(--accent)' : 'var(--border, #e5e5e5)'}`,
-        borderRadius: 8,
-        padding: '0 14px',
+        borderRadius: 10,
+        padding: '0 16px',
         minHeight: 44,
         cursor: 'pointer',
         transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',

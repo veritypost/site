@@ -11,7 +11,7 @@ interface ArticleActionsProps {
 export default function ArticleActions({ articleId, currentUserId }: ArticleActionsProps) {
   return (
     <div style={{ maxWidth: 680, margin: '16px auto 0', padding: '0 20px' }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <ShareButton />
         <BookmarkButton articleId={articleId} currentUserId={currentUserId} />
       </div>

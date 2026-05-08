@@ -48,16 +48,19 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
       <button
         onClick={openWall}
         style={{
+          // Aligned to the article-page button family (14/600/10r), same
+          // baseline as the Anon Banner Sign-up CTA.
           display: 'inline-flex',
           alignItems: 'center',
           gap: 6,
-          fontSize: 13,
-          fontWeight: 500,
+          fontSize: 14,
+          fontWeight: 600,
+          letterSpacing: '-0.005em',
           color: 'var(--text, #1a1a1a)',
           background: 'transparent',
           border: '1px solid var(--border, #e5e5e5)',
-          borderRadius: 8,
-          padding: '0 14px',
+          borderRadius: 10,
+          padding: '0 16px',
           minHeight: 44,
           cursor: 'pointer',
           WebkitTapHighlightColor: 'transparent',
@@ -103,16 +106,18 @@ export default function BookmarkButton({ articleId, currentUserId }: BookmarkBut
         onClick={handleBookmark}
         disabled={busy || bookmarked}
         style={{
+          // Aligned to the article-page button family (14/600/10r).
           display: 'inline-flex',
           alignItems: 'center',
           gap: 6,
-          fontSize: 13,
-          fontWeight: 500,
+          fontSize: 14,
+          fontWeight: 600,
+          letterSpacing: '-0.005em',
           color: bookmarked ? 'var(--bg, #fff)' : 'var(--text, #1a1a1a)',
           background: bookmarked ? 'var(--accent, #111)' : 'transparent',
           border: `1px solid ${bookmarked ? 'var(--accent, #111)' : 'var(--border, #e5e5e5)'}`,
-          borderRadius: 8,
-          padding: '0 14px',
+          borderRadius: 10,
+          padding: '0 16px',
           minHeight: 44,
           cursor: busy || bookmarked ? 'default' : 'pointer',
           transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',
