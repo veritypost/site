@@ -304,12 +304,12 @@ export function ProfileApp({ defaultSection }: Props) {
       ),
     },
     {
-      id: 'bookmarks',
+      id: 'following',
       glyph: '◧',
       group: 'Library',
-      title: 'Saved',
-      reason: "Articles you've saved to read.",
-      keywords: ['saved', 'reading list', 'bookmarks', 'library', 'following'],
+      title: 'Following',
+      reason: 'Stories you follow. New articles get a dot.',
+      keywords: ['following', 'follow', 'stories', 'subscriptions', 'saved', 'bookmarks'],
       render: () => <BookmarksSection preview={false} />,
     },
     {

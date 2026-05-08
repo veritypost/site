@@ -105,18 +105,30 @@ function CategoryPageInner() {
           setCurrentUser(authUser);
 
           if (authUser && articles.length > 0) {
-            const ids = articles.map((a) => a.id).slice(0, 100);
-            const { data: bms, error: bmsErr } = await supabase
-              .from('bookmarks')
-              .select('id, article_id')
-              .eq('user_id', authUser.id)
-              .in('article_id', ids);
-            if (bmsErr) console.error('Bookmarks fetch error:', bmsErr);
-            const map = new Map();
-            (bms || []).forEach((b) => map.set(b.article_id, b.id));
+            // Owner cleanup item 12 — hydrate Follow state per-story (not
+            // per-article). Each card represents a story; we follow the story.
+            const storyIds = [
+              ...new Set(
+                articles
+                  .map((a) => a.story_id)
+                  .filter((sid) => typeof sid === 'string' && sid.length > 0)
+              ),
+            ];
+            let followedSet = new Set();
+            if (storyIds.length > 0) {
+              const { data: follows, error: fErr } = await supabase
+                .from('story_follows')
+                .select('story_id')
+                .eq('user_id', authUser.id)
+                .in('story_id', storyIds);
+              if (fErr) console.error('Story follows fetch error:', fErr);
+              followedSet = new Set((follows || []).map((f) => f.story_id));
+            }
             setStories(
               articles.map((a) =>
-                map.has(a.id) ? { ...a, bookmarked: true, bookmark_id: map.get(a.id) } : a
+                a.story_id && followedSet.has(a.story_id)
+                  ? { ...a, bookmarked: true, bookmark_id: null }
+                  : a
               )
             );
           } else {
@@ -177,42 +189,36 @@ function CategoryPageInner() {
     return params.toString();
   };
 
-  const toggleBookmark = async (storyId) => {
-    // F4: anon registration wall redirect
+  // Owner cleanup item 12 (2026-05-08) — per-story Follow toggle.
+  // Replaces the article-level bookmarks toggle. Parameter is the
+  // STORY id (uuid). The card props still carry `bookmarked` as the
+  // boolean for legacy reasons; semantically it now means "is the
+  // viewer following this story." `bookmarkingId` busy state keys on
+  // the story id too.
+  const toggleBookmark = async (storyDbId) => {
     if (!currentUser) {
       window.location.href = `/login?return=/category/${id}`;
       return;
     }
-    const story = stories.find((s) => s.id === storyId);
-    if (!story) return;
-    setBookmarkingId(storyId);
+    setBookmarkingId(storyDbId);
     try {
-      if (story.bookmarked && story.bookmark_id) {
-        const res = await fetch(`/api/bookmarks/${story.bookmark_id}`, { method: 'DELETE' });
-        if (res.ok) {
-          setStories((prev) =>
-            prev.map((s) => (s.id === storyId ? { ...s, bookmarked: false, bookmark_id: null } : s))
-          );
-        } else {
-          showToast('Could not remove bookmark.');
-        }
-        return;
-      }
-      const res = await fetch('/api/bookmarks', {
+      const res = await fetch('/api/story-follows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ article_id: storyId }),
+        body: JSON.stringify({ story_id: storyDbId }),
       });
       if (res.ok) {
         const body = await res.json().catch(() => ({}));
         setStories((prev) =>
           prev.map((s) =>
-            s.id === storyId ? { ...s, bookmarked: true, bookmark_id: body?.id || null } : s
+            s.story_id === storyDbId
+              ? { ...s, bookmarked: !!body?.following, bookmark_id: body?.follow_id || null }
+              : s
           )
         );
       } else {
         const body = await res.json().catch(() => ({}));
-        showToast(body?.error || 'Could not save bookmark.');
+        showToast(body?.error || 'Could not update follow.');
       }
     } finally {
       setBookmarkingId(null);
@@ -649,10 +655,11 @@ function CategoryPageInner() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleBookmark(story.id);
+                    if (!story.story_id) return;
+                    toggleBookmark(story.story_id);
                   }}
-                  disabled={bookmarkingId === story.id}
-                  aria-label={story.bookmarked ? 'Remove bookmark' : 'Save article'}
+                  disabled={bookmarkingId === story.story_id}
+                  aria-label={story.bookmarked ? 'Unfollow story' : 'Follow story'}
                   style={{
                     position: 'absolute',
                     right: 12,
@@ -671,7 +678,7 @@ function CategoryPageInner() {
                     minHeight: 44,
                   }}
                 >
-                  {bookmarkingId === story.id ? '…' : story.bookmarked ? 'Saved' : 'Save'}
+                  {bookmarkingId === story.story_id ? '…' : story.bookmarked ? 'Following' : 'Follow'}
                 </button>
               </div>
               </React.Fragment>
