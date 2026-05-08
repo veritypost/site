@@ -1,43 +1,70 @@
 import SwiftUI
 import Supabase
 
-// MARK: - Decodable response types (file-private)
+// Owner cleanup item 12 (2026-05-08) — Following tab.
+// Lists every story the user has explicitly followed (story_follows
+// table). Each row shows an unread dot when a new article has landed
+// on the story since the user's last visit (last_seen_at on the
+// follow row). Tap → latest article on the story's timeline + RPC
+// mark_story_seen to clear the dot.
 
-private struct ReadingLogRow: Decodable {
-    let articleId: String
-    let articles: ArticleStoryRef?
-    enum CodingKeys: String, CodingKey {
-        case articleId = "article_id"
-        case articles
-    }
-}
+private struct FollowRow: Decodable, Identifiable {
+    let storyId: String
+    let lastSeenAt: Date?
+    let stories: StoryRef?
+    var id: String { storyId }
 
-private struct ArticleStoryRef: Decodable {
-    let storyId: String?
     enum CodingKeys: String, CodingKey {
         case storyId = "story_id"
+        case lastSeenAt = "last_seen_at"
+        case stories
     }
 }
 
-private struct FollowedStoryContainer: Identifiable, Decodable {
+private struct StoryRef: Decodable {
     let id: String
+    let slug: String?
     let title: String
     let lifecycleStatus: String
     let publishedAt: Date?
+
     enum CodingKeys: String, CodingKey {
-        case id, title
+        case id, slug, title
         case lifecycleStatus = "lifecycle_status"
         case publishedAt = "published_at"
     }
 }
 
-// MARK: - FollowingView
+private struct LatestArticleRow: Decodable {
+    let id: String
+    let title: String
+    let storyId: String
+    let publishedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case storyId = "story_id"
+        case publishedAt = "published_at"
+    }
+}
+
+private struct DisplayRow: Identifiable {
+    let storyId: String
+    let title: String
+    let lifecycleStatus: String
+    let lastSeenAt: Date?
+    let latestArticleTitle: String?
+    let latestArticlePublishedAt: Date?
+    let unread: Bool
+    let storyRef: Story?  // for NavigationLink to StoryDetailView
+
+    var id: String { storyId }
+}
 
 struct FollowingView: View {
     @EnvironmentObject var auth: AuthViewModel
 
-    @State private var followed: [FollowedStoryContainer] = []
-    @State private var latestArticle: [String: Story] = [:]  // story container id → most recent article
+    @State private var rows: [DisplayRow] = []
     @State private var loading = true
     @State private var loadError: String? = nil
 
@@ -47,8 +74,8 @@ struct FollowingView: View {
         Group {
             if auth.currentUser == nil {
                 SignInGate(
-                    feature: "Following",
-                    detail: "Sign in to track stories as you read. Stories you've read at least one article from appear here."
+                    feature: "Follow stories",
+                    detail: "Sign in to follow stories and get a dot when new articles land."
                 )
             } else {
                 content
@@ -79,10 +106,10 @@ struct FollowingView: View {
                     .padding(.horizontal, 40)
                 Spacer()
             }
-        } else if followed.isEmpty {
+        } else if rows.isEmpty {
             VStack(spacing: 16) {
                 Spacer()
-                Text("Stories you follow will appear here. Read an article to start tracking it.")
+                Text("Tap Follow on a story to start tracking it.")
                     .font(.subheadline)
                     .foregroundColor(VP.dim)
                     .multilineTextAlignment(.center)
@@ -91,15 +118,18 @@ struct FollowingView: View {
             }
         } else {
             List {
-                ForEach(followed) { container in
-                    if let article = latestArticle[container.id] {
-                        NavigationLink(value: article) {
-                            storyRow(container)
+                ForEach(rows) { row in
+                    if let story = row.storyRef {
+                        NavigationLink(value: story) {
+                            renderRow(row)
                         }
+                        .simultaneousGesture(
+                            TapGesture().onEnded { Task { await markSeen(row.storyId) } }
+                        )
                         .listRowBackground(VP.bg)
                         .listRowSeparatorTint(VP.rule)
                     } else {
-                        storyRow(container)
+                        renderRow(row)
                             .listRowBackground(VP.bg)
                             .listRowSeparatorTint(VP.rule)
                     }
@@ -115,27 +145,37 @@ struct FollowingView: View {
     }
 
     @ViewBuilder
-    private func storyRow(_ container: FollowedStoryContainer) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(statusLabel(container.lifecycleStatus))
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(0.8)
-                    .foregroundColor(statusColor(container.lifecycleStatus))
-                    .textCase(.uppercase)
-                Text(container.title)
-                    .font(.system(.subheadline, design: .serif, weight: .semibold))
-                    .foregroundColor(VP.text)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let date = container.publishedAt {
-                Text(Self.dateFmt.string(from: date))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(VP.muted)
+    private func renderRow(_ row: DisplayRow) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Circle()
+                .fill(row.unread ? VP.accent : Color.clear)
+                .frame(width: 8, height: 8)
+                .padding(.top, 8)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(statusLabel(row.lifecycleStatus))
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(0.8)
+                        .foregroundColor(statusColor(row.lifecycleStatus))
+                        .textCase(.uppercase)
+                    Text(row.title)
+                        .font(.system(.subheadline, design: .serif, weight: row.unread ? .bold : .semibold))
+                        .foregroundColor(VP.text)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let latestTitle = row.latestArticleTitle {
+                    let prefix = row.unread ? "New: " : "Latest: "
+                    let suffix = row.latestArticlePublishedAt
+                        .map { " · " + Self.dateFmt.string(from: $0) } ?? ""
+                    Text(prefix + latestTitle + suffix)
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundColor(VP.muted)
+                        .lineLimit(1)
+                }
             }
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
     }
 
     private func statusLabel(_ status: String) -> String {
@@ -169,54 +209,108 @@ struct FollowingView: View {
         guard let userId = auth.currentUser?.id else { return }
 
         do {
-            // Step 1: distinct story_ids the user has read via reading_log → articles join
-            let logRows: [ReadingLogRow] = try await client
-                .from("reading_log")
-                .select("article_id, articles(story_id)")
+            // 1) The user's follows joined to stories.
+            let follows: [FollowRow] = try await client
+                .from("story_follows")
+                .select("story_id, last_seen_at, stories(id, slug, title, lifecycle_status, published_at)")
                 .eq("user_id", value: userId)
+                .order("followed_at", ascending: false)
                 .execute()
                 .value
 
-            let storyIds = Set(logRows.compactMap { $0.articles?.storyId }.filter { !$0.isEmpty })
+            let storyIds = follows.compactMap { $0.stories?.id }
             guard !storyIds.isEmpty else {
-                followed = []
-                latestArticle = [:]
+                rows = []
                 return
             }
 
-            // Steps 2 & 3 in parallel: active story containers + most recent article per container
-            async let containersReq: [FollowedStoryContainer] = client
-                .from("stories")
-                .select("id, title, lifecycle_status, published_at")
-                .in("id", values: Array(storyIds))
-                .in("lifecycle_status", values: ["breaking", "developing"])
-                .order("published_at", ascending: false)
-                .limit(50)
-                .execute()
-                .value
-
-            async let articlesReq: [Story] = client
+            // 2) Latest published article per followed story. One bulk
+            //    fetch ordered by published_at DESC, reduced client-side.
+            let articles: [LatestArticleRow] = try await client
                 .from("articles")
-                .select("id, title, story_id, published_at, excerpt, cover_image_url, category_id, is_breaking, is_developing, stories(slug)")
-                .in("story_id", values: Array(storyIds))
-                .eq("browse_only", value: false)
+                .select("id, title, story_id, published_at")
+                .in("story_id", values: storyIds)
+                .eq("status", value: "published")
+                .not("published_at", operator: .is, value: "null")
+                .is("deleted_at", value: nil)
                 .order("published_at", ascending: false)
+                .limit(storyIds.count * 5)
                 .execute()
                 .value
 
-            let (containers, articles) = try await (containersReq, articlesReq)
-
-            // Keep only the latest article per story container (articles are already ordered DESC)
-            var byStory: [String: Story] = [:]
-            for article in articles {
-                guard let sid = article.storyId, byStory[sid] == nil else { continue }
-                byStory[sid] = article
+            var latestByStory: [String: LatestArticleRow] = [:]
+            for a in articles {
+                if latestByStory[a.storyId] == nil { latestByStory[a.storyId] = a }
             }
 
-            followed = containers
-            latestArticle = byStory
+            // 3) Build display rows. unread = latest.publishedAt > lastSeenAt.
+            rows = follows.compactMap { f -> DisplayRow? in
+                guard let s = f.stories else { return nil }
+                let latest = latestByStory[s.id]
+                let unread: Bool = {
+                    guard let pub = latest?.publishedAt else { return false }
+                    guard let seen = f.lastSeenAt else { return true }
+                    return pub > seen
+                }()
+                let storyRef = latest.map { la in
+                    Story(
+                        id: la.id,
+                        storyId: s.id,
+                        stories: s.slug.map { StorySlugRef(slug: $0) },
+                        title: s.title,
+                        summary: nil,
+                        content: nil,
+                        imageUrl: nil,
+                        categoryId: nil,
+                        subcategoryId: nil,
+                        status: nil,
+                        isBreaking: nil,
+                        isDeveloping: nil,
+                        publishedAt: la.publishedAt,
+                        createdAt: nil,
+                        heroPickForDate: nil
+                    )
+                }
+                return DisplayRow(
+                    storyId: s.id,
+                    title: s.title,
+                    lifecycleStatus: s.lifecycleStatus,
+                    lastSeenAt: f.lastSeenAt,
+                    latestArticleTitle: latest?.title,
+                    latestArticlePublishedAt: latest?.publishedAt,
+                    unread: unread,
+                    storyRef: storyRef
+                )
+            }
         } catch {
             loadError = "Couldn't load your followed stories."
+        }
+    }
+
+    private func markSeen(_ storyId: String) async {
+        // Optimistic local clear.
+        await MainActor.run {
+            rows = rows.map { row in
+                guard row.storyId == storyId else { return row }
+                return DisplayRow(
+                    storyId: row.storyId,
+                    title: row.title,
+                    lifecycleStatus: row.lifecycleStatus,
+                    lastSeenAt: Date(),
+                    latestArticleTitle: row.latestArticleTitle,
+                    latestArticlePublishedAt: row.latestArticlePublishedAt,
+                    unread: false,
+                    storyRef: row.storyRef
+                )
+            }
+        }
+        // Server bump via RPC.
+        do {
+            try await client
+                .rpc("mark_story_seen", params: ["p_story_id": storyId])
+                .execute()
+        } catch {
+            // Non-fatal: next load reconciles.
         }
     }
 }

@@ -340,7 +340,7 @@ export default async function ArticleSlugPage({
             />
             {!isCoppa && (article.status === 'published' || canEdit || isOwnerModeViewer) && (
               <ArticleActions
-                articleId={article.id}
+                storyId={article.story_id ?? null}
                 currentUserId={user?.id ?? null}
               />
             )}

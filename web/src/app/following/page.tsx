@@ -1,15 +1,16 @@
 'use client';
 
-// LAUNCH-HIDE — kept alive, no nav link pre-launch.
-// "Active Stories" / Following slot was removed from web NavWrapper in
-// commit 5e4beee (2026-05-03 /browse redesign). Mirror of iOS decision
-// in VerityPost/VerityPost/ContentView.swift (Tab.following dropped).
-// Page is reachable by direct URL but not promoted. Preserved for
-// one-line re-expose: re-add the nav array entry in NavWrapper.tsx.
+// Owner cleanup item 12 (2026-05-08) — Following page.
+// Lists every story the user has explicitly followed via the
+// FollowStoryButton on an article reader. Each row decorated with an
+// unread dot when a new article has landed on the story since the
+// user's last visit (last_seen_at on the story_follows row).
+//
+// Tap a row → navigate to the most recent article on that story's
+// timeline + PATCH the follow row's last_seen_at so the dot clears.
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/app/NavWrapper';
 import ErrorState from '@/components/ErrorState';
 
@@ -21,16 +22,26 @@ const C = {
   rule: 'var(--border)',
   breaking: '#dc2626',
   developing: '#d97706',
+  unread: 'var(--accent, #2563eb)',
 } as const;
 
 const SERIF = "Georgia, 'Times New Roman', serif";
 
-type StoryRow = {
-  id: string;
-  title: string;
-  lifecycle_status: string;
-  published_at: string | null;
-  slug: string | null;
+type Row = {
+  story: {
+    id: string;
+    slug: string | null;
+    title: string;
+    lifecycle_status: string;
+    published_at: string | null;
+  };
+  last_seen_at: string;
+  latest_article: {
+    id: string;
+    title: string;
+    published_at: string;
+  } | null;
+  unread: boolean;
 };
 
 function statusColor(status: string) {
@@ -56,65 +67,50 @@ function timeShort(iso: string | null): string {
 
 export default function FollowingPage() {
   const { loggedIn, authLoaded } = useAuth();
-  const [stories, setStories] = useState<StoryRow[]>([]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadStories() {
+  const load = useCallback(async () => {
     setError(null);
     setLoading(true);
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setLoading(false); return; }
-
-    // Step 1: story IDs the user has read via reading_log
-    const { data: logRows, error: logErr } = await supabase
-      .from('reading_log')
-      .select('article_id, articles(story_id)')
-      .eq('user_id', user.id)
-      .limit(500);
-
-    if (logErr) {
-      setError('Couldn\'t load your reading history. Try again.');
+    try {
+      const res = await fetch('/api/story-follows', { method: 'GET' });
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json();
+      setRows(Array.isArray(data?.rows) ? data.rows : []);
+    } catch {
+      setError("Couldn't load your follows. Try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const storyIds = [
-      ...new Set(
-        ((logRows || []) as Array<{ articles: { story_id: string | null } | null }>)
-          .map((r) => r.articles?.story_id)
-          .filter((id): id is string => typeof id === 'string' && id.length > 0)
-      ),
-    ];
-
-    if (storyIds.length === 0) { setLoading(false); return; }
-
-    // Step 2: active stories from that set
-    const { data: storyRows, error: storyErr } = await supabase
-      .from('stories')
-      .select('id, title, lifecycle_status, published_at, slug')
-      .in('id', storyIds)
-      .in('lifecycle_status', ['breaking', 'developing'])
-      .order('published_at', { ascending: false })
-      .limit(50);
-
-    if (storyErr) {
-      setError('Couldn\'t load stories. Try again.');
-      setLoading(false);
-      return;
-    }
-
-    setStories((storyRows || []) as StoryRow[]);
-    setLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
     if (!authLoaded) return;
-    if (!loggedIn) { setLoading(false); return; }
-    loadStories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoaded, loggedIn]);
+    if (!loggedIn) {
+      setLoading(false);
+      return;
+    }
+    load();
+  }, [authLoaded, loggedIn, load]);
+
+  // Mark the row seen when the user clicks through. Optimistically clears
+  // the dot client-side; server confirms via PATCH.
+  async function handleRowClick(storyId: string) {
+    setRows((prev) =>
+      prev.map((r) => (r.story.id === storyId ? { ...r, unread: false } : r))
+    );
+    try {
+      await fetch('/api/story-follows', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ story_id: storyId }),
+      });
+    } catch {
+      // Non-fatal — next page load will reconcile.
+    }
+  }
 
   const hairline: React.CSSProperties = {
     border: 'none',
@@ -135,10 +131,10 @@ export default function FollowingPage() {
             letterSpacing: '-0.02em',
           }}
         >
-          Active Stories
+          Following
         </h1>
         <p style={{ fontFamily: SERIF, fontSize: 15, color: C.dim, margin: '0 0 24px', fontWeight: 400 }}>
-          Stories you&rsquo;ve been reading that are still active.
+          Stories you follow. New articles get a dot.
         </p>
 
         {!authLoaded || loading ? (
@@ -146,7 +142,7 @@ export default function FollowingPage() {
         ) : !loggedIn ? (
           <div style={{ paddingTop: 48, textAlign: 'center' }}>
             <p style={{ color: C.dim, fontSize: 15, marginBottom: 16 }}>
-              Sign in to see stories you&rsquo;ve been reading.
+              Sign in to follow stories.
             </p>
             <Link
               href="/login"
@@ -165,25 +161,35 @@ export default function FollowingPage() {
             </Link>
           </div>
         ) : error ? (
-          <ErrorState inline message={error} onRetry={loadStories} style={{ marginTop: 48 }} />
-        ) : stories.length === 0 ? (
+          <ErrorState inline message={error} onRetry={load} style={{ marginTop: 48 }} />
+        ) : rows.length === 0 ? (
           <p style={{ color: C.dim, fontSize: 14, paddingTop: 48, textAlign: 'center' }}>
-            Stories you&rsquo;ve read articles from will appear here once they&rsquo;re active.
+            Tap Follow on a story to start tracking it.
           </p>
         ) : (
           <div>
-            {stories.map((story, idx) => (
-              <div key={story.id}>
-                {idx > 0 && <hr style={hairline} />}
-                {story.slug ? (
-                  <Link href={`/${story.slug}`} style={{ textDecoration: 'none', display: 'block' }}>
-                    <StoryCard story={story} />
+            {rows.map((row, idx) => {
+              // Tap target = the latest article on the story (so the user
+              // lands on what's new). Falls back to the story slug if no
+              // article published yet (rare).
+              const href = row.latest_article
+                ? `/${row.story.slug ?? row.story.id}`
+                : row.story.slug
+                ? `/${row.story.slug}`
+                : '#';
+              return (
+                <div key={row.story.id}>
+                  {idx > 0 && <hr style={hairline} />}
+                  <Link
+                    href={href}
+                    onClick={() => handleRowClick(row.story.id)}
+                    style={{ textDecoration: 'none', display: 'block' }}
+                  >
+                    <StoryRow row={row} />
                   </Link>
-                ) : (
-                  <StoryCard story={story} />
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         )}
       </main>
@@ -191,39 +197,55 @@ export default function FollowingPage() {
   );
 }
 
-function StoryCard({ story }: { story: StoryRow }) {
+function StoryRow({ row }: { row: Row }) {
+  const story = row.story;
   return (
-    <div style={{ padding: '16px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: statusColor(story.lifecycle_status),
-            flexShrink: 0,
-          }}
-        >
-          {statusLabel(story.lifecycle_status)}
-        </span>
-        <span
-          style={{
-            fontFamily: SERIF,
-            fontSize: 16,
-            fontWeight: 600,
-            color: 'var(--text)',
-            lineHeight: 1.35,
-          }}
-        >
-          {story.title}
-        </span>
+    <div style={{ padding: '16px 0', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <span
+        aria-label={row.unread ? 'Unread' : undefined}
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          background: row.unread ? C.unread : 'transparent',
+          flexShrink: 0,
+          marginTop: 8,
+        }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: statusColor(story.lifecycle_status),
+              flexShrink: 0,
+            }}
+          >
+            {statusLabel(story.lifecycle_status)}
+          </span>
+          <span
+            style={{
+              fontFamily: SERIF,
+              fontSize: 16,
+              fontWeight: row.unread ? 700 : 600,
+              color: 'var(--text)',
+              lineHeight: 1.35,
+            }}
+          >
+            {story.title}
+          </span>
+        </div>
+        {row.latest_article && (
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)' }}>
+            {row.unread ? 'New: ' : 'Latest: '}
+            {row.latest_article.title}
+            {row.latest_article.published_at && ' · ' + timeShort(row.latest_article.published_at)}
+          </p>
+        )}
       </div>
-      {story.published_at && (
-        <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)' }}>
-          {timeShort(story.published_at)}
-        </p>
-      )}
     </div>
   );
 }

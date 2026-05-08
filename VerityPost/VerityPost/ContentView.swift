@@ -281,11 +281,11 @@ struct MainTabView: View {
             case .following:
                 NavigationStack {
                     if isLoggedIn {
-                        BookmarksView()
+                        FollowingView()
                     } else {
                         SignInGate(
-                            feature: "Save articles",
-                            detail: "Sign up to save articles and pick up where you left off."
+                            feature: "Follow stories",
+                            detail: "Sign up to follow stories and get a dot when new articles land."
                         )
                     }
                 }

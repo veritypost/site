@@ -6,6 +6,36 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### Owner cleanup — item 12 shipped (Follow stories) — web + main iOS
+**Files:** see breakdown below.
+
+Closes the conceptual rebuild kicked off in item 2: the retired bookmarks framing is replaced with explicit per-user, per-story Follow. The unit followed is the **story (slug)**, not the article. New article on a followed story → in-app notification + unread dot in the Following list. Tap the row → land on the latest article + dot clears.
+
+**DB migrations (applied via supabase MCP):**
+- `story_follows_owner_cleanup_12` — new table `story_follows (id, user_id FK→users, story_id FK→stories, followed_at, last_seen_at, UNIQUE(user_id, story_id))`. RLS enabled with 4 own-row policies. Indexes on `(user_id, followed_at DESC)` and `(story_id)`. Two SECURITY DEFINER RPCs: `toggle_story_follow(p_story_id)` returns `(following, follow_id)` (idempotent — INSERT or DELETE based on existing row); `mark_story_seen(p_story_id)` bumps `last_seen_at` to NOW() (no-op if not following). Trigger `articles_fanout_story_follow_notifications` writes one in-app `notifications` row per follower (excluding the author) when a published article lands on a followed story.
+- `story_follows_trigger_fix_owner_cleanup_12` — adversary surfaced two bugs in the initial trigger: action_url interpolated story_id UUID instead of slug (404'd on tap); fanout fired on INSERT only (missed draft→published UPDATE workflow). Fix joins `stories` for slug and adds a separate `AFTER UPDATE OF status` trigger gated on the published-transition.
+
+**API:** `web/src/app/api/story-follows/route.js` (new). POST = toggle via RPC. GET = list user's follows joined to stories, decorated with `latest_article` + `unread` (latest article published_at > follow.last_seen_at). PATCH = mark seen. DELETE = explicit unfollow. Auth via `requireAuth()`; rate-limit policy `story-follows` at 60/min on POST.
+
+**Web UI:**
+- New `web/src/components/FollowStoryButton.tsx` (heart icon + Follow / Following label, anon path opens registration wall, optimistic toggle with revert on failure).
+- `web/src/components/ArticleActions.tsx` swapped from `BookmarkButton` to `FollowStoryButton`. Hidden when article has no `story_id`.
+- `web/src/app/[slug]/page.tsx` caller now passes `article.story_id`.
+- `web/src/components/BookmarkButton.tsx` deleted (`git rm`) — orphaned after the swap.
+- `web/src/app/following/page.tsx` rewritten end-to-end. Pulls `/api/story-follows`, renders rows with unread dots, bold title for unread, "New: " prefix on latest article. PATCHes /api/story-follows on row click to mark seen (optimistic dot clear).
+
+**iOS main app:**
+- `VerityPost/VerityPost/ContentView.swift` `.following` tab routes to `FollowingView()` instead of `BookmarksView()`.
+- `VerityPost/VerityPost/FollowingView.swift` rewritten end-to-end. Queries `story_follows` joined to `stories` via the Swift Supabase client, fetches latest published article per story via a single bulk query, computes unread, renders rows with circle dot + bold title. Tap → NavigationLink to `StoryDetailView` + RPC `mark_story_seen` for live dot clear.
+- `VerityPost/VerityPost/StoryDetailView.swift` Save/Saved button replaced with Follow/Following gated on `story.storyId` (hidden if article has no story). New state `isFollowing` + `followBusy`. New `toggleStoryFollow(storyId:)` (POST /api/story-follows + optimistic flip) and `loadStoryFollowState()` (queries story_follows for membership on view appear). Old bookmark state (`isBookmarked`, `bookmarkId`, `attemptBookmark`, `toggleBookmark`) left as orphan since it's still wired into the bookmark-cap alert chain — harmless, no UI references; cleanup pass can remove later.
+
+**Kids iOS — data layer ready, UI deferred:**
+- `VerityPostKids/VerityPostKids/Models.swift` `KidArticle` now decodes `story_id`. `ArticleListView.swift` SELECT extended to pull `story_id`.
+- The DB table + API + RLS + RPCs + trigger are all kid-safe (RLS scopes to `auth.uid()`; kids users have their own auth path).
+- The kid Follow button + kid Following list are NOT shipped this batch. Reasoning: kids tab bar is fixed at 4 (Home / Ranks / Experts / Me) — a Following destination needs its own design pass (sub-section under "Me" vs new tab vs gated entry), and a Follow button without a Following list is a half-affordance for a kid. Filed for the next batch as item 12-kids.
+
+**Adversary pass run after impl** — found 2 trigger blockers (action_url UUID instead of slug; INSERT-only path missing draft→published transitions), both fixed via the second migration before commit. Otherwise clean: SQL inspection confirmed RLS, indexes, RPCs, triggers all in place; web UI handles loading/error/empty/populated states; iOS Story init matches Models.swift memberwise init; orphan bookmark state in StoryDetailView verified as having no live references.
+
 ### Owner cleanup — third batch shipped (6, 7)
 **Files:** see breakdown.
 

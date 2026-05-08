@@ -38,25 +38,56 @@ If reviewers diverge on a bigger item, dispatch a fresh independent panel to bre
 
 ## Items
 
-### 12. "Following stories" page — list all followed timelines
-**Page / screen:** the menu/section that lists what the user is following (formerly Saved / bookmarks; see item 2)
-**What owner sees:** the page should show every story the user is following.
-**Concept (owner clarified 2026-05-08):** "following a story" = following its **timeline**. When a new article is appended to that story's timeline, the user sees it appear in their Following feed. This is a notification-like subscription, not a save-for-later bookmark.
+### 12. Follow stories — locked spec
+**The unit being followed:** the **story (slug)**. Not articles, not events, not timelines — the whole story. One Follow row per user per story.
 
-**What should change:**
-- The page lists every **story timeline** the user is following.
-- Each entry shows the story's headline + last-updated indicator + new-article count since last visit.
-- New articles appended to a followed timeline trigger an unread-state on the entry (and possibly a push, scope TBD).
-- Bookmarks framing is fully retired — labels, icons, and component names flip.
+**Behavior:**
+1. User taps Follow on a story → one row added to their Following list.
+2. A new article gets stamped with that `story_id` (i.e. a new event lands on that story's timeline) → the row shows an unread dot + the user gets an in-app notification.
+3. User taps the row → lands on **the most recent article on that story's timeline**. Unread dot clears on tap.
 
-**Owner direction (2026-05-08):** when a new article lands on a followed timeline, the entry on the Following page shows a small unread dot. No push/email for now — in-app unread state only. ("I feel like we can do something else there as well" — owner is open to layering more on later, but unread-dot is the v1.)
+**Mental-model tree:**
+```
+Story (slug)               ← the thing you follow
+├── lifecycle_status, title
+└── Timeline               ← list of events on this story
+    ├── Event 1 (article)
+    ├── Event 2 (article)
+    └── new events appended over time → drives the unread dot
+```
 
-**Phase 2 still needs to confirm:**
-- Data model: does a `story_follows` table already exist, or are we currently using bookmarks rows? Need a grep pass before Phase 3.
-- Where the "follow this story" affordance lives today (article header? timeline header? somewhere on the story page?). The follow trigger has to be paired with this destination, so I need to find or build it.
-- iOS + kids parity: standard cross-platform — port the unread-dot to iOS Following tab; kids n/a unless owner wants kids to follow story timelines too.
+Articles are stamped with `story_id`. Following the slug = following everything that lands inside it.
 
-**Status:** concept + v1 behavior locked — Phase 2 diagnostic still pending on data model + follow-affordance source
+**Phase 2 (diagnostic) findings:**
+- DB: no `story_follows` table exists. `bookmarks` is per-article (wrong unit). `follows` is user-to-user. `notifications` table has full unread infra (`is_read`, `read_at`) — reusable. `stories` and `timelines` tables exist; `articles.story_id` FK exists.
+- Web: launch-hidden `/following/page.tsx` exists but infers follows from `reading_log` (wrong). No "Follow story" button anywhere.
+- iOS: `BookmarksView` currently routed for the `.following` tab (wrong content). A parallel launch-hidden `FollowingView.swift` exists, also reading_log-based. No "Follow story" button.
+- Notification + realtime infra (used by messages) is the unread-state precedent to borrow.
+
+**Phase 3 — implementation scope (sized, no work started yet):**
+1. New `story_follows` table: `(user_id, story_id, followed_at, last_seen_at)` + RPC for toggle + index.
+2. New API: `POST /api/story-follows` (toggle), `GET /api/story-follows` (list user's follows).
+3. "Follow story" button on the story page (web + iOS). Replaces the per-article Save heart in the unified concept.
+4. Web: rewrite `/following/page.tsx` to query `story_follows` joined to `stories`, with a per-row unread dot (newest article on the story has `published_at > follow.last_seen_at`).
+5. iOS: route the `.following` tab at `FollowingView.swift` (not `BookmarksView`); rebuild `FollowingView` to mirror web.
+6. Realtime: subscribe to `articles` INSERT events filtered by user's followed story_ids → update unread dot live.
+7. Notification on new article in followed story: write a `notifications` row (in-app channel only per owner direction).
+8. Cross-platform: web + iOS. Kids = needs owner call on whether kids can follow stories.
+9. Existing `bookmarks` table data: needs owner call — convert article-level saves to story follows (one follow per unique story_id), or leave dormant and start fresh.
+
+**Owner answers (2026-05-08):**
+- Kids: yes, in scope.
+- Existing bookmarks: ignore — all seeded data, no real-user value to migrate.
+- Button label: "Follow."
+
+**Phase 3 shipped (2026-05-08):**
+- DB: `story_follows` table + RLS + `toggle_story_follow` and `mark_story_seen` RPCs + `articles_fanout_story_follow_notifications` triggers (INSERT path + draft→published UPDATE path) writing in-app notifications with story-slug deep-links.
+- API: `web/src/app/api/story-follows/route.js` — POST (toggle) / GET (list with unread + latest article) / PATCH (mark seen) / DELETE (explicit unfollow). Auth-gated, rate-limited.
+- Web UI: `FollowStoryButton` replaces `BookmarkButton` (deleted) on the article reader. `/following/page.tsx` rewritten to query `story_follows` with unread dots + latest-article previews + tap-to-mark-seen.
+- iOS main: `.following` tab swapped from `BookmarksView` to `FollowingView` (rewritten end-to-end). `StoryDetailView` Save button replaced with Follow button gated on `story.storyId`. State load via task; toggle via API.
+- Kids iOS: data layer is universal (table + API + RLS work for kids) and `KidArticle` now decodes `story_id`. **Kids UI surfaces deferred** — adding a Follow button without a Following list is a half-affordance, and kids' fixed 4-tab bar needs a design pass before a Following destination lands. Filed as item 12-kids for a separate batch.
+
+**Status:** shipped (web + main iOS). Kids UI = follow-up.
 
 ---
 

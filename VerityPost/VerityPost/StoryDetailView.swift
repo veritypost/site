@@ -182,6 +182,12 @@ struct StoryDetailView: View {
     // Bookmarks
     @State private var isBookmarked = false
     @State private var bookmarkId: String? = nil
+    // Owner cleanup item 12 — story-level follow state. The "Save" button
+    // is now "Follow" (story-level); old bookmark state above stays as
+    // orphan for the bookmark-cap alert path which the data layer still
+    // shares (table left dormant). UI flips entirely to follow.
+    @State private var isFollowing = false
+    @State private var followBusy = false
     @State private var showUpgradeAlert = false
     @State private var showSubscription = false
     // OwnersAudit Story Task 18 — anon Discussion tab → LoginView sheet
@@ -420,16 +426,20 @@ struct StoryDetailView: View {
                         Image(systemName: "square.and.arrow.up").foregroundColor(VP.dim)
                     }
                 }
-                // D13: bookmarks are free with a 10-cap; paid gets unlimited.
-                // Spec: display "Save" / "Saved" text, not an icon.
-                Button {
-                    Task { await attemptBookmark() }
-                } label: {
-                    Text(isBookmarked ? "Saved" : "Save")
-                        .font(.system(.footnote, design: .default, weight: .semibold))
-                        .foregroundColor(isBookmarked ? VP.accent : VP.text)
+                // Owner cleanup item 12 (2026-05-08) — Follow button.
+                // The unit being followed is the STORY (slug), not the
+                // article. Article without a story_id → button hidden.
+                if let storyDbId = story.storyId {
+                    Button {
+                        Task { await toggleStoryFollow(storyId: storyDbId) }
+                    } label: {
+                        Text(isFollowing ? "Following" : "Follow")
+                            .font(.system(.footnote, design: .default, weight: .semibold))
+                            .foregroundColor(isFollowing ? VP.accent : VP.text)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(followBusy)
                 }
-                .buttonStyle(.bordered)
 
                 // Apple Guideline 1.2 — UGC requires "Report" on every piece
                 // of user-visible content the app surfaces, including the
@@ -547,6 +557,7 @@ struct StoryDetailView: View {
         .task(id: story.id) { await loadData() }
         .task(id: story.id) { await loadUpNextStories() }
         .task(id: story.id) { await subscribeToNewComments() }
+        .task(id: story.id) { await loadStoryFollowState() }
         .task { await push.refresh() }
         .task(id: perms.changeToken) {
             canPlayTTS = await PermissionService.shared.has("article.tts.play")
@@ -3373,6 +3384,61 @@ struct StoryDetailView: View {
     // 403 with `{"error":"bookmark_cap_exceeded"}`. We read the body,
     // route a cap-exceeded response into the upgrade alert, and treat
     // every other non-2xx as a transient failure.
+    // Owner cleanup item 12 — story-level follow toggle. POSTs the new
+    // /api/story-follows endpoint, optimistically flips local state.
+    // Hidden when the article has no story_id (handled at the call site).
+    private func toggleStoryFollow(storyId: String) async {
+        guard let session = try? await client.auth.session else { return }
+        await MainActor.run { followBusy = true }
+        defer { Task { @MainActor in followBusy = false } }
+
+        let site = SupabaseManager.shared.siteURL
+        guard let url = URL(string: "/api/story-follows", relativeTo: site) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["story_id": storyId])
+
+        // Optimistic flip; reconcile from server on response.
+        await MainActor.run { isFollowing.toggle() }
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                // Revert.
+                await MainActor.run { isFollowing.toggle() }
+                return
+            }
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let following = json["following"] as? Bool {
+                await MainActor.run { isFollowing = following }
+            }
+        } catch {
+            // Revert on network failure.
+            await MainActor.run { isFollowing.toggle() }
+        }
+    }
+
+    private struct StoryFollowMembership: Decodable {
+        let storyId: String
+        enum CodingKeys: String, CodingKey { case storyId = "story_id" }
+    }
+
+    private func loadStoryFollowState() async {
+        guard let storyDbId = story.storyId else { return }
+        do {
+            let rows: [StoryFollowMembership] = try await client
+                .from("story_follows")
+                .select("story_id")
+                .eq("story_id", value: storyDbId)
+                .execute()
+                .value
+            await MainActor.run { isFollowing = !rows.isEmpty }
+        } catch {
+            // Silent — default to not-following.
+        }
+    }
+
     private func toggleBookmark() async {
         guard let session = try? await client.auth.session else { return }
         let site = SupabaseManager.shared.siteURL

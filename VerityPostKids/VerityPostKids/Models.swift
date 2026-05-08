@@ -112,6 +112,9 @@ struct KidArticle: Codable, Identifiable, Equatable {
     let kidsSummary: String?
     let coverImageUrl: String?
     let categoryId: String?
+    /// Owner cleanup item 12 — kids share the same stories as the
+    /// adult app. Drives the "Follow story" button on the kid reader.
+    let storyId: String?
     let readingTimeMinutes: Int?
     let difficultyLevel: String?
     let ageBand: String?
@@ -122,6 +125,7 @@ struct KidArticle: Codable, Identifiable, Equatable {
         case kidsSummary = "kids_summary"
         case coverImageUrl = "cover_image_url"
         case categoryId = "category_id"
+        case storyId = "story_id"
         case readingTimeMinutes = "reading_time_minutes"
         case difficultyLevel = "difficulty_level"
         case ageBand = "age_band"

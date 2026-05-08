@@ -207,7 +207,7 @@ struct ArticleListView: View {
         do {
             let baseQuery = client
                 .from("articles")
-                .select("id, title, slug, excerpt, kids_summary, cover_image_url, category_id, reading_time_minutes, difficulty_level, age_band, published_at")
+                .select("id, title, slug, excerpt, kids_summary, cover_image_url, category_id, story_id, reading_time_minutes, difficulty_level, age_band, published_at")
                 .eq("status", value: "published")
                 .eq("is_kids_safe", value: true)
                 .in("age_band", values: bands)
