@@ -39,6 +39,9 @@ struct KidReaderView: View {
     // KidQuizResult so celebration scenes know a streak-day's read
     // didn't actually persist.
     @State private var readingLogFailed: Bool = false
+    // Owner cleanup item 12 — kid story follow state.
+    @State private var isFollowing: Bool = false
+    @State private var followBusy: Bool = false
 
     private var client: SupabaseClient { SupabaseKidsClient.shared.client }
 
@@ -113,6 +116,7 @@ struct KidReaderView: View {
             }
         }
         .task { await loadArticle() }
+        .task { await loadFollowState() }
         // OwnersAudit Kids A91 — body is loaded once on .task and never
         // re-fetched. A kid who opens an article, backgrounds the app
         // for hours/days, and comes back is reading a stale snapshot —
@@ -159,15 +163,40 @@ struct KidReaderView: View {
                 .foregroundStyle(K.text)
                 .multilineTextAlignment(.leading)
 
-            if let mins = article.readingTimeMinutes {
-                HStack(spacing: 6) {
-                    Image(systemName: "clock")
-                        .font(.system(.caption, weight: .bold))
-                        .accessibilityHidden(true)
-                    Text("\(mins) min read")
-                        .font(.system(.caption, design: .rounded, weight: .semibold))
+            HStack(spacing: 10) {
+                if let mins = article.readingTimeMinutes {
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock")
+                            .font(.system(.caption, weight: .bold))
+                            .accessibilityHidden(true)
+                        Text("\(mins) min read")
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                    }
+                    .foregroundStyle(K.dim)
                 }
-                .foregroundStyle(K.dim)
+                Spacer(minLength: 0)
+                // Owner cleanup item 12 — Follow the story this article
+                // belongs to. Hidden if the article isn't part of a story.
+                if let storyDbId = article.storyId, auth.kid != nil {
+                    Button {
+                        Task { await toggleFollow(storyId: storyDbId) }
+                    } label: {
+                        Label(isFollowing ? "Following" : "Follow",
+                              systemImage: isFollowing ? "heart.fill" : "heart")
+                            .font(.system(.caption, design: .rounded, weight: .bold))
+                            .foregroundStyle(isFollowing ? .white : K.text)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule().fill(isFollowing ? categoryColor : K.card)
+                            )
+                            .overlay(
+                                Capsule().stroke(isFollowing ? categoryColor : K.border, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(followBusy)
+                }
             }
         }
     }
@@ -334,6 +363,55 @@ struct KidReaderView: View {
         } catch {
             self.loadError = "Couldn't load article"
             self.body_ = ""
+        }
+    }
+
+    // Owner cleanup item 12 — kid story follow. Loads current
+    // membership on appear; toggle calls the kid-flavoured RPC.
+    private func loadFollowState() async {
+        guard let storyDbId = article.storyId, let kidId = auth.kid?.id else { return }
+        struct Membership: Decodable {
+            let storyId: String
+            enum CodingKeys: String, CodingKey { case storyId = "story_id" }
+        }
+        do {
+            let rows: [Membership] = try await client
+                .from("story_follows")
+                .select("story_id")
+                .eq("kid_profile_id", value: kidId)
+                .eq("story_id", value: storyDbId)
+                .execute()
+                .value
+            await MainActor.run { isFollowing = !rows.isEmpty }
+        } catch {
+            // Silent — defaults to not-following.
+        }
+    }
+
+    private func toggleFollow(storyId: String) async {
+        guard let kidId = auth.kid?.id else { return }
+        await MainActor.run {
+            followBusy = true
+            isFollowing.toggle()
+        }
+        defer { Task { @MainActor in followBusy = false } }
+        struct ToggleResult: Decodable {
+            let following: Bool
+        }
+        do {
+            let result: [ToggleResult] = try await client
+                .rpc("toggle_story_follow_kid", params: [
+                    "p_kid_profile_id": kidId,
+                    "p_story_id": storyId,
+                ])
+                .execute()
+                .value
+            if let first = result.first {
+                await MainActor.run { isFollowing = first.following }
+            }
+        } catch {
+            // Revert on failure.
+            await MainActor.run { isFollowing.toggle() }
         }
     }
 

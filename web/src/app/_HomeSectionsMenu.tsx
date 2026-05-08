@@ -429,6 +429,7 @@ export default function HomeSectionsMenu() {
                   <FollowingRow
                     expanded={expanded.has('__following__')}
                     onToggle={() => toggle('__following__')}
+                    onNavigate={close}
                   />
 
                   <AllRow active={isHomeActive} onNavigate={close} />
@@ -593,13 +594,64 @@ function SearchResults({
   );
 }
 
+type FollowingMenuRow = {
+  story: { id: string; slug: string | null; title: string };
+  unread: boolean;
+};
+
 function FollowingRow({
   expanded,
   onToggle,
+  onNavigate,
 }: {
   expanded: boolean;
   onToggle: () => void;
+  onNavigate: () => void;
 }) {
+  // Owner cleanup item 12 (2026-05-08) — wire the Sections menu's
+  // "Following" expander to /api/story-follows. Was a stub. Renders
+  // every story the user follows with an unread dot when a new
+  // article has landed since last visit. Tap → close menu, navigate
+  // to story slug, PATCH mark-seen so the dot clears.
+  const [rows, setRows] = useState<FollowingMenuRow[] | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!expanded || rows !== null) return;
+    let cancelled = false;
+    void fetch('/api/story-follows', { method: 'GET' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data) => {
+        if (cancelled) return;
+        const list = Array.isArray(data?.rows) ? data.rows : [];
+        setRows(
+          list.map((r: { story: { id: string; slug: string | null; title: string }; unread: boolean }) => ({
+            story: r.story,
+            unread: !!r.unread,
+          }))
+        );
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError(true);
+        setRows([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, rows]);
+
+  function markSeen(storyId: string) {
+    setRows((prev) =>
+      prev ? prev.map((r) => (r.story.id === storyId ? { ...r, unread: false } : r)) : prev
+    );
+    void fetch('/api/story-follows', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ story_id: storyId }),
+    }).catch(() => {});
+  }
+
   return (
     <div style={{ borderBottom: `1px solid ${C.rule}` }}>
       <button
@@ -639,18 +691,92 @@ function FollowingRow({
             borderLeft: `1px solid ${C.rule}`,
           }}
         >
-          <p
-            style={{
-              fontFamily: serifStack,
-              fontStyle: 'italic',
-              fontSize: 14,
-              color: C.muted,
-              margin: 0,
-              padding: '2px 0',
-            }}
-          >
-            No followed sections yet.
-          </p>
+          {rows === null ? (
+            <p
+              style={{
+                fontFamily: serifStack,
+                fontStyle: 'italic',
+                fontSize: 14,
+                color: C.muted,
+                margin: 0,
+                padding: '2px 0',
+              }}
+            >
+              Loading…
+            </p>
+          ) : error ? (
+            <p
+              style={{
+                fontFamily: serifStack,
+                fontStyle: 'italic',
+                fontSize: 14,
+                color: C.muted,
+                margin: 0,
+                padding: '2px 0',
+              }}
+            >
+              Couldn’t load follows.
+            </p>
+          ) : rows.length === 0 ? (
+            <p
+              style={{
+                fontFamily: serifStack,
+                fontStyle: 'italic',
+                fontSize: 14,
+                color: C.muted,
+                margin: 0,
+                padding: '2px 0',
+              }}
+            >
+              Tap Follow on any story to track it here.
+            </p>
+          ) : (
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              {rows.map((r) => {
+                const slug = r.story.slug || r.story.id;
+                return (
+                  <li key={r.story.id} style={{ padding: '2px 0' }}>
+                    <Link
+                      href={`/${slug}`}
+                      onClick={() => {
+                        markSeen(r.story.id);
+                        onNavigate();
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        textDecoration: 'none',
+                        padding: '6px 0',
+                        color: C.text,
+                      }}
+                    >
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: r.unread ? C.text : 'transparent',
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontFamily: serifStack,
+                          fontSize: 16,
+                          fontWeight: r.unread ? 600 : 400,
+                          letterSpacing: '-0.005em',
+                        }}
+                      >
+                        {r.story.title}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       )}
     </div>
