@@ -6,6 +6,45 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### Editorial typography family — 16-round visual polish pass across the product
+**Files:** every page-shell + section component on web (article, home, profile, leaderboard, messages, search, pricing, login/signup) — see commits below for the per-surface diffs. Pure visual; no schema, no behavior, no chrome additions.
+- **The shipped family:** Page H1s 28–44px / 600 / -0.02em / 1.1–1.15. Body 18px / 1.7 / antialiased + kern + liga. Card-list titles 17px Source Serif 4 / 500 / -0.01em / 1.3. Editorial meta family (byline, eyebrows, timestamps, section labels): 11px / 600 / 0.1em uppercase muted-ink. Comment body 16/1.7. Comment author 14/600/-0.005em. Action chips 12/500-inactive/600-active/pill 20px/32-min-height. Button family 14/600/10r with -0.005em. Reading progress ribbon 2px ink. **Restraint rule: weight 700 and 800 banished — 600 is the heaviest active state.** **Color rule: accent-blue is reserved for the Alerts top-bar slot only**; editorial chrome stays in ink + ink-muted + dim. Card chrome borderRadius 10–12, no heavy shadows.
+- **Round-by-round commit map:**
+  - `4cb4cb56` — Article surface foundation: title 44/600/-0.02, drop cap, body links, blockquote, h2/h3, hr.
+  - `5463a21c` — Comment HTML rendering parity, reading ribbon 3px accent → 2px ink.
+  - `303eab8d` — NextStoryFooter, mobile tab strip, CommentRow chrome (author/timestamp/pinned label).
+  - `98e4fb5b` — Comment action chips (heart, tag pills, replies toggle), Sources heading.
+  - `1da66bf7` — CommentComposer (body 14→15/1.7, no shadow, 700→600 buttons), TimelineSection (label serif, NOW badge, heading 0.1em).
+  - `71f9d81e` — ArticleQuiz + MidBodyQuizTeaser (passed-state "You're in." 32/700 → 28/600 — calm card, no fanfare, matching the original code-comment intent).
+  - `eccf6767` — UpNextSheet (sans 15/700 titles → Source Serif 4 17/500).
+  - `1ad718f0` — AnonArticleCtaBanner.
+  - `4d250810` — ArticleActions row (Save + Share buttons aligned to 14/600/10r family).
+  - `bad539a5` — Home page (Hero, TwoUpCard, SupportingCard, MetaLine, eyebrow, lifecycle pills, BreakingStrip, SectionsMenu).
+  - `01190e52` — Profile (StatTile values 800 → 600, all serif headings -0.01 → -0.02, AppShell rail, expert/verified badges).
+  - `d340d33a` — `/leaderboard` (7 weight-700 violations swept).
+  - `4492d871` — `/messages` (densest concentration of 700/800 — H1, paywall dialog, conversation list, message bubbles all aligned).
+  - `d70eea5d` — `/search` (H1 24/800 → 28/600, result-card titles to Source Serif 4 17/500, meta to 11/600/0.1em).
+  - `823240f9` — `/pricing` (price weight 800 → 600 — removes "loud SaaS landing page" feel).
+  - `976b70a7` — `/login` + `/signup` (logo accent-blue → ink, "Check your email" 26/700 → 28/600, featured-article read link accent-blue → editorial underline).
+
+### Bug-sweep pass — Messages, NavWrapper, KidsStoryEditor
+- **Messages badge counted general notifications, not DMs** (commit `970204c4`). ProfileApp's Messages-rail badge was sourcing from `/api/notifications?unread=1` (counts comment replies, follow events, mentions, etc.) instead of the `get_unread_counts()` RPC the `/messages` page uses. Fixed: badge now sums per-conversation unread counts from the same RPC. Source of truth shared with the inbox page.
+- **NavWrapper polled `/api/notifications` with no consumer** (commit `9b6d5f6e`, then re-enabled in `3b46fede` with a real consumer). The bottom nav lost its `/notifications` slot but the 60-second poll kept running; gated to no-op when no nav item references the route. Re-enabled when the Alerts top-bar slot landed.
+- **`/api/conversations` GET 404** → MessagesSection inline view always rendered "no conversations" (commit `0f735260`). Route only exports POST; the inline section's GET fetch silently 404'd into the catch block. Fixed by reading directly via supabase client (same query the `/messages` page uses).
+- **KidsStoryEditor "AI generate" + "Simplify language" buttons POSTed to `/api/ai/generate` which doesn't exist** (commit `793b02b1`). Empty placeholder directory; every click 404'd silently behind a misleading "AI API key not configured" toast. Removed dead UI; comment marks the spot for future build.
+
+### Following → Saved rename + Alerts top-bar link
+**Files:** `web/src/app/NavWrapper.tsx`, `BookmarkButton.tsx`, `bookmarks/page.tsx`, `profile/_components/ProfileApp.tsx`, `VerityPost/VerityPost/ContentView.swift`, `StoryDetailView.swift`, `ProfileView.swift`. Commit: `3b46fede`.
+- **Decision-driven from a 4+4 panel** (4-expert audit + 4 fresh judges to break a 2:2 tie). Verdict: 4/0 unanimous on second round — bookmark feature is functionally a manual save with no notifications and no auto-feed; "Following" semantically implies a subscription stream (which the user-graph IS or will be). Today's labels were inverted vs what the features actually do.
+- **Article-following surfaces renamed to "Saved"**: bottom-nav slot (web + iOS), profile rail entry, page H1, `BookmarkButton` labels (Save / Saved), iOS Tab.following label, iOS sign-in-gate copy, iOS quick-action chip, iOS profile quick link. Schema untouched (`bookmarks` table).
+- **User-graph "Following" surfaces preserved**: profile YouSection stat tile, `FollowButton`, `PublicProfileView`, `FollowingView` (iOS), `UserFollowListView` nav title.
+- **"Alerts" top-bar link** added on web (text-only, dim → accent + bold when unreadCount > 0). Single visible-when-needed entry point to `/notifications` from every page; no icon, no dot, color shift is the entire signal (per owner directive).
+
+### Following as 3rd bottom-nav slot (web + iOS)
+**Files:** `web/src/app/NavWrapper.tsx`, `VerityPost/VerityPost/ContentView.swift`. Commit: `800fd60d` (later renamed to "Saved" in `3b46fede`).
+- Article-level following was reachable only via Profile → Library → Following (2 clicks). Both surfaces gained a direct slot; logged-in nav becomes Home / Following / Profile (web) and Today / Following / Profile (iOS Tab enum). Anon nav unchanged.
+- Story-level `/following` (Active Stories) surface remains launch-hidden — different page, different watch list.
+
 ### TODO 47 — Advanced search filters on iOS
 **File:** `VerityPost/VerityPost/FindView.swift` (rewritten). Closes TODO 47. Audit-driven plan; one override on the agent's plan (Filters affordance is text-only, not an icon, per the editorial restraint rule).
 - New filter sheet (`.sheet`-presented from a "Filters" text button at the trailing edge of the search bar). Three filter rows, each gated independently by its own permission so anon and free users see only the doors they can open: `search.advanced.category` (Picker over top-level non-kids categories with `deleted_at IS NULL`), `search.advanced.date_range` (two `DatePicker`s with a "Clear dates" reset), `search.advanced.source` (free-text publisher field, matches web).
