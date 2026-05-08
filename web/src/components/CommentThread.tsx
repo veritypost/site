@@ -397,12 +397,13 @@ export default function CommentThread({
         },
         async (payload: { new: CommentDb }) => {
           if (payload.new.status && payload.new.status !== 'visible') return;
-          const { data: row } = await supabase
-            .from('comments')
-            .select('*')
-            .eq('id', payload.new.id)
-            .maybeSingle();
-          if (cancelled || !row) return;
+          // payload.new contains the full row already — Postgres logical
+          // replication emits the complete new tuple on INSERT. Dropping
+          // the redundant re-SELECT saves a round-trip per realtime
+          // event per viewer. RLS evaluation is unchanged: realtime ran
+          // it at broadcast time, the channel uses the same user JWT.
+          const row = payload.new;
+          if (cancelled) return;
           type AuthorRow = NonNullable<CommentWithAuthor['users']>;
           let author: AuthorRow | undefined;
           if (row.user_id) {
@@ -445,12 +446,10 @@ export default function CommentThread({
           if (alreadyPresent) {
             setComments((prev) => prev.map((c) => (c.id === id ? { ...c, ...payload.new } : c)));
           } else {
-            const { data: row } = await supabase
-              .from('comments')
-              .select('*')
-              .eq('id', id)
-              .maybeSingle();
-            if (cancelled || !row) return;
+            // Same redundancy as the INSERT handler — payload.new is the
+            // full row; skip the re-SELECT.
+            const row = payload.new;
+            if (cancelled) return;
             type AuthorRow = NonNullable<CommentWithAuthor['users']>;
             let author: AuthorRow | undefined;
             if (row.user_id) {
