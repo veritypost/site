@@ -47,9 +47,9 @@ export default function HomeBreakingStrip({ story }: { story: HomeStory }) {
     >
       <span
         style={{
-          fontWeight: 800,
+          fontWeight: 600,
           fontSize: 11,
-          letterSpacing: '0.12em',
+          letterSpacing: '0.1em',
           background: 'rgba(0, 0, 0, 0.22)',
           padding: '2px 8px',
           borderRadius: 3,

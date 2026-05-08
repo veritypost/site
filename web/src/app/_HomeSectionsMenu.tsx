@@ -541,11 +541,14 @@ function SearchResults({
           >
             <h3
               style={{
-                fontFamily: serifStack,
+                // Source Serif 4 explicit (was inheriting serifStack which
+                // falls through to Georgia). Ensures the same family as
+                // UpNextSheet + NextStoryFooter card titles.
+                fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
                 fontSize: 17,
                 fontWeight: 500,
                 color: C.text,
-                lineHeight: 1.25,
+                lineHeight: 1.3,
                 letterSpacing: '-0.01em',
                 margin: 0,
               }}
@@ -555,9 +558,11 @@ function SearchResults({
             {a.excerpt && (
               <p
                 style={{
+                  // Hardcoded --stone-700 -> editorial muted-ink token.
+                  // Line-height 1.5 -> 1.4 (matches UpNextSheet excerpt).
                   fontSize: 13,
-                  color: 'var(--stone-700, #44403c)',
-                  lineHeight: 1.5,
+                  color: 'var(--p-ink-muted)',
+                  lineHeight: 1.4,
                   marginTop: 5,
                   marginBottom: 0,
                 }}

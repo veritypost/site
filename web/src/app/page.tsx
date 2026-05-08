@@ -404,7 +404,7 @@ export default async function HomePage({
                 margin: 0,
                 fontSize: 11,
                 fontWeight: 600,
-                letterSpacing: '0.12em',
+                letterSpacing: '0.1em',
                 textTransform: 'uppercase',
                 color: C.dim,
               }}
@@ -415,9 +415,9 @@ export default async function HomePage({
               style={{
                 fontFamily: serifStack,
                 fontSize: 28,
-                fontWeight: 700,
+                fontWeight: 600,
                 lineHeight: 1.15,
-                letterSpacing: '-0.015em',
+                letterSpacing: '-0.02em',
                 margin: '6px 0 0',
                 color: C.text,
               }}
@@ -553,8 +553,8 @@ function NewPill() {
         color: 'var(--pill-new-text, #ffffff)',
         fontFamily: serifStack,
         fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.08em',
+        fontWeight: 600,
+        letterSpacing: '0.1em',
         textTransform: 'uppercase',
         padding: '2px 6px',
         borderRadius: 2,
@@ -575,8 +575,8 @@ function LifecyclePill({ status, dark = false }: { status: string; dark?: boolea
       style={{
         display: 'inline-block',
         fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: '0.08em',
+        fontWeight: 600,
+        letterSpacing: '0.1em',
         textTransform: 'uppercase' as const,
         padding: '2px 6px',
         borderRadius: 2,
@@ -603,7 +603,7 @@ function Eyebrow({ category }: { category: CategoryRow | undefined }) {
         fontFamily: serifStack,
         fontSize: 11,
         fontWeight: 600,
-        letterSpacing: '0.12em',
+        letterSpacing: '0.1em',
         textTransform: 'uppercase',
         color: C.muted,
       }}
@@ -618,10 +618,11 @@ function MetaLine({ story }: { story: HomeStory }) {
     <p
       style={{
         margin: '12px 0 0',
-        fontSize: 13,
+        fontSize: 11,
         color: C.muted,
-        fontWeight: 500,
-        letterSpacing: '0.01em',
+        fontWeight: 600,
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
       }}
     >
       {timeShort(story.published_at)}
@@ -677,7 +678,7 @@ function Hero({
                         fontFamily: serifStack,
                         fontSize: 11,
                         fontWeight: 600,
-                        letterSpacing: '0.12em',
+                        letterSpacing: '0.1em',
                         textTransform: 'uppercase' as const,
                         color: 'var(--hero-eyebrow, rgba(255,255,255,0.65))',
                       }}
@@ -694,8 +695,8 @@ function Hero({
                         color: '#111111',
                         fontFamily: serifStack,
                         fontSize: 10,
-                        fontWeight: 700,
-                        letterSpacing: '0.08em',
+                        fontWeight: 600,
+                        letterSpacing: '0.1em',
                         textTransform: 'uppercase',
                         padding: '2px 6px',
                         borderRadius: 2,
@@ -711,8 +712,8 @@ function Hero({
                 style={{
                   fontFamily: serifStack,
                   fontSize: 'clamp(24px, 5vw, 40px)',
-                  fontWeight: 700,
-                  lineHeight: 1.15,
+                  fontWeight: 600,
+                  lineHeight: 1.1,
                   letterSpacing: '-0.02em',
                   margin: 0,
                   color: heroTitleColor,
@@ -741,10 +742,11 @@ function Hero({
               <p
                 style={{
                   margin: '20px 0 0',
-                  fontSize: 13,
+                  fontSize: 11,
                   color: 'var(--hero-meta, rgba(255,255,255,0.55))',
-                  fontWeight: 500,
-                  letterSpacing: '0.01em',
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
                 }}
               >
                 {timeShort(story.published_at)}
@@ -784,7 +786,7 @@ function Hero({
                         fontFamily: serifStack,
                         fontSize: 11,
                         fontWeight: 600,
-                        letterSpacing: '0.12em',
+                        letterSpacing: '0.1em',
                         textTransform: 'uppercase' as const,
                         color: 'var(--hero-eyebrow, rgba(255,255,255,0.65))',
                       }}
@@ -801,8 +803,8 @@ function Hero({
                         color: '#111111',
                         fontFamily: serifStack,
                         fontSize: 10,
-                        fontWeight: 700,
-                        letterSpacing: '0.08em',
+                        fontWeight: 600,
+                        letterSpacing: '0.1em',
                         textTransform: 'uppercase',
                         padding: '2px 6px',
                         borderRadius: 2,
@@ -818,8 +820,8 @@ function Hero({
                 style={{
                   fontFamily: serifStack,
                   fontSize: 'clamp(24px, 5vw, 40px)',
-                  fontWeight: 700,
-                  lineHeight: 1.15,
+                  fontWeight: 600,
+                  lineHeight: 1.1,
                   letterSpacing: '-0.02em',
                   margin: 0,
                   color: heroTitleColor,
@@ -848,10 +850,11 @@ function Hero({
               <p
                 style={{
                   margin: '20px 0 0',
-                  fontSize: 13,
+                  fontSize: 11,
                   color: 'var(--hero-meta, rgba(255,255,255,0.55))',
-                  fontWeight: 500,
-                  letterSpacing: '0.01em',
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
                 }}
               >
                 {timeShort(story.published_at)}
@@ -964,9 +967,11 @@ function TwoUpCard({
       </div>
       <h3
         style={{
+          // Drop banished 700 -> 600. Source Serif 4 + tight tracking
+          // matches the article H1 family at a card-scale size.
           fontFamily: serifStack,
           fontSize: 20,
-          fontWeight: 700,
+          fontWeight: 600,
           lineHeight: 1.2,
           letterSpacing: '-0.01em',
           margin: 0,
@@ -1057,7 +1062,7 @@ function SupportingCard({
           style={{
             fontFamily: serifStack,
             fontSize: 22,
-            fontWeight: 700,
+            fontWeight: 600,
             lineHeight: 1.2,
             letterSpacing: '-0.01em',
             margin: 0,
@@ -1108,7 +1113,7 @@ function SupportingCard({
           style={{
             fontFamily: serifStack,
             fontSize: 22,
-            fontWeight: 700,
+            fontWeight: 600,
             lineHeight: 1.2,
             letterSpacing: '-0.01em',
             margin: 0,
