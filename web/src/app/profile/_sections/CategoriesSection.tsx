@@ -363,7 +363,7 @@ export function CategoriesSection({ categories, scores, loading }: CategoriesSec
                       letterSpacing: '0.06em',
                     }}
                   >
-                    Score
+                    {score?.rank != null ? `#${score.rank.toLocaleString()}` : 'Score'}
                   </div>
                 </div>
                 <span aria-hidden style={{ color: C.inkFaint, fontSize: F.lg }}>

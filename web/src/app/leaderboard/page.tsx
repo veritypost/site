@@ -166,9 +166,14 @@ function LeaderboardPageContent() {
     router.replace(`?${params.toString()}`, { scroll: false });
   };
   const setActiveSub = (sub: string | null) => {
-    setActiveSubState(sub);
+    // Match the profile's CategoriesSection pill behavior: clicking an
+    // already-active sub deselects back to the parent view. Sub-pill
+    // call sites pass the clicked sub's id; we toggle here so both
+    // surfaces share one mental model.
+    const next = sub && activeSub === sub ? null : sub;
+    setActiveSubState(next);
     const params = new URLSearchParams(searchParams.toString());
-    if (sub) params.set('sub', sub); else params.delete('sub');
+    if (next) params.set('sub', next); else params.delete('sub');
     router.replace(`?${params.toString()}`, { scroll: false });
   };
 
@@ -479,6 +484,13 @@ function LeaderboardPageContent() {
     setMyRank(i >= 0 ? i + 1 : null);
   }, [me, users]);
 
+  // Top-N% derivation for the rank cards. Same math as the profile's
+  // user_category_ranks RPC: CEIL(rank / total * 100). Suppressed when
+  // there's only one participant — "top 100%" reads as broken.
+  const myPercentile = myRank != null && users.length > 1
+    ? Math.ceil((myRank / users.length) * 100)
+    : null;
+
   const activeSubs = activeCat ? subcats.filter((s) => s.category_id === activeCat) : [];
   // Wave F — admin-aware visible-sub set, used by both the parent-pill row
   // (to tighten its trailing padding when subs render below) and the
@@ -551,7 +563,7 @@ function LeaderboardPageContent() {
                       "This view" was ambiguous; users couldn't tell whether
                       changing tab/category/period would surface their rank. */}
                   {myRank
-                    ? `#${myRank}`
+                    ? `#${myRank}${myPercentile != null ? ` · top ${myPercentile}%` : ''}`
                     : `not in the top ${visibleUsers.length || 'list'} for ${activeTab}`}
                 </span>
               </div>
@@ -1028,6 +1040,11 @@ function LeaderboardPageContent() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 15, fontWeight: 700, color: rankAccentColor(myRank) }}>
                 #{myRank}
+                {myPercentile != null ? (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dim)', marginLeft: 6 }}>
+                    top {myPercentile}%
+                  </span>
+                ) : null}
               </span>
               <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>
                 {displayMetric.toLocaleString()}
