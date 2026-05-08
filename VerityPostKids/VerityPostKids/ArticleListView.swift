@@ -148,7 +148,6 @@ struct ArticleListView: View {
                     Text(summary)
                         .font(.system(.caption, design: .rounded, weight: .medium))
                         .foregroundStyle(K.dim)
-                        .lineLimit(2)
                         .multilineTextAlignment(.leading)
                 }
 

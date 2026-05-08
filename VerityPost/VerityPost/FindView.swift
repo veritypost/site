@@ -383,7 +383,6 @@ struct FindView: View {
                     .font(.system(size: 14, weight: .regular))
                     .foregroundColor(VP.muted)
                     .lineSpacing(2)
-                    .lineLimit(2)
                     .multilineTextAlignment(.leading)
             }
         }

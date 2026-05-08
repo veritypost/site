@@ -434,7 +434,6 @@ struct HomeView: View {
                     .font(.system(.subheadline, design: .serif, weight: .regular))
                     .lineSpacing(2)
                     .foregroundColor(VP.soft)
-                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 8)
             }
@@ -1305,7 +1304,7 @@ struct HomeSectionsSheet: View {
                                 .foregroundColor(VP.text)
                                 .lineLimit(2)
                             if let ex = story.excerpt {
-                                Text(ex).font(.caption).foregroundColor(VP.dim).lineLimit(2)
+                                Text(ex).font(.caption).foregroundColor(VP.dim)
                             }
                         }
                         .padding(.vertical, 4)
@@ -1569,7 +1568,7 @@ struct CategoryFeedView: View {
                                 .foregroundColor(VP.text)
                                 .lineLimit(3)
                             if let ex = story.excerpt {
-                                Text(ex).font(.caption).foregroundColor(VP.dim).lineLimit(2)
+                                Text(ex).font(.caption).foregroundColor(VP.dim)
                             }
                         }
                         .padding(.vertical, 4)

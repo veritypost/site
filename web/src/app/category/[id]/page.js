@@ -643,11 +643,7 @@ function CategoryPageInner() {
                       {story.title}
                     </p>
                     <span style={{ fontSize: 12, color: '#666666', fontWeight: 500 }}>
-                      {story.excerpt
-                        ? story.excerpt.length > 60
-                          ? story.excerpt.slice(0, 60) + '…'
-                          : story.excerpt
-                        : ''}
+                      {story.excerpt || ''}
                     </span>
                   </div>
                 </Link>

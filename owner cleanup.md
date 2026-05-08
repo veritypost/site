@@ -101,7 +101,69 @@ Articles are stamped with `story_id`. Following the slug = following everything 
 
 **Owner note (2026-05-08):** max length = TBD. Will set when Phase 2 surfaces sample distribution + breakpoint behavior.
 
-**Status:** flagged — Phase 2 diagnostic pending. Needs to confirm: (a) where summaries currently get clamped (CSS line-clamp on cards?), (b) whether summaries are admin-written or AI-generated and where the generation prompt/length bound lives, (c) sample distribution of existing summary lengths, (d) sample-renders at mobile / tablet / desktop breakpoints to inform owner's max-length pick.
+**Phase 2 (diagnostic) findings — 2026-05-08:**
+
+(a) **Where summaries currently truncate.** Adult summary lives on `articles.excerpt`; kid summary on `articles.kids_summary`.
+- Web home `web/src/app/page.tsx`: 5 clamp sites — hero cards `WebkitLineClamp: 4` (lines 717, 825); standard cards `WebkitLineClamp: 2` + `maxHeight: 3.15em` Firefox fallback (lines 976, 1067, 1118).
+- Web category `web/src/app/category/[id]/page.js:638`: title 2-line clamp + a hard 60-char string slice on excerpt (`excerpt.slice(0, 60) + '…'`).
+- iOS main `VerityPost/VerityPost/HomeView.swift:432-438` (standard card): `.lineLimit(2)`. Hero card at `:368-374` is **already untruncated** (`fixedSize` only).
+- Kids iOS `VerityPostKids/VerityPostKids/ArticleListView.swift:147-152`: `.lineLimit(2)` on `kids_summary ?? excerpt`.
+
+(b) **Generation source + length bound.** Excerpts are AI-generated, not admin-written. Two prompts target slightly different lengths — divergence worth normalizing:
+- `web/src/app/api/admin/pipeline/generate/route.ts:1684` — "EXACTLY 3 sentences, 40–60 words total."
+- `web/src/lib/pipeline/editorial-guide.ts:854, 1184` — "2–3 sentences, 30–50 words. Fixed target."
+- The persisted column is `articles.excerpt` (no `summary` column despite its name in the prompt), set at `generate/route.ts:2564`.
+- Source-fed excerpts (RSS / scrape paths) cap at 3000 chars (`scrape-discovery.ts:39`, `scrape-json.ts:40`) but those raw values are not used directly on the home cards — generation rewrites them.
+
+(c) **Sample distribution (4 published articles in prod DB).**
+
+| metric | chars |
+|---|---|
+| min | 266 |
+| p50 | 311 |
+| avg | 329 |
+| p90 | 394 |
+| p95 | 411 |
+| p99 | 425 |
+| max | 428 |
+
+40-60 words ≈ 240-360 chars in English, so most rows land in spec; the 425-char tail suggests a few prompts overshoot. `kids_summary` is currently empty across the 4 published rows.
+
+(d) **Breakpoint reality at current 30-60-word generation target.**
+- Standard card content width is ~280px on a 320px mobile viewport, which fits ~30 chars per line at the existing 14px serif. A 311-char p50 excerpt wraps to ~10 lines on mobile, ~6 on tablet, ~4 on desktop.
+- The 2-line web clamp + iOS `lineLimit(2)` therefore drop ~80% of summary text on a small phone today. Cards look "crunched" because the clamp + the excerpt size are mismatched, not because the excerpt is too long in absolute terms.
+
+**Recommendation for the owner's max-length call.**
+
+The cap has to satisfy two things at once: (1) the smallest mobile card stays the height the owner wants without truncation, (2) the line is still useful information.
+
+| target | chars | mobile lines | desktop lines | feel |
+|---|---|---|---|---|
+| label | 60-90 | 2-3 | 1 | Drudge-ish one-liner |
+| **tight** | **100-140** | **3-4** | **1-2** | **fits typical card without crunching** |
+| current | 240-360 | 8-12 | 4-6 | requires clamp |
+
+If the goal is "card never truncates and never looks crunched on a 320px viewport," **100-140 chars (≈ 18-22 words, 1-2 sentences)** is the realistic ceiling. Loosen to 160-180 if owner wants a bit more breathing room and accepts a 4-line block on the smallest screens.
+
+To ship, the work splits into:
+- **Content rule:** rewrite both AI prompts (`generate/route.ts:1684` and `editorial-guide.ts:854/1184`) to target the new word/char count, single source of truth.
+- **UI rule:** delete the `WebkitLineClamp` styles on `page.tsx` (5 sites), drop the `slice(0, 60) + '…'` on `category/[id]/page.js:638`, drop iOS `.lineLimit(2)` in `HomeView.swift:432` + `ArticleListView.swift:147,151`.
+- **Backfill:** existing 4 articles' excerpts run through the new shorter prompt (or get manually trimmed since the dataset is tiny).
+
+**Owner pick (2026-05-08):** tight (100–140 chars / 18–22 words / 1–2 sentences).
+
+**Phase 3 shipped (2026-05-08):**
+- AI generation prompt at `web/src/app/api/admin/pipeline/generate/route.ts:1684` rewritten to "1–2 sentences, 18–22 words total (target ≈120 characters)" with a 25-word / 160-char ceiling and 12-word floor.
+- `web/src/lib/pipeline/editorial-guide.ts` — adult, kids, and tweens deck rules all rewritten to the same tight target. Stale "30–50 words" / "40–60 words" / "2–3 sentences" copy removed end-to-end.
+- Web home `web/src/app/page.tsx` — 5 `WebkitLineClamp` blocks deleted (hero ×2, standard ×3 + Firefox `maxHeight: 3.15em`).
+- Web category `web/src/app/category/[id]/page.js:646-650` — `excerpt.length > 60 ? slice(0, 60) + '…'` replaced with `story.excerpt || ''`.
+- iOS main: `HomeView.swift` standard card + the 2 secondary-list excerpts at lines ~1307 + ~1571 — `.lineLimit(2)` removed. `FindView.swift:386` — same.
+- Kids iOS: `ArticleListView.swift:147-152` — `.lineLimit(2)` on summary removed (title-clamp above intentionally kept).
+- DB backfill: 4 published articles' `articles.excerpt` rewritten in-place to land 108–134 chars (down from 266–428).
+
+**Reviewer post-impl pass (2026-05-08):** caught 4 holes (HomeView.swift secondary-list `.lineLimit`, FindView.swift `.lineLimit`, stale kids LENGTH paragraph in editorial-guide); all fixed before commit.
+
+**Status:** shipped.
 
 ---
 

@@ -712,10 +712,6 @@ function Hero({
                     color: 'var(--hero-excerpt, rgba(255,255,255,0.80))',
                     margin: '12px 0 0',
                     fontWeight: 400,
-                    overflow: 'hidden',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 4,
-                    WebkitBoxOrient: 'vertical',
                   }}
                 >
                   {story.excerpt}
@@ -820,10 +816,6 @@ function Hero({
                     color: 'var(--hero-excerpt, rgba(255,255,255,0.80))',
                     margin: '12px 0 0',
                     fontWeight: 400,
-                    overflow: 'hidden',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 4,
-                    WebkitBoxOrient: 'vertical',
                   }}
                 >
                   {story.excerpt}
@@ -971,11 +963,6 @@ function TwoUpCard({
             color: C.soft,
             margin: '8px 0 0',
             fontWeight: 400,
-            overflow: 'hidden',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            maxHeight: '3.15em',
           }}
         >
           {story.excerpt}
@@ -1062,11 +1049,6 @@ function SupportingCard({
               color: C.soft,
               margin: '8px 0 0',
               fontWeight: 400,
-              overflow: 'hidden',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              maxHeight: '3.15em', // ~2 lines at lineHeight:1.5 for Firefox
             }}
           >
             {story.excerpt}
@@ -1113,11 +1095,6 @@ function SupportingCard({
               color: C.soft,
               margin: '8px 0 0',
               fontWeight: 400,
-              overflow: 'hidden',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              maxHeight: '3.15em', // ~2 lines at lineHeight:1.5 for Firefox
             }}
           >
             {story.excerpt}

@@ -848,22 +848,18 @@ SUMMARY RULES — LENGTH SCALES WITH ARTICLE LENGTH:
 
 The summary is a deck — it sits above the article and gives
 a skimmer the additional facts they need beyond the headline.
-A summary that approaches the article in length is a second
-article, not a deck. Target ~10–12% of body word count.
+The summary also renders on the home and category cards, where
+it has to fit a 320px mobile viewport without clamping or
+truncation, so the bound below is tight on purpose.
 
-LENGTH: 2–3 sentences, 30–50 words. Fixed target. The summary
-call runs in parallel with the body, so it cannot observe the
-body's actual length — conditional bands would be aspirational.
-A consistent 2–3 sentence deck is honest about that constraint.
+LENGTH: 1–2 sentences, 18–22 words (target ≈120 characters).
+Fixed target. The summary call runs in parallel with the body,
+so it cannot observe the body's actual length — a consistent
+short deck is honest about that constraint.
 
-Hard ceiling: 70 words. The summary never crosses this — past
-70 it stops being a deck.
-Hard floor: 15 words. A one-clause summary is too thin.
-
-Verity Post adult bodies target 250–450 words, so the typical
-summary lands at 30–50 words across 2–3 sentences. Pick the
-band that matches the body the editorial guide will produce
-for this story.
+Hard ceiling: 25 words / 160 characters. The summary never
+crosses this — past it the home card has to clamp.
+Hard floor: 12 words. A one-clause summary is too thin.
 
 CONTENT RULES:
 - The summary must NOT restate the headline or the article's
@@ -1130,22 +1126,19 @@ HEADLINE RULES:
 - No idioms or wordplay a kid would miss.
 - Present tense.
 
-SUMMARY RULES — LENGTH SCALES WITH ARTICLE LENGTH:
+SUMMARY RULES — TIGHT, FIXED-LENGTH DECK:
 
-The summary sits above the article. Keep it short — a kid who
-reads the summary should still want to read the article.
-Target ~10–12% of body word count.
+The summary sits above the article and also renders on home
+and category cards. To never clamp or truncate on a 320px
+mobile viewport, the deck stays short. A kid who reads the
+summary should still want to read the article.
 
-LENGTH: 2–3 short sentences, 30–50 words. Fixed target. The
-summary call runs in parallel with the body, so length cannot
-adapt to actual body length — a consistent deck is honest about
-the constraint.
+LENGTH: 1–2 sentences, 18–22 words (target ≈120 characters).
+Fixed target. The summary call runs in parallel with the body,
+so it cannot observe the body's actual length — a consistent
+short deck is honest about that constraint.
 
-Hard ceiling: 60 words for kids — even shorter than adult.
-Hard floor: 15 words.
-
-Verity Post kids bodies target 250–450 words, so the typical
-summary lands at 30–50 words across 2–3 sentences.
+Hard ceiling: 25 words / 160 characters. Hard floor: 12 words.
 
 CONTENT RULES:
 - Short sentences in 7–9 voice. One idea per sentence.
@@ -1175,21 +1168,18 @@ HEADLINE RULES:
 - No clickbait, no rhetorical questions.
 - Present tense for current events.
 
-SUMMARY RULES — LENGTH SCALES WITH ARTICLE LENGTH:
+SUMMARY RULES — TIGHT, FIXED-LENGTH DECK:
 
-The summary sits above the article. Keep the deck-to-article
-ratio honest — a summary that approaches the article in length
-is a second article. Target ~10–12% of body word count.
+The summary sits above the article and also renders on home
+and category cards. To never clamp or truncate on a 320px
+mobile viewport, the deck stays short.
 
-LENGTH: 2–3 sentences, 30–50 words. Fixed target. The summary
-call runs in parallel with the body, so length cannot adapt to
-actual body length — a consistent deck is honest about the
-constraint.
+LENGTH: 1–2 sentences, 18–22 words (target ≈120 characters).
+Fixed target. The summary call runs in parallel with the body,
+so it cannot observe the body's actual length — a consistent
+short deck is honest about that constraint.
 
-Hard ceiling: 70 words. Hard floor: 15 words.
-
-Verity Post tweens bodies target 250–450 words, so the typical
-summary lands at 30–50 words across 2–3 sentences.
+Hard ceiling: 25 words / 160 characters. Hard floor: 12 words.
 
 CONTENT RULES:
 - Different facts than the headline. The summary must NOT
