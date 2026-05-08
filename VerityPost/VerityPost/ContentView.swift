@@ -234,11 +234,14 @@ struct MainTabView: View {
     @State private var deepLinkStory: Story?
     private let deepLinkClient = SupabaseManager.shared.client
 
-    // Nav restructure 2026-05-06: 2-tab layout matching mobile web.
-    // Browse removed from bottom nav; sections accessible via HomeSectionsSheet.
-    // Following dropped pre-launch. Notifications and Rankings moved into Profile.
+    // Nav restructure 2026-05-06: matches mobile web. Browse removed
+    // from bottom nav; sections accessible via HomeSectionsSheet.
+    // 2026-05-07: Following added back as a 3rd tab (mirrors web
+    // NavWrapper update) — points at the article-bookmarks list.
+    // The story-level /following surface stays launch-hidden.
+    // Notifications and Rankings still accessed from Profile.
     // Profile slot relabels to "Sign up" for anon users.
-    enum Tab: Hashable { case today, profile }
+    enum Tab: Hashable { case today, following, profile }
 
     private var isLoggedIn: Bool { auth.currentUser != nil }
 
@@ -275,6 +278,17 @@ struct MainTabView: View {
         ZStack {
             switch selectedTab {
             case .today: NavigationStack { HomeView() }
+            case .following:
+                NavigationStack {
+                    if isLoggedIn {
+                        BookmarksView()
+                    } else {
+                        SignInGate(
+                            feature: "Follow articles",
+                            detail: "Sign up to follow articles and pick up where you left off."
+                        )
+                    }
+                }
             case .profile:
                 NavigationStack {
                     if isLoggedIn {
@@ -458,11 +472,20 @@ struct TextTabBar: View {
     }
 
     private var items: [Item] {
-        // Nav restructure 2026-05-06: 2 tabs matching mobile web.
-        // FollowingView.swift + BrowseLanding kept alive for one-line re-expose if needed.
-        [
-            Item(id: .today, label: "Home"),
-            Item(id: .profile, label: isLoggedIn ? "Profile" : "Sign up"),
+        // Nav restructure: matches mobile web. Following tab added 2026-05-07
+        // (points at BookmarksView — article-level following). Anon users
+        // see Home + Sign up; the standalone Following tab is hidden for
+        // them since it requires an account anyway.
+        if isLoggedIn {
+            return [
+                Item(id: .today,     label: "Home"),
+                Item(id: .following, label: "Following"),
+                Item(id: .profile,   label: "Profile"),
+            ]
+        }
+        return [
+            Item(id: .today,   label: "Home"),
+            Item(id: .profile, label: "Sign up"),
         ]
     }
 
