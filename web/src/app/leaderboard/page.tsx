@@ -532,7 +532,7 @@ function LeaderboardPageContent() {
     // Ext-NN1 — main landmark for screen readers.
     <main className="vp-dark">
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px 16px 80px' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 20px', letterSpacing: '-0.02em' }}>
+        <h1 style={{ fontSize: 28, fontWeight: 600, margin: '0 0 20px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
           Most Informed
         </h1>
         <h2 style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
@@ -568,7 +568,7 @@ function LeaderboardPageContent() {
                 </span>
               </div>
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>
               {displayMetric.toLocaleString()}
             </div>
           </div>
@@ -606,9 +606,9 @@ function LeaderboardPageContent() {
                   border: 'none',
                   minHeight: 44,
                   background: activeTab === t ? 'var(--tab-active-bg)' : 'var(--card)',
-                  color: activeTab === t ? 'var(--accent)' : 'var(--dim)',
-                  fontSize: 13,
-                  fontWeight: 500,
+                  color: activeTab === t ? 'var(--text-primary)' : 'var(--dim)',
+                  fontSize: 12,
+                  fontWeight: activeTab === t ? 600 : 500,
                   cursor: 'pointer',
                   fontFamily: 'var(--font-sans)',
                   whiteSpace: 'nowrap',
@@ -635,7 +635,7 @@ function LeaderboardPageContent() {
                   background: period === p ? 'var(--text-primary)' : 'transparent',
                   color: period === p ? 'var(--bg)' : 'var(--dim)',
                   fontSize: 11,
-                  fontWeight: 500,
+                  fontWeight: period === p ? 600 : 500,
                   minHeight: 44,
                   cursor: 'pointer',
                   fontFamily: 'var(--font-sans)',
@@ -789,7 +789,7 @@ function LeaderboardPageContent() {
           )}
           {!loading && !loadError && visibleUsers.length === 0 && (
             <div style={{ padding: '24px 20px', textAlign: 'center' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, letterSpacing: '-0.01em' }}>
                 {!me ? 'Leaderboard is warming up' : 'No results'}
               </div>
               <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 14, lineHeight: 1.5 }}>
@@ -867,7 +867,7 @@ function LeaderboardPageContent() {
                   borderTop: '1px solid var(--rule)',
                 }}
               >
-                <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                <p style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em' }}>
                   Sign up to see the full leaderboard
                 </p>
                 <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--dim)' }}>
@@ -934,7 +934,7 @@ function LeaderboardPageContent() {
                     borderTop: '1px solid var(--rule)',
                   }}
                 >
-                  <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                  <p style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em' }}>
                     Verify your email to see ranks beyond top 3.
                   </p>
                   {resendState === 'sent' ? (
@@ -1038,15 +1038,15 @@ function LeaderboardPageContent() {
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: rankAccentColor(myRank) }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: rankAccentColor(myRank) }}>
                 #{myRank}
                 {myPercentile != null ? (
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--dim)', marginLeft: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--dim)', marginLeft: 6 }}>
                     top {myPercentile}%
                   </span>
                 ) : null}
               </span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>
                 {displayMetric.toLocaleString()}
               </span>
             </div>
@@ -1103,7 +1103,7 @@ function LeaderRow({
       <span
         style={{
           fontSize: 14,
-          fontWeight: 700,
+          fontWeight: 600,
           color: rankColor,
           width: 28,
           textAlign: 'right',
@@ -1147,7 +1147,7 @@ function LeaderRow({
           </div>
         )}
       </div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>
+      <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--accent)' }}>
         {(u.displayScore || 0).toLocaleString()}
       </div>
     </div>
