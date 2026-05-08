@@ -13,6 +13,9 @@ export default function AnonArticleCtaBanner() {
       borderRadius: 12,
       background: 'var(--card, #f9f9f9)',
       border: '1px solid var(--p-border)',
+      // Explicit no-shadow — editorial cards rely on border + neutral
+      // surface, not lifted-card shadow weight.
+      boxShadow: 'none',
       display: 'flex',
       alignItems: 'center',
       gap: 16,
@@ -20,10 +23,27 @@ export default function AnonArticleCtaBanner() {
       flexWrap: 'wrap' as const,
     }}>
       <div>
-        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--p-ink)' }}>
+        <p style={{
+          // 14/600 -> editorial meta family (11/600/0.1em uppercase) so the
+          // banner reads as native article chrome, not a marketing tag.
+          margin: 0,
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: 'var(--p-ink-muted)',
+        }}>
           Join the discussion
         </p>
-        <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--p-ink-muted)' }}>
+        <p style={{
+          // 13 -> 14/1.5. The sub-copy carries the actual value prop now
+          // that the heading is a label; lifting size + leading makes it
+          // legibly so.
+          margin: '6px 0 0',
+          fontSize: 14,
+          lineHeight: 1.5,
+          color: 'var(--p-ink)',
+        }}>
           Sign up free to bookmark, follow topics, and comment after the quiz.
         </p>
       </div>
@@ -31,13 +51,16 @@ export default function AnonArticleCtaBanner() {
         <a
           href={`/login?next=${encodeURIComponent(pathname)}`}
           style={{
+            // Aligned to the Quiz CTA family (14/600, padding 10/20,
+            // borderRadius 10, -0.005em tracking).
             display: 'inline-block',
             background: 'var(--p-ink)',
             color: 'var(--p-bg)',
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: 600,
-            padding: '9px 18px',
-            borderRadius: 8,
+            letterSpacing: '-0.005em',
+            padding: '10px 20px',
+            borderRadius: 10,
             textDecoration: 'none',
             whiteSpace: 'nowrap' as const,
           }}
@@ -47,9 +70,11 @@ export default function AnonArticleCtaBanner() {
         <button
           onClick={() => setDismissed(true)}
           style={{
+            // 12 -> 13 for touch readability; stay quiet (no underline,
+            // muted ink) so it recedes against the primary CTA.
             background: 'transparent',
             border: 0,
-            fontSize: 12,
+            fontSize: 13,
             color: 'var(--p-ink-muted)',
             cursor: 'pointer',
             padding: '4px 8px',
