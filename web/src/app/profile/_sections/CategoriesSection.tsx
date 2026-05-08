@@ -50,6 +50,12 @@ export type CategoryScoreRow = {
   quizzes_passed: number;
   comments: number;
   upvotes_received: number;
+  // Rank within the leaf's leaderboard, total scoring users at the leaf,
+  // and "Top X%" percentile. Null when the user has never scored against
+  // that leaf or the leaf has no other participants.
+  rank: number | null;
+  total: number | null;
+  percentile: number | null;
 };
 
 export interface CategoriesSectionProps {
@@ -240,6 +246,17 @@ export function CategoriesSection({ categories, scores, loading }: CategoriesSec
             score
           </span>
         </div>
+        {scopeRow?.rank != null && scopeRow?.total != null ? (
+          <div style={{
+            fontSize: F.sm, color: C.inkMuted, marginTop: -S[3], marginBottom: S[4],
+            fontFamily: FONT.sans, lineHeight: 1.4,
+          }}>
+            #{scopeRow.rank.toLocaleString()} of {scopeRow.total.toLocaleString()}
+            {scopeRow.percentile != null && scopeRow.total > 1
+              ? <> · top <strong style={{ color: C.ink }}>{scopeRow.percentile}%</strong></>
+              : null}
+          </div>
+        ) : null}
         <div
           style={{
             display: 'grid',
@@ -392,7 +409,7 @@ export function CategoriesSectionConnected({ authUserId }: CategoriesSectionConn
       // kids surface; same filter the /leaderboard page applies). Scores
       // are scoped to this user's adult rows — kid_profile_id IS NULL
       // ensures we don't pull family-shared kid scores into the adult view.
-      const [catsRes, metricsRes] = await Promise.all([
+      const [catsRes, metricsRes, ranksRes] = await Promise.all([
         supabase
           .from('categories')
           .select('id, name, slug, parent_id, sort_order')
@@ -400,6 +417,7 @@ export function CategoriesSectionConnected({ authUserId }: CategoriesSectionConn
           .eq('is_kids_safe', false)
           .order('sort_order'),
         supabase.rpc('get_user_category_metrics', { p_user_id: authUserId }),
+        supabase.rpc('user_category_ranks'),
       ]);
 
       if (cancelled) return;
@@ -419,15 +437,41 @@ export function CategoriesSectionConnected({ authUserId }: CategoriesSectionConn
         upvotes_received: number;
         score: number;
       };
-      const scoreRows: CategoryScoreRow[] = ((metricsRes.data ?? []) as MetricsRow[]).map((r) => ({
-        category_id: r.category_id,
-        leaf_id: r.subcategory_id ?? r.category_id,
-        score: r.score,
-        reads: r.reads,
-        quizzes_passed: r.quizzes_passed,
-        comments: r.comments,
-        upvotes_received: r.upvotes_received,
-      }));
+      type RankRow = {
+        category_id: string;
+        subcategory_id: string | null;
+        score: number;
+        rank: number;
+        total: number;
+        percentile: number | null;
+      };
+      // Rank lookup keyed the same way scoreById is — leaf_id collapses
+      // (category_id, subcategory_id) so the scope card resolves with one
+      // map hit. ranksRes errors don't block the section; rank just shows
+      // as null in that case.
+      const rankByLeaf = new Map<string, { rank: number; total: number; percentile: number | null }>();
+      if (!ranksRes?.error) {
+        for (const r of ((ranksRes?.data ?? []) as RankRow[])) {
+          const leaf = r.subcategory_id ?? r.category_id;
+          rankByLeaf.set(leaf, { rank: r.rank, total: r.total, percentile: r.percentile });
+        }
+      }
+      const scoreRows: CategoryScoreRow[] = ((metricsRes.data ?? []) as MetricsRow[]).map((r) => {
+        const leaf = r.subcategory_id ?? r.category_id;
+        const rk = rankByLeaf.get(leaf);
+        return {
+          category_id: r.category_id,
+          leaf_id: leaf,
+          score: r.score,
+          reads: r.reads,
+          quizzes_passed: r.quizzes_passed,
+          comments: r.comments,
+          upvotes_received: r.upvotes_received,
+          rank: rk?.rank ?? null,
+          total: rk?.total ?? null,
+          percentile: rk?.percentile ?? null,
+        };
+      });
 
       setCategories((catsRes.data ?? []) as CategoryRow[]);
       setScores(scoreRows);
