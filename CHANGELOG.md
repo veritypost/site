@@ -6,6 +6,78 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### Kid soft-pause — pause/unpause now takes effect in seconds
+**Files:** see breakdown.
+
+Owner-flagged: when a parent paused a kid profile, the kid's iPhone
+kept working for up to 24h before the pause actually took effect.
+"Pause" was a label nobody read — RLS didn't gate on it, the iOS
+app didn't notice it, and `kid_sessions` weren't revoked. Delete
+worked because it killed the session; pause never had analogous
+plumbing.
+
+Owner-stated requirement: pause/unpause should be a frictionless
+toggle, not a session-kill that requires re-pair. Designed
+end-to-end via two recon agents + adversary; adversary caught one
+critical security flaw (blanket-replacing `is_kid_delegated()`
+would have inverted security on 46 block-clauses on adult tables —
+a paused kid would gain write access to `users` / `subscriptions` /
+`messages`). Final design has three layers:
+
+**Layer A — DB (security floor):**
+- New `is_kid_delegated_and_active()` SECURITY DEFINER STABLE function
+  that does the JWT check + EXISTS on `kid_profiles WHERE id=auth.uid()
+  AND is_active=true AND paused_at IS NULL`.
+- Swapped into 12 kid-grant policies (write paths + most reads):
+  `articles_read_kid_jwt`, `category_scores_select_kid_jwt`,
+  `kid_expert_questions_*`, `kid_expert_sessions_select_kid_jwt`,
+  `kid_profiles_select_global_leaderboard_kid_jwt`,
+  `kid_profiles_select_siblings_kid_jwt`, `quiz_attempts_*`,
+  `reading_log_*`, `user_achievements_select_kid_jwt`. Every kid
+  write fails RLS denial sub-second after pause commits.
+- Deliberately NOT swapped: 46 block-clauses on adult tables (kept
+  on the JWT-only `is_kid_delegated()` so paused kids stay blocked
+  from `users` / `messages` / etc) and `kid_profiles_select_kid_jwt`
+  (own-row read — paused kid must still read their profile to
+  detect the pause and render the friendly screen).
+- Migration: `kid_paused_active_rls_predicate`.
+
+**Layer B — kids iOS (UX):**
+- New `KidPausedView.swift` — friendly screen with kid's name,
+  "your parent paused this — they can unpause it any time, no need
+  to set anything up again" copy, and a "Check again" button. Soft-
+  delete shows different copy ("this profile was removed").
+- `KidsAppState.swift` — added `@Published isPaused`, `isInactive`,
+  `didInitialLoad`. `loadKidRow()` SELECT extended to include
+  `paused_at` and `is_active`; sets the flags after read.
+- `KidsAppRoot.swift` — new branch routes `auth.kid != nil &&
+  (state.isPaused || state.isInactive)` to KidPausedView instead of
+  the tabbed app. Cold-launch flicker prevention: route to
+  `launchGate` while `!state.didInitialLoad` so a paused kid never
+  sees the home screen briefly before flipping. Realtime subscription
+  on the kid's own kid_profiles row via postgres_changes filtered
+  to `id=eq.<kid_id>` (lowercased for canonical-uuid match) — any
+  UPDATE re-runs `state.load`, flipping the screen live in seconds.
+
+**Skipped (intentional):**
+- Hard session revocation on pause. Owner explicitly chose soft-
+  pause: pause should be a parent-side toggle, not a sign-out event
+  that forces re-pair on unpause. Delete still revokes sessions
+  (existing behavior, separate path).
+
+Effective time of action after this lands: parent pauses → kid's
+RLS-denied next write within ~1 round-trip; kid's iOS app flips
+to paused screen via realtime in seconds (or on next foreground
+recheck if realtime is unavailable). Was previously 24h.
+
+Adversary review on the bundle: HOLDS with 3 small adjustments,
+all applied (cold-launch flicker guard via `didInitialLoad`,
+`paused_at != nil` instead of empty-string check, lowercase the
+realtime filter value). One non-blocking note deferred: the
+inlined detached-unsubscribe pattern in KidsAppRoot duplicates
+`RealtimeHelpers.drainRealtimeChannel` from the adult target —
+extract to shared file in a follow-up.
+
 ### BugList sweep — race & atomicity 4 shipped, 1 refuted
 **Files:** see breakdown.
 

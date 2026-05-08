@@ -56,6 +56,34 @@ struct KidsAppRoot: View {
                 launchGate
                     .environmentObject(auth)
                     .transition(.opacity)
+            } else if auth.kid != nil, !state.didInitialLoad {
+                // Cold launch — keep the launch gate up until the
+                // first kid_profiles read resolves. Without this, a
+                // paused kid would briefly see tabbedApp + the home
+                // screen for the ~200-400ms loadKidRow takes, before
+                // flipping to KidPausedView.
+                launchGate
+                    .environmentObject(auth)
+                    .transition(.opacity)
+            } else if auth.kid != nil, state.isPaused || state.isInactive {
+                // Soft-pause / soft-delete branch. The kid stays
+                // logged in (no re-pair on unpause) — server RLS via
+                // is_kid_delegated_and_active() denies all writes
+                // while paused, and this screen flips back to the
+                // tabbed app the moment the parent unpauses (live via
+                // the kid_profiles realtime subscription below).
+                KidPausedView(
+                    kidName: auth.kid?.name ?? "",
+                    isInactive: state.isInactive,
+                    onCheckAgain: {
+                        if let kid = auth.kid {
+                            Task { await state.load(forKidId: kid.id, kidName: kid.name) }
+                        }
+                    }
+                )
+                .environmentObject(auth)
+                .environmentObject(state)
+                .transition(.opacity)
             } else if auth.kid != nil {
                 tabbedApp
                     .environmentObject(auth)
@@ -77,6 +105,38 @@ struct KidsAppRoot: View {
         .task(id: auth.kid?.id) {
             guard let kid = auth.kid else { return }
             await state.load(forKidId: kid.id, kidName: kid.name)
+        }
+        // Realtime subscription on the kid's own kid_profiles row.
+        // When a parent flips paused_at or is_active on another device,
+        // the UPDATE arrives here within seconds and we re-load the
+        // profile state — KidPausedView appears (or disappears) live.
+        // RLS already permits self-row reads, so the channel sees the
+        // update without extra grants. Channel is keyed on kid.id so
+        // .task(id:) auto-tears it down on profile switch / sign-out.
+        .task(id: auth.kid?.id) {
+            guard let kid = auth.kid else { return }
+            let client = SupabaseKidsClient.shared.client
+            let channel = client.channel("kid-profile-self-\(kid.id)")
+            // Lowercase the id for the realtime filter — Postgres renders
+            // uuids canonical-lowercase in WAL events, and any uppercased
+            // / whitespace-padded value at pairing time would silently
+            // never match.
+            let stream = channel.postgresChange(
+                AnyAction.self,
+                schema: "public",
+                table: "kid_profiles",
+                filter: .eq("id", value: kid.id.lowercased())
+            )
+            await channel.subscribe()
+            await withTaskCancellationHandler {
+                for await _ in stream {
+                    await state.load(forKidId: kid.id, kidName: kid.name)
+                }
+            } onCancel: {
+                Task.detached { @Sendable in
+                    await channel.unsubscribe()
+                }
+            }
         }
         // K2: rotate the kid JWT on every foreground transition when it's
         // under a day from expiry. Launch-time refresh is handled inside

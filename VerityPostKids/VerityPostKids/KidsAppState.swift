@@ -36,6 +36,21 @@ final class KidsAppState: ObservableObject {
     @Published var verityScore: Int = 0
     @Published var quizzesPassed: Int = 0
 
+    // Pause / soft-deactivation state. Set from loadKidRow() and
+    // refreshed on foreground transitions + via the kid_profiles
+    // realtime subscription in KidsAppRoot. When either flips true,
+    // KidsAppRoot replaces the tab-bar app with KidPausedView. RLS
+    // also denies all kid writes server-side, so the lock is real
+    // even if the UI lags by a beat.
+    @Published var isPaused: Bool = false
+    @Published var isInactive: Bool = false
+
+    // Set true at the end of the first successful loadKidRow() so the
+    // routing branch in KidsAppRoot can route paused kids straight to
+    // KidPausedView on cold launch instead of flashing tabbedApp for
+    // ~200-400ms while loadKidRow is in flight. Adversary-flagged.
+    @Published var didInitialLoad: Bool = false
+
     private var didOptimisticallyIncrementStreak: Bool = false
 
     // Home content
@@ -96,11 +111,13 @@ final class KidsAppState: ObservableObject {
             let reading_band: String?
             let verity_score: Int?
             let quizzes_completed_count: Int?
+            let paused_at: String?
+            let is_active: Bool?
         }
         do {
             let row: Row = try await client
                 .from("kid_profiles")
-                .select("streak_current, reading_band, verity_score, quizzes_completed_count")
+                .select("streak_current, reading_band, verity_score, quizzes_completed_count, paused_at, is_active")
                 .eq("id", value: kidId)
                 .single()
                 .execute()
@@ -119,8 +136,16 @@ final class KidsAppState: ObservableObject {
             self.readingBand = row.reading_band ?? "kids"
             self.verityScore = row.verity_score ?? self.verityScore
             self.quizzesPassed = row.quizzes_completed_count ?? self.quizzesPassed
+            // Soft-pause: paused_at NOT NULL or is_active=false flips
+            // the lock. KidsAppRoot watches these and shows the paused
+            // screen. Unpause on the parent side flips both back and
+            // the kid's UI unlocks live (no re-pair).
+            self.isPaused = (row.paused_at != nil)
+            self.isInactive = (row.is_active == false)
+            self.didInitialLoad = true
         } catch {
             self.loadError = "Couldn't update your home screen."
+            self.didInitialLoad = true
         }
     }
 
