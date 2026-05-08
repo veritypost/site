@@ -6,6 +6,17 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### Pipeline — backward source hydration at generate-time
+**Files:** `web/src/app/api/admin/pipeline/generate/route.ts`. Closes the "older related coverage gets missed" gap that the 24h ingest window opens.
+
+**Problem:** RSS ingest pulls only items fetched in the last 24h (default `lookbackMs`). When a new article on the same story arrives days after the original, the older discovery_item is already in the DB but invisible to the in-batch clusterer (`.gte('fetched_at', cutoffIso)` filter), so it never merges into the new cluster. The body-writer then generates from one source even though older, related coverage exists.
+
+**Fix:** New step 9b inserted before source_fetch. Before scraping, the route queries `feed_clusters` for other recent rows (last 30 days, `created_at >=`) whose `keywords` array overlaps the current cluster's via Postgres `&&`. Each candidate gets scored with the existing `keywordOverlap()` from `cluster.ts`; matches above the 0.4 threshold (mirroring story-match) are sorted by score and capped at 5. Their `discovery_items` are pulled (`raw_body` already populated from prior scrape), deduped against the current cluster's URLs, capped at 5 added items, and merged into the `items` array that feeds source_fetch. Already-cached `raw_body` means line 1388's `>200 chars` cache hit fires and the scrape step skips the network round-trip — free hydration.
+
+Skipped on the `source_urls` override path (operator picked specifically) and on standalone / story-generate sentinel clusters (those keywords have no semantic signal). Non-fatal try/catch — a lookup failure logs a warning and falls through to current-cluster-only generation. Logs `newsroom.generate.related_sources_added` with cluster ids + match scores so operator can see what got merged.
+
+Cross-platform: web pipeline only. iOS / iOS Kids automatically benefit (richer corpus produces better articles, no app-side change).
+
 ### TODO 51 Part B — consolidated prompt-pass closing the remaining 4 items
 **Files:** `web/src/lib/pipeline/editorial-guide.ts`, `web/src/app/api/admin/pipeline/generate/route.ts`, `web/src/app/admin/newsroom/_components/SourcesBlock.tsx`. After 4 skeptical audit agents (one per remaining 51B item), each item collapsed from "architectural" to "prompt-rule + small validator." Owner's instinct was right: 51B was overstated. Closed all 4 in one session, ~150 lines instead of the 17–23 hours / 5–6 sessions originally estimated.
 - **#1 Native JSON mode → prompt-fix.** Every JSON-emitting user prompt now ends with "Respond with the JSON object only — no preamble, no markdown fence, no explanation." extractJSON's existing fence-strip + `{...}` regex fallback already handles the long tail. Native tool-use was theater for our <0.5% drift rate.

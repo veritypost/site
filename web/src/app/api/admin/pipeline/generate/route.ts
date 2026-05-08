@@ -49,6 +49,7 @@ import {
   PerRunCapExceededError,
 } from '@/lib/pipeline/errors';
 import { scrapeArticle } from '@/lib/pipeline/scrape-article';
+import { keywordOverlap } from '@/lib/pipeline/cluster';
 import { cleanText } from '@/lib/pipeline/clean-text';
 import { checkPlagiarism, rewriteForPlagiarism } from '@/lib/pipeline/plagiarism-check';
 import { fetchPromptOverrides, composeSystemPrompt } from '@/lib/pipeline/prompt-overrides';
@@ -1366,7 +1367,111 @@ export async function POST(req: Request) {
     }
 
     // ────────────────────────────────────────────────────────────────────────
-    // 9b. source_fetch — scrape raw_body for any item missing it
+    // 9b. related-source hydration — TODO 51B follow-up.
+    //
+    // The 24h ingest window leaves earlier coverage stranded: when a new
+    // article on the same story comes in 4 days after the original, the
+    // older row is invisible to the clusterer. Close that gap by looking
+    // backward at generate-time across other recent feed_clusters whose
+    // keywords overlap with this cluster's, and merging their already-
+    // scraped discovery_items into the source pool. Already-cached
+    // raw_body means the scrape step skips the network round-trip for
+    // these (line ~1388 cache check).
+    //
+    // Skipped on:
+    //   - source_urls override (operator picked specifically; respect that)
+    //   - standalone clusters (keywords=['standalone'|'story-generate']
+    //     are sentinels with no semantic signal)
+    //   - clusters with empty keywords (nothing to overlap on)
+    // ────────────────────────────────────────────────────────────────────────
+    if (!sourceUrlsOverridden && cluster_id) {
+      try {
+        const RELATED_LOOKBACK_DAYS = 30;
+        const RELATED_MAX_ITEMS = 5;
+        const RELATED_KEYWORD_OVERLAP = 0.4;
+        const STANDALONE_SENTINELS = new Set(['standalone', 'story-generate']);
+
+        const { data: clusterRow } = await service
+          .from('feed_clusters')
+          .select('id, keywords')
+          .eq('id', cluster_id)
+          .maybeSingle();
+
+        const currentKeywords = ((clusterRow?.keywords as string[] | null) ?? []).filter(
+          (k) => typeof k === 'string' && k.length > 0
+        );
+        const isSentinel =
+          currentKeywords.length === 1 && STANDALONE_SENTINELS.has(currentKeywords[0]);
+
+        if (currentKeywords.length > 0 && !isSentinel) {
+          const lookbackIso = new Date(
+            Date.now() - RELATED_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+          ).toISOString();
+
+          const { data: relatedClusters } = await service
+            .from('feed_clusters')
+            .select('id, keywords, created_at')
+            .overlaps('keywords', currentKeywords)
+            .gte('created_at', lookbackIso)
+            .neq('id', cluster_id)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+          const matched = (relatedClusters ?? [])
+            .map((r) => ({
+              id: r.id as string,
+              score: keywordOverlap(
+                currentKeywords,
+                ((r.keywords as string[] | null) ?? []).filter(
+                  (k) => typeof k === 'string' && k.length > 0
+                )
+              ),
+            }))
+            .filter((r) => r.score >= RELATED_KEYWORD_OVERLAP)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5);
+
+          if (matched.length > 0) {
+            const relatedClusterIds = matched.map((m) => m.id);
+            const existingUrls = new Set(items.map((i) => i.raw_url));
+
+            const { data: relatedItems } = await service
+              .from(discoveryTable)
+              .select('id, raw_url, raw_title, raw_body, metadata, feed_id, state')
+              .in('cluster_id', relatedClusterIds)
+              .not('raw_body', 'is', null)
+              .order('fetched_at', { ascending: false })
+              .limit(RELATED_MAX_ITEMS * 3);
+
+            const additions = (relatedItems ?? [])
+              .filter((it) => it.raw_url && !existingUrls.has(it.raw_url))
+              .slice(0, RELATED_MAX_ITEMS) as unknown as DiscoveryItem[];
+
+            if (additions.length > 0) {
+              items = items.concat(additions);
+              pipelineLog.info('newsroom.generate.related_sources_added', {
+                run_id: runId,
+                cluster_id,
+                related_clusters_considered: relatedClusters?.length ?? 0,
+                related_clusters_matched: matched.length,
+                related_items_added: additions.length,
+                top_score: matched[0]?.score ?? 0,
+              });
+            }
+          }
+        }
+      } catch (relErr) {
+        pipelineLog.warn('newsroom.generate.related_sources_failed', {
+          run_id: runId,
+          cluster_id,
+          error_message: relErr instanceof Error ? relErr.message : String(relErr),
+        });
+        // Non-fatal — fall through to normal generation with current cluster only.
+      }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 9c. source_fetch — scrape raw_body for any item missing it
     // ────────────────────────────────────────────────────────────────────────
     const fetchStart = Date.now();
     const scrapeStepName: Step = 'source_fetch';
