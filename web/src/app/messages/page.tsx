@@ -974,7 +974,7 @@ function MessagesPageInner() {
             </button>
             <div
               id="dm-paywall-title"
-              style={{ fontSize: 20, fontWeight: 800, marginBottom: 10, color: '#111' }}
+              style={{ fontSize: 20, fontWeight: 600, marginBottom: 10, color: '#111' }}
             >
               Direct messages are a paid feature
             </div>
@@ -1003,7 +1003,7 @@ function MessagesPageInner() {
                   marginBottom: 8,
                 }}
               >
-                <span style={{ fontSize: 15, fontWeight: 800, color: '#111' }}>Verity</span>
+                <span style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>Verity</span>
                 <span style={{ fontSize: 13, color: '#666' }}>{FALLBACK_VERITY_MONTHLY.formatted}/mo</span>
               </div>
               <ul
@@ -1030,7 +1030,7 @@ function MessagesPageInner() {
                   background: '#111',
                   color: '#fff',
                   fontSize: 14,
-                  fontWeight: 700,
+                  fontWeight: 600,
                   textDecoration: 'none',
                 }}
               >
@@ -1085,7 +1085,7 @@ function MessagesPageInner() {
                 marginBottom: 10,
               }}
             >
-              <h1 style={{ fontSize: 20, fontWeight: 700, color: '#111', margin: 0 }}>Messages</h1>
+              <h1 style={{ fontSize: 28, fontWeight: 600, color: '#111', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.15 }}>Messages</h1>
               <button
                 onClick={() => setShowSearch(true)}
                 style={{
@@ -1165,7 +1165,7 @@ function MessagesPageInner() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontSize: 15,
-                      fontWeight: 700,
+                      fontWeight: 600,
                       color: '#fff',
                       flexShrink: 0,
                     }}
@@ -1192,7 +1192,7 @@ function MessagesPageInner() {
                             aria-label={`${unread} unread`}
                             style={{
                               fontSize: 11,
-                              fontWeight: 700,
+                              fontWeight: 600,
                               color: '#fff',
                               background: '#111',
                               borderRadius: 999,
@@ -1204,7 +1204,7 @@ function MessagesPageInner() {
                             {unread}
                           </span>
                         )}
-                        <span style={{ fontSize: 11, color: '#999' }}>
+                        <span style={{ fontSize: 11, color: 'var(--p-ink-muted, #999)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                           {formatTime(c.last_message_at)}
                         </span>
                       </div>
@@ -1269,7 +1269,7 @@ function MessagesPageInner() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: 11,
-                    fontWeight: 700,
+                    fontWeight: 600,
                     color: '#fff',
                     flexShrink: 0,
                   }}
@@ -1293,7 +1293,7 @@ function MessagesPageInner() {
                       border: '1px solid #e5e5e5',
                       background: '#fff',
                       fontSize: 14,
-                      fontWeight: 700,
+                      fontWeight: 600,
                       color: '#111',
                       cursor: 'pointer',
                       lineHeight: 1,
@@ -1406,7 +1406,7 @@ function MessagesPageInner() {
               >
                 <div
                   id="dm-report-title"
-                  style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 8 }}
+                  style={{ fontSize: 15, fontWeight: 600, color: '#111', marginBottom: 8 }}
                 >
                   Report this user
                 </div>
@@ -1538,7 +1538,9 @@ function MessagesPageInner() {
                         style={{
                           fontSize: 11,
                           fontWeight: 600,
-                          color: '#999',
+                          letterSpacing: '0.1em',
+                          textTransform: 'uppercase',
+                          color: 'var(--p-ink-muted, #999)',
                           marginBottom: 2,
                           marginLeft: 4,
                         }}
@@ -1553,8 +1555,9 @@ function MessagesPageInner() {
                         borderRadius: 14,
                         background: isMe ? '#111' : '#fff',
                         color: isMe ? '#fff' : '#111',
-                        fontSize: 14,
-                        lineHeight: 1.45,
+                        fontSize: 16,
+                        lineHeight: 1.6,
+                        letterSpacing: '-0.005em',
                         border: isMe ? 'none' : '1px solid #e5e5e5',
                       }}
                     >
@@ -1562,8 +1565,11 @@ function MessagesPageInner() {
                     </div>
                     <span
                       style={{
-                        fontSize: 10,
-                        color: '#bbb',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: '0.1em',
+                        textTransform: 'uppercase',
+                        color: 'var(--p-ink-muted, #bbb)',
                         marginTop: 2,
                         marginLeft: 4,
                         marginRight: 4,
@@ -1697,7 +1703,7 @@ function MessagesPageInner() {
               >
                 <span
                   id="messages-new-title"
-                  style={{ fontSize: 16, fontWeight: 700, color: '#111' }}
+                  style={{ fontSize: 16, fontWeight: 600, color: '#111' }}
                 >
                   New message
                 </span>
@@ -1814,7 +1820,7 @@ function MessagesPageInner() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontSize: 14,
-                      fontWeight: 700,
+                      fontWeight: 600,
                       color: '#fff',
                       flexShrink: 0,
                     }}
