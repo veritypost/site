@@ -56,6 +56,12 @@ export interface CallModelParams {
   provider: Provider;
   model: string;
   system: string;
+  // Stable prefix of `system` to mark as cacheable (Anthropic prompt cache,
+  // 5-min ephemeral). Must be a prefix of `system`. The remainder of `system`
+  // (admin overrides, per-category appends) is sent as a second uncached
+  // block. Without this, the entire system param hashes differently per
+  // call and never hits the cache. OpenAI ignores this field.
+  system_cache_stable?: string;
   prompt: string;
   max_tokens: number;
   pipeline_run_id: string;
@@ -193,12 +199,33 @@ async function callAnthropicOnce(
 ): Promise<{ text: string; usage: Usage; raw: unknown; duration_ms: number }> {
   const client = getAnthropic();
   const t0 = Date.now();
+
+  // Build system blocks. If a stable prefix is declared and is actually a
+  // prefix of `system`, mark only that prefix as cached and put the rest
+  // (admin overrides, per-category appends) in a second uncached block.
+  // This lets EDITORIAL_GUIDE / HEADLINE_PROMPT / etc. hit the 5-min cache
+  // across calls even when overrides differ.
+  const stable = params.system_cache_stable;
+  const systemBlocks: Anthropic.Messages.TextBlockParam[] =
+    stable && params.system.startsWith(stable) && stable.length > 0
+      ? (() => {
+          const rest = params.system.slice(stable.length);
+          const blocks: Anthropic.Messages.TextBlockParam[] = [
+            { type: 'text', text: stable, cache_control: { type: 'ephemeral' } },
+          ];
+          if (rest.trim().length > 0) {
+            blocks.push({ type: 'text', text: rest });
+          }
+          return blocks;
+        })()
+      : [{ type: 'text', text: params.system, cache_control: { type: 'ephemeral' } }];
+
   const resp = await client.messages.create(
     {
       model: params.model,
       max_tokens: params.max_tokens,
       temperature: params.temperature ?? 0.3,
-      system: [{ type: 'text', text: params.system, cache_control: { type: 'ephemeral' } }],
+      system: systemBlocks,
       messages: [{ role: 'user', content: params.prompt }],
       ...(params.tools ? { tools: params.tools as Anthropic.Tool[] } : {}),
     },

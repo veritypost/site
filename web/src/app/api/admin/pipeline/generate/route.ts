@@ -1334,6 +1334,7 @@ export async function POST(req: Request) {
         provider: 'anthropic',
         model: HAIKU_MODEL,
         system: composeSystemPrompt(AUDIENCE_PROMPT, promptOverrides.get('audience_safety_check')),
+        system_cache_stable: AUDIENCE_PROMPT,
         prompt: userTurn,
         max_tokens: 400,
         pipeline_run_id: runId,
@@ -1610,6 +1611,7 @@ ${catListText}`;
         provider,
         model,
         system: composeSystemPrompt(headlineSystem, promptOverrides.get('headline')),
+        system_cache_stable: headlineSystem,
         prompt: headlineUser,
         max_tokens: 600,
         pipeline_run_id: runId,
@@ -1622,6 +1624,7 @@ ${catListText}`;
         provider,
         model,
         system: composeSystemPrompt(headlineSystem, promptOverrides.get('summary')),
+        system_cache_stable: headlineSystem,
         prompt: summaryUser,
         max_tokens: 400,
         pipeline_run_id: runId,
@@ -1636,6 +1639,7 @@ ${catListText}`;
             provider,
             model,
             system: composeSystemPrompt(CATEGORIZATION_PROMPT, promptOverrides.get('categorization')),
+            system_cache_stable: CATEGORIZATION_PROMPT,
             prompt: categorizationUser,
             max_tokens: 200,
             pipeline_run_id: runId,
@@ -1722,6 +1726,15 @@ ${catListText}`;
         : effectiveAgeBand === 'tweens'
           ? TWEENS_ARTICLE_PROMPT
           : KIDS_ARTICLE_PROMPT;
+    // EDITORIAL_GUIDE is ~5.3K tokens and identical across every adult run;
+    // mark it cacheable so the per-category append + JSON trailer + admin
+    // override all hash separately without busting the static prefix.
+    const bodyCacheStable =
+      audience === 'adult'
+        ? EDITORIAL_GUIDE
+        : effectiveAgeBand === 'tweens'
+          ? TWEENS_ARTICLE_PROMPT
+          : KIDS_ARTICLE_PROMPT;
     const bodyUser = `Write an ORIGINAL news article from the sources below. Today is ${new Date()
       .toISOString()
       .slice(0, 10)}.
@@ -1742,6 +1755,7 @@ ${corpus}`;
       provider,
       model,
       system: composeSystemPrompt(bodySystem, promptOverrides.get('body')),
+      system_cache_stable: bodyCacheStable,
       prompt: bodyUser,
       max_tokens: 3000,
       pipeline_run_id: runId,
@@ -1804,6 +1818,7 @@ Return JSON:
         provider: 'anthropic',
         model: HAIKU_MODEL,
         system: composeSystemPrompt(groundingSystem, promptOverrides.get('source_grounding')),
+        system_cache_stable: groundingSystem,
         prompt: groundingUser,
         max_tokens: 1500,
         pipeline_run_id: runId,
@@ -2031,6 +2046,7 @@ Return JSON:
       provider,
       model,
       system: composeSystemPrompt(timelineSystem, promptOverrides.get('timeline')),
+      system_cache_stable: timelineSystem,
       prompt: timelineUser,
       max_tokens: 2000,
       pipeline_run_id: runId,
@@ -2078,6 +2094,7 @@ Return JSON:
           provider: 'anthropic',
           model: HAIKU_MODEL,
           system: composeSystemPrompt(sanitizerSystem, promptOverrides.get('kid_url_sanitizer')),
+          system_cache_stable: sanitizerSystem,
           prompt: sanitizerUser,
           max_tokens: 3000,
           pipeline_run_id: runId,
@@ -2160,6 +2177,7 @@ Each option MUST be an object with a "text" field — never a bare string.${free
       provider,
       model,
       system: composeSystemPrompt(quizSystem, promptOverrides.get('quiz')),
+      system_cache_stable: quizSystem,
       prompt: quizUser,
       max_tokens: 2000,
       pipeline_run_id: runId,
@@ -2221,6 +2239,7 @@ Empty array if all correct.`;
       provider: 'anthropic',
       model: HAIKU_MODEL,
       system: composeSystemPrompt(verifySystem, promptOverrides.get('quiz_verification')),
+      system_cache_stable: verifySystem,
       prompt: verifyUser,
       max_tokens: 1000,
       pipeline_run_id: runId,

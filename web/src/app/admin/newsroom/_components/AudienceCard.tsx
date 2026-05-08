@@ -93,6 +93,10 @@ function AudienceCard(props: AudienceCardProps) {
   const [currentStep, setCurrentStep] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Two-step retry confirm: retry creates a fresh `articles` row, so any
+  // hand-edits the operator made to the prior article are stranded on the
+  // old row. First click arms the confirm; second click fires the retry.
+  const [confirmingRetry, setConfirmingRetry] = useState(false);
   const pollHandle = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollRunId = useRef<string | null>(null);
 
@@ -244,6 +248,7 @@ function AudienceCard(props: AudienceCardProps) {
 
   async function handleRetry() {
     if (!runId) return;
+    setConfirmingRetry(false);
     setBusy(true);
     setActionError(null);
     try {
@@ -453,9 +458,14 @@ function AudienceCard(props: AudienceCardProps) {
             )}
           </>
         )}
-        {state === 'failed' && (
+        {state === 'failed' && !confirmingRetry && (
           <>
-            <Button onClick={() => void handleRetry()} disabled={busy} variant="primary" size="sm">
+            <Button
+              onClick={() => { setActionError(null); setConfirmingRetry(true); }}
+              disabled={busy}
+              variant="primary"
+              size="sm"
+            >
               {busy ? 'Retrying…' : 'Retry'}
             </Button>
             {runId && (
@@ -477,6 +487,21 @@ function AudienceCard(props: AudienceCardProps) {
               </Link>
             )}
           </>
+        )}
+        {state === 'failed' && confirmingRetry && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: S[1], width: '100%' }}>
+            <span style={{ fontSize: F.xs, color: C.dim, lineHeight: 1.4 }}>
+              Retry creates a new article row. Any hand-edits to the previous one will be stranded.
+            </span>
+            <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>
+              <Button onClick={() => void handleRetry()} disabled={busy} variant="primary" size="sm">
+                {busy ? 'Retrying…' : 'Yes, regenerate'}
+              </Button>
+              <Button onClick={() => setConfirmingRetry(false)} disabled={busy} variant="ghost" size="sm">
+                Cancel
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>
