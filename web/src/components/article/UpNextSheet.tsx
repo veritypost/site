@@ -103,10 +103,13 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
         >
           <h3
             style={{
+              // Aligned to the editorial meta family (11/600/0.1em
+              // uppercase) used by byline, Sources heading, NextStoryFooter,
+              // Timeline, mobile reader tab strip, Quiz eyebrow.
               margin: 0,
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: 600,
-              letterSpacing: '0.08em',
+              letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: 'var(--p-ink-muted)',
             }}
@@ -138,7 +141,7 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
         </div>
 
         {/* Article list */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {articles.slice(0, 3).map((article) => (
             <Link
               key={article.id}
@@ -163,10 +166,12 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
               {article.category_name && (
                 <div
                   style={{
+                    // Editorial meta family alignment.
                     fontSize: 11,
+                    fontWeight: 600,
                     color: 'var(--p-ink-muted)',
                     marginBottom: 6,
-                    letterSpacing: '0.04em',
+                    letterSpacing: '0.1em',
                     textTransform: 'uppercase',
                   }}
                 >
@@ -175,9 +180,15 @@ const UpNextSheet = forwardRef<UpNextSheetHandle, UpNextSheetProps>(function UpN
               )}
               <div
                 style={{
-                  fontWeight: 700,
-                  fontSize: 15,
+                  // Sans 15/700 -> Source Serif 4 17/500 with -0.01em.
+                  // Same shape as NextStoryFooter up-next titles so the
+                  // sheet reads as native editorial chrome, not a
+                  // bolted-on bottom modal.
+                  fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
+                  fontWeight: 500,
+                  fontSize: 17,
                   lineHeight: 1.3,
+                  letterSpacing: '-0.01em',
                   color: 'var(--p-ink)',
                   marginBottom: article.excerpt ? 4 : 0,
                 }}
