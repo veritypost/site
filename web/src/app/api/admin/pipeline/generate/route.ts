@@ -1492,6 +1492,23 @@ export async function POST(req: Request) {
       sourceTexts.push({ outlet, raw_title: it.raw_title ?? null, url: it.raw_url, text: it.raw_body });
     }
     let corpus = sourceTexts.map((s) => wrapSource(s.outlet ?? 'Unknown', s.url, s.text)).join('\n\n---\n\n');
+    // Distinct-outlet count (case-insensitive). Drives the SINGLE-OUTLET
+    // FRAMING rule appended to the body prompt — when the corpus is from a
+    // single news outlet, the model must attribute every contested claim to
+    // that outlet by name (Reuters reported... / The Times reported...).
+    // Verifiable public facts can stand flat; everything else must read as
+    // the outlet's reporting, not Verity Post's reporting. Closes the
+    // single-source compilation-copyright + libel exposure that EDITORIAL
+    // GUIDE rule SINGLE-OUTLET FRAMING describes.
+    const distinctOutlets = new Set(
+      sourceTexts
+        .map((s) => (s.outlet ?? '').trim().toLowerCase())
+        .filter((o) => o.length > 0)
+    );
+    const isSingleOutlet = distinctOutlets.size === 1;
+    const soleOutletName = isSingleOutlet
+      ? (sourceTexts.find((s) => s.outlet && s.outlet.trim().length > 0)?.outlet ?? null)
+      : null;
     const freeformBlock = freeform_instructions
       ? `\n\n<user_instructions>\n${escapeFreeform(freeform_instructions)}\n</user_instructions>`
       : '';
@@ -1556,13 +1573,13 @@ CATEGORIES:
 ${catListText}`;
 
     const batchStart = Date.now();
-    const headlineUser = `Generate headline + summary for this news cluster. Return JSON: {"headline":"...","summary":"...","slug":"..."}. Today: ${new Date()
+    const headlineUser = `Generate headline + summary for this news cluster. Return JSON: {"headline":"...","summary":"...","slug":"..."}. Respond with the JSON object only — no preamble, no markdown fence, no explanation. Today: ${new Date()
       .toISOString()
       .slice(0, 10)}.${freeformBlock}\n\nSOURCES:\n${corpus}`;
-    const summaryUser = `Write a plain-text summary (40–60 words, up to 3 sentences) capturing the who/what/where of this story. A reader who sees only the summary must know what actually happened — not a tease, not a hook. Must not restate the headline. Must contain different facts than the headline. Return JSON with ONLY a "summary" field: {"summary":"<your summary>"}. Today: ${new Date()
+    const summaryUser = `Write a plain-text summary in EXACTLY 3 sentences, 40–60 words total. Sentence 1: the setup or context (who, where). Sentence 2: the event or development (what happened). Sentence 3: why it matters or what comes next (consequence, mechanism, or scheduled follow-up). Must not restate the headline. Must contain different facts than the headline. Reader who sees only the summary must know what actually happened — not a tease, not a hook. Return JSON with ONLY a "summary" field: {"summary":"<your summary>"}. Respond with the JSON object only — no preamble, no markdown fence. Today: ${new Date()
       .toISOString()
       .slice(0, 10)}.${freeformBlock}\n\nSOURCES:\n${corpus}`;
-    const categorizationUser = `Pick the best category for this cluster. Return ONLY the JSON.${freeformBlock}\n\nSOURCES:\n${corpus}`;
+    const categorizationUser = `Pick the best category for this cluster. Return ONLY the JSON object — no preamble, no markdown fence.${freeformBlock}\n\nSOURCES:\n${corpus}`;
 
     const headlineSystem =
       audience === 'adult'
@@ -1720,12 +1737,16 @@ ${catListText}`;
     const categoryAppend = CATEGORY_PROMPTS[catNameLower]
       ? `\n\n${CATEGORY_PROMPTS[catNameLower]}`
       : '';
+    const singleOutletWarning =
+      isSingleOutlet && soleOutletName
+        ? `\n\nSINGLE OUTLET ALERT: Corpus contains reporting from only one news outlet (${soleOutletName}). Per editorial-guide rule SINGLE-OUTLET FRAMING, attribute every contested or non-public claim to "${soleOutletName}" by name throughout the body. Verifiable public facts (statute text, on-record quotes, government statements) can stand flat; everything else must read as ${soleOutletName}'s reporting.`
+        : '';
     const bodySystem =
       audience === 'adult'
-        ? `${EDITORIAL_GUIDE}${categoryAppend}\n\nIMPORTANT: Return your response as a JSON object. Do NOT include any HTML tags or code blocks in JSON fields. Markdown paragraphs ALLOWED in "body" (use \\n\\n between paragraphs, **bold** sparingly, no other markup).`
+        ? `${EDITORIAL_GUIDE}${categoryAppend}${singleOutletWarning}\n\nIMPORTANT: Return your response as a JSON object. Do NOT include any HTML tags or code blocks in JSON fields. Markdown paragraphs ALLOWED in "body" (use \\n\\n between paragraphs, **bold** sparingly, no other markup).`
         : effectiveAgeBand === 'tweens'
-          ? TWEENS_ARTICLE_PROMPT
-          : KIDS_ARTICLE_PROMPT;
+          ? `${TWEENS_ARTICLE_PROMPT}${singleOutletWarning}`
+          : `${KIDS_ARTICLE_PROMPT}${singleOutletWarning}`;
     // EDITORIAL_GUIDE is ~5.3K tokens and identical across every adult run;
     // mark it cacheable so the per-category append + JSON trailer + admin
     // override all hash separately without busting the static prefix.
@@ -1739,7 +1760,7 @@ ${catListText}`;
       .toISOString()
       .slice(0, 10)}.
 
-Return ONLY a valid JSON object:
+Return ONLY a valid JSON object — no preamble, no markdown fence, no explanation:
 {
   "title": "${cleanText(headline)}",
   "body": "The full article in markdown. Paragraphs separated by \\n\\n. 250-450 words. 100% original language — not rephrased source text.",
@@ -1785,9 +1806,54 @@ ${corpus}`;
       cost_usd: bodyRes.cost_usd,
     });
 
+    // Hallucinated-attribution detector — TODO 51B (the Haiku grounding step
+    // catches "claim has no source," but it doesn't specifically flag the
+    // libel-shaped phrasings ("according to a person familiar...") that the
+    // EDITORIAL GUIDE rule NEVER INVENT ATTRIBUTION forbids. This regex pass
+    // scans the generated body for those exact phrasings; any hit flips
+    // attributionFlaggedReview which feeds needs_manual_review.
+    //
+    // Naive implementation: flag presence, not absence-in-corpus. False
+    // positives are acceptable here — operator review is the gate. The
+    // upgrade path (per-claim provenance) cross-references the named entity
+    // against the corpus to suppress true matches; deferred per owner read.
+    let attributionFlaggedReview = false;
+    const attributionHitSamples: string[] = [];
+    const ATTRIBUTION_PATTERNS = [
+      /\baccording to (?:a |an |the )?(?:person|people|source|sources|individual|individuals)(?: familiar with(?: the matter)?)?\b/i,
+      /\b(?:a )?person familiar with(?: the matter)?\b/i,
+      /\b(?:sources|insiders|people|individuals)(?:\s+\w+){0,3}\s+(?:said|told|claimed|reported|noted|added)\b/i,
+      /\bofficials?(?:\s+\w+){0,3}\s+(?:said|told|claimed)\b/i,
+      /\bspokes(?:person|people|man|woman)\s+(?:said|told|stated|claimed)\b/i,
+    ];
+    for (const pat of ATTRIBUTION_PATTERNS) {
+      const m = finalBodyMarkdown.match(pat);
+      if (m) {
+        attributionFlaggedReview = true;
+        attributionHitSamples.push(m[0]);
+      }
+    }
+    if (attributionFlaggedReview) {
+      pipelineLog.warn(`newsroom.generate.${bodyStepName}_attribution`, {
+        run_id: runId,
+        cluster_id,
+        audience,
+        step: bodyStepName,
+        attribution_hits: attributionHitSamples,
+      });
+    }
+
     // ────────────────────────────────────────────────────────────────────────
-    // 9g. source_grounding — Haiku, continues on warn (>3 unsupported claims)
+    // 9g. source_grounding — Haiku audit. Any unsupported claim flips
+    //     groundingFlaggedReview, which feeds into needs_manual_review at
+    //     persist time so the operator sees it inline in the AudienceCard
+    //     trust pills before publish. Tightened from the prior >3 warn-only
+    //     threshold (which silently passed near-libel drift) per TODO 51B.
+    //     Step itself is still non-fatal (exceptions log + continue) — the
+    //     operator review is the gate, not a hard pipeline abort.
     // ────────────────────────────────────────────────────────────────────────
+    let groundingFlaggedReview = false;
+    let groundingUnsupportedCount = 0;
     const groundingStart = Date.now();
     const groundingStepName: Step = 'source_grounding';
     pipelineLog.info(`newsroom.generate.${groundingStepName}`, {
@@ -1830,13 +1896,16 @@ Return JSON:
       totalCostUsd += groundingRes.cost_usd;
       assertPerRunCap(totalCostUsd, perRunCapUsd);
       const grounding = SourceGroundingSchema.parse(extractJSON(groundingRes.text));
-      if ((grounding.unsupported_claims?.length ?? 0) > 3) {
+      groundingUnsupportedCount = grounding.unsupported_claims?.length ?? 0;
+      if (groundingUnsupportedCount > 0) {
+        groundingFlaggedReview = true;
         pipelineLog.warn(`newsroom.generate.${groundingStepName}`, {
           run_id: runId,
           cluster_id,
           audience,
           step: groundingStepName,
-          unsupported_count: grounding.unsupported_claims.length,
+          unsupported_count: groundingUnsupportedCount,
+          unsupported_sample: grounding.unsupported_claims.slice(0, 3),
         });
       }
     } catch (groundingErr) {
@@ -1971,10 +2040,16 @@ Return JSON:
     }
     // Flag for manual review whenever soft-degrade kept original near-dup
     // body OR rewrite errored out. Editors clear before publish (M4 / Q9).
+    // Plus TODO 51B additions: groundingFlaggedReview (any unsupported claim
+    // surfaced by the source_grounding Haiku audit) + attributionFlaggedReview
+    // (regex hit on the libel-shaped attribution phrasings forbidden by
+    // EDITORIAL GUIDE rule NEVER INVENT ATTRIBUTION).
     const needsManualReview =
       plagiarismStatus === 'rewrite_failed' ||
       plagiarismStatus === 'rewrite_kept_original' ||
-      finalPlagOverlap > settings.plagiarism_flag_pct;
+      finalPlagOverlap > settings.plagiarism_flag_pct ||
+      groundingFlaggedReview ||
+      attributionFlaggedReview;
     if (finalPlagOverlap > settings.plagiarism_flag_pct) {
       pipelineLog.warn(`newsroom.generate.${plagStepName}`, {
         run_id: runId,

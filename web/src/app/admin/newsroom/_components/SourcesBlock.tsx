@@ -86,6 +86,24 @@ export default function SourcesBlock({ sources, selectedUrls, onToggle, onRemove
               </>
             )}
           </span>
+          {/* Single-outlet warning — text-only, editorial meta family. The
+              article generator's SINGLE-OUTLET FRAMING rule will force
+              attribution-by-outlet on every contested claim, but the
+              operator should also see the warning before clicking Generate
+              so they can pull in a second source instead. */}
+          {outlets.length === 1 && (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color: C.danger,
+              }}
+            >
+              Single outlet
+            </span>
+          )}
         </div>
       )}
       {onToggle && (

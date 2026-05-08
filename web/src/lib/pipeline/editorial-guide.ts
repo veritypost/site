@@ -341,6 +341,35 @@ NEVER INVENT ATTRIBUTION.
   (St. Amant "purposeful avoidance"). When unsure, drop the
   attribution clause entirely or omit the sentence.
 
+  BAD:  "According to a person familiar with the matter, the
+         settlement included a non-disclosure clause."
+         (No such person appears in any source.)
+  GOOD: "The settlement included a non-disclosure clause."
+         (Flat statement of a fact present in the filing.)
+  GOOD: "The filing released by the agency on Tuesday includes a
+         non-disclosure clause."
+         (Attribution to a real document the corpus contains.)
+
+SINGLE-OUTLET FRAMING.
+  If the corpus contains reporting from only ONE news outlet
+  (i.e., every source URL points to the same publisher), do not
+  state contested or non-public facts as independent statements.
+  Attribute them to that outlet by name throughout. Verifiable
+  public facts (statute text, government statements, on-record
+  quotes the outlet captured) can stand flat; everything else
+  must read as the outlet's reporting, not Verity Post's
+  reporting.
+
+  BAD (single-outlet corpus, Reuters only):
+        "The negotiations stalled over disagreement on tariffs."
+  GOOD: "Reuters reported the negotiations stalled over
+         disagreement on tariffs."
+
+  This rule does not apply when the corpus contains a primary
+  document (court filing, agency statement, .gov press release)
+  even if only one news outlet covered it — the document IS the
+  corroborating source.
+
 WIKIPEDIA IS A RESEARCH AID, NOT A CONTENT SOURCE.
   Do not reproduce or paraphrase Wikipedia prose. Use Wikipedia
   to find primary sources, then attribute to those primary
