@@ -64,6 +64,7 @@ export async function POST(request) {
   }
 
   const { data, error } = await service.rpc('toggle_story_follow', {
+    p_user_id: user.id,
     p_story_id: story_id,
   });
   if (error) {
