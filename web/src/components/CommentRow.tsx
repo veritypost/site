@@ -470,7 +470,7 @@ export default function CommentRow({
         <div
           style={{ borderLeft: '2px solid var(--p-ink)', paddingLeft: 8, marginBottom: 8 }}
         >
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--p-ink)' }}>
+          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--p-ink)' }}>
             Pinned as Article Context
           </span>
         </div>
@@ -510,7 +510,7 @@ export default function CommentRow({
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--p-ink)' }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--p-ink)', letterSpacing: '-0.005em' }}>
                   {user.username || 'user'}
                 </span>
                 {SHOW_EXPERT_CHROME_ON_COMMENTS && <VerifiedBadge user={user} />}
@@ -521,8 +521,8 @@ export default function CommentRow({
                   title="Copy link to comment"
                   style={{
                     background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                    fontSize: 12, lineHeight: 1,
-                    color: copiedLink ? 'var(--success-text, #16a34a)' : 'var(--p-ink-dim, #71717a)',
+                    fontSize: 11, lineHeight: 1, letterSpacing: '0.02em',
+                    color: copiedLink ? 'var(--success-text, #16a34a)' : 'var(--p-ink-muted)',
                     fontFamily: 'inherit',
                     transition: 'color 100ms',
                   }}
@@ -713,10 +713,14 @@ export default function CommentRow({
             <div
               style={{
                 fontSize: 16,
-                lineHeight: 1.75,
+                lineHeight: 1.7,
                 color: 'var(--p-ink)',
-                letterSpacing: '-0.01em',
+                letterSpacing: '-0.005em',
                 marginBottom: 2,
+                WebkitFontSmoothing: 'antialiased',
+                MozOsxFontSmoothing: 'grayscale',
+                textRendering: 'optimizeLegibility',
+                fontFeatureSettings: '"kern" 1, "liga" 1',
                 filter: blurred ? 'blur(6px)' : 'none',
                 userSelect: blurred ? 'none' : 'auto',
                 pointerEvents: blurred ? 'none' : 'auto',

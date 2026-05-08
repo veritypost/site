@@ -13,33 +13,41 @@ export default function NextStoryFooter({ category, nearbyStories }: NextStoryFo
         <section style={{ marginBottom: 28 }}>
           <p
             style={{
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: '0.06em',
+              // Match the byline meta style: 11px small-caps, 0.1em
+              // letter-spacing, weight 600. Same family of editorial
+              // chrome across the page.
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.1em',
               textTransform: 'uppercase',
-              color: 'var(--dim, #5a5a5a)',
-              margin: '0 0 12px',
+              color: 'var(--p-ink-muted)',
+              margin: '0 0 16px',
             }}
           >
             More in{' '}
             <Link
               href={`/?cat=${category.slug}`}
-              style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
+              style={{ color: 'inherit', textDecoration: 'underline', textDecorationThickness: 1, textUnderlineOffset: '0.18em' }}
             >
               {category.name}
             </Link>
           </p>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
             {nearbyStories.map((s) => (
               <li key={s.slug}>
                 <Link
                   href={`/${s.slug}`}
+                  // Serif headlines for the up-next list — same family as
+                  // the article body, slightly larger and weight 500 so
+                  // each link reads as a real headline, not a list item.
                   style={{
-                    fontSize: 15,
+                    fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
+                    fontSize: 17,
                     fontWeight: 500,
-                    color: 'var(--text, #1a1a1a)',
+                    lineHeight: 1.3,
+                    letterSpacing: '-0.01em',
+                    color: 'var(--p-ink)',
                     textDecoration: 'none',
-                    lineHeight: 1.4,
                   }}
                 >
                   {s.title}

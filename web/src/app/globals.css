@@ -686,14 +686,19 @@ body {
     border-bottom: 1px solid var(--p-border);
   }
   [data-reader-tabstrip] button {
+    /* 13/600 -> 11px small-caps, 0.08em letter-spacing. Matches the
+       editorial meta family (byline, NextStoryFooter heading). 1px
+       active border instead of 2px reads as restraint. */
     flex: 1;
     background: transparent;
     border: 0;
-    border-bottom: 2px solid transparent;
-    padding: 10px 8px;
+    border-bottom: 1px solid transparent;
+    padding: 12px 8px;
     font: inherit;
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     color: var(--p-ink-muted);
     cursor: pointer;
     margin-bottom: -1px;
