@@ -1144,6 +1144,12 @@ function LeaderRow({
         {showVerityScore && (
           <div style={{ fontSize: 11, color: 'var(--dim)' }}>
             {(u.verity_score || 0).toLocaleString()} verity
+            {typeof u.comment_count === 'number' && u.comment_count > 0 && (
+              <> · {u.comment_count.toLocaleString()} {u.comment_count === 1 ? 'comment' : 'comments'}</>
+            )}
+            {typeof u.quizzes_completed_count === 'number' && u.quizzes_completed_count > 0 && (
+              <> · {u.quizzes_completed_count.toLocaleString()} {u.quizzes_completed_count === 1 ? 'quiz' : 'quizzes'}</>
+            )}
           </div>
         )}
       </div>
