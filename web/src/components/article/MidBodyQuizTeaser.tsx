@@ -9,14 +9,17 @@ type MidBodyQuizTeaserProps = {
 };
 
 const CARD_STYLE: React.CSSProperties = {
-  background: 'var(--hover, #f5f5f5)',
+  // hover-tint background -> neutral surface; the hover token reads as
+  // stateful chrome interrupting the article body. borderRadius 10 -> 12
+  // to align with the card family.
+  background: 'var(--p-bg)',
   border: '1px solid var(--p-border)',
-  borderRadius: 10,
-  padding: 16,
-  margin: '24px 0',
+  borderRadius: 12,
+  padding: '16px 20px',
+  margin: '28px 0',
   display: 'flex',
   justifyContent: 'space-between',
-  alignItems: 'flex-end',
+  alignItems: 'center',
   gap: 12,
 };
 
@@ -26,23 +29,37 @@ const TEXT_COL_STYLE: React.CSSProperties = {
 };
 
 const HEADLINE_STYLE: React.CSSProperties = {
-  fontSize: 14,
+  // 14 -> 15 with weight 600 + tightened tracking. The teaser interrupts
+  // the article body and should read as a small editorial headline,
+  // not a list-row label.
+  fontSize: 15,
+  fontWeight: 600,
+  letterSpacing: '-0.01em',
   color: 'var(--p-ink)',
   margin: 0,
 };
 
 const SUBLINE_STYLE: React.CSSProperties = {
-  fontSize: 13,
+  // 13 -> 14 / 1.5. At 13px on muted ink the subline read marginal.
+  fontSize: 14,
+  lineHeight: 1.5,
   color: 'var(--p-ink-muted)',
   marginTop: 4,
   display: 'block',
 };
 
 const BUTTON_STYLE: React.CSSProperties = {
+  // accent-blue link inside an editorial card competed with the Alerts
+  // top-bar slot. Switch to ink with editorial underline so it reads
+  // as a body-link CTA, not a feature flag.
   flexShrink: 0,
-  fontSize: 13,
+  fontSize: 14,
   fontWeight: 600,
-  color: 'var(--p-accent)',
+  color: 'var(--p-ink)',
+  textDecoration: 'underline',
+  textDecorationThickness: 1,
+  textUnderlineOffset: '0.18em',
+  textDecorationColor: 'var(--p-border)',
   background: 'none',
   border: 'none',
   cursor: 'pointer',

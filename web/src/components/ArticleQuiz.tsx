@@ -292,7 +292,7 @@ export default function ArticleQuiz({
       }}>
         <div style={{
           fontSize: 11,
-          fontWeight: 700,
+          fontWeight: 600,
           letterSpacing: '0.1em',
           textTransform: 'uppercase' as const,
           color: C.dim,
@@ -302,7 +302,7 @@ export default function ArticleQuiz({
         </div>
         <div style={{
           fontSize: 22,
-          fontWeight: 700,
+          fontWeight: 600,
           color: C.text,
           lineHeight: 1.25,
           letterSpacing: '-0.02em',
@@ -323,11 +323,11 @@ export default function ArticleQuiz({
             background: C.accent,
             color: 'var(--bg)',
             fontSize: 16,
-            fontWeight: 700,
+            fontWeight: 600,
             cursor: stage === 'loading-start' ? 'default' : 'pointer',
             opacity: stage === 'loading-start' ? 0.6 : 1,
             fontFamily: 'inherit',
-            letterSpacing: '-0.01em',
+            letterSpacing: '-0.005em',
           }}
         >
           {stage === 'loading-start' ? 'Loading…' : 'Take the quiz'}
@@ -361,9 +361,9 @@ export default function ArticleQuiz({
           <div
             style={{
               fontSize: 11,
-              fontWeight: 700,
+              fontWeight: 600,
               color: C.dim,
-              letterSpacing: '0.08em',
+              letterSpacing: '0.1em',
               textTransform: 'uppercase',
             }}
           >
@@ -398,7 +398,7 @@ export default function ArticleQuiz({
                 fontSize: 17,
                 color: C.text,
                 marginBottom: 18,
-                lineHeight: 1.5,
+                lineHeight: 1.6,
                 fontWeight: 600,
               }}
             >
@@ -427,7 +427,7 @@ export default function ArticleQuiz({
                     marginBottom: 8,
                     cursor: grading || anySelected ? 'default' : 'pointer',
                     fontSize: 14,
-                    fontWeight: selected ? 700 : 400,
+                    fontWeight: selected ? 600 : 400,
                     fontFamily: 'inherit',
                     opacity: anySelected && !selected ? 0.38 : 1,
                     transition: 'all 150ms ease',
@@ -443,7 +443,7 @@ export default function ArticleQuiz({
                       borderRadius: 6,
                       flexShrink: 0,
                       fontSize: 11,
-                      fontWeight: 700,
+                      fontWeight: 600,
                       background: selected ? '#fff' : 'var(--border)',
                       color: selected ? 'var(--accent)' : 'var(--dim)',
                       transition: 'background 150ms ease, color 150ms ease',
@@ -520,8 +520,8 @@ export default function ArticleQuiz({
           >
             <div
               style={{
-                fontSize: 32,
-                fontWeight: 700,
+                fontSize: 28,
+                fontWeight: 600,
                 color: C.text,
                 lineHeight: 1.1,
                 letterSpacing: '-0.02em',
@@ -531,10 +531,10 @@ export default function ArticleQuiz({
             </div>
             <div
               style={{
-                fontSize: 15,
-                fontWeight: 400,
+                fontSize: 14,
+                fontWeight: 500,
                 color: C.dim,
-                marginTop: 10,
+                marginTop: 8,
                 lineHeight: 1.4,
               }}
             >
@@ -560,7 +560,7 @@ export default function ArticleQuiz({
           <div
             style={{
               fontSize: 18,
-              fontWeight: 700,
+              fontWeight: 600,
               color: C.text,
             }}
           >
@@ -582,16 +582,16 @@ export default function ArticleQuiz({
               <div
                 style={{
                   fontSize: 11,
-                  fontWeight: 700,
+                  fontWeight: 600,
                   textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
+                  letterSpacing: '0.1em',
                   color: C.dim,
                   marginBottom: 4,
                 }}
               >
                 Question {i + 1}
               </div>
-              <div style={{ fontSize: 14, color: C.text, marginBottom: 8 }}>{r.question_text}</div>
+              <div style={{ fontSize: 14, color: C.text, marginBottom: 8, lineHeight: 1.5 }}>{r.question_text}</div>
               <div
                 style={{
                   fontSize: 13,
@@ -609,7 +609,7 @@ export default function ArticleQuiz({
                 </div>
               )}
               {r.explanation && (
-                <div style={{ fontSize: 12, color: C.dim, marginTop: 6, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 13, color: C.dim, marginTop: 6, lineHeight: 1.6 }}>
                   {r.explanation}
                 </div>
               )}
@@ -628,10 +628,11 @@ export default function ArticleQuiz({
                 background: C.accent,
                 color: 'var(--bg)',
                 fontSize: 15,
-                fontWeight: 700,
+                fontWeight: 600,
                 cursor: 'pointer',
                 marginTop: 4,
                 fontFamily: 'inherit',
+                letterSpacing: '-0.005em',
               }}
             >
               Take another look and try again
