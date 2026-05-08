@@ -57,7 +57,13 @@ export default function ConfirmDialog({
           'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         )
       ).filter((el) => !el.hasAttribute('data-focus-trap'));
-      if (focusable.length === 0) return;
+      // No focusable elements (every button disabled, etc): swallow the
+      // Tab so focus can't escape the dialog backdrop. Without this the
+      // user could tab back into the page behind the modal.
+      if (focusable.length === 0) {
+        e.preventDefault();
+        return;
+      }
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (e.shiftKey && document.activeElement === first) {

@@ -198,10 +198,14 @@ struct ArticleListView: View {
             }
         }
 
-        // Phase 3: filter by age_band visible to this profile. RLS already
-        // enforces this server-side; the client-side filter is defense-
-        // in-depth so a stale JWT or RLS misconfig still produces an empty
-        // list rather than leaking bands.
+        // Phase 3: filter by age_band visible to this profile. RLS
+        // enforces this server-side; the client-side filter is a
+        // best-effort hint, NOT defense-in-depth — the upstream caller
+        // at KidsAppRoot.swift substitutes `["kids"]` when bands are
+        // empty (covers the loading-state window before the profile
+        // row arrives), so by the time we reach this layer
+        // `visibleBands` is never empty. A graduated profile is
+        // gated by RLS at the row level via kid_visible_bands().
         let bands = visibleBands.isEmpty ? ["kids"] : visibleBands
         do {
             let baseQuery = client

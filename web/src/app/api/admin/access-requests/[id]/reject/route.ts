@@ -49,6 +49,23 @@ export async function POST(request: Request, { params }: { params: { id: string 
     .maybeSingle();
   if (!prior) return NextResponse.json({ error: 'Request not found' }, { status: 404 });
 
+  // Idempotency / accidental-double-click guard. The approve route
+  // returns 409 if the request is already approved (route.ts:63-68);
+  // mirror that here so a network retry or a fast double-click can't
+  // silently flip an already-decided request to rejected.
+  if (prior.status === 'rejected') {
+    return NextResponse.json(
+      { error: 'Already rejected', status: prior.status },
+      { status: 409 }
+    );
+  }
+  if (prior.status === 'approved') {
+    return NextResponse.json(
+      { error: 'Cannot reject an already-approved request', status: prior.status },
+      { status: 409 }
+    );
+  }
+
   const { error } = await service
     .from('access_requests')
     .update({

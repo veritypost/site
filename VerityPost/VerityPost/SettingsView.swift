@@ -665,6 +665,7 @@ struct SettingsView: View {
     @State private var mfaEnabled: Bool = false
     @State private var dmReceiptsEnabled: Bool = true
     @State private var dmReceiptsLoading: Bool = true
+    @State private var dmReceiptsSaving: Bool = false
     // RID-031 — shown when saveDmReceiptsPref fails and reverts the toggle.
     @State private var dmReceiptsErrorAlert: Bool = false
     @AppStorage("vp_theme") private var vpTheme: String = "system"
@@ -1058,7 +1059,7 @@ struct SettingsView: View {
                                   title: "DM read receipts",
                                   subtitle: "Let senders see when you\u{2019}ve read",
                                   showDivider: !isLast,
-                                  kind: .toggle(binding, isDisabled: self.dmReceiptsLoading)))
+                                  kind: .toggle(binding, isDisabled: self.dmReceiptsLoading || self.dmReceiptsSaving)))
         })
 
         out.append(HubRowSpec(id: "blocked",
@@ -1249,6 +1250,8 @@ struct SettingsView: View {
         guard auth.currentUser?.id != nil else { return }
         struct Args: Encodable { let p_fields: Patch }
         struct Patch: Encodable { let dm_read_receipts_enabled: Bool }
+        await MainActor.run { dmReceiptsSaving = true }
+        defer { Task { @MainActor in dmReceiptsSaving = false } }
         do {
             try await SupabaseManager.shared.client.rpc(
                 "update_own_profile",
@@ -3831,6 +3834,8 @@ struct DataPrivacyView: View {
     // Task 62 — DM read receipts opt-out (migration 044).
     @State private var dmReceiptsEnabled = true
     @State private var dmReceiptsLoading = true
+    @State private var dmReceiptsSaving = false
+    @State private var dmReceiptsErrorAlert = false
     @ObservedObject private var perms = PermissionStore.shared
     @State private var canExport = false
 
@@ -3841,11 +3846,16 @@ struct DataPrivacyView: View {
                 SettingsToggleRow(title: "DM read receipts",
                                   subtitle: "Let senders see when you\u{2019}ve read their messages",
                                   isOn: $dmReceiptsEnabled,
-                                  isDisabled: dmReceiptsLoading,
+                                  isDisabled: dmReceiptsLoading || dmReceiptsSaving,
                                   showDivider: false)
                     .onChange(of: dmReceiptsEnabled) { _, newValue in
                         Task { await saveDmReceiptsPref(newValue) }
                     }
+            }
+            .alert("Couldn\u{2019}t save", isPresented: $dmReceiptsErrorAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("DM read receipts didn\u{2019}t save. Try again.")
             }
 
             if canExport {
@@ -3913,13 +3923,22 @@ struct DataPrivacyView: View {
         guard auth.currentUser?.id != nil else { return }
         struct Args: Encodable { let p_fields: Patch }
         struct Patch: Encodable { let dm_read_receipts_enabled: Bool }
+        await MainActor.run { dmReceiptsSaving = true }
+        defer { Task { @MainActor in dmReceiptsSaving = false } }
         do {
             try await client.rpc(
                 "update_own_profile",
                 params: Args(p_fields: Patch(dm_read_receipts_enabled: newValue))
             ).execute()
         } catch {
-            Log.d("saveDmReceiptsPref error: \(error)")
+            Log.d("DataPrivacy saveDmReceiptsPref error:", error)
+            // Mirror Hub semantics: revert UI on failure + surface alert
+            // so the user knows the toggle didn't save (was silent
+            // print-only before, leaving a state lie on the screen).
+            await MainActor.run {
+                self.dmReceiptsEnabled = !newValue
+                self.dmReceiptsErrorAlert = true
+            }
         }
     }
 

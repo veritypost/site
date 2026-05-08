@@ -183,9 +183,18 @@ export async function POST(request: Request) {
     }
   }
 
+  // Surface partial-failure counts as top-level fields so admin UI /
+  // scripts that only check ok/approved_count don't miss them. HTTP
+  // status stays 200 — admin/access-requests/page.tsx already
+  // destructures email_failed_ids and shows a warn toast; flipping
+  // status would break that consumer. ok=false when ANY failure
+  // happened so any new caller that just checks ok is honest.
+  const anyFailure = results.failed_ids.length > 0 || results.email_failed_ids.length > 0;
   return NextResponse.json({
-    ok: true,
+    ok: !anyFailure,
     approved_count: results.approved_count,
+    failed_count: results.failed_ids.length,
+    email_failed_count: results.email_failed_ids.length,
     failed_ids: results.failed_ids,
     email_failed_ids: results.email_failed_ids,
   });

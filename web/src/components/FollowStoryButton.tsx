@@ -76,7 +76,13 @@ export default function FollowStoryButton({ storyId, currentUserId }: FollowStor
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(friendlyError(data?.error, 'Could not update. Try again.'));
-      setFollowing(!!data?.following);
+      // Validate the shape before flipping. Without this, a 200 OK whose
+      // body is missing `following` (RPC drift, bad caching layer)
+      // silently flipped UI to false even though the server toggled on.
+      if (typeof data?.following !== 'boolean') {
+        throw new Error('Could not update. Try again.');
+      }
+      setFollowing(data.following);
     } catch (err) {
       // Revert on failure.
       setFollowing(prev);

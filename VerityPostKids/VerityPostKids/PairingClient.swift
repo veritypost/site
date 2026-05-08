@@ -271,8 +271,18 @@ final class PairingClient {
               let expiresIso = UserDefaults.standard.string(forKey: expiresKey)
         else { return nil }
 
-        // Check expiry (lenient — let server reject if really expired)
-        if let expires = Self.isoFormatter.date(from: expiresIso), expires < Date() {
+        // Check expiry. Treat a malformed `expiresIso` (corrupted
+        // UserDefaults / older write format) as expired — falling
+        // through silently kept the kid on a possibly-dead bearer
+        // until a server 401, which the parent could mistake for a
+        // network problem. clear() drops them cleanly back to the
+        // pair screen.
+        guard let expires = Self.isoFormatter.date(from: expiresIso) else {
+            log.error("[PairingClient] restore: malformed expiresIso, treating as expired")
+            clear()
+            return nil
+        }
+        if expires < Date() {
             clear()
             return nil
         }

@@ -51,11 +51,15 @@ if (process.env.NODE_ENV === 'production' && !process.env.EVENT_HASH_SALT) {
 }
 
 // Salt for hashing UA + IP. In production set EVENT_HASH_SALT; the dev
-// fallback is deterministic so local dashboards show stable hashes
-// across restarts, but rotates with any code change to the literal.
+// fallback is generated per process so deterministic literal hashes
+// don't ship to preview deploys (the prior literal defeated the
+// anonymization the table is meant to provide). Dashboards expecting
+// stable hashes across dev restarts can re-derive after each restart.
 const HASH_SALT =
   process.env.EVENT_HASH_SALT ||
-  (process.env.NODE_ENV === 'production' ? '' : 'dev-fallback-salt-v1');
+  (process.env.NODE_ENV === 'production'
+    ? ''
+    : `dev-${createHash('sha256').update(`${process.pid}-${Date.now()}-${Math.random()}`).digest('hex').slice(0, 32)}`);
 
 function sha256(value: string): string {
   return createHash('sha256').update(HASH_SALT).update(value).digest('hex');
