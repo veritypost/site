@@ -296,6 +296,17 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       setUnreadCount(0);
       return;
     }
+    // The bottom nav previously had a /notifications slot that this
+    // poll badged. Slot was removed when notifications moved into the
+    // Profile rail; the poll kept running and hitting /api/notifications
+    // every 60s with nowhere to surface the count. Gate on the nav
+    // actually containing a /notifications item so the machinery stays
+    // dormant until / unless the slot returns — avoids the wasted
+    // network call without deleting the wiring.
+    if (!navItems.some((item) => item.href === '/notifications')) {
+      setUnreadCount(0);
+      return;
+    }
     let cancelled = false;
     async function poll() {
       try {
