@@ -410,6 +410,7 @@ export default async function ArticleSlugPage({
               key={article.id}
               articleId={article.id}
               articleCategoryId={article.category_id}
+              articleCategoryName={category?.name ?? null}
               hasQuiz={hasQuiz}
               initialPassed={initialPassed}
               currentUserId={user?.id ?? null}

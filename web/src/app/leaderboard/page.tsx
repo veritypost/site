@@ -1012,7 +1012,17 @@ function LeaderboardPageContent() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Avatar user={me} size={24} />
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                Your rank
+                {(() => {
+                  const subName = activeSub
+                    ? stripKidsTag(subcats.find((s) => s.id === activeSub)?.name)
+                    : null;
+                  const catName = activeCat
+                    ? stripKidsTag(categories.find((c) => c.id === activeCat)?.name)
+                    : null;
+                  if (subName && catName) return `Your rank · ${catName} · ${subName}`;
+                  if (catName) return `Your rank · ${catName}`;
+                  return 'Your rank';
+                })()}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
