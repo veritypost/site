@@ -341,10 +341,12 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // Note: `/pricing` deliberately surfaces in the desktop
   // footer instead of the bottom nav. Bottom nav is the 4 high-frequency
   // tasks; conversion CTAs route through the footer.
+  // Owner cleanup item 12 (2026-05-08, refined) — Following lives in
+  // the Sections menu (top-bar HomeSectionsMenu), not as a tab. Bottom
+  // nav drops to Home + Profile for signed-in users.
   const navItems: NavItem[] = loggedIn
     ? [
         { label: 'Home', href: '/' },
-        { label: 'Following', href: '/following' },
         { label: 'Profile', href: '/profile' },
       ]
     : [

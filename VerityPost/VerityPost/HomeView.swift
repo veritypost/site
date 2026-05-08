@@ -1259,6 +1259,11 @@ struct HomeSectionsSheet: View {
 
     private var categoryList: some View {
         List {
+            // Owner cleanup item 12 (2026-05-08, refined) — Following row
+            // at the top of the Sections sheet. Lazy-fetches the user's
+            // story_follows when the section is expanded.
+            FollowingSection()
+
             ForEach(parentCats) { cat in
                 let subs = categories.filter { $0.categoryId == cat.id }
                     .sorted { ($0.displayOrder ?? 999) < ($1.displayOrder ?? 999) }
@@ -1334,6 +1339,204 @@ struct HomeSectionsSheet: View {
         } catch {
             searchResults = []
         }
+    }
+}
+
+// MARK: - FollowingSection (owner cleanup item 12)
+//
+// Lives at the top of HomeSectionsSheet.categoryList. Lazy-loads the
+// user's story_follows on first appear, renders one row per followed
+// story with an unread dot when a new article has landed since
+// last_seen_at. Tap a row → land on the latest article + RPC
+// mark_story_seen so the dot clears.
+
+private struct FollowingSheetRow: Decodable, Identifiable {
+    let storyId: String
+    let lastSeenAt: Date?
+    let stories: FollowingSheetStory?
+    var id: String { storyId }
+    enum CodingKeys: String, CodingKey {
+        case storyId = "story_id"
+        case lastSeenAt = "last_seen_at"
+        case stories
+    }
+}
+
+private struct FollowingSheetStory: Decodable {
+    let id: String
+    let slug: String?
+    let title: String
+    let publishedAt: Date?
+    enum CodingKeys: String, CodingKey {
+        case id, slug, title
+        case publishedAt = "published_at"
+    }
+}
+
+private struct FollowingSheetLatest: Decodable {
+    let id: String
+    let title: String
+    let storyId: String
+    let publishedAt: Date?
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case storyId = "story_id"
+        case publishedAt = "published_at"
+    }
+}
+
+private struct FollowingSheetDisplay: Identifiable {
+    let storyId: String
+    let title: String
+    let unread: Bool
+    let latestStory: Story?
+    var id: String { storyId }
+}
+
+struct FollowingSection: View {
+    @EnvironmentObject var auth: AuthViewModel
+    @State private var rows: [FollowingSheetDisplay] = []
+    @State private var loaded = false
+    @State private var loading = false
+    private let client = SupabaseManager.shared.client
+
+    var body: some View {
+        Section("Following") {
+            if !loaded && loading {
+                HStack {
+                    Spacer()
+                    ProgressView().controlSize(.small)
+                    Spacer()
+                }
+            } else if rows.isEmpty {
+                Text(auth.currentUser == nil
+                     ? "Sign in to follow stories."
+                     : "Tap Follow on any story to track it here.")
+                    .font(.system(.subheadline))
+                    .foregroundColor(VP.dim)
+            } else {
+                ForEach(rows) { row in
+                    if let story = row.latestStory {
+                        NavigationLink(destination: StoryDetailView(story: story)) {
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(row.unread ? VP.accent : Color.clear)
+                                    .frame(width: 7, height: 7)
+                                Text(row.title)
+                                    .font(.system(.subheadline, weight: row.unread ? .bold : .semibold))
+                                    .foregroundColor(VP.text)
+                                    .lineLimit(2)
+                            }
+                        }
+                        .simultaneousGesture(
+                            TapGesture().onEnded { Task { await markSeen(row.storyId) } }
+                        )
+                    } else {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(row.unread ? VP.accent : Color.clear)
+                                .frame(width: 7, height: 7)
+                            Text(row.title)
+                                .font(.system(.subheadline, weight: .medium))
+                                .foregroundColor(VP.dim)
+                                .lineLimit(2)
+                        }
+                    }
+                }
+            }
+        }
+        .task {
+            guard !loaded, auth.currentUser != nil else {
+                loaded = true
+                return
+            }
+            await load()
+        }
+    }
+
+    private func load() async {
+        loading = true
+        defer { loading = false; loaded = true }
+        guard let userId = auth.currentUser?.id else { return }
+        do {
+            let follows: [FollowingSheetRow] = try await client
+                .from("story_follows")
+                .select("story_id, last_seen_at, stories(id, slug, title, published_at)")
+                .eq("user_id", value: userId)
+                .order("followed_at", ascending: false)
+                .execute()
+                .value
+            let storyIds = follows.compactMap { $0.stories?.id }
+            guard !storyIds.isEmpty else { rows = []; return }
+            let articles: [FollowingSheetLatest] = try await client
+                .from("articles")
+                .select("id, title, story_id, published_at")
+                .in("story_id", values: storyIds)
+                .eq("status", value: "published")
+                .not("published_at", operator: .is, value: "null")
+                .is("deleted_at", value: nil)
+                .order("published_at", ascending: false)
+                .limit(storyIds.count * 5)
+                .execute()
+                .value
+            var latestByStory: [String: FollowingSheetLatest] = [:]
+            for a in articles {
+                if latestByStory[a.storyId] == nil { latestByStory[a.storyId] = a }
+            }
+            rows = follows.compactMap { f -> FollowingSheetDisplay? in
+                guard let s = f.stories else { return nil }
+                let latest = latestByStory[s.id]
+                let unread: Bool = {
+                    guard let pub = latest?.publishedAt else { return false }
+                    guard let seen = f.lastSeenAt else { return true }
+                    return pub > seen
+                }()
+                let storyRef = latest.map { la in
+                    Story(
+                        id: la.id,
+                        storyId: s.id,
+                        stories: s.slug.map { StorySlugRef(slug: $0) },
+                        title: s.title,
+                        summary: nil,
+                        content: nil,
+                        imageUrl: nil,
+                        categoryId: nil,
+                        subcategoryId: nil,
+                        status: nil,
+                        isBreaking: nil,
+                        isDeveloping: nil,
+                        publishedAt: la.publishedAt,
+                        createdAt: nil,
+                        heroPickForDate: nil
+                    )
+                }
+                return FollowingSheetDisplay(
+                    storyId: s.id,
+                    title: s.title,
+                    unread: unread,
+                    latestStory: storyRef
+                )
+            }
+        } catch {
+            rows = []
+        }
+    }
+
+    private func markSeen(_ storyId: String) async {
+        await MainActor.run {
+            rows = rows.map { r in
+                guard r.storyId == storyId else { return r }
+                return FollowingSheetDisplay(
+                    storyId: r.storyId,
+                    title: r.title,
+                    unread: false,
+                    latestStory: r.latestStory
+                )
+            }
+        }
+        try? await client
+            .rpc("mark_story_seen", params: ["p_story_id": storyId])
+            .execute()
     }
 }
 

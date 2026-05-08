@@ -60,18 +60,24 @@ const nextConfig = {
         destination: '/?cat=:slug',
         permanent: true,
       },
-      // Owner cleanup item 2 — bookmarks concept retired in favour of
-      // "following stories" (subscribe to a story timeline). 301 so any
-      // existing browser bookmarks, share-sheet links, or installed iOS
-      // builds with hardcoded URLs land on the new surface.
+      // Owner cleanup item 2 — bookmarks concept retired. The successor
+      // (Following) doesn't have a dedicated page — it lives in the
+      // Sections menu on the home page. Old /bookmarks links land on
+      // home; users can open the Sections menu from there.
       {
         source: '/bookmarks',
-        destination: '/following',
+        destination: '/',
+        permanent: true,
+      },
+      // Owner cleanup item 12 — same for the brief /following page that
+      // existed mid-batch; it was replaced by the Sections menu surface.
+      {
+        source: '/following',
+        destination: '/',
         permanent: true,
       },
       // Owner cleanup item 2 — `/notifications` page retired (locked
       // decision: notifications stay security-only, no rich inbox).
-      // 301 catches any stale push payloads and shared deep links.
       {
         source: '/notifications',
         destination: '/',

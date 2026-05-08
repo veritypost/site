@@ -17,7 +17,6 @@ import { useToast } from './Toast';
 import { C, S } from '../_lib/palette';
 import { deriveAccountStates, isHardBlock } from '../_lib/states';
 import { ActivitySection } from '../_sections/ActivitySection';
-import { BookmarksSection } from '../_sections/BookmarksSection';
 import { CategoriesSectionConnected } from '../_sections/CategoriesSection';
 import { DataSection } from '../_sections/DataSection';
 import { BackgroundSection } from '../_sections/BackgroundSection';
@@ -303,15 +302,11 @@ export function ProfileApp({ defaultSection }: Props) {
         />
       ),
     },
-    {
-      id: 'following',
-      glyph: '◧',
-      group: 'Library',
-      title: 'Following',
-      reason: 'Stories you follow. New articles get a dot.',
-      keywords: ['following', 'follow', 'stories', 'subscriptions', 'saved', 'bookmarks'],
-      render: () => <BookmarksSection preview={false} />,
-    },
+    // Owner cleanup item 12 (2026-05-08, refined) — Following lives in
+    // the home Sections menu only, not in the profile shell. The
+    // BookmarksSection component still exists (still rendered if any
+    // future caller wires it back in), but no profile entry surfaces
+    // it.
     {
       id: 'messages',
       glyph: '✉',

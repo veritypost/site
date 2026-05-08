@@ -13,7 +13,6 @@ export default function robots() {
           '/admin',
           '/admin/',
           '/api/',
-          '/following',
           '/forgot-password',
           '/kids-article/*',
           '/logout',

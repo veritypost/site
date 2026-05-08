@@ -241,7 +241,10 @@ struct MainTabView: View {
     // The story-level /following surface stays launch-hidden.
     // Notifications and Rankings still accessed from Profile.
     // Profile slot relabels to "Sign up" for anon users.
-    enum Tab: Hashable { case today, following, profile }
+    // Owner cleanup item 12 (2026-05-08, refined) — Following lives in
+    // HomeSectionsSheet (top-bar grid icon on Home), not as a tab. Two
+    // tabs only: Today + Profile. Mirrors web's Home + Profile bottom nav.
+    enum Tab: Hashable { case today, profile }
 
     private var isLoggedIn: Bool { auth.currentUser != nil }
 
@@ -278,17 +281,6 @@ struct MainTabView: View {
         ZStack {
             switch selectedTab {
             case .today: NavigationStack { HomeView() }
-            case .following:
-                NavigationStack {
-                    if isLoggedIn {
-                        FollowingView()
-                    } else {
-                        SignInGate(
-                            feature: "Follow stories",
-                            detail: "Sign up to follow stories and get a dot when new articles land."
-                        )
-                    }
-                }
             case .profile:
                 NavigationStack {
                     if isLoggedIn {
@@ -472,15 +464,13 @@ struct TextTabBar: View {
     }
 
     private var items: [Item] {
-        // Nav restructure: matches mobile web. Following tab added 2026-05-07
-        // (points at BookmarksView — article-level following). Anon users
-        // see Home + Sign up; the standalone Following tab is hidden for
-        // them since it requires an account anyway.
+        // Owner cleanup item 12 (2026-05-08, refined) — Following lives in
+        // HomeSectionsSheet (top-bar grid icon on Home), not as a tab. Two
+        // slots only: Home + Profile (or Sign up for anon). Mirrors web.
         if isLoggedIn {
             return [
-                Item(id: .today,     label: "Home"),
-                Item(id: .following, label: "Following"),
-                Item(id: .profile,   label: "Profile"),
+                Item(id: .today,   label: "Home"),
+                Item(id: .profile, label: "Profile"),
             ]
         }
         return [

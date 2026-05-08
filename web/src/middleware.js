@@ -33,7 +33,6 @@ import { incrementAnonRead } from '@/lib/anonReadCounter';
 const PROTECTED_PREFIXES = [
   '/profile',
   '/messages',
-  '/following',
   '/recap',
   '/expert-queue',
   '/billing',
@@ -487,7 +486,7 @@ export async function middleware(request) {
     '/about', '/pricing', '/how-it-works', '/contact', '/help', '/accessibility',
     '/privacy', '/terms', '/cookies', '/dmca', '/corrections',
     '/editorial-standards', '/methodology', '/kids-app', '/preview',
-    '/following', '/appeal', '/expert-queue', '/recap', '/billing',
+    '/appeal', '/expert-queue', '/recap', '/billing',
     '/messages',
   ]);
   const pathParts = pathname.split('/').filter(Boolean);
