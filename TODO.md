@@ -169,27 +169,9 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 ## Category leaderboard
 
-- 36: Category leaderboard + scoring — scoring events and subcategory data exist but the UI is generally broken/incomplete. Users currently have no clear way to see their standing.
+- 36: **Mostly SHIPPED 2026-05-07** (commits `a2fef2a8` + `c6fc6a71` + `6ce3f584`). Context tag scoring buckets to category; profile shows rank + percentile; article footer has a "See {Category} leaderboard →" entry; sticky rank bar shows category label. Helpful-tag scoring removed (legacy rule was never seeded; heart is the social signal in the new comment voice model).
 
-  **Already wired (do not rebuild):**
-  - `score_on_reading_complete` — `api/stories/read/route.js` + `api/events/batch/route.ts`
-  - `score_on_quiz_submit` — `api/quiz/submit/route.js`
-  - `scoreReceiveHelpfulTag` on helpful tag — `context-tag/route.js:101-113`
-  - `category_scores` table with `subcategory_id` rollup rows
-  - `/leaderboard` has parent + sub pill drilldown, "Your rank" card, sticky rank bar
-  - `CategoriesSection` in profile shows per-category scores with sub-pills + 2×2 stat grid
-
-  **UI gaps to fix:**
-  - No entry point from articles or profile to the category leaderboard — user reads an article in Politics but can't jump to "See Politics leaderboard"
-  - Profile `CategoriesSection` shows the user's own score but never shows their rank within that category (no "Your rank: #12 in Politics")
-  - Leaderboard sticky rank bar shows rank + score but no category label (shows "#5" not "Politics #5")
-  - `context` tag does not award points — only `helpful` does; decide if `context` should score
-  - Subcategory deselect-on-click in profile is inconsistent with leaderboard pill behavior
-
-  **New: percentile display**
-  - Show the user's percentile rank among all users in that category/subcategory — e.g. "Top 8% of readers in Politics" or "Top 3% of taggers in World"
-  - No max-possible ceiling needed — purely rank the user's score against all other users in that node
-  - Show in both the profile `CategoriesSection` score card and on the leaderboard when drilling into a category
+  **Tail item still open:** subcategory deselect-on-click in profile is inconsistent with leaderboard pill behavior — profile toggles the sub off on second click, leaderboard treats it as drilldown. Minor UX polish; pick one and align both.
 
 ---
 

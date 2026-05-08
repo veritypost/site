@@ -6,6 +6,14 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-07 (continued)
 
+### TODO 36 — Category leaderboard, mostly shipped
+**Files:** `web/src/lib/scoring.js`, `web/src/app/api/comments/[id]/context-tag/route.js`, `web/src/app/profile/_sections/CategoriesSection.tsx`, `web/src/components/ArticleEngagementZone.tsx`, `web/src/app/[slug]/page.tsx`, `web/src/app/leaderboard/page.tsx`, `web/src/types/database.ts`. Commits: `a2fef2a8`, `c6fc6a71`, `6ce3f584`. **DB migrations:** `score_receive_context_tag` (new score_rules row), `user_category_ranks_self_only` (new RPC).
+- **Context tag now scores into the article's category.** Replaces the legacy `receive_helpful_tag` path (the rule was never seeded into `score_rules` — silent no-op for as long as it's been wired). The Helpful tag is the heart / social signal in the new comment voice model and intentionally does not score. New `receive_context_tag` rule = 15 pts, max 20/day. `scoreReceiveContextTag` reads the comment's article + the article's category and passes both to `award_points` so a great Politics commenter actually moves on the Politics leaderboard.
+- **Rank + percentile in the profile.** New `user_category_ranks()` RPC — window-function pass over `category_scores` partitioned by `(category_id, COALESCE(subcategory_id))` returns the caller's rank, total participants, and "Top X%" per leaf in one round trip. RPC is `auth.uid()`-scoped (no parameter; matches `category_scores` RLS posture). `CategoriesSection`'s scope card now reads "47 score · #14 of 612 · top 2%" — same scope (parent OR sub-pill leaf) drives both the metrics block and the rank line.
+- **Article → leaderboard entry point.** Below the comment thread on every article (signed-in, quiz-passed branch), centered "See {Category} leaderboard →" link routing to `/leaderboard?cat=<id>`. `ArticleEngagementZone` got a new `articleCategoryName` prop fed from the article page's existing category load.
+- **Sticky leaderboard rank bar shows the active category.** Was just "Your rank · #15 · 1234"; now reads "Your rank · Politics" with parent active or "Your rank · Politics · Elections" with a sub drilled in. Falls through to plain "Your rank" on the global view.
+- **Tail item still open:** subcategory deselect-on-click inconsistency between profile (toggles off) and leaderboard (drilldown semantics). Minor UX polish; tracked as the lone TODO 36 remainder.
+
 ### Daily impression cap on ad units
 **Files:** `web/src/app/admin/ad-units/[id]/page.tsx`, `web/src/app/api/admin/ad-units/[id]/route.js`, `web/src/types/database.ts`. Commit: `3ad9dd24`. **DB:** `ad_units_daily_impression_cap` migration (new column + `serve_ad` rewrite).
 - Common direct-buy ask: "stop after N impressions per day." The existing freq caps were per-user / per-session only — there was no ad-unit-wide daily ceiling.
