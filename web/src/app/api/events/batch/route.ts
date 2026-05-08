@@ -30,6 +30,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { isBotUserAgent } from '@/lib/botDetect';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { incrementField } from '@/lib/counters';
+import { checkAchievements } from '@/lib/scoring';
 import type { BatchResponseBody } from '@/lib/events/types';
 
 export const runtime = 'nodejs';
@@ -362,6 +363,11 @@ export async function POST(request: Request) {
             }
           );
           await incrementField(supabase, 'articles', ev.article_id as string, 'view_count', 1);
+          // Match the iOS path (/api/stories/read:103,145): evaluate
+          // achievement criteria right after scoring so a user who
+          // crosses a milestone mid-session gets the unlock without
+          // waiting for the next page event.
+          await checkAchievements(supabase, { userId: authedUserId });
         }
       } catch (err) {
         console.error('[events.batch] completion scoring failed', { article_id: ev.article_id, err });

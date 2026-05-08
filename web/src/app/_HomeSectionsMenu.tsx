@@ -642,14 +642,34 @@ function FollowingRow({
   }, [expanded, rows]);
 
   function markSeen(storyId: string) {
-    setRows((prev) =>
-      prev ? prev.map((r) => (r.story.id === storyId ? { ...r, unread: false } : r)) : prev
-    );
+    // Optimistic flip with rollback on failure. Without the rollback
+    // a failed PATCH (network, auth, or the new RPC-level rate limit)
+    // leaves the UI claiming "no unread" while the server still says
+    // unread — the dot would reappear on next refresh, mid-conversation.
+    let prevRow: FollowingMenuRow | undefined;
+    setRows((prev) => {
+      if (!prev) return prev;
+      prevRow = prev.find((r) => r.story.id === storyId);
+      return prev.map((r) => (r.story.id === storyId ? { ...r, unread: false } : r));
+    });
+    const rollback = () => {
+      if (!prevRow) return;
+      const restored = prevRow;
+      setRows((prev) =>
+        prev ? prev.map((r) => (r.story.id === storyId ? restored : r)) : prev
+      );
+    };
     void fetch('/api/story-follows', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ story_id: storyId }),
-    }).catch(() => {});
+    })
+      .then((res) => {
+        if (!res.ok) rollback();
+      })
+      .catch(() => {
+        rollback();
+      });
   }
 
   return (
