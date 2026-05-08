@@ -119,34 +119,42 @@ export async function scoreDailyLogin(service, { userId }) {
   return { ...pointsData, streak: streakData };
 }
 
-// scoreReceiveHelpfulTag — award the `receive_helpful_tag` rule to the
-// comment author when an actor marks it helpful for the first time.
-// Idempotent per (actor, comment) so repeat toggles don't double-award.
-export async function scoreReceiveHelpfulTag(service, { actorId, authorId, commentId }) {
+// scoreReceiveContextTag — award the `receive_context_tag` rule to the
+// comment author when an actor marks the comment as adding context.
+// Bucketed to the article's category so per-category leaderboards
+// reflect comment quality, not just reading stats. Idempotent per
+// (actor, comment) so repeat toggles don't double-award; self-tags
+// are skipped at the route layer too but defended again here.
+//
+// (Replaces scoreReceiveHelpfulTag — the legacy `receive_helpful_tag`
+// rule was never seeded into score_rules, so the old call path was a
+// silent no-op. The "Helpful" tag is the heart / social signal in the
+// new comment voice model and intentionally does not score.)
+export async function scoreReceiveContextTag(service, { actorId, authorId, commentId, articleId, categoryId }) {
   if (!actorId || !authorId || !commentId) {
     return { awarded: false, error: 'actorId, authorId, commentId required' };
   }
   if (actorId === authorId) return { awarded: false, reason: 'self_tag' };
 
-  const syntheticKey = `receive_helpful_tag:${actorId}:${commentId}`;
+  const syntheticKey = `receive_context_tag:${actorId}:${commentId}`;
   const { data: existing } = await service
     .from('score_events')
     .select('id')
     .eq('user_id', authorId)
-    .eq('action', 'receive_helpful_tag')
+    .eq('action', 'receive_context_tag')
     .filter('metadata->>key', 'eq', syntheticKey)
     .limit(1)
     .maybeSingle();
   if (existing) return { awarded: false, reason: 'already_awarded' };
 
   const { data, error } = await service.rpc('award_points', {
-    p_action: 'receive_helpful_tag',
+    p_action: 'receive_context_tag',
     p_user_id: authorId,
     p_kid_profile_id: null,
-    p_article_id: null,
-    p_category_id: null,
+    p_article_id: articleId || null,
+    p_category_id: categoryId || null,
     p_source_type: 'comment_tag',
-    p_source_id: null,
+    p_source_id: commentId,
     p_synthetic_key: syntheticKey,
   });
   if (error) return { awarded: false, error: error.message };

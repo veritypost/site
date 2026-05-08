@@ -6,7 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { scoreReceiveHelpfulTag } from '@/lib/scoring';
+import { scoreReceiveContextTag } from '@/lib/scoring';
 
 // POST /api/comments/[id]/context-tag
 // Toggle a per-user tag on a comment. Four kinds: helpful, context,
@@ -97,19 +97,29 @@ export async function POST(request, { params }) {
       fallbackStatus: 400,
     });
 
-  // Award scoring points when a helpful tag is freshly applied.
-  if (data?.tagged && data?.tag_kind === 'helpful') {
-    const { data: comment } = await service
+  // Award scoring points when a Context tag is freshly applied. Bucket
+  // to the article's category so per-category leaderboards reflect
+  // comment quality, not just reading stats. The Helpful tag is the
+  // heart / social signal in the new comment voice model and does not
+  // score (the legacy `receive_helpful_tag` rule was never in
+  // `score_rules` anyway — the old call path was a silent no-op).
+  if (data?.tagged && data?.tag_kind === 'context') {
+    const { data: ctx } = await service
       .from('comments')
-      .select('user_id')
+      .select('user_id, article_id, articles(category_id)')
       .eq('id', params.id)
       .maybeSingle();
-    if (comment?.user_id) {
-      scoreReceiveHelpfulTag(service, {
+    const authorId = ctx?.user_id;
+    const articleId = ctx?.article_id || null;
+    const categoryId = ctx?.articles?.category_id ?? null;
+    if (authorId) {
+      scoreReceiveContextTag(service, {
         actorId: user.id,
-        authorId: comment.user_id,
+        authorId,
         commentId: params.id,
-      }).catch((e) => console.error('[comments.id.context-tag] scoreReceiveHelpfulTag', e));
+        articleId,
+        categoryId,
+      }).catch((e) => console.error('[comments.id.context-tag] scoreReceiveContextTag', e));
     }
   }
 
