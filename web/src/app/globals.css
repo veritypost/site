@@ -549,6 +549,81 @@ body {
    680px inside a 75% column left a wide page off-center. Sources moved
    inline into the body (TODO-3); the timeline now flows below the
    article instead of a side rail. Mobile tab UI is preserved below. */
+/* Article body content typography. Targets the server-sanitized HTML
+   inside [data-article-body]: paragraph rhythm, drop cap on the lead,
+   pull-quote treatment for <blockquote>, editorial link underlines,
+   section heading scale. Pure visual — no chrome additions. */
+[data-article-body] > p {
+  margin: 0 0 1.1em;
+}
+[data-article-body] > p:last-child {
+  margin-bottom: 0;
+}
+[data-article-body] > p:first-of-type::first-letter {
+  float: left;
+  font-family: 'Source Serif 4', var(--font-source-serif), Georgia, serif;
+  font-size: 3.6em;
+  line-height: 0.85;
+  font-weight: 600;
+  padding: 0.05em 0.08em 0 0;
+  color: var(--p-ink);
+}
+[data-article-body] h2 {
+  font-family: 'Source Serif 4', var(--font-source-serif), Georgia, serif;
+  font-size: 1.5em;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  margin: 1.6em 0 0.5em;
+  color: var(--p-ink);
+}
+[data-article-body] h3 {
+  font-size: 1.15em;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 1.4em 0 0.4em;
+  color: var(--p-ink);
+}
+[data-article-body] blockquote {
+  margin: 1.5em 0;
+  padding: 0 0 0 1em;
+  border-left: 3px solid var(--p-ink);
+  font-style: italic;
+  font-size: 1.15em;
+  line-height: 1.55;
+  color: var(--p-ink);
+}
+[data-article-body] blockquote p {
+  margin: 0 0 0.5em;
+}
+[data-article-body] blockquote p:last-child {
+  margin-bottom: 0;
+}
+[data-article-body] a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: var(--p-border);
+  transition: text-decoration-color 0.12s ease;
+}
+[data-article-body] a:hover {
+  text-decoration-color: var(--p-ink);
+}
+[data-article-body] em, [data-article-body] i {
+  font-style: italic;
+}
+[data-article-body] strong, [data-article-body] b {
+  font-weight: 600;
+}
+[data-article-body] hr {
+  border: 0;
+  margin: 2em auto;
+  width: 80px;
+  height: 1px;
+  background: var(--p-border);
+}
+
 [data-reader-tabstrip] { display: none; }
 [data-reader-body] {
   display: block;

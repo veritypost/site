@@ -40,26 +40,51 @@ const PAGE_STYLE: React.CSSProperties = {
   maxWidth: 680,
   margin: '0 auto',
   padding: '32px 20px 16px',
+  // Tight type rendering for prose. Kerning + ligatures opt-in via
+  // font-feature-settings; antialiasing + legibility hint for crisp
+  // serif glyphs at body sizes. Whole-tree default — child components
+  // inherit unless they override.
+  WebkitFontSmoothing: 'antialiased',
+  MozOsxFontSmoothing: 'grayscale',
+  textRendering: 'optimizeLegibility',
+  fontFeatureSettings: '"kern" 1, "liga" 1',
 };
 
 const TITLE_STYLE: React.CSSProperties = {
-  fontSize: 36,
-  fontWeight: 700,
-  lineHeight: 1.2,
-  margin: '0 0 12px',
+  // 36 → 44; weight 700 → 600 for editorial restraint; tighter
+  // tracking matches modern news-app titles (NYT, Atlantic).
+  fontSize: 44,
+  fontWeight: 600,
+  lineHeight: 1.1,
+  letterSpacing: '-0.02em',
+  margin: '0 0 8px',
   color: 'var(--p-ink)',
 };
 
 const SUBTITLE_STYLE: React.CSSProperties = {
-  fontSize: 18,
-  lineHeight: 1.4,
-  margin: '0 0 24px',
+  // Italic deck — classic editorial deck convention; keeps the visual
+  // distinction between title and lead without competing on size.
+  fontSize: 19,
+  lineHeight: 1.45,
+  fontStyle: 'italic',
+  margin: '0 0 28px',
+  color: 'var(--p-ink-muted)',
+};
+
+const BYLINE_STYLE: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.1em',
+  marginBottom: 24,
   color: 'var(--p-ink-muted)',
 };
 
 const BODY_STYLE: React.CSSProperties = {
-  fontSize: 17,
-  lineHeight: 1.6,
+  // 17 → 18, 1.6 → 1.7 — measurable readability win on long-form prose.
+  // Per-paragraph spacing handled in globals.css under [data-article-body].
+  fontSize: 18,
+  lineHeight: 1.7,
   color: 'var(--p-ink)',
 };
 
@@ -132,7 +157,7 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
       )}
       <h1 style={TITLE_STYLE}>{article.title}</h1>
       {article.subtitle && <p style={SUBTITLE_STYLE}>{article.subtitle}</p>}
-      <p style={{ fontSize: 13, color: 'var(--p-ink-muted)', marginBottom: 16, letterSpacing: '0.03em' }}>
+      <p style={BYLINE_STYLE}>
         Verity Post{article.published_at ? ` · ${new Date(article.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` : ''}
       </p>
       {/* article_header: between title/byline block and body (DECISION #048) */}
