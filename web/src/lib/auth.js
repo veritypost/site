@@ -387,7 +387,17 @@ async function loadAliasesFor(client, key) {
     .from('permission_key_aliases')
     .select('old_key, new_key');
   if (error || !data) {
-    // Table absent (pre-migration) or RLS denies — treat as no aliases.
+    // 42P01 = undefined_table: pre-migration environments where the alias
+    // table genuinely does not exist. Silent no-aliases is correct.
+    // Any other error (42501 permission denied, network/transient) we log
+    // so regressions surface, but still return [] — requirePermission
+    // handles missing aliases gracefully and we don't want a transient DB
+    // hiccup to brick the auth path. Cache either way so we don't hammer
+    // the DB on every permission check.
+    if (error && error.code !== '42P01') {
+      // eslint-disable-next-line no-console
+      console.error('[auth.aliasLoad]', { code: error.code, message: error.message });
+    }
     _aliasCache = { byKey: new Map(), expiresAt: now + ALIAS_TTL_MS };
     return [];
   }

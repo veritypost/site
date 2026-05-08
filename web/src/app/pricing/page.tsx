@@ -89,8 +89,8 @@ function PlanCard({
         minWidth: 260,
       }}
     >
-      <div style={{ fontSize: 18, fontWeight: 700 }}>{name}</div>
-      <div style={{ fontSize: 32, fontWeight: 800, lineHeight: 1 }}>
+      <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.01em' }}>{name}</div>
+      <div style={{ fontSize: 32, fontWeight: 600, lineHeight: 1.1, letterSpacing: '-0.02em' }}>
         {price}
         {pricePeriod && (
           <span style={{ fontSize: 14, fontWeight: 400, color: C.dim, marginLeft: 6 }}>
@@ -122,7 +122,7 @@ function PlanCard({
             padding: '12px 16px',
             textAlign: 'center',
             fontSize: 14,
-            fontWeight: 700,
+            fontWeight: 600,
             background: 'transparent',
             color: C.dim,
             border: `1px solid ${C.border}`,
@@ -141,7 +141,7 @@ function PlanCard({
             padding: '12px 16px',
             textAlign: 'center',
             fontSize: 14,
-            fontWeight: 700,
+            fontWeight: 600,
             textDecoration: 'none',
             background: highlight ? C.accent : 'transparent',
             color: highlight ? '#fff' : C.accent,
@@ -214,7 +214,7 @@ export default async function PricingPage() {
         color: C.text,
       }}
     >
-      <h1 style={{ fontSize: 32, fontWeight: 800, margin: '0 0 8px' }}>Pricing</h1>
+      <h1 style={{ fontSize: 32, fontWeight: 600, margin: '0 0 8px', letterSpacing: '-0.02em', lineHeight: 1.1 }}>Pricing</h1>
       <p style={{ fontSize: 15, color: C.dim, margin: '0 0 32px', maxWidth: 640 }}>
         Verity Post is original journalism. No clickbait. No outrage farming. Pick the plan that
         fits your household.
@@ -286,7 +286,7 @@ export default async function PricingPage() {
           borderRadius: 14,
         }}
       >
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 12px' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 12px', letterSpacing: '-0.01em' }}>
           How Family pricing scales
         </h2>
         <table
