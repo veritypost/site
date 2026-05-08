@@ -21,10 +21,11 @@ import MobileStickyAd from '../components/MobileStickyAd';
 // even if the env var isn't configured on a branch preview.
 const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-NE37VG1FP6';
 
-// Google AdSense publisher ID (ca-pub-xxxxxxxxxxxxxxxx). Only set this
-// once AdSense has approved the domain; until then the script tag stays
-// off. `AdSenseSlot` components gate themselves on this being present.
-const ADSENSE_PUB_ID = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID || '';
+// Google AdSense publisher ID (ca-pub-xxxxxxxxxxxxxxxx). Vercel prod
+// env supplies it; the literal fallback matches the hardcoded
+// `google-adsense-account` meta tag below so the script still loads
+// in any env where the var isn't set.
+const ADSENSE_PUB_ID = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID || 'ca-pub-3486969662269929';
 
 // DA-030 — self-host fonts via next/font/google. Killed the cross-
 // origin @import in globals.css which was paying DNS + TLS + fetch
