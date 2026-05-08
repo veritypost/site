@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission, getUserRoles } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { MOD_ROLES } from '@/lib/roles';
 
 // GET  — list approved questions for the session. kid_profiles identity
@@ -90,6 +91,20 @@ export async function POST(request, { params }) {
   }
 
   const service = createServiceClient();
+
+  // Per-user cap. Sister /api/expert/ask uses 5/60 — match cadence.
+  const rl = await checkRateLimit(service, {
+    key: `expert-question-ask:${user.id}`,
+    policyKey: 'expert-question-ask',
+    max: 5,
+    windowSec: 60,
+  });
+  if (rl.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rl.windowSec ?? 60) } }
+    );
+  }
 
   // Confirm the parent owns this kid profile.
   const { data: kid } = await service

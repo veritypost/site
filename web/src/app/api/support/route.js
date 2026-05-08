@@ -1,9 +1,10 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified profile_settings 2026-04-18
-import { createClient, createClientFromToken } from '@/lib/supabase/server';
+import { createClient, createClientFromToken, createServiceClient } from '@/lib/supabase/server';
 import { requireAuth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 // Round 7 follow-up — iOS (SettingsView, ProfileView) POSTs here with a
 // Bearer token; without bearer-bound client the create_support_ticket
@@ -18,9 +19,25 @@ export async function POST(request) {
   try {
     const token = bearerToken(request);
     const supabase = token ? createClientFromToken(token) : await createClient();
-    // requireAuth throws on unauth — we don't need the returned user here,
-    // just its gating side effect before processing the ticket body.
-    await requireAuth(supabase);
+    const user = await requireAuth(supabase);
+
+    // Per-user ticket-create cap. Tight (3/hr) because tickets are
+    // rare. Replies live on a separate higher-cadence bucket
+    // (support_message_send) at /api/support/[id]/messages.
+    const service = createServiceClient();
+    const rl = await checkRateLimit(service, {
+      key: `support_ticket_create:${user.id}`,
+      policyKey: 'support_ticket_create',
+      max: 3,
+      windowSec: 3600,
+    });
+    if (rl.limited) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(rl.windowSec ?? 3600) } }
+      );
+    }
+
     const { category, subject, description } = await request.json();
 
     if (!category || !subject || !description) {

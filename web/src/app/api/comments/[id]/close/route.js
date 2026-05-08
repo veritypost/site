@@ -19,6 +19,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { isExpertThreadsEnabled } from '@/lib/expertConfig';
 
 export async function POST(request, { params }) {
@@ -44,6 +45,24 @@ export async function POST(request, { params }) {
   const action = url.searchParams.get('action') === 'reopen' ? 'reopen' : 'close';
 
   const service = createServiceClient();
+
+  // Per-user cap across all threads. Distinguish from the per-thread
+  // 60s cooldown in close_expert_thread (which returns
+  // { ok: false, reason: 'wait_for_cooldown', seconds_remaining }) so
+  // clients can show "you're closing too many threads" vs "wait Ns
+  // on this thread."
+  const rl = await checkRateLimit(service, {
+    key: `comment-thread-close:${user.id}`,
+    policyKey: 'comment-thread-close',
+    max: 20,
+    windowSec: 60,
+  });
+  if (rl.limited) {
+    return NextResponse.json(
+      { error: 'rate_limited', scope: 'global' },
+      { status: 429, headers: { 'Retry-After': String(rl.windowSec ?? 60) } }
+    );
+  }
 
   if (action === 'reopen') {
     const { error } = await service.rpc('reopen_expert_thread', {

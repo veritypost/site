@@ -540,6 +540,21 @@ export async function DELETE(_request, { params }) {
   const { id } = params;
   const service = createServiceClient();
 
+  // Per-user delete cap, gates both admin direct-delete branch and
+  // user RPC branch. soft_delete_comment RPC has no internal limit.
+  const rate = await checkRateLimit(service, {
+    key: `comment-delete:${user.id}`,
+    policyKey: 'comment-delete',
+    max: 10,
+    windowSec: 60,
+  });
+  if (rate.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(rate.windowSec ?? 60) } }
+    );
+  }
+
   if (isAdminDelete) {
     // Direct soft-delete via service client — same semantics as the RPC
     // (body redacted, status=deleted, deleted_at stamped, comment_count

@@ -34,6 +34,7 @@ import {
   createClientFromToken,
   createServiceClient,
 } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 
@@ -61,6 +62,23 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401, headers: NO_STORE });
   }
 
+  // Per-user save-username cap. Username probe / squat vector even
+  // when authed: pre-set state hits reserved_usernames + users
+  // lookups. Tight: this is a write-once-per-account action.
+  const service = createServiceClient();
+  const rl = await checkRateLimit(service, {
+    key: `save-username:${user.id}`,
+    policyKey: 'save_username',
+    max: 5,
+    windowSec: 3600,
+  });
+  if (rl.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(rl.windowSec ?? 3600) } }
+    );
+  }
+
   let payload: { username?: unknown } = {};
   try {
     payload = await request.json();
@@ -81,7 +99,6 @@ export async function PATCH(request: Request) {
   // Returning 409 for reserved keeps the iOS error path uniform —
   // "taken just now" is the single retry signal regardless of
   // whether the name is taken or reserved.
-  const service = createServiceClient();
   const { data: reservedRow } = await service
     .from('reserved_usernames')
     .select('username')

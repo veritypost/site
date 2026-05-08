@@ -1,9 +1,10 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified profile_settings 2026-04-18
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { requireAuth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 export async function GET(request, { params }) {
   try {
@@ -44,6 +45,24 @@ export async function POST(request, { params }) {
   try {
     const user = await requireAuth();
     const supabase = await createClient();
+
+    // Per-user reply cap — higher cadence than ticket-create
+    // (support_ticket_create) since active back-and-forth triage
+    // can legitimately fire many messages in a short window.
+    const service = createServiceClient();
+    const rl = await checkRateLimit(service, {
+      key: `support_message_send:${user.id}`,
+      policyKey: 'support_message_send',
+      max: 30,
+      windowSec: 3600,
+    });
+    if (rl.limited) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(rl.windowSec ?? 3600) } }
+      );
+    }
+
     const { body } = await request.json();
 
     if (!body?.trim()) {

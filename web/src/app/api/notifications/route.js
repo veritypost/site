@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { checkRateLimit } from '@/lib/rateLimit';
 
 const MAX_IDS_PER_PATCH = 200;
 
@@ -88,6 +89,19 @@ export async function PATCH(request) {
 
   const { ids, mark, all } = await request.json().catch(() => ({}));
   const service = createServiceClient();
+  // Shared bucket with /api/notifications/[id]/read POST.
+  const rl = await checkRateLimit(service, {
+    key: `notifications_mark_read:${user.id}`,
+    policyKey: 'notifications_mark_read',
+    max: 60,
+    windowSec: 60,
+  });
+  if (rl.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(rl.windowSec ?? 60) } }
+    );
+  }
   const now = new Date().toISOString();
   const update =
     mark === 'seen'
