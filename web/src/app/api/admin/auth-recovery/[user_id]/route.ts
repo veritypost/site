@@ -12,11 +12,12 @@
 //   - clear_login_lock: calls clear_failed_login RPC. Used when a user
 //                       tripped the failed-login lockout (locked_until).
 //
-// Permission: admin.users.delete — same high-trust level as the user-delete
-// route, since these actions can unlock an account that was locked for
-// security reasons. We don't have a narrower perm key yet; if support
-// access without delete-account access becomes a real need, mint
-// admin.auth_recovery and grant it to a "support" role-set.
+// Permission: admin.users.recovery — distinct from admin.users.delete_account
+// because these actions are reversible support primitives (confirm email,
+// clear lockouts), not the irreversible PII destruction the delete route
+// performs. Granting recovery without granting delete_account is now
+// possible — both keys are minted in `permissions` and granted to the
+// admin + owner permission_sets.
 //
 // Audit: each action writes a dedicated audit_log row via recordAdminAction
 // so the existing admin-audit dashboard (filters on action prefix) sees
@@ -37,7 +38,7 @@ function isAction(s: unknown): s is Action {
 export async function POST(request: Request, { params }: { params: { user_id: string } }) {
   let actor;
   try {
-    actor = await requirePermission('admin.users.delete');
+    actor = await requirePermission('admin.users.recovery');
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status;
     if (status) {

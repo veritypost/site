@@ -95,6 +95,13 @@ export async function POST(request) {
       .single();
 
     if (insertError) {
+      // 23505 = unique_violation. The new uq_reports_reporter_target
+      // constraint means a user can only report the same (target_type,
+      // target_id) once — an idempotent "thank you, already filed"
+      // is the right shape, not a 500.
+      if (insertError.code === '23505') {
+        return NextResponse.json({ ok: true, alreadyReported: true }, { status: 200 });
+      }
       return NextResponse.json({ error: 'Could not file report' }, { status: 500 });
     }
 

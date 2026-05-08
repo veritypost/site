@@ -131,12 +131,21 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   // Mark approved + bind code + stamp invite_sent_at if email succeeded.
+  // BugList #4: also stamp metadata.email_status so the admin UI can
+  // surface a "Resend invite" button on rows where the initial email
+  // attempt failed (was previously only inferable via the absence of
+  // invite_sent_at).
   const updatePayload: TableUpdate<'access_requests'> = {
     status: 'approved',
     approved_by: actor.id,
     approved_at: new Date().toISOString(),
     access_code_id: codeId,
-    metadata: { approval_email_id: emailId, invite_url: inviteUrl },
+    metadata: {
+      approval_email_id: emailId,
+      invite_url: inviteUrl,
+      email_status: emailId ? 'sent' : 'failed',
+      email_last_attempt_at: new Date().toISOString(),
+    },
     ...(cohortSource ? { referral_source: cohortSource } : {}),
     ...(cohortMedium ? { referral_medium: cohortMedium } : {}),
   } as TableUpdate<'access_requests'>;

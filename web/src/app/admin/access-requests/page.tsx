@@ -155,6 +155,27 @@ function RequestsInner() {
     }
   };
 
+  // BugList #4 — Resend the approval email for a row whose original
+  // send failed. Reuses the existing minted access_codes row; does not
+  // re-mint. Backend gates on metadata.email_status === 'failed'.
+  const resendInvite = async (r: Req) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/access-requests/${r.id}/resend-invite`, {
+        method: 'POST',
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        push({ message: json.error || 'Resend failed', variant: 'danger' });
+        return;
+      }
+      push({ message: `Invite resent to ${r.email}.`, variant: 'success' });
+      await loadAll();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const bulkApprove = async () => {
     if (selected.size === 0) return;
     setBulkBusy(true);
@@ -459,6 +480,29 @@ function RequestsInner() {
                   expiresAt={active.access_codes.expires_at}
                   redeemed={(active.access_codes.current_uses || 0) > 0}
                 />
+              </DetailRow>
+            )}
+            {/* BugList #4 — surface Resend button for approved rows whose
+                initial email send failed. Backend gates on
+                metadata.email_status === 'failed' OR (status='approved'
+                AND invite_sent_at IS NULL). */}
+            {active.status === 'approved' &&
+             !active.invite_sent_at &&
+             active.access_code_id && (
+              <DetailRow label="Email status">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
+                  <span style={{ fontSize: F.sm, color: C.danger }}>
+                    Initial send failed — invite was never delivered.
+                  </span>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => resendInvite(active)}
+                  >
+                    Resend invite
+                  </Button>
+                </div>
               </DetailRow>
             )}
             {active.ip_address && <DetailRow label="IP"><code style={{ fontSize: F.xs }}>{active.ip_address}</code></DetailRow>}

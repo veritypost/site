@@ -6,6 +6,96 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### BugList sweep — owner-judgment 5 + safe-batch 8 + dropped 1
+**Files:** see breakdown.
+
+After the safe-batch 8 (separate entry) shipped, the 6 remaining
+owner-judgment items got a recon-and-adversary pass. **5 shipped, 1
+dropped from the list as misdiagnosed.**
+
+**Shipped this commit:**
+
+- **#5 admin support reply rank guard — closed by design comment.**
+  `web/src/app/api/admin/support/[id]/reply/route.ts:14-23` — added
+  doc comment explaining why `requireAdminOutranks` is intentionally
+  absent: support replies write to `ticket_messages` (replier-owned),
+  not to the target user's record — same shape as a public comment
+  not outranks-checking against the article author. Adversary verified
+  the recon's "future moderator support" framing was speculative; the
+  correct reason is the surface, not the org chart.
+
+- **#7 reports flood UNIQUE + threshold setting + 23505 handling.**
+  Migration `reports_unique_reporter_target_plus_autohide_setting`
+  adds `UNIQUE(reporter_id, target_type, target_id)` on `reports`
+  (table empty — zero-cost) and seeds `report_autohide_threshold=3`
+  into `settings` so it's no longer a magic-number fallback. With
+  the constraint, `COUNT(*)` per target == distinct reporter count
+  automatically — no app-layer DISTINCT query needed. Route handler
+  at `web/src/app/api/reports/route.js:97-106` now intercepts
+  Postgres `23505` unique-violation as `{ ok: true, alreadyReported:
+  true }` instead of a 500. Note: `audit_log.metadata.report_count`
+  semantics shifts from "raw reports" to "distinct reporters."
+
+- **#3 admin.users.recovery permission minted + route swap +
+  doc-comment retrofit.** Migration
+  `admin_users_recovery_permission` mints the new key and grants it
+  to the `admin` and `owner` permission_sets (mirroring
+  `admin.users.delete_account`). Route at
+  `web/src/app/api/admin/auth-recovery/[user_id]/route.ts:41` swapped
+  from the non-existent `admin.users.delete` to `admin.users.recovery`.
+  Doc comments at the route header and at
+  `web/src/app/admin/auth-recovery/page.tsx:15-18` rewritten to match.
+  Adversary confirmed `admin.users.delete` exists nowhere in
+  `permissions` or `permission_key_aliases`; the route only "worked"
+  before because admin@veritypost.com bypasses via owner-mode.
+
+- **#4 access-request approve email-failure recovery flow.**
+  - New route `web/src/app/api/admin/access-requests/[id]/resend-invite/route.ts`
+    — reuses the existing `access_codes` row (no double-mint),
+    re-renders the approval template, and updates
+    `metadata.email_status` based on the second-attempt outcome.
+    Permission: `admin.access_requests.approve` (same as approve);
+    rate-limited at 30/min.
+  - Both `approve/route.ts` and `bulk-approve/route.ts` now stamp
+    `metadata.email_status` (`'sent'` or `'failed'`) +
+    `email_last_attempt_at` so the admin UI can surface failures
+    without inferring from `invite_sent_at IS NULL`.
+  - Admin UI at `web/src/app/admin/access-requests/page.tsx` adds
+    a `resendInvite` handler and a "Resend invite" button rendered
+    inside the row drawer when `status='approved' AND
+    invite_sent_at IS NULL AND access_code_id IS NOT NULL`.
+  - Backfill: 3 currently-stuck rows (verified via DB —
+    cliff.hawes@outlook.com, support@veritypost.com,
+    advertisting@veritypost.com) had `metadata.email_status`
+    stamped to `'failed'` so the UI button picks them up. They
+    can now be resent from the admin drawer.
+
+- **#9 kid cover-image 2MB byte cap.** New file
+  `VerityPostKids/VerityPostKids/KidCoverImage.swift` — custom
+  SwiftUI loader that uses `URLSession`, checks `Content-Length`
+  before download, accumulates-and-checks against a 2MB cap (defense
+  against servers that omit/lie about Content-Length), uses
+  `URLCache.shared` for caching, and falls back to the gradient
+  placeholder on cap-exceeded or any error. `KidReaderView.swift:144`
+  swapped from `AsyncImage(url:)` to `KidCoverImage`. Scope is
+  kids-only: adult `StoryDetailView.swift` SELECTs `cover_image_url`
+  but never renders it as an image, so cross-platform doesn't apply.
+  `allowedImageHosts` whitelist still gates origin; this caps
+  payload size as belt-and-suspenders.
+
+**Dropped from BugList (was misdiagnosed):**
+
+- **#6 DM block — one-way client load is intentional.** Adversary
+  caught what recon missed: the `messages/page.tsx:234-244` outgoing-
+  only load is **deliberately** scoped to drive the unblock-button
+  DELETE decision. The `post_message` RPC already enforces both
+  directions of the block. "Fixing" the client to two-way would
+  surface an Unblock button when the OTHER party blocked you, the
+  Unblock click would silently no-op at the API (you don't own the
+  row to delete), the toast would say "unblocked," and the user
+  would still be blocked — exactly the failure mode the existing
+  comment predicts. No code change.
+
 ### BugList sweep — 14 bugs shipped (2 blockers + 12 easy-tier)
 **Files:** see breakdown.
 

@@ -142,13 +142,20 @@ export async function POST(request: Request) {
         // Continue — still mark approved even if email failed.
       }
 
-      // Mark approved.
+      // Mark approved. BugList #4: stamp metadata.email_status so the
+      // admin UI can surface a per-row "Resend invite" button on
+      // rows where the initial email attempt failed.
       const { error: updErr } = await service.from('access_requests').update({
         status: 'approved',
         approved_by: actor.id,
         approved_at: new Date().toISOString(),
         access_code_id: codeId,
-        metadata: { approval_email_id: emailId, invite_url: inviteUrl },
+        metadata: {
+          approval_email_id: emailId,
+          invite_url: inviteUrl,
+          email_status: emailId ? 'sent' : 'failed',
+          email_last_attempt_at: new Date().toISOString(),
+        },
         ...(cohortSource ? { referral_source: cohortSource } : {}),
         ...(cohortMedium ? { referral_medium: cohortMedium } : {}),
         ...(emailId ? { invite_sent_at: new Date().toISOString() } : {}),

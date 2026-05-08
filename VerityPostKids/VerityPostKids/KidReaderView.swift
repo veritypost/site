@@ -140,16 +140,11 @@ struct KidReaderView: View {
                    let host = url.host?.lowercased(),
                    !host.isEmpty,
                    allowedImageHosts.contains(host) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        default:
-                            gradientPlaceholder
-                        }
-                    }
+                    // BugList #9 — capped image loader. AsyncImage has no
+                    // byte limit; an oversized cover (admin compromise,
+                    // CDN bug) could OOM a kid's device. allowedImageHosts
+                    // gates origin; this caps payload at 2 MB.
+                    KidCoverImage(url: url, fallback: gradientPlaceholder)
                 } else {
                     gradientPlaceholder
                 }

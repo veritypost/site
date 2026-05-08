@@ -11,6 +11,14 @@ export async function POST(
 ) {
   let actor: { id: string };
   try {
+    // BugList #5 — `requireAdminOutranks` is intentionally absent here.
+    // Support replies write to `ticket_messages` (a row owned by the
+    // replier), not to the target user's record — same shape as a
+    // public comment that doesn't outranks-check against the article
+    // author. The outranks pattern is for routes that mutate the
+    // target user (delete / ban / sessions / plan / achievements).
+    // If a future "admin can edit/delete a user's ticket" surface
+    // ships, THAT route should add outranks; don't blanket-exempt it.
     actor = await requirePermission('admin.support.reply');
   } catch (err) {
     return permissionError(err);

@@ -12,10 +12,10 @@
 // /api/admin/auth-recovery/[user_id] which writes its own audit_log
 // row + bumps perms_version where applicable.
 //
-// Permission: admin.users.delete (same high-trust level as the
-// existing user-delete route). The route enforces server-side; this
-// page checks it locally for a clean fail-state instead of letting
-// the buttons 403.
+// Permission: admin.users.recovery (distinct from admin.users.delete_account —
+// recovery actions are reversible support primitives). The route enforces
+// server-side; this page checks it locally for a clean fail-state instead
+// of letting the buttons 403.
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
