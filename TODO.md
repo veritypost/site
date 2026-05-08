@@ -167,14 +167,6 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 ---
 
-## Category leaderboard
-
-- 36: **Mostly SHIPPED 2026-05-07** (commits `a2fef2a8` + `c6fc6a71` + `6ce3f584`). Context tag scoring buckets to category; profile shows rank + percentile; article footer has a "See {Category} leaderboard →" entry; sticky rank bar shows category label. Helpful-tag scoring removed (legacy rule was never seeded; heart is the social signal in the new comment voice model).
-
-  **Tail item still open:** subcategory deselect-on-click in profile is inconsistent with leaderboard pill behavior — profile toggles the sub off on second click, leaderboard treats it as drilldown. Minor UX polish; pick one and align both.
-
----
-
 ## Article surface — sources
 
 - 26: Sources still showing "Unknown" for some articles — `SourcesSection.tsx:88` renders `s.title || s.publisher || hostFromUrl(s.url) || 'Source'`. The backfill migration `20260503000007_backfill_unknown_sources_to_null.sql` has not been applied yet (see TODO 19), so rows with literal `'Unknown'` in the `title` column pass the `s.title` check and render "Unknown" instead of falling through to `hostFromUrl`. Fix: apply the backfill migration (owner action, TODO 19) — no code change needed.

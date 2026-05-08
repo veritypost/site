@@ -6,6 +6,13 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-07 (continued)
 
+### TODO 36 finish — deselect, row-list rank, percentile on leaderboard
+**Files:** `web/src/app/leaderboard/page.tsx`, `web/src/app/profile/_sections/CategoriesSection.tsx`. Commit: `6611fb8c`. No DB.
+- **Sub-pill deselect alignment.** `/leaderboard`'s `setActiveSub` toggles off on second click — matches the profile pattern. One mental model across both surfaces.
+- **Rank in the profile's all-parents row list.** "Score" caption under each parent's score becomes `#14` when the user has a rank for that category, falling back to "Score" otherwise. See standing without drilling into the scope card.
+- **Percentile on `/leaderboard`.** `CEIL(rank / total * 100)` derived client-side from the loaded users list (suppressed when only one participant). Rendered in the "Your rank" inline card up top and the sticky bottom bar — same "top X%" string the profile shows.
+- TODO 36 closed.
+
 ### TODO 36 — Category leaderboard, mostly shipped
 **Files:** `web/src/lib/scoring.js`, `web/src/app/api/comments/[id]/context-tag/route.js`, `web/src/app/profile/_sections/CategoriesSection.tsx`, `web/src/components/ArticleEngagementZone.tsx`, `web/src/app/[slug]/page.tsx`, `web/src/app/leaderboard/page.tsx`, `web/src/types/database.ts`. Commits: `a2fef2a8`, `c6fc6a71`, `6ce3f584`. **DB migrations:** `score_receive_context_tag` (new score_rules row), `user_category_ranks_self_only` (new RPC).
 - **Context tag now scores into the article's category.** Replaces the legacy `receive_helpful_tag` path (the rule was never seeded into `score_rules` — silent no-op for as long as it's been wired). The Helpful tag is the heart / social signal in the new comment voice model and intentionally does not score. New `receive_context_tag` rule = 15 pts, max 20/day. `scoreReceiveContextTag` reads the comment's article + the article's category and passes both to `award_points` so a great Politics commenter actually moves on the Politics leaderboard.
