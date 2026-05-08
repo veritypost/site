@@ -173,12 +173,6 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 ---
 
-## Comments / tagging
-
-- 39: **iOS parity — port web tag-row redesign to `StoryDetailView.swift`.** Web shipped 2026-05-07 (commit `dd73c1ec`): `helpful` is a heart icon in the action row, `context` / `cite_needed` / `off_topic` are always-visible inline buttons. iOS `commentTagChipsRow` (`StoryDetailView.swift:4347`) still uses `+ Tag` opens-picker pattern with inactive tags hidden. Mirror the web pattern: heart for helpful, three inline buttons always visible, no picker. iOS Kids: not applicable (no comments).
-
----
-
 ## iOS parity — bring iOS up to web mobile standard
 
 Web mobile is the product standard. These items bring iOS in line.

@@ -4,6 +4,17 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ---
 
+## 2026-05-08
+
+### TODO 39 — iOS tag-row parity ports the web pattern
+**File:** `VerityPost/VerityPost/StoryDetailView.swift`. Closes the iOS half of TODO 39 (web shipped 2026-05-07, commit `dd73c1ec`).
+- Replaced the old `+ Tag` opens-picker UX in `commentTagChipsRow` with the always-visible heart + three inline pills: `helpful` is a heart-icon button (unicode ♥/♡, matches the web rendering exactly) at the front of the row, followed by `context` / `cite_needed` / `off_topic` as always-visible pill chips. No opener, no picker, no two-step reveal.
+- Chips share the web action-chip family shape: 12px / weight 500 inactive / 600 active, pill 20px radius, 32 min-height, transparent → tinted-color bg on cast.
+- Helpful heart picks up `VP.tagHelpful` for the cast state (matches the existing color choice from `commentTagOrder`).
+- Dropped dead state (`tagOpenCommentId` `@State` + `tagPickerOpen(for:)` helper) — no callers after the redesign. Build clean.
+
+---
+
 ## 2026-05-07 (continued)
 
 ### TODO 36 finish — deselect, row-list rank, percentile on leaderboard

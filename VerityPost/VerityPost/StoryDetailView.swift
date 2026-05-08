@@ -135,7 +135,6 @@ struct StoryDetailView: View {
     @State private var commentTagsByUser: [String: Set<String>] = [:]
     @State private var commentHelpfulCounts: [String: Int] = [:]
     @State private var commentTagBusyKey: String = ""
-    @State private var tagOpenCommentId: String? = nil
 
     // D21: @mention autocomplete — paid tiers only.
     @State private var mentionSuggestions: [VPUser] = []
@@ -4345,76 +4344,76 @@ struct StoryDetailView: View {
 
     @ViewBuilder
     private func commentTagChipsRow(for comment: VPComment) -> some View {
+        // Web parity (commit dd73c1ec, ported to iOS 2026-05-08): helpful is
+        // a heart in the action row; context / cite_needed / off_topic are
+        // always-visible inline pill buttons. No "+ Tag" opener, no hidden
+        // picker, no two-step reveal — the same UX the web shipped.
         let userTags = commentTagsByUser[comment.id] ?? []
-        // Active: cast by user OR community count > 0
-        let active = Self.commentTagOrder.filter { entry in
-            userTags.contains(entry.kind) || tagCount(for: comment, kind: entry.kind) > 0
-        }
-        let inactive = Self.commentTagOrder.filter { entry in
-            !userTags.contains(entry.kind) && tagCount(for: comment, kind: entry.kind) == 0
-        }
-        if active.isEmpty && !tagPickerOpen(for: comment) {
-            Button {
-                withAnimation(.easeOut(duration: 0.15)) { tagOpenCommentId = comment.id }
-            } label: {
-                Text("+ Tag")
-                    .font(.system(size: VP.Size.xs, weight: .medium))
-                    .foregroundColor(VP.dim.opacity(0.7))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(VP.border, style: StrokeStyle(lineWidth: 1, dash: [4])))
-            }
-            .buttonStyle(.plain)
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(active, id: \.kind) { entry in
-                        tagChipButton(comment: comment, entry: entry, isCast: userTags.contains(entry.kind))
-                    }
-                    if !inactive.isEmpty {
-                        Button {
-                            withAnimation(.easeOut(duration: 0.15)) {
-                                tagOpenCommentId = tagPickerOpen(for: comment) ? nil : comment.id
-                            }
-                        } label: {
-                            Text(tagPickerOpen(for: comment) ? "\u{2212}" : "+")
-                                .font(.system(size: VP.Size.xs, weight: .medium))
-                                .foregroundColor(VP.dim.opacity(0.7))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(VP.border, style: StrokeStyle(lineWidth: 1, dash: [4])))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if tagPickerOpen(for: comment) {
-                        ForEach(inactive, id: \.kind) { entry in
-                            tagChipButton(comment: comment, entry: entry, isCast: false)
-                        }
-                    }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                heartHelpfulButton(comment: comment, isCast: userTags.contains("helpful"))
+                ForEach(Self.commentTagOrder.filter { $0.kind != "helpful" }, id: \.kind) { entry in
+                    tagChipButton(
+                        comment: comment,
+                        entry: entry,
+                        isCast: userTags.contains(entry.kind)
+                    )
                 }
             }
         }
     }
 
-    private func tagPickerOpen(for comment: VPComment) -> Bool {
-        tagOpenCommentId == comment.id
+    @ViewBuilder
+    private func heartHelpfulButton(comment: VPComment, isCast: Bool) -> some View {
+        let busy = commentTagBusyKey == "\(comment.id):helpful"
+        let count = tagCount(for: comment, kind: "helpful")
+        Button {
+            Task { await toggleCommentTag(comment, kind: "helpful") }
+        } label: {
+            HStack(spacing: 4) {
+                // Unicode heart matches the web rendering exactly (♥ / ♡).
+                Text(isCast ? "\u{2665}" : "\u{2661}")
+                    .font(.system(size: VP.Size.sm))
+                    .foregroundColor(isCast ? VP.tagHelpful : VP.dim)
+                Text(count > 0 ? String(count) : "Helpful")
+                    .font(.system(size: VP.Size.xs, weight: isCast ? .semibold : .medium))
+                    .foregroundColor(isCast ? VP.tagHelpful : VP.dim)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .frame(minHeight: 32)
+            .background(isCast ? VP.tagHelpful.opacity(0.08) : Color.clear)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(isCast ? VP.tagHelpful : VP.border, lineWidth: 1)
+            )
+            .opacity(busy ? 0.6 : 1)
+        }
+        .buttonStyle(.plain)
+        .disabled(busy)
+        .accessibilityLabel(isCast ? "Remove helpful mark" : "Mark as helpful")
     }
 
     @ViewBuilder
     private func tagChipButton(comment: VPComment, entry: (kind: String, label: String, color: Color), isCast: Bool) -> some View {
+        // Pill-shape always-visible chip. Active chip: 600 weight + tinted
+        // bg + colored border; inactive: 500 weight + neutral. Matches the
+        // web action-chip family (12px / 500 inactive / 600 active / pill
+        // 20px radius / 32 min-height).
         let busy = commentTagBusyKey == "\(comment.id):\(entry.kind)"
+        let count = tagCount(for: comment, kind: entry.kind)
         Button {
-            withAnimation(.easeOut(duration: 0.12)) { tagOpenCommentId = nil }
             Task { await toggleCommentTag(comment, kind: entry.kind) }
         } label: {
-            Text(entry.label)
-                .font(.system(size: VP.Size.xs, weight: isCast ? .bold : .medium))
+            Text(count > 0 ? "\(entry.label) \(count)" : entry.label)
+                .font(.system(size: VP.Size.xs, weight: isCast ? .semibold : .medium))
                 .foregroundColor(isCast ? entry.color : VP.dim)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(isCast ? entry.color.opacity(0.12) : Color.clear)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .frame(minHeight: 32)
+                .background(isCast ? entry.color.opacity(0.08) : Color.clear)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 5)
+                    RoundedRectangle(cornerRadius: 20)
                         .stroke(isCast ? entry.color : VP.border, lineWidth: 1)
                 )
                 .opacity(busy ? 0.6 : 1)
