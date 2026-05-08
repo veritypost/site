@@ -1,5 +1,8 @@
 import Foundation
 import Supabase
+import os.log
+
+private let log = Logger(subsystem: "com.veritypost.kids", category: "Pairing")
 
 // Kid-side pairing network + token persistence.
 //
@@ -33,6 +36,12 @@ enum PairError: Error, LocalizedError {
     case rateLimited
     case notConfigured
     case unauthorized
+    case emailUnverified
+    case kidCapReached(maxKids: Int)
+    case seatRequired(extraCents: Int)
+    case seatCheckUnavailable
+    case validation(String)
+    case consentVersionStale(currentVersion: String)
     case server(String)
 
     var errorDescription: String? {
@@ -44,6 +53,13 @@ enum PairError: Error, LocalizedError {
         case .rateLimited:    return "Too many tries. Wait a minute and try again."
         case .notConfigured:  return "Pairing isn't set up yet."
         case .unauthorized:   return "Session expired. Ask a parent to pair again."
+        case .emailUnverified:        return "Verify your email before adding a reader. Check your inbox."
+        case .kidCapReached(let max): return "You've reached the limit of \(max) readers on your plan."
+        case .seatRequired:           return "Adding this reader requires upgrading your plan. Open the parent web app to add a seat."
+        case .seatCheckUnavailable:   return "Couldn't check your plan. Try again in a moment."
+        case .validation(let msg):    return msg
+        case .consentVersionStale(let current):
+            return "Verity Post Kids needs an update. Please update from the App Store. (App: 2026-04-15-v1, Required: \(current))"
         case .server(let m):  return m
         }
     }
@@ -94,6 +110,16 @@ final class PairingClient {
     var hasCredentials: Bool {
         keychainReadToken() != nil
             && UserDefaults.standard.string(forKey: kidIdKey) != nil
+    }
+
+    /// Read-only kid token accessor for callers that need to forward the
+    /// bearer to a per-request URLSession path (parent-mode sheets,
+    /// SensitiveActionView, etc.). Routes through `keychainReadToken`'s
+    /// install-id freshness gate (Ext-W.1) — a stale keychain entry from
+    /// a prior install returns nil, matching what every other consumer of
+    /// the kid token sees. Internal visibility: kids app target only.
+    func storedKidToken() -> String? {
+        keychainReadToken()
     }
 
     // MARK: Pair
@@ -152,7 +178,17 @@ final class PairingClient {
 
     /// Called during parent-signup: parent's access token authorises the pair,
     /// no 8-char code needed. Returns the resulting kid session.
-    func pairDirect(parentToken: String, kidName: String) async throws -> PairSuccess {
+    ///
+    /// V2 (server-side flag pair_direct_v2_enforced=ON) requires
+    /// `dateOfBirth` ('YYYY-MM-DD' UTC) and `parentName`; the client sends
+    /// the structured `consent` block with the canonical version string.
+    /// V1 servers (flag OFF) ignore the extra fields harmlessly.
+    func pairDirect(
+        parentToken: String,
+        kidName: String,
+        dateOfBirth: String,
+        parentName: String
+    ) async throws -> PairSuccess {
         let url = SupabaseKidsClient.shared.siteURL
             .appendingPathComponent("api/kids/pair-direct")
 
@@ -161,7 +197,17 @@ final class PairingClient {
         req.timeoutInterval = 15
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(parentToken)", forHTTPHeaderField: "Authorization")
-        req.httpBody = try JSONSerialization.data(withJSONObject: ["kid_name": kidName])
+        let bodyDict: [String: Any] = [
+            "kid_name": kidName,
+            "date_of_birth": dateOfBirth,
+            "consent": [
+                "parent_name": parentName.trimmingCharacters(in: .whitespacesAndNewlines),
+                "ack": true,
+                "version": "2026-04-15-v1",
+            ],
+            "device": deviceId,
+        ]
+        req.httpBody = try JSONSerialization.data(withJSONObject: bodyDict)
 
         let (data, response): (Data, URLResponse)
         do {
@@ -181,14 +227,37 @@ final class PairingClient {
             return success
         }
 
-        // Error branches
-        let msg = (try? JSONDecoder().decode(ServerError.self, from: data))?.error
-            ?? "Pairing failed"
+        // Error branches. Decode the shared error envelope so the optional
+        // `code` and `current_version` fields can map V2-specific failures
+        // to typed cases the UI can branch on.
+        let envelope = (try? JSONDecoder().decode(PairErrorEnvelope.self, from: data))
+        let msg = envelope?.error ?? "Pairing failed"
+        let code = envelope?.code
+
         switch http.statusCode {
-        case 400:  throw PairError.invalidCode
+        case 400:
+            switch code {
+            case "kid_cap_reached":
+                throw PairError.kidCapReached(maxKids: envelope?.max_kids ?? 4)
+            case "consent_version_stale":
+                throw PairError.consentVersionStale(currentVersion: envelope?.current_version ?? "unknown")
+            case "consent_invalid":
+                throw PairError.validation(msg)
+            default:
+                // DOB / kid_name validators land here. Server messages are
+                // user-friendly; surface verbatim.
+                throw PairError.validation(msg)
+            }
         case 401:  throw PairError.unauthorized
+        case 402:
+            throw PairError.seatRequired(extraCents: envelope?.extra_kid_price_cents ?? 499)
+        case 403:
+            if code == "email_unverified" { throw PairError.emailUnverified }
+            throw PairError.server(msg)
         case 429:  throw PairError.rateLimited
-        case 503:  throw PairError.notConfigured
+        case 503:
+            if code == "seat_check_unavailable" { throw PairError.seatCheckUnavailable }
+            throw PairError.notConfigured
         default:   throw PairError.server(msg)
         }
     }
@@ -216,7 +285,7 @@ final class PairingClient {
         do {
             try await applySession(token: token)
         } catch {
-            print("[PairingClient] restore: applySession failed —", error)
+            log.error("[PairingClient] restore: applySession failed — \(error.localizedDescription, privacy: .private)")
             clear()
             return nil
         }
@@ -253,13 +322,13 @@ final class PairingClient {
         do {
             try await refresh()
         } catch PairError.unauthorized {
-            print("[PairingClient] refresh rejected — profile unavailable; clearing session")
+            log.error("[PairingClient] refresh rejected — profile unavailable; clearing session")
             clear()
         } catch {
             // Transient failures (network, rate limit, server hiccup) are
             // non-fatal — the existing token is still valid; we'll retry on
             // the next foreground / restore. Only unauthorized clears state.
-            print("[PairingClient] refreshIfNeeded: ", error)
+            log.error("[PairingClient] refreshIfNeeded: \(error.localizedDescription, privacy: .private)")
         }
     }
 
@@ -278,6 +347,12 @@ final class PairingClient {
         req.timeoutInterval = 15
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(currentToken)", forHTTPHeaderField: "Authorization")
+        // Ext-W.1 — server compares this against the device_id stored on
+        // the live kid_sessions row. Mismatch → 401 device_mismatch →
+        // refreshIfNeeded clears local state and we route back to PairCodeView.
+        req.httpBody = try JSONSerialization.data(withJSONObject: [
+            "device": deviceId,
+        ])
 
         let (data, response): (Data, URLResponse)
         do {
@@ -427,4 +502,14 @@ struct StoredPair {
 
 private struct ServerError: Decodable {
     let error: String
+}
+
+// Richer envelope used by /api/kids/pair-direct. Optional fields are
+// populated only on the V2 (flag-on) error branches that need them.
+private struct PairErrorEnvelope: Decodable {
+    let error: String
+    let code: String?
+    let max_kids: Int?
+    let extra_kid_price_cents: Int?
+    let current_version: String?
 }

@@ -1,6 +1,9 @@
 // Parent sign-in flow for the kids app. Supabase email OTP. No kid accounts involved.
 
 import SwiftUI
+import os.log
+
+private let log = Logger(subsystem: "com.veritypost.kids", category: "ParentAuth")
 
 struct ParentAuthView: View {
     @EnvironmentObject private var auth: KidsAuth
@@ -162,7 +165,10 @@ struct ParentAuthView: View {
                 )
                 step = .otp(email: trimmedEmail)
             } catch {
-                print("[ParentAuthView] signInWithOTP failed:", error)
+                // Server-side error text can include the email or other
+                // session details — keep that at .private; the static
+                // prefix stays public so the line is searchable in logs.
+                log.error("[ParentAuthView] signInWithOTP failed: \(error.localizedDescription, privacy: .private)")
                 errorMessage = "Couldn\u{2019}t send the code. Check your email address and try again."
             }
         }
@@ -296,7 +302,7 @@ struct ParentAuthView: View {
                 auth.adoptParentSession(email: email, accessToken: session.accessToken)
                 dismiss()
             } catch {
-                print("[ParentAuthView] verifyOTP failed:", error)
+                log.error("[ParentAuthView] verifyOTP failed: \(error.localizedDescription, privacy: .private)")
                 errorMessage = "That code didn\u{2019}t work. Try again."
             }
         }
@@ -316,7 +322,7 @@ struct ParentAuthView: View {
                 )
                 startCooldown(cooldownWindow)
             } catch {
-                print("[ParentAuthView] resend failed:", error)
+                log.error("[ParentAuthView] resend failed: \(error.localizedDescription, privacy: .private)")
                 errorMessage = "Couldn\u{2019}t resend the code. Try again."
             }
         }

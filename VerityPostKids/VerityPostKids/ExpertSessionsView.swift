@@ -78,11 +78,11 @@ struct ExpertSessionsView: View {
             .padding(.bottom, 40)
         }
         .background(K.bg.ignoresSafeArea())
-        // C16 — gate sessions fetch behind the parental check so a kid
-        // browsing the tab doesn't see any adult-contact content until a
-        // parent verifies. Gate also suppresses the data egress (network
-        // call) until gate passes.
-        .parentalGate(isPresented: $showParentGate) {
+        // C16 — gate sessions fetch behind a parent-mode PIN check so a
+        // kid browsing the tab doesn't see any adult-contact content until
+        // a parent verifies. Replaces the old math gate with the new PIN
+        // entry flow per the locked parent-mode spec.
+        .parentMode(isPresented: $showParentGate) {
             parentGatePassed = true
             Task { await load() }
         }

@@ -1,7 +1,16 @@
 import SwiftUI
+import os.log
 
 @main
 struct VerityPostKidsApp: App {
+    init() {
+        // Run the one-time UserDefaults rewrite so existing installs
+        // pick up the new NSFileProtectionComplete class declared in
+        // VerityPostKids.entitlements. Cheap no-op after the first
+        // post-upgrade launch.
+        DataProtectionMigration.runIfNeeded()
+    }
+
     var body: some Scene {
         WindowGroup {
             KidsAppRoot()

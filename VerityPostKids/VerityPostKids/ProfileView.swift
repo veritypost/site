@@ -20,13 +20,11 @@ struct ProfileView: View {
     @State private var badges: [UserAchievement] = []
     @State private var loading: Bool = true
     @State private var loadError: String? = nil
-    // T-013 — parental gate before unpair. Unpair is effectively a
-    // "log out / forget device" action; COPPA/Kids Category review
-    // requires parental verification before a kid can trigger it.
-    @State private var showUnpairGate: Bool = false
-    // Apple Kids Category review — leaving the app to view Privacy or
-    // Terms must go through a parental gate first.
-    @State private var showLegalGate: Bool = false
+    // Parent-mode PIN gates. Unpair is destructive → PIN + email OTP via
+    // SensitiveActionView. Legal links are non-destructive → PIN-only via
+    // .parentMode modifier. Replaces the old math-question parentalGate.
+    @State private var showUnpairSensitive: Bool = false
+    @State private var showLegalParentGate: Bool = false
     @State private var pendingLegalURL: URL? = nil
 
     private var client: SupabaseClient { SupabaseKidsClient.shared.client }
@@ -34,6 +32,9 @@ struct ProfileView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
+                if let banner = auth.unpairBanner {
+                    unpairBannerView(banner)
+                }
                 header
                 statsGrid
                 badgesSection
@@ -45,15 +46,60 @@ struct ProfileView: View {
         }
         .background(K.bg.ignoresSafeArea())
         .task { await loadBadges() }
-        .parentalGate(isPresented: $showUnpairGate) {
-            Task { await auth.signOut() }
-        }
-        .parentalGate(isPresented: $showLegalGate) {
+        // Unpair: destructive → PIN + email OTP via SensitiveActionView.
+        .sensitiveAction(
+            isPresented: $showUnpairSensitive,
+            actionKey: "unpair",
+            label: "Unpair this device",
+            description: "This signs the kid out and forgets this device.",
+            onConfirmed: { confirmationToken in
+                await auth.signOutAfterServerRevoke(confirmationToken: confirmationToken)
+            }
+        )
+        // Legal links: PIN-only — viewing Privacy/Terms isn't destructive,
+        // but leaving the app still requires parent approval per Apple's
+        // Kids Category guidance.
+        .parentMode(isPresented: $showLegalParentGate) {
             if let url = pendingLegalURL {
                 UIApplication.shared.open(url, options: [:], completionHandler: nil)
             }
             pendingLegalURL = nil
         }
+    }
+
+    // MARK: Unpair banner — surfaced when the destructive-route flow fails
+    // in a way that doesn't justify clearing local state (parent session
+    // expired, network, throttle). Tap to dismiss; the next attempt clears.
+
+    private func unpairBannerView(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.scaledSystem(size: 16, weight: .bold))
+                .foregroundStyle(K.coralDark)
+            Text(text)
+                .font(.scaledSystem(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(K.text)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button {
+                auth.unpairBanner = nil
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.scaledSystem(size: 12, weight: .bold))
+                    .foregroundStyle(K.dim)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss")
+        }
+        .padding(12)
+        .background(K.card)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(K.coralDark.opacity(0.4), lineWidth: 1)
+        )
     }
 
     // MARK: About / Legal — parental-gated outbound links
@@ -89,7 +135,7 @@ struct ProfileView: View {
     private func aboutRow(label: String, url: URL) -> some View {
         Button {
             pendingLegalURL = url
-            showLegalGate = true
+            showLegalParentGate = true
         } label: {
             HStack {
                 Text(label)
@@ -129,7 +175,7 @@ struct ProfileView: View {
                 .font(.scaledSystem(size: 22, weight: .black, design: .rounded))
                 .foregroundStyle(K.text)
 
-            Button { showUnpairGate = true } label: {
+            Button { showUnpairSensitive = true } label: {
                 Text("Unpair this device")
                     .font(.scaledSystem(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(K.dim)

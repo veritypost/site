@@ -1,5 +1,8 @@
 import SwiftUI
 import UIKit
+import os.log
+
+private let log = Logger(subsystem: "com.veritypost.kids", category: "Pairing")
 
 // Primary sign-in for the kids app. Parent enters the pair code on the
 // kid's device (or the kid types what the parent reads). On success:
@@ -160,8 +163,16 @@ struct PairCodeView: View {
             focused = true
             assertServerCodeLengthMatches()
         }
-        .parentalGate(isPresented: $showHelpGate) {
-            // After grown-up passes the math check, open the mail composer.
+        .parentMode(isPresented: $showHelpGate) {
+            // After parent unlocks via PIN, open the mail composer.
+            // PairCodeView runs before the kid is paired, so there's no
+            // kid token yet. The .parentMode modifier presents the PIN
+            // entry sheet, which will show the "Session expired. Re-pair
+            // this device." fallback when no kid token exists. In that
+            // path the mailto never fires — the parent can't unlock the
+            // help link before pairing. Acceptable: until paired, the
+            // "Need help" surface is best served by typing the support
+            // address into a different app on the parent's device.
             if let url = URL(string: "mailto:support@veritypost.com?subject=Kids%20app%20pair%20code%20help") {
                 UIApplication.shared.open(url, options: [:]) { opened in
                     if !opened { showMailUnavailable = true }
@@ -221,7 +232,7 @@ struct PairCodeView: View {
         Task {
             do {
                 let success = try await PairingClient.shared.pair(code: code)
-                await auth.adoptPair(success)
+                auth.adoptPair(success)
             } catch let err as PairError {
                 errorMessage = err.errorDescription
                 switch err {
@@ -239,7 +250,7 @@ struct PairCodeView: View {
             } catch {
                 // T-042 — don't leak raw Swift errors to a child's UI.
                 // Log the real error for debugging; show a friendly line.
-                print("[PairCodeView] pair failed:", error)
+                log.error("[PairCodeView] pair failed: \(error.localizedDescription, privacy: .private)")
                 errorMessage = "Something went wrong. Try again."
             }
             isPairing = false

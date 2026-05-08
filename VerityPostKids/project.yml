@@ -61,6 +61,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.veritypost.kids
         DEVELOPMENT_TEAM: FQCAS829U7
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: VerityPostKids/VerityPostKids.entitlements
         # Default values for local builds. CI / TestFlight / App Store
         # submissions can override these via xcconfig or `xcodebuild
         # SUPABASE_KEY=...` to keep the publishable key out of git history.
