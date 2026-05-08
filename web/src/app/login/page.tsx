@@ -93,7 +93,7 @@ function LoginPageInner() {
         style={{
           backgroundColor: C.card,
           border: `1px solid ${C.border}`,
-          borderRadius: '18px',
+          borderRadius: '12px',
           padding: '40px 36px',
           width: '100%',
           maxWidth: '480px',
@@ -104,9 +104,9 @@ function LoginPageInner() {
           <div
             style={{
               fontSize: '20px',
-              fontWeight: 800,
-              color: C.accent,
-              letterSpacing: '-0.5px',
+              fontWeight: 600,
+              color: 'var(--text)',
+              letterSpacing: '-0.02em',
               marginBottom: '24px',
             }}
           >

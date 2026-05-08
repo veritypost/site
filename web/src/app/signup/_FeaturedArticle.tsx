@@ -199,7 +199,7 @@ export default async function FeaturedArticle() {
       <h2
         style={{
           fontSize: 24,
-          fontWeight: 700,
+          fontWeight: 600,
           lineHeight: 1.25,
           margin: '0 0 8px 0',
           color: 'var(--text)',
@@ -238,9 +238,12 @@ export default async function FeaturedArticle() {
           display: 'inline-block',
           marginTop: 16,
           fontSize: 13,
-          color: 'var(--accent)',
+          color: 'var(--text)',
           fontWeight: 600,
-          textDecoration: 'none',
+          textDecoration: 'underline',
+          textDecorationThickness: 1,
+          textUnderlineOffset: '0.18em',
+          textDecorationColor: 'var(--border)',
         }}
       >
         read the full story →

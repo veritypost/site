@@ -397,7 +397,7 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
   return (
     <>
       <h1
-        style={{ fontSize: '26px', fontWeight: 700, color: C.text, margin: '0 0 8px 0' }}
+        style={{ fontSize: '28px', fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.15, color: C.text, margin: '0 0 8px 0' }}
       >
         Check your email
       </h1>

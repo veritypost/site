@@ -49,7 +49,7 @@ export default function AccessFlow() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 13,
-                fontWeight: 700,
+                fontWeight: 600,
                 color: C.dim,
               }}
             >
