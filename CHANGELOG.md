@@ -6,6 +6,15 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### TODO 47 — Advanced search filters on iOS
+**File:** `VerityPost/VerityPost/FindView.swift` (rewritten). Closes TODO 47. Audit-driven plan; one override on the agent's plan (Filters affordance is text-only, not an icon, per the editorial restraint rule).
+- New filter sheet (`.sheet`-presented from a "Filters" text button at the trailing edge of the search bar). Three filter rows, each gated independently by its own permission so anon and free users see only the doors they can open: `search.advanced.category` (Picker over top-level non-kids categories with `deleted_at IS NULL`), `search.advanced.date_range` (two `DatePicker`s with a "Clear dates" reset), `search.advanced.source` (free-text publisher field, matches web).
+- Active-filter chip strip below the search bar surfaces every applied filter as a tappable pill (12/600 with × glyph). Tap clears that filter and re-runs the search.
+- `doSearch()` now appends `category` / `from` / `to` / `source` query params when the corresponding permission is granted AND the filter has a value. Param shape matches `/api/search` exactly — same endpoint web uses.
+- Permission resolution via `PermissionService.shared.has(...)` resolved on mount + on `PermissionStore.changeToken` (mirrors the AlertsView pattern).
+- Result-row typography snapped to the editorial card-list family: 17px Source Serif 4 / 500 / -0.17 tracking title, 14/regular muted excerpt, 11/600/0.1em uppercase byline meta. Same shape as UpNextSheet / NextStoryFooter / SectionsMenu / web `/search`.
+- iOS Kids: n/a (kids has no search surface).
+
 ### TODO 45 — iOS ads wired end-to-end (home + article)
 **Files:** `VerityPost/VerityPost/HomeFeedSlots.swift` (rewrite), `HomeView.swift`, `StoryDetailView.swift`. Closes TODO 45. Audit-driven plan from a fresh agent verified against the live `serve_ad` RPC + impression/click endpoints.
 - **AdPayload rewritten.** Old shape decoded a flat `{id, title, body, click_url}` from the response root; the API actually returns `{ ad_unit: {...} | null }` wrapping the row. New `AdServeResponse` + `AdPayload` decodes the 9 columns the `serve_ad` RPC emits (`id`, `placement_id`, `ad_format`, `creative_url`, `creative_html`, `click_url`, `alt_text`, `cta_text`, `advertiser_name`). Optional RPC columns (`campaign_id`, `ad_network`, `ad_network_unit_id`, `reduced`) safely ignored.

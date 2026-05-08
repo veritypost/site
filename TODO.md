@@ -173,19 +173,7 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 ---
 
-## iOS parity — bring iOS up to web mobile standard
-
-Web mobile is the product standard. These items bring iOS in line.
-
-- 47: **Advanced search filters on iOS** — `FindView.swift` is keyword-only. Web `/search` supports category, date range, and source publisher filters for `search.advanced` users. Complexity: M.
-  - Add a filter panel / sheet to `FindView.swift` with category picker, date range picker, source field — gated by `search.advanced` permission
-  - The existing `/api/search` route already accepts the filter params (same API web uses)
-  - Permission keys: `search.advanced`, `search.advanced.category`, `search.advanced.date_range`, `search.advanced.source`
-  - iOS Kids: not applicable (kids has no search)
-
-
-
----
+<!-- iOS parity items 39, 45, 47 all shipped 2026-05-08; section retired. -->
 
 ## Owner action items
 
