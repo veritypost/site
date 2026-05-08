@@ -9,14 +9,13 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { scoreReceiveContextTag } from '@/lib/scoring';
 
 // POST /api/comments/[id]/context-tag
-// Toggle a per-user tag on a comment. Four kinds: helpful, context,
-// cite_needed, off_topic. Defaults to 'context' for backward compat.
-// quality_score (helpful + context - cite_needed - off_topic) maintained
-// by DB trigger + RPC; not returned here — clients sort by recency/quality
+// Toggle a per-user tag on a comment. Three kinds: context, cite_needed,
+// off_topic. Defaults to 'context' for backward compat.
+// quality_score (context - cite_needed - off_topic) maintained by DB
+// trigger + RPC; not returned here — clients sort by recency/quality
 // and read the derived indicator, never raw counts.
 const ALLOWED_TAG_KINDS = new Set([
   'context',
-  'helpful',
   'cite_needed',
   'off_topic',
 ]);

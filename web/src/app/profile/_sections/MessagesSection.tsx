@@ -147,7 +147,7 @@ export function MessagesSection({ preview }: Props) {
         {threads.map((t) => (
           <li key={t.id}>
             <Link
-              href={`/messages/${t.id}`}
+              href={t.other_user?.id ? `/messages?to=${t.other_user.id}` : '/messages'}
               style={{
                 display: 'flex',
                 gap: S[3],

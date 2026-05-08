@@ -39,7 +39,6 @@ export default function AboutPage() {
           <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111111', margin: '0 0 4px' }}>
             About Verity Post
           </h1>
-          <div style={{ fontSize: '13px', color: '#666666' }}>Read. Prove it. Discuss.</div>
         </div>
 
         <Section title="What we are">

@@ -39,12 +39,11 @@ type CommentUser = {
 
 type Mention = { user_id?: string; username: string };
 
-export type TagKind = 'context' | 'helpful' | 'cite_needed' | 'off_topic';
+export type TagKind = 'context' | 'cite_needed' | 'off_topic';
 
-// Four tags: two additive (helpful, context), two challenge (cite_needed, off_topic).
+// Three tags: one additive (context), two challenge (cite_needed, off_topic).
 // No counts shown in UI — quality_score is the only derived number surfaced.
 const TAG_META: Record<TagKind, { label: string; color: string; challenge: boolean }> = {
-  helpful:     { label: 'Helpful',     color: 'var(--success-text)', challenge: false },
   context:     { label: 'Context',     color: 'var(--p-ink)', challenge: false },
   cite_needed: { label: 'Cite needed', color: '#ea580c', challenge: true },
   off_topic:   { label: 'Off-topic',   color: '#6b7280', challenge: true },
@@ -110,7 +109,7 @@ interface CommentRowProps {
   quizPassed?: boolean;
 }
 
-const DEFAULT_TAG_KINDS: TagKind[] = ['helpful', 'context', 'cite_needed', 'off_topic'];
+const DEFAULT_TAG_KINDS: TagKind[] = ['context', 'cite_needed', 'off_topic'];
 
 // EXPERT_THREADS Wave 4b — render expert tokens (`@expert` / `@expert_<u>`)
 // distinctly from bare mentions. Mentions array carries *resolved bare*
@@ -436,8 +435,6 @@ export default function CommentRow({
   const mentions = (Array.isArray(comment.mentions) ? comment.mentions : []) as Mention[];
   const commentDepth = comment.thread_depth ?? depth;
   const yours = comment._your_tags ?? new Set<TagKind>();
-  const helpfulCount = comment.helpful_count ?? 0;
-  const isHelpfulTagged = yours.has('helpful');
   function tagCount(k: TagKind): number {
     if (k === 'context') return (comment as CommentRowDb & { context_tag_count?: number | null }).context_tag_count ?? 0;
     if (k === 'cite_needed') return comment.cite_needed_count ?? 0;
@@ -1157,35 +1154,6 @@ export default function CommentRow({
               ) : null;
             return (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
-                  {/* Helpful heart — primary social signal, always visible to non-owners */}
-                  {!isOwner && canContextTag && quizPassed !== false && (
-                    <button
-                      onClick={() => doTag('helpful')}
-                      disabled={!!busy}
-                      title={isHelpfulTagged ? 'Remove helpful mark' : 'Mark as helpful'}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        fontSize: 12,
-                        fontWeight: isHelpfulTagged ? 600 : 500,
-                        padding: '5px 12px',
-                        borderRadius: 20,
-                        minHeight: 32,
-                        border: `1px solid ${isHelpfulTagged ? 'var(--success-text, #16a34a)' : 'var(--border, #e5e5e5)'}`,
-                        background: isHelpfulTagged ? 'rgba(22,163,74,0.08)' : 'transparent',
-                        color: isHelpfulTagged ? 'var(--success-text, #16a34a)' : 'var(--p-ink-muted, #888)',
-                        cursor: busy ? 'default' : 'pointer',
-                        transition: 'border-color 120ms, background 120ms, color 120ms',
-                        letterSpacing: '0',
-                        touchAction: 'manipulation',
-                        WebkitTapHighlightColor: 'transparent',
-                      }}
-                    >
-                      <span style={{ fontSize: 14, lineHeight: 1 }}>{isHelpfulTagged ? '♥' : '♡'}</span>
-                      <span>{helpfulCount > 0 ? String(helpfulCount) : 'Helpful'}</span>
-                    </button>
-                  )}
                   {/* Quote reply — appears when reader has selected text in this comment's body */}
                   {selectedQuote && canReply && !replyOpen && (
                     <button
@@ -1330,7 +1298,7 @@ export default function CommentRow({
                     </span>
                   )}
                   {/* Context / Cite needed / Off-topic tag buttons — inline, always visible to non-owners */}
-                  {!isOwner && canContextTag && quizPassed !== false && tagKinds.filter(k => k !== 'helpful').map(k => {
+                  {!isOwner && canContextTag && quizPassed !== false && tagKinds.map(k => {
                     const meta = TAG_META[k];
                     const active = yours.has(k);
                     const count = tagCount(k);

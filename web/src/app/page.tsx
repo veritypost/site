@@ -373,24 +373,6 @@ export default async function HomePage({
             paddingBottom: 64,
           }}
         >
-        {/* Brand tagline — pulled forward from /about. Renders only on the
-            unfiltered home so it doesn't compete with a category header.
-            Editorial italic, no heavy framing. */}
-        {!activeCat && (
-          <p
-            style={{
-              fontFamily: serifStack,
-              fontStyle: 'italic',
-              fontSize: 14,
-              color: C.dim,
-              textAlign: 'center',
-              margin: '0 0 28px',
-              letterSpacing: '0.01em',
-            }}
-          >
-            Read. Prove it. Discuss.
-          </p>
-        )}
         {activeCat && (
           <header
             style={{

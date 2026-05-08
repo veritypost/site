@@ -582,23 +582,14 @@ body {
    inline into the body (TODO-3); the timeline now flows below the
    article instead of a side rail. Mobile tab UI is preserved below. */
 /* Article body content typography. Targets the server-sanitized HTML
-   inside [data-article-body]: paragraph rhythm, drop cap on the lead,
-   pull-quote treatment for <blockquote>, editorial link underlines,
-   section heading scale. Pure visual — no chrome additions. */
+   inside [data-article-body]: paragraph rhythm, pull-quote treatment
+   for <blockquote>, editorial link underlines, section heading scale.
+   Pure visual — no chrome additions. */
 [data-article-body] > p {
   margin: 0 0 1.1em;
 }
 [data-article-body] > p:last-child {
   margin-bottom: 0;
-}
-[data-article-body] > p:first-of-type::first-letter {
-  float: left;
-  font-family: 'Source Serif 4', var(--font-source-serif), Georgia, serif;
-  font-size: 3.6em;
-  line-height: 0.85;
-  font-weight: 600;
-  padding: 0.05em 0.08em 0 0;
-  color: var(--p-ink);
 }
 [data-article-body] h2 {
   font-family: 'Source Serif 4', var(--font-source-serif), Georgia, serif;

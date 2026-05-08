@@ -6,11 +6,8 @@
 // below stays viewport-centered. Hidden below 1280px so the centered 880px
 // feed never collides with the rail.
 //
-// Parents render collapsed by default. Subs reveal when the viewer clicks
-// the row's chevron, or automatically when the parent contains the active
-// (URL-filtered) subcategory.
+// Subs always render under their parent — no chevron, no collapse.
 
-import { useState } from 'react';
 import Link from 'next/link';
 import {
   HOME_COLORS as C,
@@ -164,20 +161,12 @@ function SidebarSection({
   active?: boolean;
   activeSubSlug?: string | null;
 }) {
-  // Auto-expand the parent that contains the currently-active sub so the
-  // viewer's location is always visible without an extra click. All other
-  // parents stay collapsed until the viewer toggles them.
-  const containsActiveSub = !!activeSubSlug && subs.some((s) => s.slug === activeSubSlug);
-  const [expanded, setExpanded] = useState(containsActiveSub);
   const hasSubs = subs.length > 0;
 
   return (
     <div style={{ marginBottom: 14 }}>
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
           paddingTop: 4,
           paddingBottom: 4,
         }}
@@ -186,8 +175,6 @@ function SidebarSection({
           href={href}
           aria-current={active ? 'page' : undefined}
           style={{
-            flex: 1,
-            minWidth: 0,
             display: 'block',
             textDecoration: 'none',
             fontFamily: serifStack,
@@ -199,48 +186,8 @@ function SidebarSection({
         >
           {name}
         </Link>
-        {hasSubs && (
-          <button
-            type="button"
-            aria-expanded={expanded}
-            aria-label={expanded ? `Collapse ${name}` : `Expand ${name}`}
-            onClick={() => setExpanded((v) => !v)}
-            style={{
-              flexShrink: 0,
-              width: 24,
-              height: 24,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'transparent',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              color: C.muted,
-              borderRadius: 4,
-            }}
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              style={{
-                transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                transition: 'transform 140ms ease-out',
-              }}
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-        )}
       </div>
-      {hasSubs && expanded && (
+      {hasSubs && (
         <div style={{ paddingLeft: 2 }}>
           {subs.map((s) => {
             const subActive = !!s.slug && s.slug === activeSubSlug;

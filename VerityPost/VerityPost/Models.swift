@@ -432,18 +432,13 @@ struct VPComment: Codable, Identifiable {
     /// Cached count of @-mentions in this comment's body. Server-side
     /// trigger maintains it; iOS only reads.
     var contextTagCount: Int?
-    /// Section A — count of `helpful`-kind tag rows on this comment.
-    /// Server-side trigger on `comment_context_tags` increments/decrements
-    /// it; iOS only reads. Drives the inline "Helpful" badge once the row
-    /// crosses the editorial threshold (SettingsService.helpfulBadgeThreshold).
-    var helpfulCount: Int?
     var citeNeededCount: Int?
     var offTopicCount: Int?
     var qualityScore: Int?
     var agreeCount: Int?
     var disagreeCount: Int?
     /// Section A — client-side cache of the kinds the current user has
-    /// cast on this comment ('context', 'helpful', 'cite_needed', 'off_topic').
+    /// cast on this comment ('context', 'cite_needed', 'off_topic').
     /// Not part of the row's
     /// JSON shape; populated by StoryDetailView from a separate fetch
     /// against `comment_context_tags` so each chip renders cast/uncast.
@@ -552,7 +547,6 @@ struct VPComment: Codable, Identifiable {
         case deletedAt = "deleted_at"
         case isEdited = "is_edited"
         case contextTagCount = "context_tag_count"
-        case helpfulCount = "helpful_count"
         case citeNeededCount = "cite_needed_count"
         case offTopicCount = "off_topic_count"
         case qualityScore = "quality_score"

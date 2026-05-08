@@ -129,11 +129,9 @@ struct StoryDetailView: View {
     @State private var agreedComments: Set<String> = []
     @State private var disagreedComments: Set<String> = []
 
-    // Section A — comment-tag chips (helpful, context, cite_needed, off_topic).
-    // Per-comment per-kind cast set for the *current* user, plus public
-    // helpful_count for the inline Helpful badge. context_tag_count already lives on VPComment.
+    // Section A — comment-tag chips (context, cite_needed, off_topic).
+    // Per-comment per-kind cast set for the *current* user. context_tag_count already lives on VPComment.
     @State private var commentTagsByUser: [String: Set<String>] = [:]
-    @State private var commentHelpfulCounts: [String: Int] = [:]
     @State private var commentTagBusyKey: String = ""
 
     // D21: @mention autocomplete — paid tiers only.
@@ -2146,20 +2144,6 @@ struct StoryDetailView: View {
                     }
                     if Self.SHOW_EXPERT_CHROME_ON_COMMENTS {
                         VerifiedBadgeView(isExpert: u?.isExpert, isVerifiedPublicFigure: u?.isVerifiedPublicFigure)
-                    }
-                    // Section A — inline "Helpful" badge once the comment's
-                    // helpful_count crosses the editorial threshold (default
-                    // 10, settings-tunable via SettingsService.helpfulBadgeThreshold).
-                    // Public count is read from local cache populated on
-                    // comment fetch + updated on toggle response.
-                    if (commentHelpfulCounts[comment.id] ?? comment.helpfulCount ?? 0)
-                        >= SettingsService.shared.helpfulBadgeThreshold {
-                        Text("Helpful")
-                            .font(.system(.caption2, design: .default, weight: .bold))
-                            .foregroundColor(VP.tagHelpful)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(RoundedRectangle(cornerRadius: VP.radiusXS).fill(VP.tagHelpful.opacity(0.12)))
                     }
                     if comment.isEdited == true && !comment.isDeleted {
                         Text("(edited)")
@@ -4337,7 +4321,6 @@ struct StoryDetailView: View {
 
     // Order matches web DEFAULT_TAG_KINDS. No insightful/sarcastic.
     private static let commentTagOrder: [(kind: String, label: String, color: Color)] = [
-        ("helpful",     "Helpful",     VP.tagHelpful),
         ("context",     "Context",     VP.accent),
         ("cite_needed", "Cite needed", VP.tagCiteNeeded),
         ("off_topic",   "Off-topic",   VP.tagOffTopic),
@@ -4346,7 +4329,6 @@ struct StoryDetailView: View {
     // Returns the community count for a tag kind on a given comment.
     private func tagCount(for comment: VPComment, kind: String) -> Int {
         switch kind {
-        case "helpful":    return commentHelpfulCounts[comment.id] ?? comment.helpfulCount ?? 0
         case "context":    return comment.contextTagCount ?? 0
         case "cite_needed": return comment.citeNeededCount ?? 0
         case "off_topic":  return comment.offTopicCount ?? 0
@@ -4356,15 +4338,12 @@ struct StoryDetailView: View {
 
     @ViewBuilder
     private func commentTagChipsRow(for comment: VPComment) -> some View {
-        // Web parity (commit dd73c1ec, ported to iOS 2026-05-08): helpful is
-        // a heart in the action row; context / cite_needed / off_topic are
-        // always-visible inline pill buttons. No "+ Tag" opener, no hidden
-        // picker, no two-step reveal — the same UX the web shipped.
+        // Web parity: context / cite_needed / off_topic are always-visible
+        // inline pill buttons. No "+ Tag" opener, no hidden picker.
         let userTags = commentTagsByUser[comment.id] ?? []
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                heartHelpfulButton(comment: comment, isCast: userTags.contains("helpful"))
-                ForEach(Self.commentTagOrder.filter { $0.kind != "helpful" }, id: \.kind) { entry in
+                ForEach(Self.commentTagOrder, id: \.kind) { entry in
                     tagChipButton(
                         comment: comment,
                         entry: entry,
@@ -4373,37 +4352,6 @@ struct StoryDetailView: View {
                 }
             }
         }
-    }
-
-    @ViewBuilder
-    private func heartHelpfulButton(comment: VPComment, isCast: Bool) -> some View {
-        let busy = commentTagBusyKey == "\(comment.id):helpful"
-        let count = tagCount(for: comment, kind: "helpful")
-        Button {
-            Task { await toggleCommentTag(comment, kind: "helpful") }
-        } label: {
-            HStack(spacing: 4) {
-                // Unicode heart matches the web rendering exactly (♥ / ♡).
-                Text(isCast ? "\u{2665}" : "\u{2661}")
-                    .font(.system(size: VP.Size.sm))
-                    .foregroundColor(isCast ? VP.tagHelpful : VP.dim)
-                Text(count > 0 ? String(count) : "Helpful")
-                    .font(.system(size: VP.Size.xs, weight: isCast ? .semibold : .medium))
-                    .foregroundColor(isCast ? VP.tagHelpful : VP.dim)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 5)
-            .frame(minHeight: 32)
-            .background(isCast ? VP.tagHelpful.opacity(0.08) : Color.clear)
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(isCast ? VP.tagHelpful : VP.border, lineWidth: 1)
-            )
-            .opacity(busy ? 0.6 : 1)
-        }
-        .buttonStyle(.plain)
-        .disabled(busy)
-        .accessibilityLabel(isCast ? "Remove helpful mark" : "Mark as helpful")
     }
 
     @ViewBuilder
@@ -4450,11 +4398,6 @@ struct StoryDetailView: View {
             if wasCast { set.remove(kind) } else { set.insert(kind) }
             if set.isEmpty { commentTagsByUser.removeValue(forKey: comment.id) }
             else { commentTagsByUser[comment.id] = set }
-            // Pre-emptive helpful_count tweak; server response overrides.
-            if kind == "helpful" {
-                let current = commentHelpfulCounts[comment.id] ?? comment.helpfulCount ?? 0
-                commentHelpfulCounts[comment.id] = max(0, current + (wasCast ? -1 : 1))
-            }
         }
 
         let site = SupabaseManager.shared.siteURL
@@ -4477,12 +4420,9 @@ struct StoryDetailView: View {
                 throw URLError(.badServerResponse)
             }
             // Reconcile with server truth where it ships. RPC returns
-            // { tagged, count, tag_kind, helpful_count, is_pinned }.
+            // { tagged, count, tag_kind, is_pinned }.
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 await MainActor.run {
-                    if let h = json["helpful_count"] as? Int {
-                        commentHelpfulCounts[comment.id] = h
-                    }
                     if let tagged = json["tagged"] as? Bool {
                         var set = commentTagsByUser[comment.id] ?? []
                         if tagged { set.insert(kind) } else { set.remove(kind) }
@@ -4513,10 +4453,6 @@ struct StoryDetailView: View {
         if wasCast { set.insert(kind) } else { set.remove(kind) }
         if set.isEmpty { commentTagsByUser.removeValue(forKey: commentId) }
         else { commentTagsByUser[commentId] = set }
-        if kind == "helpful" {
-            let current = commentHelpfulCounts[commentId] ?? 0
-            commentHelpfulCounts[commentId] = max(0, current + (wasCast ? 1 : -1))
-        }
     }
 
     // MARK: - C3: Moderator comment actions

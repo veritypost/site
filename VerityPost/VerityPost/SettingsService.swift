@@ -109,11 +109,4 @@ final class SettingsService: ObservableObject {
         return defaultValue
     }
 
-    /// Section A — threshold (in helpful-tag count) at which a comment
-    /// earns the inline "Helpful" badge in the discussion section. Pulled
-    /// from the public `settings` table key `helpful_badge_threshold`;
-    /// falls back to 10 (matches CommentRow.tsx's web default).
-    var helpfulBadgeThreshold: Int {
-        getNumber("helpful_badge_threshold", default: 10)
-    }
 }

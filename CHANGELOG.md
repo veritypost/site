@@ -6,6 +6,27 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### Owner cleanup — first 5 items shipped (1, 3, 5, 8, 9)
+**Files:** see breakdown per item.
+
+Working from `/owner cleanup.md` (owner-driven page-by-page cleanup pass). Each item self-contained, no panel review required (trivial bucket).
+
+**Item 1 — tagline removed.** Phrase "Read. Prove it. Discuss." removed from web home masthead (`web/src/app/page.tsx`) and About page (`web/src/app/about/page.tsx`). Variant "Read. Quiz. Discuss." removed from iOS Welcome onboarding (`VerityPost/VerityPost/WelcomeView.swift`). How-it-works step titles ("Read", "Quiz", "Discuss", "Earn") left intact — they're page architecture, not the tagline.
+
+**Item 3 — home sidebar simplified.** `web/src/app/_HomeSidebar.tsx` no longer collapses subcategories behind a chevron. Subs render unconditionally under each parent. Chevron `<button>` + `<svg>` deleted, `useState` import + `expanded`/`setExpanded` state removed. Sidebar still hidden below 1280px (existing behavior — owner confirmed mobile is fine as-is).
+
+**Item 5 — "Helpful" tag/+1 removed across web + iOS.** `helpful` retired as a comment-tag kind. UI is gone; column `comments.helpful_count` stays dormant per locked decision (asymmetric drop cost + labeled-corpus value).
+- Web: `CommentRow.tsx` (TagKind type, TAG_META, DEFAULT_TAG_KINDS, helpfulCount/isHelpfulTagged derivations, the heart button, and the now-vestigial `.filter(k => k !== 'helpful')` all removed); `CommentThread.tsx` (TagKind + TAG_KINDS); `redesign/leaderboard/page.tsx` (fixture); `api/comments/[id]/context-tag/route.js` (writer kill — `'helpful'` no longer in `ALLOWED_TAG_KINDS`).
+- iOS: `StoryDetailView.swift` (`commentHelpfulCounts` state, `heartHelpfulButton`, the inline "Helpful" badge ~line 2150, the `if kind == "helpful"` branches in `toggleCommentTag` + `revertCommentTagOptimistic`, the `helpful_count` parsing in the response handler — all removed); `Models.swift` (`helpfulCount` field + CodingKey on VPComment); `SettingsService.swift` (`helpfulBadgeThreshold` getter); `Theme.swift` (`tagHelpful` color).
+- Kids iOS: n/a (no comment-tag UI, intentional).
+- SELECT statements in `StoryDetailView.swift` still fetch `helpful_count` — Codable ignores the column now that the field is gone, harmless and consistent with "leave column dormant."
+
+**Item 8 — drop cap removed.** `web/src/app/globals.css` no longer renders an oversized first letter on the article body's lead paragraph. Single CSS rule (`[data-article-body] > p:first-of-type::first-letter`) deleted. Stale "drop cap on the lead" reference in the typography block comment also cleaned up. Web only — iOS / kids never had a drop cap.
+
+**Item 9 — Messages link 404 fix.** `web/src/app/profile/_sections/MessagesSection.tsx:150` was generating `/messages/${t.id}` (URL segment), but the messages page only accepts `/messages?to=<userId>` (query param). One-line fix: `t.other_user?.id ? '/messages?to=${t.other_user.id}' : '/messages'`. Web only — iOS goes direct to `MessagesView()` and was never broken.
+
+Adversary pass run after impl — no compile / cross-platform / flow issues found beyond the stale CSS comment that's now fixed.
+
 ### Security — TODO 7: lock permission-management surfaces to owner_mode
 **Files:** seven `route.js` files under `web/src/app/api/admin/permissions/`, `web/src/app/api/admin/permission-sets/`, and `web/src/app/api/admin/users/[id]/permissions/`. Closes the privilege-escalation path TODO 7 named.
 

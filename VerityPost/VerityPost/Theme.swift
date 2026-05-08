@@ -119,9 +119,6 @@ enum VP {
     // the web side (CommentRow.tsx → TAG_META). 'context' reuses
     // VP.accent on purpose (no rainbow per the no-color-per-tier rule —
     // tags are utility, not status).
-    static let tagHelpful    = Color(hex: "16a34a")
-    static let tagInsightful = Color(hex: "2563eb")
-    static let tagSarcastic  = Color(hex: "f59e0b")
     static let tagCiteNeeded = Color(hex: "ea580c")
     static let tagOffTopic   = Color(hex: "6b7280")
 

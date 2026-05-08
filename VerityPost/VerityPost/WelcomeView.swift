@@ -178,10 +178,6 @@ struct WelcomeView: View {
     private var screenTwo: some View {
         VStack(alignment: .leading, spacing: 14) {
             eyebrow("How it works")
-            Text("Read. Quiz. Discuss.")
-                .font(.system(size: VP.Size.xxl, weight: .bold, design: .serif))
-                .tracking(-0.6)
-                .foregroundColor(VP.text)
 
             // Unlock chain visual
             HStack(spacing: 8) {

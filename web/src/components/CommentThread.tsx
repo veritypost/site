@@ -87,9 +87,9 @@ type DialogState = {
   targetUserId?: string;
 } | null;
 
-export type TagKind = 'context' | 'helpful' | 'cite_needed' | 'off_topic';
+export type TagKind = 'context' | 'cite_needed' | 'off_topic';
 
-const TAG_KINDS: TagKind[] = ['helpful', 'context', 'cite_needed', 'off_topic'];
+const TAG_KINDS: TagKind[] = ['context', 'cite_needed', 'off_topic'];
 
 export default function CommentThread({
   articleId,
