@@ -6,6 +6,45 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### Owner cleanup — third batch shipped (6, 7)
+**Files:** see breakdown.
+
+Closing the remaining cleanup items the owner had open. Item 6 was a quick visual polish; item 7 was a substantive design change to comment edit + a teardown of the follow-ups feature.
+
+**Item 6 — comment-tag chips de-bulked.** `web/src/components/CommentRow.tsx` + `VerityPost/VerityPost/StoryDetailView.swift` (`tagChipButton`) flipped to muted text-only chips: 11px font, tighter padding (4×10 web / 4×10 iOS), 28px min-height, single ink color throughout, no filled backgrounds, no colored borders. Active state = full ink + 600 weight; inactive = muted + 500. Per-tag colors stay defined in `TAG_META`/`commentTagOrder` for any future audit/log surface but aren't used in the chip render. Owner's `feedback_no_color_per_tier` rule applied at the chip level.
+
+**Item 7 — comment edit overhaul + follow-ups retired.** Owner-approved design change: TODO-48 ("non-editable, author can append up to 2 follow-ups") replaced by real edit with a 60-second silent typo grace, a 15-minute hard window, append-only enforcement after the grace, and immediate lock-on-reply.
+
+*DB migration (applied via supabase MCP):* `comments.edit_history JSONB NOT NULL DEFAULT '[]'`. Each entry shape: `{ edited_at, prev_body, prev_body_html, mode: 'typo' | 'append' }`. Server-side only, never exposed in public API responses; used for moderation, abuse appeals, and dispute resolution. Migration name `comments_edit_history_owner_cleanup_7`.
+
+*Server:* `web/src/app/api/comments/[id]/route.js` PATCH path:
+- `EDIT_WINDOW_MS` = 15 min (was 10).
+- New `TYPO_GRACE_MS` = 60s. Edits inside grace flip is_edited back to false + edited_at to null after the RPC sets them, so reads stay clean (no "edited" marker on early typo fixes).
+- New lock-on-reply check using `reply_count > 0` → 403 `comment_locked_by_reply`. Closes the bait-and-switch attack — once anyone has built on a comment, it's frozen.
+- New append-only check after grace: `body.startsWith(existing.body)` must hold or 400 `append_only_required`. Author can extend their comment ("\nEdit: …") but cannot rewrite the prefix readers/repliers already saw.
+- New history append: each successful PATCH writes one entry to `edit_history` BEFORE the RPC mutates the body. Recorded mode is `'typo'` inside grace, `'append'` after.
+- SELECT extended to pull `body_html`, `edit_history`, `reply_count` (+ existing `body`, `created_at`, etc).
+- Admin path (`admin.comments.edit.any`) intentionally bypasses window/lock/append checks — the moderation surface stays unaffected.
+- The header doc block was rewritten to publish the new contract for cross-platform consumers.
+
+*Follow-ups feature retired entirely:*
+- API route `web/src/app/api/comments/[id]/followups/route.js` deleted (`git rm`).
+- Web: `CommentRow.tsx` had its `CommentFollowup` type, `EnrichedComment.followups` field, all 5 follow-up state vars + the FOLLOWUP_MAX/CHAR_LIMIT consts, the `followupsMerged` derivation, and the entire ~280-line follow-up JSX block (composer, list, "Add an update" button) deleted.
+- Web: `CommentThread.tsx` switched 3 SELECTs from `'*, followups:comment_followups(...)'` to `'*'`. The realtime subscription for the `comment_followups` table (INSERT + DELETE handlers) deleted.
+- iOS: `StoryDetailView.swift` had 5 follow-up state vars, the `followupSection(for:)` view function, `relativeUpdateLabel`, `mergedFollowups`, `postFollowup`, `refetchFollowups`, the `followupSection` call site, and the `comment_followups` realtime channel subscribers (INSERT + DELETE async loops) all deleted. The 3 iOS SELECT statements dropped the `comment_followups(...)` embed and added `reply_count`.
+- iOS: `Models.swift` had the `VPComment.Followup` nested struct + `followups` field + `case followups = "comment_followups"` CodingKey deleted; `replyCount` field + CodingKey added (drives the lock-on-reply UI gate).
+- The `comment_followups` table itself stays dormant per the same pattern as `comments.helpful_count`. No reads, no writes from clients.
+
+*UI gates (so the edit affordance disappears when the user can't succeed):*
+- Web `CommentRow.tsx` derives `editWindowOpen` (within 15 min) and `editLockedByReply` (`reply_count > 0`); the edit menu item is gated on `canEditOwnNow = canEditOwn && editWindowOpen && !editLockedByReply`. `hasMenuItems` updated in lockstep.
+- iOS `StoryDetailView.swift` Edit button gated on `(comment.replyCount ?? 0) == 0 && (comment.createdAt.map { Date().timeIntervalSince($0) <= 15 * 60 } ?? false)`.
+- Server stays the final arbiter; the UI gates just spare the user a 403 on common rejections.
+- Kids iOS: n/a (no comment UI).
+
+*Permission separation:* `comments.expert_thread.allow_followup` is the EXPERT THREAD grant feature (asker grants the expert another reply slot). Different concept from author follow-ups, kept untouched.
+
+Adversary pass run after impl — no compile / type / runtime / cross-platform issues found. Edge cases covered: clock skew (POSITIVE_INFINITY fallback blocks edits on malformed timestamps), nil `createdAt` on iOS, nil `replyCount` on iOS (older cached rows treated as no-replies until refresh), history immutability if RPC fails (history records the attempt, body unchanged — semantically correct).
+
 ### Owner cleanup — second batch shipped (2, 4, 10, 11)
 **Files:** see breakdown per item.
 

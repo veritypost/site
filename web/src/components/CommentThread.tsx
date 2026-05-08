@@ -211,7 +211,7 @@ export default function CommentThread({
     // ships, threads beyond 50 rows render the top-50 by quality order.
     const { data: rows, error: loadErr } = await supabase
       .from('comments')
-      .select('*, followups:comment_followups(id, body, sort_order, created_at)')
+      .select('*')
       .eq('article_id', articleId)
       .eq('status', 'visible')
       .is('deleted_at', null)
@@ -399,7 +399,7 @@ export default function CommentThread({
           if (payload.new.status && payload.new.status !== 'visible') return;
           const { data: row } = await supabase
             .from('comments')
-            .select('*, followups:comment_followups(id, body, sort_order, created_at)')
+            .select('*')
             .eq('id', payload.new.id)
             .maybeSingle();
           if (cancelled || !row) return;
@@ -447,7 +447,7 @@ export default function CommentThread({
           } else {
             const { data: row } = await supabase
               .from('comments')
-              .select('*, followups:comment_followups(id, body, sort_order, created_at)')
+              .select('*')
               .eq('id', id)
               .maybeSingle();
             if (cancelled || !row) return;
@@ -467,54 +467,6 @@ export default function CommentThread({
               prev.find((c) => c.id === id) ? prev : [...prev, enriched]
             );
           }
-        }
-      )
-      .on(
-        'postgres_changes' as never,
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'comment_followups',
-        },
-        async (payload: { new: { comment_id: string } }) => {
-          const cid = payload.new?.comment_id;
-          if (!cid) return;
-          if (!commentsRef.current.find((c) => c.id === cid)) return;
-          const { data: rows } = await supabase
-            .from('comment_followups')
-            .select('id, body, sort_order, created_at')
-            .eq('comment_id', cid)
-            .order('sort_order', { ascending: true });
-          if (cancelled) return;
-          setComments((prev) =>
-            prev.map((c) =>
-              c.id === cid ? ({ ...c, followups: rows || [] } as CommentWithAuthor) : c
-            )
-          );
-        }
-      )
-      .on(
-        'postgres_changes' as never,
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'comment_followups',
-        },
-        async (payload: { old: { comment_id: string } }) => {
-          const cid = payload.old?.comment_id;
-          if (!cid) return;
-          if (!commentsRef.current.find((c) => c.id === cid)) return;
-          const { data: rows } = await supabase
-            .from('comment_followups')
-            .select('id, body, sort_order, created_at')
-            .eq('comment_id', cid)
-            .order('sort_order', { ascending: true });
-          if (cancelled) return;
-          setComments((prev) =>
-            prev.map((c) =>
-              c.id === cid ? ({ ...c, followups: rows || [] } as CommentWithAuthor) : c
-            )
-          );
         }
       )
       .subscribe();

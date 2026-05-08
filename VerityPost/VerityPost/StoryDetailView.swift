@@ -113,14 +113,10 @@ struct StoryDetailView: View {
     @State private var commentFirsthand: Bool = false
     @State private var commentFirsthandContext: String = ""
 
-    // Author follow-ups (TODO-48). Read off `comment.followups` (embedded
-    // via the comment_followups relation). Local optimistic-add map merges
-    // server rows + just-posted rows for instant feedback before refetch.
-    @State private var followupsLocalAdds: [String: [VPComment.Followup]] = [:]
-    @State private var followupOpenFor: String? = nil
-    @State private var followupText: String = ""
-    @State private var followupBusy: Bool = false
-    @State private var followupError: String = ""
+    // Owner cleanup item 7 (2026-05-08) — TODO-48 author follow-ups
+    // retired in favour of real comment edit (PATCH /api/comments/[id])
+    // with lock-on-reply + 60s typo grace + append-only after the grace.
+    // The comment_followups table stays dormant; UI + API route deleted.
 
     // Cancellable 350ms auto-advance after a quiz option tap. Cancelled on
     // option re-tap, on view disappear, and on stage transition.
@@ -2232,8 +2228,6 @@ struct StoryDetailView: View {
                     }
                     .padding(.top, 6)
                 }
-                // Author follow-ups — pinned beneath comment, OP-only composer.
-                followupSection(for: comment, isOwnComment: isOwnComment)
                 if !comment.isDeleted && !isEditing {
                     // Tag chips — always visible when any tag is active (cast or count > 0).
                     // Self-tag blocked by the API (403); we hide for own comments to avoid tease.
@@ -2279,7 +2273,13 @@ struct StoryDetailView: View {
                                     .foregroundColor(VP.dim)
                             }
                         }
-                        if isOwnComment && canEditOwnComment && muteState == nil {
+                        // Owner cleanup item 7 (2026-05-08) — gate the edit
+                        // affordance on the same window + lock-on-reply
+                        // rules the server enforces. Server is final
+                        // arbiter; this just spares a 403.
+                        if isOwnComment && canEditOwnComment && muteState == nil
+                            && (comment.replyCount ?? 0) == 0
+                            && (comment.createdAt.map { Date().timeIntervalSince($0) <= 15 * 60 } ?? false) {
                             Button {
                                 beginEdit(comment)
                             } label: {
@@ -2375,218 +2375,6 @@ struct StoryDetailView: View {
                         Label("Flag for review", systemImage: "flag")
                     }
                 }
-            }
-        }
-    }
-
-    /// Author follow-ups (TODO-48). Read off `comment.followups` (embedded
-    /// from the `comment_followups` relation). Local optimistic adds merge
-    /// with server rows for instant feedback before refetch.
-    @ViewBuilder
-    private func followupSection(for comment: VPComment, isOwnComment: Bool) -> some View {
-        let followups = mergedFollowups(for: comment)
-        let isOpen = followupOpenFor == comment.id
-        let canAdd = isOwnComment && !comment.isDeleted && followups.count < 3
-        if !followups.isEmpty || isOpen || canAdd {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(Array(followups.enumerated()), id: \.element.id) { idx, f in
-                    HStack(alignment: .top, spacing: 12) {
-                        Rectangle()
-                            .fill(VP.warn.opacity(0.9))
-                            .frame(width: 14, height: 1)
-                            .padding(.top, 7)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(followups.count > 1
-                                ? "Update \(idx + 1) of \(followups.count), \(relativeUpdateLabel(for: f.createdAt))"
-                                : "Update, \(relativeUpdateLabel(for: f.createdAt))")
-                                .font(.system(.footnote, design: .serif).italic())
-                                .foregroundColor(VP.warn)
-                            Text(f.body)
-                                .font(.system(.subheadline))
-                                .foregroundColor(VP.text)
-                        }
-                    }
-                }
-                if isOpen {
-                    HStack(alignment: .top, spacing: 12) {
-                        Rectangle()
-                            .fill(VP.warn.opacity(0.9))
-                            .frame(width: 14, height: 1)
-                            .padding(.top, 7)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Update")
-                                .font(.system(.footnote, design: .serif).italic())
-                                .foregroundColor(VP.warn)
-                            TextField(
-                                "Clarify or correct — pinned beneath your comment.",
-                                text: $followupText,
-                                axis: .vertical
-                            )
-                            .font(.subheadline)
-                            .foregroundColor(VP.text)
-                            .lineLimit(2...4)
-                            .disabled(followupBusy)
-                            .onChange(of: followupText) { _, new in
-                                if new.count > 280 {
-                                    followupText = String(new.prefix(280))
-                                }
-                            }
-                            HStack(spacing: 14) {
-                                Text("\(280 - followupText.count)")
-                                    .font(.system(.caption, design: .serif).italic())
-                                    .foregroundColor(followupText.count > 260 ? VP.warn : VP.muted)
-                                    .monospacedDigit()
-                                Spacer()
-                                Button {
-                                    followupOpenFor = nil
-                                    followupText = ""
-                                    followupError = ""
-                                } label: {
-                                    Text("Cancel")
-                                        .font(.footnote)
-                                        .foregroundColor(VP.dim)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(followupBusy)
-                                Button {
-                                    Task { await postFollowup(for: comment.id) }
-                                } label: {
-                                    Text(followupBusy ? "Posting…" : "Post update")
-                                        .font(.system(.footnote, design: .serif).italic().weight(.medium))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 5)
-                                        .background(
-                                            Capsule().fill(
-                                                followupText.trimmingCharacters(in: .whitespaces).isEmpty || followupBusy
-                                                    ? VP.warn.opacity(0.4)
-                                                    : VP.warn
-                                            )
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(followupText.trimmingCharacters(in: .whitespaces).isEmpty || followupBusy)
-                            }
-                            if !followupError.isEmpty {
-                                Text(followupError)
-                                    .font(.footnote.italic())
-                                    .foregroundColor(VP.warn)
-                            }
-                        }
-                    }
-                }
-                if canAdd && !isOpen {
-                    Button {
-                        followupOpenFor = comment.id
-                        followupText = ""
-                        followupError = ""
-                    } label: {
-                        Text(followups.isEmpty ? "Add an update" : "Add another")
-                            .font(.system(.footnote, design: .serif).italic())
-                            .foregroundColor(VP.warn)
-                            .opacity(0.78)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.top, 14)
-        } else {
-            EmptyView()
-        }
-    }
-
-    private func relativeUpdateLabel(for date: Date?) -> String {
-        guard let date else { return "just now" }
-        let s = Int(Date().timeIntervalSince(date))
-        if s < 30 { return "just now" }
-        if s < 3600 { return "\(s / 60) min later" }
-        if s < 86_400 { return "\(s / 3600) h later" }
-        return "\(s / 86_400) d later"
-    }
-
-    /// Merge server-side followups (from the comment's embedded relation)
-    /// with locally-added optimistic rows. De-dupe by id; sort by sort_order
-    /// then created_at to mirror the DB UNIQUE (comment_id, sort_order).
-    private func mergedFollowups(for comment: VPComment) -> [VPComment.Followup] {
-        var byId: [String: VPComment.Followup] = [:]
-        for f in (comment.followups ?? []) {
-            byId[f.id] = f
-        }
-        for f in (followupsLocalAdds[comment.id] ?? []) {
-            byId[f.id] = f
-        }
-        return byId.values.sorted { a, b in
-            let sa = a.sortOrder ?? 0
-            let sb = b.sortOrder ?? 0
-            if sa != sb { return sa < sb }
-            let da = a.createdAt ?? .distantPast
-            let db = b.createdAt ?? .distantPast
-            return da < db
-        }
-    }
-
-    /// POST /api/comments/[id]/followups — author-only, cap-of-2 enforced
-    /// server-side. On success, append to followupsLocalAdds for instant
-    /// render; refetch on next comments load reconciles authoritatively.
-    private func postFollowup(for commentId: String) async {
-        let body = followupText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !body.isEmpty, !followupBusy else { return }
-        guard let session = try? await client.auth.session else {
-            followupError = "sign in to post an update."
-            return
-        }
-        followupBusy = true
-        defer { followupBusy = false }
-
-        let url = SupabaseManager.shared.siteURL
-            .appendingPathComponent("api/comments/\(commentId)/followups")
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
-        struct Payload: Encodable { let body: String }
-        req.httpBody = try? JSONEncoder().encode(Payload(body: body))
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: req)
-            guard let http = response as? HTTPURLResponse else {
-                followupError = "could not post update."
-                return
-            }
-            if http.statusCode == 200 {
-                struct Resp: Decodable { let followup: VPComment.Followup }
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                if let decoded = try? decoder.decode(Resp.self, from: data) {
-                    await MainActor.run {
-                        var arr = followupsLocalAdds[commentId] ?? []
-                        arr.append(decoded.followup)
-                        followupsLocalAdds[commentId] = arr
-                        followupText = ""
-                        followupOpenFor = nil
-                        followupError = ""
-                    }
-                } else {
-                    await MainActor.run {
-                        followupError = "could not parse server response."
-                    }
-                }
-            } else if http.statusCode == 409 {
-                await MainActor.run {
-                    followupError = "this comment already has 3 updates."
-                }
-            } else if http.statusCode == 403 {
-                await MainActor.run {
-                    followupError = "only the comment author can post follow-ups."
-                }
-            } else {
-                await MainActor.run {
-                    followupError = "could not post update."
-                }
-            }
-        } catch {
-            await MainActor.run {
-                followupError = "could not post update."
             }
         }
     }
@@ -3222,7 +3010,7 @@ struct StoryDetailView: View {
                 // (is_expert_thread_root, expert_thread_root_id,
                 // expert_thread_closed_at, expert_thread_closed_by,
                 // last_reopen_at) so close/reopen + cap affordances render.
-                .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, is_expert_thread_root, expert_thread_root_id, expert_thread_closed_at, expert_thread_closed_by, last_reopen_at, upvote_count, downvote_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions, real_world_experience, comment_followups(id, body, sort_order, created_at)")
+                .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, is_expert_thread_root, expert_thread_root_id, expert_thread_closed_at, expert_thread_closed_by, last_reopen_at, upvote_count, downvote_count, reply_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions, real_world_experience")
                 .eq("article_id", value: story.id)
                 .eq("status", value: "visible")
                 .is("deleted_at", value: nil)
@@ -3479,23 +3267,6 @@ struct StoryDetailView: View {
     // detached unsubscribe hops on both branches.
     // A124 — UPDATE listener added so soft-deleted comments and edited
     // bodies render live without a story re-load.
-    /// Refetch a single comment's follow-ups and merge into its row.
-    /// Called from the realtime followup INSERT/DELETE handlers when the
-    /// affected comment_id is in the locally-visible set.
-    private func refetchFollowups(for commentId: String) async {
-        let rows: [VPComment.Followup] = (try? await client
-            .from("comment_followups")
-            .select("id, body, sort_order, created_at")
-            .eq("comment_id", value: commentId)
-            .order("sort_order", ascending: true)
-            .execute()
-            .value) ?? []
-        await MainActor.run {
-            if let idx = comments.firstIndex(where: { $0.id == commentId }) {
-                comments[idx].followups = rows
-            }
-        }
-    }
 
     private func subscribeToNewComments() async {
         let channel = client.channel("comments-story-\(story.id)")
@@ -3511,19 +3282,6 @@ struct StoryDetailView: View {
             table: "comments",
             filter: "article_id=eq.\(story.id)"
         )
-        // comment_followups doesn't carry article_id; subscribe broadly and
-        // filter in the handler against the locally-visible comment ids.
-        // INSERT/DELETE both refetch a single comment's followups and merge.
-        let followupInserts = channel.postgresChange(
-            InsertAction.self,
-            schema: "public",
-            table: "comment_followups"
-        )
-        let followupDeletes = channel.postgresChange(
-            DeleteAction.self,
-            schema: "public",
-            table: "comment_followups"
-        )
         await channel.subscribe()
         await withTaskCancellationHandler {
             await withTaskGroup(of: Void.self) { group in
@@ -3533,7 +3291,7 @@ struct StoryDetailView: View {
                               case let .string(newId) = idValue else { continue }
                         if comments.contains(where: { $0.id == newId }) { continue }
                         guard var fresh: VPComment = try? await client.from("comments")
-                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions")
+                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, reply_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions")
                             .eq("id", value: newId)
                             .single()
                             .execute()
@@ -3568,7 +3326,7 @@ struct StoryDetailView: View {
                         // bare columns. Author data is preserved from the existing
                         // displayed comment (updates don't change authorship).
                         guard var refreshed: VPComment = try? await client.from("comments")
-                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions")
+                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, reply_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions")
                             .eq("id", value: updatedId)
                             .single()
                             .execute()
@@ -3590,22 +3348,6 @@ struct StoryDetailView: View {
                         if let idx = comments.firstIndex(where: { $0.id == updatedId }) {
                             comments[idx] = refreshed
                         }
-                    }
-                }
-                group.addTask { @MainActor in
-                    for await change in followupInserts {
-                        guard let cidValue = change.record["comment_id"],
-                              case let .string(cid) = cidValue else { continue }
-                        guard comments.contains(where: { $0.id == cid }) else { continue }
-                        await refetchFollowups(for: cid)
-                    }
-                }
-                group.addTask { @MainActor in
-                    for await change in followupDeletes {
-                        guard let cidValue = change.oldRecord["comment_id"],
-                              case let .string(cid) = cidValue else { continue }
-                        guard comments.contains(where: { $0.id == cid }) else { continue }
-                        await refetchFollowups(for: cid)
                     }
                 }
                 await group.waitForAll()
@@ -4362,20 +4104,20 @@ struct StoryDetailView: View {
         // 20px radius / 32 min-height).
         let busy = commentTagBusyKey == "\(comment.id):\(entry.kind)"
         let count = tagCount(for: comment, kind: entry.kind)
+        // Owner cleanup item 6 (2026-05-08): muted text-only chips matching
+        // web. Single ink color throughout per the no-color-per-tier rule;
+        // active = VP.text + .semibold weight, inactive = VP.dim + .medium.
+        // No filled backgrounds, no colored borders. entry.color preserved
+        // in commentTagOrder for any future audit/log surface.
         Button {
             Task { await toggleCommentTag(comment, kind: entry.kind) }
         } label: {
             Text(count > 0 ? "\(entry.label) \(count)" : entry.label)
-                .font(.system(size: VP.Size.xs, weight: isCast ? .semibold : .medium))
-                .foregroundColor(isCast ? entry.color : VP.dim)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 5)
-                .frame(minHeight: 32)
-                .background(isCast ? entry.color.opacity(0.08) : Color.clear)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(isCast ? entry.color : VP.border, lineWidth: 1)
-                )
+                .font(.system(size: 11, weight: isCast ? .semibold : .medium))
+                .foregroundColor(isCast ? VP.text : VP.dim)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .frame(minHeight: 28)
                 .opacity(busy ? 0.6 : 1)
         }
         .buttonStyle(.plain)

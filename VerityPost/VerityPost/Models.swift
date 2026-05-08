@@ -419,6 +419,9 @@ struct VPComment: Codable, Identifiable {
     var lastReopenAt: Date?
     var upvoteCount: Int?
     var downvoteCount: Int?
+    /// Owner cleanup item 7 — server-maintained reply count drives the
+    /// lock-on-reply gate. iOS reads (write-side stays server-only).
+    var replyCount: Int?
     var createdAt: Date?
     /// A126 — soft-delete + edit + mention fields. The web client's
     /// /api/comments/[id] PATCH route sets `is_edited=true` on edits and
@@ -456,25 +459,6 @@ struct VPComment: Codable, Identifiable {
     /// claim; NULL/empty ⇒ no claim. Captured at compose time only — comments
     /// are non-editable, so this is set once on insert.
     var realWorldExperience: String?
-    /// Author follow-ups (TODO-48). Pinned beneath the parent comment.
-    /// Cap of 2 enforced server-side. Decoded from the embedded
-    /// `comment_followups(id, body, sort_order, created_at)` relation in
-    /// the iOS comment select.
-    var followups: [Followup]?
-
-    struct Followup: Codable, Identifiable {
-        let id: String
-        var body: String
-        var sortOrder: Int?
-        var createdAt: Date?
-
-        enum CodingKeys: String, CodingKey {
-            case id, body
-            case sortOrder = "sort_order"
-            case createdAt = "created_at"
-        }
-    }
-
     /// True when the row has been soft-deleted server-side. Renderer
     /// should swap the body text for a "[deleted]" tombstone and hide
     /// the vote/reply affordances.
@@ -543,6 +527,7 @@ struct VPComment: Codable, Identifiable {
         case lastReopenAt = "last_reopen_at"
         case upvoteCount = "upvote_count"
         case downvoteCount = "downvote_count"
+        case replyCount = "reply_count"
         case createdAt = "created_at"
         case deletedAt = "deleted_at"
         case isEdited = "is_edited"
@@ -553,7 +538,6 @@ struct VPComment: Codable, Identifiable {
         case agreeCount = "agree_count"
         case disagreeCount = "disagree_count"
         case realWorldExperience = "real_world_experience"
-        case followups = "comment_followups"
     }
 }
 

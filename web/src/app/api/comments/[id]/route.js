@@ -28,20 +28,38 @@ const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 // S5-iOS-parity (A123 / A124 / A125 / A126) — comment edit + delete
 // API contract published for S9 to cite by file:line.
 //
-// Contract: edit (A123)
-// ---------------------
+// Contract: edit (A123, revised by owner cleanup item 7 on 2026-05-08)
+// --------------------------------------------------------------------
 //   PATCH /api/comments/[id]
 //   Body:    { body: string }                  // 1..comment_max_length chars after trim
 //   Auth:    bearer required.
 //   Perms:   comments.edit.own (owner) — mods/admins use the moderation
 //            surface, gated on a different permission key.
-//   Window:  EDIT_WINDOW_MS = 10 minutes from comments.created_at for the
-//            owner branch (T280). Mods bypass via the moderation surface.
+//   Window:  EDIT_WINDOW_MS = 15 minutes from comments.created_at.
+//            TYPO_GRACE_MS = 60 seconds from comments.created_at — a
+//            silent typo-grace window inside the edit window where
+//            edits don't bump is_edited / edited_at and don't surface
+//            an "edited" indicator to readers.
+//   Lock:    once a comment has any non-deleted reply (reply_count > 0
+//            on the row, OR a child row with deleted_at IS NULL exists),
+//            edits are blocked entirely regardless of window. Closes the
+//            bait-and-switch attack — a comment can't be wiped after
+//            replies have built on it.
+//   Append-only: post-grace edits (60s — 15min, un-replied) must NOT
+//            modify the prefix the original body holds. New body MUST
+//            start with the existing body verbatim — additions only.
+//            Free typo-fix only inside the 60-second grace window.
+//   History: every successful edit appends one row to comments.edit_history
+//            JSONB array with { edited_at, prev_body, prev_body_html, mode }
+//            BEFORE applying the new body. Immutable, server-side only,
+//            never exposed in public API responses.
 //   Server:  edit_comment RPC sets body, body_html (re-render), is_edited,
 //            edited_at, mentions (re-extracted from new body); mentions
-//            unresolved against users.username get dropped.
-//   Resp:    200 { ok: true } | 400 { error: 'body required' | 'comment_too_long' (+ max_length) }
-//                              | 403 { error: 'edit_window_expired' (+ message), or 'Forbidden' }
+//            unresolved against users.username get dropped. For typo-grace
+//            edits we revert is_edited + edited_at after the RPC so reads
+//            don't show the edited marker.
+//   Resp:    200 { ok: true } | 400 { error: 'body required' | 'comment_too_long' (+ max_length) | 'append_only_required' }
+//                              | 403 { error: 'edit_window_expired' (+ message), 'comment_locked_by_reply', or 'Forbidden' }
 //                              | 404 { error: 'not_found' }
 //                              | 429 { error: 'Too many requests', Retry-After header }
 //   Realtime: server emits an UPDATE on comments via Postgres realtime;
@@ -148,17 +166,20 @@ export async function PATCH(request, { params }) {
   // §2 #12). Snapshot pinned for the rest of the request.
   const expertConfig = await getExpertConfigSnapshot();
 
-  // T280 — cap the self-edit window to 10 minutes so authors can fix typos
-  // but can't silently rewrite a comment after it has been replied to,
-  // quoted, or reported. Mods/admins use the moderation surface, which
-  // gates on a different permission and isn't affected. The RPC is
+  // Owner cleanup item 7 (2026-05-08) — 15-minute self-edit window with
+  // a 60-second silent typo grace and append-only enforcement after the
+  // grace. Lock-on-reply blocks edits the moment any reply lands. Mods/
+  // admins use the moderation surface, gated separately. The RPC is
   // SECURITY DEFINER so we read the row through the service client first.
   // Wave 3: extend the SELECT to pull `body` (for OLD-expert-mention
-  // re-extraction) and `article_id` (for commit_expert_mentions).
-  const EDIT_WINDOW_MS = 10 * 60 * 1000;
+  // re-extraction), `article_id` (for commit_expert_mentions), `body_html`
+  // + `edit_history` (for the immutable history append), and `reply_count`
+  // (for lock-on-reply).
+  const EDIT_WINDOW_MS = 15 * 60 * 1000;
+  const TYPO_GRACE_MS = 60 * 1000;
   const { data: existing, error: lookupErr } = await service
     .from('comments')
-    .select('user_id, created_at, body, article_id, parent_id')
+    .select('user_id, created_at, body, body_html, edit_history, reply_count, article_id, parent_id')
     .eq('id', id)
     .maybeSingle();
   if (lookupErr || !existing) {
@@ -188,15 +209,41 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ ok: true }, { headers: NO_STORE });
   }
 
-  // Self-edit: enforce ownership and the 10-minute window.
+  // Self-edit: enforce ownership, the 15-minute window, lock-on-reply,
+  // and append-only outside the typo grace window.
   if (existing.user_id !== user.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: NO_STORE });
   }
+
+  // Lock-on-reply — reply_count is server-maintained; trust it. (Defense
+  // in depth: a child INSERT could race with this PATCH, but the realtime
+  // UPDATE the edit emits will reach the replier; worst case they see a
+  // not-yet-locked edit on a comment they were about to reply to.)
+  if ((existing.reply_count ?? 0) > 0) {
+    return NextResponse.json(
+      { error: 'comment_locked_by_reply' },
+      { status: 403, headers: NO_STORE }
+    );
+  }
+
   const createdAt = new Date(existing.created_at).getTime();
-  if (Number.isFinite(createdAt) && Date.now() - createdAt > EDIT_WINDOW_MS) {
+  const ageMs = Number.isFinite(createdAt) ? Date.now() - createdAt : Number.POSITIVE_INFINITY;
+  if (ageMs > EDIT_WINDOW_MS) {
     return NextResponse.json(
       { error: 'edit_window_expired', message: COPY.comments.editWindowExpired },
       { status: 403, headers: NO_STORE }
+    );
+  }
+  const isTypoGrace = ageMs <= TYPO_GRACE_MS;
+  // Outside the typo-grace window, edits are append-only — the new body
+  // must start with the existing body verbatim. This is the bait-and-
+  // switch defense the panel landed on: an author can append clarifications
+  // ("\nEdit: ...") but cannot rewrite the original wording readers and
+  // would-be repliers already saw.
+  if (!isTypoGrace && !body.startsWith(existing.body)) {
+    return NextResponse.json(
+      { error: 'append_only_required' },
+      { status: 400, headers: NO_STORE }
     );
   }
 
@@ -359,6 +406,34 @@ export async function PATCH(request, { params }) {
     }
   }
 
+  // Owner cleanup item 7 — append immutable history entry BEFORE the body
+  // mutates. We append the prior body + body_html + the mode this edit
+  // takes ('typo' inside the grace window, 'append' after). Stored as a
+  // JSONB array on the comment row; never read back into public API.
+  const editMode = isTypoGrace ? 'typo' : 'append';
+  const priorHistory = Array.isArray(existing.edit_history) ? existing.edit_history : [];
+  const nowIso = new Date().toISOString();
+  const nextHistory = [
+    ...priorHistory,
+    {
+      edited_at: nowIso,
+      prev_body: existing.body,
+      prev_body_html: existing.body_html ?? null,
+      mode: editMode,
+    },
+  ];
+  const { error: historyErr } = await service
+    .from('comments')
+    .update({ edit_history: nextHistory })
+    .eq('id', id);
+  if (historyErr) {
+    console.error('[comments.PATCH.history]', historyErr);
+    return NextResponse.json(
+      { error: 'history_write_failed' },
+      { status: 500, headers: NO_STORE }
+    );
+  }
+
   const { error } = await service.rpc('edit_comment', {
     p_user_id: user.id,
     p_comment_id: id,
@@ -370,6 +445,22 @@ export async function PATCH(request, { params }) {
       fallbackStatus: 400,
       headers: NO_STORE,
     });
+
+  // Typo-grace edits don't surface an "edited" indicator to readers. The
+  // RPC unconditionally sets is_edited=true and stamps edited_at; revert
+  // both for the grace path so reads stay clean. The history entry above
+  // is what guarantees moderation can still see the change.
+  if (isTypoGrace) {
+    const { error: revertErr } = await service
+      .from('comments')
+      .update({ is_edited: false, edited_at: null })
+      .eq('id', id);
+    if (revertErr) {
+      // Non-fatal: edit landed; only the indicator state is wrong. Log
+      // and continue rather than 500-ing on a successful body change.
+      console.error('[comments.PATCH.typo_grace_revert]', revertErr);
+    }
+  }
 
   // Post-update expert work: commit counters for newly-added available
   // targets and write one notification row per newly-added available

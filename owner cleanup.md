@@ -38,65 +38,6 @@ If reviewers diverge on a bigger item, dispatch a fresh independent panel to bre
 
 ## Items
 
-### 6. Tags feel bulky — visual cleanup
-**Page / screen:** wherever tags render across the product
-**What owner sees (2026-05-08 clarification):** "it's just kinda bulky" — visual weight, not specific tags. Polish, not deletion.
-**What should change:** reduce visual weight of tag chips/pills wherever they render. Smaller text, tighter padding, fewer per row, maybe muted by default with hover-up.
-
-— Phase 2 (inventory of tag surfaces) —
-- **Comment-tag pills** (web `CommentRow.tsx:1333-1361`, iOS `StoryDetailView.swift:4357-4376`): currently `context` / `cite_needed` / `off_topic` — chunky chips in the action row. (Per item 5, `helpful` heart is being removed.)
-- **Article tag row** (linked via owner memory `feedback_no_color_per_tier`): tags appearing on article cards / detail headers — should grep further.
-- **Category chips** on home / browse pages.
-- **Leaderboard fixture** (`web/src/app/redesign/leaderboard/page.tsx:40-47`): defines tag colors, not currently rendered live.
-- **Kids iOS:** no tag UI (intentional, leave alone).
-
-**Recommended fix shape:** treat as a single design-polish pass — pick one chip size + one weight + one muted color, apply uniformly across all surfaces. Remove redundant chip backgrounds where the text alone reads. Owner memory `feedback_no_color_per_tier` already prohibits color-per-tier — so single muted color throughout.
-
-**Status:** scoped as visual polish — needs Phase 2 deeper grep of article + browse pages before Phase 3 gets a concrete diff
-
----
-
-### 7. Updating own comment blocked by "only the comment author can post follow-ups"
-**Page / screen:** comments — owner attempted to update their own comment (web; confirm iOS + kids in Phase 2)
-**What owner sees:** error message: *"only the comment author can post follow-ups."*
-**What should change:** the author should be able to update their own comment without hitting that error. Phase 2 needs to determine whether (a) the author check is broken, (b) edit is being misrouted as a follow-up, or (c) the gate is intentional and the UI is wrong to expose an edit affordance.
-
-— Phase 2 (diagnostic) —
-**System design (TODO-48):** comments are non-editable. The author can append up to 2 short "follow-up" notes. Two endpoints: `PATCH /api/comments/[id]` (edit, not currently used) vs. `POST /api/comments/[id]/followups` (the followup append). Error string lives at `web/src/app/api/comments/[id]/followups/route.js:72-76`, mapped from the `create_comment_followup` RPC.
-
-**Agent's three hypotheses:**
-- (a) Author check buggy → ruled out: error only fires when caller ≠ author, so the check itself is correct.
-- (b) Edit misrouted as followup → ruled out: web and iOS have separate edit/followup state and endpoints.
-- (c) UI exposes the affordance to non-authors → confirmed on iOS: `StoryDetailView.swift:2500` "Add an update" button is **not gated on isOwner**, so any viewer taps it and gets 403. Web is correctly gated at `CommentRow.tsx:1035`.
-
-**But:** owner's report ("I try to update my comment") implies owner IS the author and still got 403. That contradicts the agent's read. Two possibilities the agent didn't fully resolve:
-1. Owner clicked "Add an update" on someone else's comment, expecting it to edit theirs (UI confusion). On iOS this is the missing-gate bug.
-2. Owner is the author, the gate is correct, but the RPC is comparing `auth.uid()` against a `user_id` that doesn't match — possibly because admin@veritypost.com has multiple permission rows and the comment was authored under a different row.
-
-**Cross-platform scope:** web (correctly gated, but owner reports issue), iOS (UI gate missing — definitive bug). Kids n/a.
-
-**Owner clarification (2026-05-08):** "author" = the person who wrote the comment, and they want to *edit* their comment. So this is a design change, not a bug — the current system intentionally blocks edits and only allows follow-up appends, but owner wants real editing.
-
-**Reframed scope:**
-- Allow the comment author to edit their own comment text (not just append follow-ups).
-- TODO-48's "non-editable + follow-ups only" design is being reversed for the author.
-
-**Open questions for owner before Phase 3:**
-1. Keep follow-ups as a separate feature alongside edit, or kill follow-ups entirely now that edit is back?
-2. Show an "edited" indicator + edit timestamp on edited comments? (Standard for comment systems — keeps trust intact.)
-3. Edit window — unlimited time, or only within N minutes of posting?
-
-**Recommended fix shape (assuming edits enabled, follow-ups stay, "edited" indicator on, no time limit):**
-- Server: enable the existing `PATCH /api/comments/[id]` endpoint (likely already exists since the architecture distinguishes edit vs. followup). Verify RPC + RLS allow author update.
-- DB: add `edited_at` (or `updated_at`) timestamp on comments if not already there.
-- Web: wire `CommentRow.tsx` edit composer (variables `editing`/`editBody` already at line 266-267 — UI partially built).
-- iOS: wire `editingCommentId` flow in `StoryDetailView.swift:2100`.
-- UI: render "edited" pill + timestamp on edited comments across web + iOS.
-
-**Status:** reframed as design change — needs owner answers on Q1-Q3 before Phase 3
-
----
-
 ### 12. "Following stories" page — list all followed timelines
 **Page / screen:** the menu/section that lists what the user is following (formerly Saved / bookmarks; see item 2)
 **What owner sees:** the page should show every story the user is following.
