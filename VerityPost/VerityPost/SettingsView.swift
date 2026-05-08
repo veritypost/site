@@ -3766,7 +3766,7 @@ private struct ExpertProfileView: View {
     /// Set to 23:59:59 UTC on the picked date — paused through end of that day.
     private func endOfDay(_ d: Date) -> Date {
         var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
+        cal.timeZone = TimeZone(identifier: "UTC") ?? .current
         var comps = cal.dateComponents([.year, .month, .day], from: d)
         comps.hour = 23
         comps.minute = 59

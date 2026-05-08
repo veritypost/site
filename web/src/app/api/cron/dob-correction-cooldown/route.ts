@@ -37,7 +37,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
 import { logCronHeartbeat } from '@/lib/cronHeartbeat';
-import { captureMessage } from '@/lib/observability';
+import { captureMessage, captureException } from '@/lib/observability';
 
 const CRON_NAME = 'dob-correction-cooldown';
 
@@ -200,7 +200,10 @@ async function handle() {
       });
       approved++;
     } catch (err) {
+      // BugList #6 — surface per-row failures in Sentry so a fully-
+      // broken batch doesn't return 200 silently.
       console.error('[dob-cooldown.row]', row.id, err);
+      await captureException(err, { cron: CRON_NAME, request_id: row.id });
       errors++;
     }
   }

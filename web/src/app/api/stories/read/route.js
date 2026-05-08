@@ -35,7 +35,14 @@ export async function POST(request) {
     }
 
     if (kidProfileId) {
-      await assertKidOwnership(kidProfileId, { client: supabase, userId: user.id });
+      try {
+        await assertKidOwnership(kidProfileId, { client: supabase, userId: user.id });
+      } catch {
+        // BugList #1 — assertKidOwnership now throws on inactive/paused
+        // kids too, not just non-owners. Without this wrap the plain
+        // Error bubbles to the outer catch returning 500.
+        return NextResponse.json({ error: 'Kid profile not accessible' }, { status: 403 });
+      }
 
       const { data: article } = await supabase
         .from('articles')

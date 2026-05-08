@@ -118,6 +118,12 @@ export async function GET(
       );
     }
 
+    // BugList #9 note — HS256 is intentional here. Kid JWTs are
+    // server-minted (pair, pair-direct, refresh) using SUPABASE_JWT_SECRET
+    // and are NOT Supabase-issued access tokens, so the alg-aware
+    // verifier in `lib/auth` does not apply. The is_kid_delegated check
+    // below rejects any adult Supabase token that happened to be minted
+    // with the same secret.
     let decoded: jwt.JwtPayload;
     try {
       decoded = jwt.verify(token, jwtSecret, {

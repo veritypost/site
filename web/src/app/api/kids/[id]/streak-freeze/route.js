@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { assertKidOwnership } from '@/lib/kids';
 
 export async function POST(_request, { params }) {
   let user;
@@ -20,6 +21,17 @@ export async function POST(_request, { params }) {
   }
 
   const service = createServiceClient();
+
+  // BugList #1 — pre-check kid ownership + is_active + paused_at parity
+  // with the rest of the kid-mutating routes. The RPC enforces ownership
+  // at SQL too, but this keeps the lockout semantics consistent (a paused
+  // kid shouldn't burn a streak-freeze even if the RPC would allow it).
+  try {
+    await assertKidOwnership(params.id, { client: service, userId: user.id });
+  } catch {
+    return NextResponse.json({ error: 'Kid profile not accessible' }, { status: 403 });
+  }
+
   const { data, error } = await service.rpc('use_kid_streak_freeze', {
     p_parent_id: user.id,
     p_kid_profile_id: params.id,

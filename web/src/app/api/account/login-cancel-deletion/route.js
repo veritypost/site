@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { createClient, createClientFromToken, createServiceClient } from '@/lib/supabase/server';
 import { isAllowedOrigin } from '@/lib/cors';
+import { enforceDeletedAccountGate } from '@/lib/auth/deletedAccountGate';
 
 // T170/T209 — login-time deletion-cancel signals deletion-state status,
 // which is per-account PII. Apply private/no-store to every response so
@@ -66,6 +67,29 @@ export async function POST(request) {
     }
 
     const service = createServiceClient();
+
+    // BugList #7 — iOS SIWA path: a user whose 30-day grace already
+    // expired (deletion_completed_at set) shouldn't be able to cancel
+    // — they're past the recoverable window. Drop their stranded
+    // auth credential and return a 401 so the iOS client treats it
+    // as a sign-out rather than a successful cancel.
+    const { data: row } = await service
+      .from('users')
+      .select('id, deletion_completed_at, deletion_auth_purged_at')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (row?.deletion_completed_at) {
+      await enforceDeletedAccountGate(service, {
+        id: row.id,
+        deletion_completed_at: row.deletion_completed_at,
+        deletion_auth_purged_at: row.deletion_auth_purged_at,
+      });
+      return NextResponse.json(
+        { cancelled: false, error: 'Account deleted' },
+        { status: 401, headers: NO_STORE }
+      );
+    }
+
     const { data, error } = await service.rpc('cancel_account_deletion', {
       p_user_id: user.id,
     });

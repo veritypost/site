@@ -842,6 +842,10 @@ final class AuthViewModel: ObservableObject {
             } else {
                 // Signup confirmation, magic link, invite, email-change
                 // confirm, or reauthentication — treat as a normal login.
+                // BugList #7 — magic-link deep links land here without
+                // the OTP route ever running, so this is another gate-
+                // bypass surface. Same cancel-deletion + 401-signOut path.
+                await cancelDeletionOnLogin(accessToken: session.accessToken)
                 await loadUser(id: session.user.id.uuidString)
                 isLoggedIn = true
                 wasLoggedIn = true
@@ -1070,6 +1074,12 @@ final class AuthViewModel: ObservableObject {
     /// access token so the server's service-role client can call
     /// cancel_account_deletion for us. Idempotent — no-op when no deletion
     /// is scheduled. Best-effort: a failure here must never block login.
+    ///
+    /// BugList #7 — when the server returns 401 the account has already
+    /// been anonymized (past the 30-day grace window). The server-side
+    /// gate just dropped the auth credential; sign out locally so the
+    /// in-memory Supabase session doesn't keep showing a half-broken UI
+    /// until the next token refresh.
     private func cancelDeletionOnLogin(accessToken: String) async {
         let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/account/login-cancel-deletion")
         var req = URLRequest(url: url)
@@ -1077,7 +1087,14 @@ final class AuthViewModel: ObservableObject {
         req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         do {
-            _ = try await URLSession.shared.data(for: req)
+            let (_, response) = try await URLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+                Log.d("login cancel-deletion: account deleted, signing out")
+                try? await SupabaseManager.shared.client.auth.signOut()
+                await MainActor.run {
+                    self.authError = "This account was deleted. Please sign up for a new account."
+                }
+            }
         } catch {
             Log.d("login cancel-deletion hook failed: \(error)")
         }
@@ -1156,6 +1173,13 @@ final class AuthViewModel: ObservableObject {
                 )
                 do {
                     let session = try await client.auth.session
+                    // BugList #7 — native SIWA mints a session entirely
+                    // client-side, so neither callback nor verify-magic-code
+                    // run. Hit /login-cancel-deletion to (a) clear pending
+                    // deletions for legit users and (b) trip the deleted-
+                    // account gate (401 → signOut + banner) for accounts
+                    // whose grace window expired.
+                    await cancelDeletionOnLogin(accessToken: session.accessToken)
                     await loadUser(id: session.user.id.uuidString)
                     isLoggedIn = true
                     wasLoggedIn = true
@@ -1250,6 +1274,11 @@ final class AuthViewModel: ObservableObject {
             )
             do {
                 let session = try await client.auth.session
+                // BugList #7 — Google OAuth via Supabase ASWebAuth also
+                // mints a session client-side (the redirectTo is the iOS
+                // verity:// scheme, not the web /api/auth/callback). Same
+                // gate-trip pattern as native SIWA above.
+                await cancelDeletionOnLogin(accessToken: session.accessToken)
                 await loadUser(id: session.user.id.uuidString)
                 isLoggedIn = true
             } catch {

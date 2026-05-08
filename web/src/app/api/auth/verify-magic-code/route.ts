@@ -29,6 +29,7 @@ import {
   runSignupBookkeeping,
   runReturningUserBookkeeping,
 } from '@/lib/auth/postLoginBookkeeping';
+import { enforceDeletedAccountGate } from '@/lib/auth/deletedAccountGate';
 
 const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 
@@ -165,9 +166,45 @@ export async function POST(request: NextRequest) {
 
   const { data: existing } = await service
     .from('users')
-    .select('id, username, onboarding_completed_at, email_verified')
+    .select(
+      'id, username, onboarding_completed_at, email_verified, deletion_completed_at, deletion_auth_purged_at'
+    )
     .eq('id', user.id)
     .maybeSingle();
+
+  // BugList #7 — anonymized account whose auth row survived a prior
+  // cron pass. Sign out, drop the credential, return generic OK so
+  // we don't reveal account state via the response shape.
+  if (existing) {
+    const verdict = await enforceDeletedAccountGate(service, {
+      id: existing.id,
+      deletion_completed_at: (existing as { deletion_completed_at: string | null }).deletion_completed_at,
+      deletion_auth_purged_at: (existing as { deletion_auth_purged_at: string | null }).deletion_auth_purged_at,
+    });
+    if (verdict.kind === 'deleted') {
+      try { await supabase.auth.signOut(); } catch (e) {
+        console.error('[verify-magic-code] deleted-gate signOut failed:', e);
+      }
+      // Same cookie-clear pattern as the gate-deny branch above —
+      // a partial signOut leaves the JWT chunks alive otherwise.
+      try {
+        const supabaseRef = (() => {
+          try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').hostname.split('.')[0]; }
+          catch { return ''; }
+        })();
+        if (supabaseRef) {
+          const cookieJarForClear = await cookies();
+          const base = `sb-${supabaseRef}-auth-token`;
+          cookieJarForClear.delete(base);
+          for (let i = 0; i < 5; i++) cookieJarForClear.delete(`${base}.${i}`);
+        }
+      } catch (e) {
+        console.error('[verify-magic-code] deleted-gate cookie-clear failed:', e);
+      }
+      await writeAuditRow(service, { email, reason: 'deleted_account', ipTruncated });
+      return genericOk();
+    }
+  }
 
   // Build the response that will carry the session cookie set by verifyOtp
   // (cookies() writes go through Next.js headers, not NextResponse.cookies,

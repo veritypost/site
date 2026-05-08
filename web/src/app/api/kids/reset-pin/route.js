@@ -74,7 +74,12 @@ export async function POST(request) {
       /* best-effort */
     }
 
-    await assertKidOwnership(kid_profile_id, { client: supabase, userId: user.id });
+    try {
+      await assertKidOwnership(kid_profile_id, { client: supabase, userId: user.id });
+    } catch {
+      // BugList #1 — helper now also rejects inactive/paused kids.
+      return NextResponse.json({ error: 'Kid profile not accessible' }, { status: 403 });
+    }
 
     const { error: updateError } = await supabase
       .from('kid_profiles')

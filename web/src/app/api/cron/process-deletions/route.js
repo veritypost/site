@@ -6,6 +6,7 @@ import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
 import { logCronHeartbeat } from '@/lib/cronHeartbeat';
 import { safeErrorResponse } from '@/lib/apiErrors';
+import { captureException } from '@/lib/observability';
 
 const CRON_NAME = 'process-deletions';
 
@@ -57,43 +58,86 @@ async function runInner() {
     });
   }
 
-  // Find rows that just completed anonymization and still need their
-  // auth.users credential dropped. The 25-hour window is generous
-  // enough to retry stragglers from the previous run.
+  // BugList #7 — query the unbounded backlog of anonymized rows whose
+  // auth credential is still alive (deletion_auth_purged_at IS NULL).
+  // The previous 25-hour window meant a single bad cron run stranded
+  // those rows forever; the partial index keeps this cheap. Cap at
+  // 1000/run for cron timeout safety; the query naturally drains as
+  // rows get stamped purged.
   let authDeleted = 0;
   let authFailed = 0;
-  if ((anonymizedCount ?? 0) > 0) {
-    const since = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
-    const { data: candidates, error: candErr } = await service
-      .from('users')
-      .select('id')
-      .not('deletion_completed_at', 'is', null)
-      .gte('deletion_completed_at', since)
-      .limit(1000);
-    if (candErr) {
-      console.error('[cron.process_deletions] candidate query', candErr);
-    } else if (candidates?.length) {
-      for (const row of candidates) {
-        try {
-          // `auth.admin.deleteUser` 404s for already-deleted rows,
-          // which is fine. Any other failure: log and continue.
-          const { error: delErr } = await service.auth.admin.deleteUser(row.id);
-          if (delErr) {
-            const msg = (delErr.message || '').toLowerCase();
-            if (msg.includes('user not found') || msg.includes('not_found')) {
-              // Already removed in a prior run — count as success.
-              authDeleted++;
-            } else {
-              authFailed++;
-              console.error('[cron.process_deletions] auth delete', row.id, delErr.message);
-            }
-          } else {
-            authDeleted++;
+  let authPaged = 0;
+  const { data: candidates, error: candErr } = await service
+    .from('users')
+    .select('id, deletion_auth_retry_count')
+    .not('deletion_completed_at', 'is', null)
+    .is('deletion_auth_purged_at', null)
+    .limit(1000);
+  if (candErr) {
+    console.error('[cron.process_deletions] candidate query', candErr);
+    await captureException(candErr, { cron: CRON_NAME, phase: 'candidate_query' });
+  } else if (candidates?.length) {
+    for (const row of candidates) {
+      const nowIso = new Date().toISOString();
+      try {
+        const { error: delErr } = await service.auth.admin.deleteUser(row.id);
+        // Prefer structured status; fall back to message-match for
+        // older SDK versions. Same fragility note as deletedAccountGate.ts.
+        const errStatus = delErr?.status;
+        const msg = (delErr?.message || '').toLowerCase();
+        const looksLikeAlreadyGone =
+          errStatus === 404 ||
+          msg.includes('user not found') ||
+          msg.includes('not_found') ||
+          msg.includes('not found');
+        if (!delErr || looksLikeAlreadyGone) {
+          // Conditional WHERE on _purged_at IS NULL — if a parallel
+          // login-time gate already stamped the column, don't write
+          // again (and especially don't reset retry_at).
+          const { error: upErr } = await service
+            .from('users')
+            .update({
+              deletion_auth_purged_at: nowIso,
+              deletion_auth_retry_at: nowIso,
+            })
+            .eq('id', row.id)
+            .is('deletion_auth_purged_at', null);
+          if (upErr) {
+            console.error('[cron.process_deletions] purge stamp failed', row.id, upErr.message);
           }
-        } catch (e) {
+          authDeleted++;
+        } else {
           authFailed++;
-          console.error('[cron.process_deletions] auth delete throw', row.id, e?.message);
+          await service.rpc('increment_deletion_auth_retry', { p_user_id: row.id });
+          const nextCount = (row.deletion_auth_retry_count ?? 0) + 1;
+          // Page on the 5th failure for a given row — surfaces an
+          // honest auth API regression (vs. transient outage that
+          // self-heals on the next nightly run).
+          if (nextCount >= 5) {
+            authPaged++;
+            await captureException(new Error(delErr.message || 'auth deleteUser failed'), {
+              cron: CRON_NAME,
+              user_id: row.id,
+              retry_count: nextCount,
+              phase: 'auth_delete',
+            });
+          }
+          console.error('[cron.process_deletions] auth delete', row.id, delErr.message);
         }
+      } catch (e) {
+        authFailed++;
+        await service.rpc('increment_deletion_auth_retry', { p_user_id: row.id });
+        const nextCount = (row.deletion_auth_retry_count ?? 0) + 1;
+        if (nextCount >= 5) {
+          authPaged++;
+          await captureException(e, {
+            cron: CRON_NAME,
+            user_id: row.id,
+            retry_count: nextCount,
+            phase: 'auth_delete_throw',
+          });
+        }
+        console.error('[cron.process_deletions] auth delete throw', row.id, e?.message);
       }
     }
   }
@@ -102,11 +146,13 @@ async function runInner() {
     anonymized_count: anonymizedCount,
     auth_rows_deleted: authDeleted,
     auth_rows_failed: authFailed,
+    auth_rows_paged: authPaged,
   });
   return NextResponse.json({
     anonymized_count: anonymizedCount,
     auth_rows_deleted: authDeleted,
     auth_rows_failed: authFailed,
+    auth_rows_paged: authPaged,
     ran_at: new Date().toISOString(),
   });
 }

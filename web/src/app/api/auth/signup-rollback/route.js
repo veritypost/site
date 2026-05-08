@@ -26,7 +26,7 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
-import jwt from 'jsonwebtoken';
+import { verifyBearerToken } from '@/lib/auth';
 
 export async function POST(request) {
   try {
@@ -45,28 +45,19 @@ export async function POST(request) {
     if (!token) {
       return NextResponse.json({ error: 'Bearer token required' }, { status: 401 });
     }
-    const jwtSecret = process.env.SUPABASE_JWT_SECRET;
-    if (!jwtSecret) {
-      console.error('[auth.signup_rollback] SUPABASE_JWT_SECRET not set');
-      return NextResponse.json({ error: 'Not configured' }, { status: 503 });
-    }
+    // BugList #9 — bearer here is a real Supabase access_token from the
+    // just-completed auth.signUp. The Supabase project issues ES256-
+    // signed tokens (asymmetric signing keys), so a bare HS256 verify
+    // would 401 every iOS/web rollback and leave orphan auth.users rows
+    // blocking the user's retry (the exact bug C17 was created to
+    // prevent). Use the alg-aware verifier from `lib/auth`, which
+    // applies the same aud + iss + alg-from-header checks this code
+    // used to do inline.
     let claims;
     try {
-      claims = jwt.verify(token, jwtSecret, { algorithms: ['HS256'] });
+      claims = await verifyBearerToken(token);
     } catch {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-    if (claims && typeof claims === 'object') {
-      if (claims.aud && claims.aud !== 'authenticated') {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-      }
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-      if (claims.iss && supabaseUrl) {
-        const expectedIss = `${supabaseUrl.replace(/\/+$/, '')}/auth/v1`;
-        if (claims.iss !== expectedIss) {
-          return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-        }
-      }
     }
     const sub = typeof claims?.sub === 'string' ? claims.sub : '';
     if (!sub || sub !== userId) {

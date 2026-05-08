@@ -12435,6 +12435,9 @@ export type Database = {
           created_at: string
           date_of_birth: string | null
           deleted_at: string | null
+          deletion_auth_purged_at: string | null
+          deletion_auth_retry_at: string | null
+          deletion_auth_retry_count: number
           deletion_completed_at: string | null
           deletion_reason: string | null
           deletion_requested_at: string | null
@@ -12546,6 +12549,9 @@ export type Database = {
           created_at?: string
           date_of_birth?: string | null
           deleted_at?: string | null
+          deletion_auth_purged_at?: string | null
+          deletion_auth_retry_at?: string | null
+          deletion_auth_retry_count?: number
           deletion_completed_at?: string | null
           deletion_reason?: string | null
           deletion_requested_at?: string | null
@@ -12657,6 +12663,9 @@ export type Database = {
           created_at?: string
           date_of_birth?: string | null
           deleted_at?: string | null
+          deletion_auth_purged_at?: string | null
+          deletion_auth_retry_at?: string | null
+          deletion_auth_retry_count?: number
           deletion_completed_at?: string | null
           deletion_reason?: string | null
           deletion_requested_at?: string | null
@@ -13775,6 +13784,7 @@ export type Database = {
         Args: { article_id: string }
         Returns: undefined
       }
+      increment_deletion_auth_retry: { Args: { p_user_id: string }; Returns: undefined }
       increment_view_count: { Args: { article_id: string }; Returns: undefined }
       invalidate_push_token: { Args: { p_token: string }; Returns: boolean }
       invalidate_user_push_token: {

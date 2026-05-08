@@ -4,6 +4,7 @@ import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
 import { logCronHeartbeat } from '@/lib/cronHeartbeat';
 import { reconcileCostReservation } from '@/lib/pipeline/cost-reservation';
+import { captureException } from '@/lib/observability';
 
 const CRON_NAME = 'reap-cost-reservations';
 
@@ -77,7 +78,16 @@ async function run(request: Request) {
         await reconcileCostReservation(row.pipeline_run_id);
         released += 1;
       } catch (rowErr) {
+        // BugList #6 — silent per-row failures used to mean a fully-
+        // broken batch returned 200 and the cron heartbeat went green.
+        // captureException surfaces them in Sentry per row so a
+        // multi-hour Anthropic/OpenAI outage doesn't accumulate
+        // orphaned reservations against the daily cap invisibly.
         console.error('[cron.reap-cost-reservations.reconcile]', row.pipeline_run_id, rowErr);
+        await captureException(rowErr, {
+          cron: CRON_NAME,
+          pipeline_run_id: row.pipeline_run_id,
+        });
       }
     }
   } catch (err) {

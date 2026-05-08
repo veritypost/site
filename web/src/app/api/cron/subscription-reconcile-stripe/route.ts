@@ -24,7 +24,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
 import { logCronHeartbeat } from '@/lib/cronHeartbeat';
-import { captureMessage } from '@/lib/observability';
+import { captureMessage, captureException } from '@/lib/observability';
 
 const CRON_NAME = 'subscription-reconcile-stripe';
 
@@ -128,7 +128,10 @@ async function handle() {
 
     for (const r of results) {
       if (r.status === 'rejected') {
+        // BugList #6 — Stripe outage used to look identical to
+        // "no drift" because the rejected promise was logged-only.
         console.error('[reconcile-stripe.row]', r.reason);
+        await captureException(r.reason, { cron: CRON_NAME, phase: 'fetch_stripe' });
         errors++;
         continue;
       }

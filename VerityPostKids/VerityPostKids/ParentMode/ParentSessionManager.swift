@@ -54,6 +54,12 @@ final class ParentSessionManager: ObservableObject {
     private var elevatedToken: String? = nil
     private var parentSessionId: String? = nil
     private var idleTimer: Task<Void, Never>? = nil
+    // BugList #4 — 30s heartbeat alongside idleTimer so the @Published
+    // `isElevated` flips to false (and SwiftUI bindings update) even
+    // if the one-shot Task.sleep gets starved by system throttling /
+    // clock jumps. idleTimer remains the precise expire signal; this
+    // is belt-and-suspenders for the UI layer.
+    private var heartbeat: Task<Void, Never>? = nil
 
     private var bgObserver: NSObjectProtocol?
     private var fgObserver: NSObjectProtocol?
@@ -221,15 +227,37 @@ final class ParentSessionManager: ObservableObject {
         self.expiresAt = expiresAt
         self.isElevated = true
         scheduleAutoExpiry(at: expiresAt)
+        scheduleHeartbeat()
     }
 
     private func purge() {
         idleTimer?.cancel()
         idleTimer = nil
+        heartbeat?.cancel()
+        heartbeat = nil
         elevatedToken = nil
         parentSessionId = nil
         expiresAt = nil
         if isElevated { isElevated = false }
+    }
+
+    /// 30s foreground heartbeat. idleTimer is the one-shot precise
+    /// signal; heartbeat catches the case where Task.sleep is starved
+    /// (system throttling, clock jump). Worst-case staleness: 30s.
+    /// Cancelled by purge(). Only schedules when expiresAt is set.
+    private func scheduleHeartbeat() {
+        heartbeat?.cancel()
+        guard expiresAt != nil else { return }
+        heartbeat = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 30 * 1_000_000_000)
+                guard let self, !Task.isCancelled else { return }
+                if let exp = self.expiresAt, exp < Date() {
+                    self.purge()
+                    return
+                }
+            }
+        }
     }
 
     /// Schedule a one-shot Task that flips isElevated → false at the

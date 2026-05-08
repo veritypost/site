@@ -6,6 +6,7 @@ import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
 import { logCronHeartbeat } from '@/lib/cronHeartbeat';
 import { callModel } from '@/lib/pipeline/call-model';
+import { captureException } from '@/lib/observability';
 
 const CRON_NAME = 'score-comments';
 
@@ -74,6 +75,16 @@ async function run(request: Request) {
     const runId = crypto.randomUUID();
     let scored = 0;
     let flagged = 0;
+    // BugList #6 follow-on — Sentry quota guard. An Anthropic outage
+    // could otherwise emit 50 (TICK_MAX_COMMENTS) × 12 ticks/hr × 24h
+    // = 14.4k events/day from this cron alone. Cap at 5/run.
+    const SENTRY_CAP = 5;
+    let sentryEmitted = 0;
+    const captureCapped = async (err: unknown, ctx: Record<string, unknown>) => {
+      if (sentryEmitted >= SENTRY_CAP) return;
+      sentryEmitted += 1;
+      await captureException(err, { ...ctx, suppressed_after: SENTRY_CAP });
+    };
 
     const MODERATION_SYSTEM =
       'You are a content moderation system. Respond ONLY with valid JSON and nothing else. Format: {"toxicity":0.0,"sentiment":"neutral","tag":"clean"} where toxicity is 0.0-1.0, sentiment is positive|neutral|negative, tag is spam|harassment|misinformation|graphic|clean.';
@@ -98,7 +109,11 @@ async function run(request: Request) {
         try {
           parsed = JSON.parse(res.text.trim());
         } catch (err) {
+          // BugList #6 — surface in Sentry; raw console-only meant a
+          // model returning malformed JSON across an outage window
+          // looked identical to "no comments to score."
           console.error('[score-comments] json-parse failed on comment', comment.id, err);
+          await captureCapped(err, { cron: CRON_NAME, comment_id: comment.id, phase: 'json_parse' });
           return;
         }
 
@@ -139,7 +154,11 @@ async function run(request: Request) {
           flagged++;
         }
       } catch (err) {
+        // BugList #6 — same reason as above. Bedrock/OpenAI outage
+        // visibility used to require a human to notice the queue
+        // wasn't draining.
         console.error('[score-comments] error on comment', comment.id, err);
+        await captureCapped(err, { cron: CRON_NAME, comment_id: comment.id, phase: 'score' });
         await (service
           .from('comments')
           .update({ ai_score_attempts: comment.ai_score_attempts + 1 } as never)

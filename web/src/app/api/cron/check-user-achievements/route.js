@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { verifyCronAuth } from '@/lib/cronAuth';
 import { withCronLog } from '@/lib/cronLog';
 import { logCronHeartbeat } from '@/lib/cronHeartbeat';
+import { captureException } from '@/lib/observability';
 
 const CRON_NAME = 'check-user-achievements';
 
@@ -64,6 +65,13 @@ async function run(request) {
     let awarded = 0;
     let failed = 0;
     let cursor = 0;
+    // BugList #6 follow-on — captureException quota guard. Cap Sentry
+    // events at 5/run so a Supabase RPC outage doesn't generate
+    // userIds.length events (~10k/run worst case). The 6th onward stays
+    // in console + the failed counter; suppressed_count is logged at
+    // 'end' so the heartbeat still reflects the true scope.
+    const SENTRY_CAP = 5;
+    let sentryEmitted = 0;
 
     async function worker() {
       while (true) {
@@ -77,16 +85,31 @@ async function run(request) {
         } catch (err) {
           failed += 1;
           console.error('[cron.check-achievements] user rpc failed:', userIds[idx], err);
+          if (sentryEmitted < SENTRY_CAP) {
+            sentryEmitted += 1;
+            await captureException(err, {
+              cron: CRON_NAME,
+              user_id: userIds[idx],
+              suppressed_after: SENTRY_CAP,
+            });
+          }
         }
       }
     }
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 
-    await logCronHeartbeat(CRON_NAME, 'end', { users: userIds.length, awarded, failed });
+    const sentrySuppressed = Math.max(0, failed - sentryEmitted);
+    await logCronHeartbeat(CRON_NAME, 'end', {
+      users: userIds.length,
+      awarded,
+      failed,
+      sentry_suppressed: sentrySuppressed,
+    });
     return NextResponse.json({
       users: userIds.length,
       awarded,
       failed,
+      sentry_suppressed: sentrySuppressed,
       ran_at: new Date().toISOString(),
     });
   } catch (err) {

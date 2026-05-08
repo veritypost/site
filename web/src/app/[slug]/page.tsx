@@ -387,9 +387,27 @@ export default async function ArticleSlugPage({
                 onClick={(e) => {
                   e.preventDefault();
                   window.location.href = `veritypostkids://story/${story.slug}`;
-                  if (process.env.NEXT_PUBLIC_KIDS_APP_URL) {
-                    setTimeout(() => { window.location.href = process.env.NEXT_PUBLIC_KIDS_APP_URL!; }, 800);
+                  // BugList #5 — parse + allowlist before navigating
+                  // off-domain. Without these, a typo'd or compromised
+                  // env value silently sends every kids-link click
+                  // wherever the bad value points. ALLOWED_HOSTS gates
+                  // schemes too: javascript:/data:/file: have empty
+                  // host strings and fall through.
+                  const raw = process.env.NEXT_PUBLIC_KIDS_APP_URL;
+                  if (!raw) return;
+                  let fallback: string;
+                  try {
+                    fallback = new URL(raw).href;
+                  } catch {
+                    console.error('[kids-link] NEXT_PUBLIC_KIDS_APP_URL is not a valid URL:', raw);
+                    return;
                   }
+                  const ALLOWED_HOSTS = new Set(['apps.apple.com', 'itunes.apple.com']);
+                  if (!ALLOWED_HOSTS.has(new URL(fallback).host)) {
+                    console.error('[kids-link] host not in allowlist:', fallback);
+                    return;
+                  }
+                  setTimeout(() => { window.location.href = fallback; }, 800);
                 }}
                 style={{
                   display: 'inline-block',

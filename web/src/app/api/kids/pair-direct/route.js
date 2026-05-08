@@ -56,6 +56,7 @@ import jwt from 'jsonwebtoken';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { isFlagEnabled } from '@/lib/featureFlags';
+import { verifyBearerToken } from '@/lib/auth';
 import { validateConsentPayload, COPPA_CONSENT_VERSION } from '@/lib/coppaConsent';
 
 // Same 24-hour TTL as /api/kids/pair (see T301 note there).
@@ -90,15 +91,15 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const jwtSecret = process.env.SUPABASE_JWT_SECRET;
-    if (!jwtSecret) {
-      console.error('[kids.pair-direct] missing SUPABASE_JWT_SECRET');
-      return NextResponse.json({ error: 'Server error' }, { status: 500 });
-    }
-
+    // BugList #9 — parent bearer here is a real Supabase access_token.
+    // The Supabase project issues ES256-signed JWTs (asymmetric signing
+    // keys), so a bare HS256 verify breaks every iOS Kids parent
+    // pairing. Use the shared alg-aware verifier from `lib/auth`,
+    // which handles HS256 (legacy + e2e) and ES256/RS256 (JWKS) and
+    // applies the same aud + iss checks.
     let decoded;
     try {
-      decoded = jwt.verify(bearerToken, jwtSecret);
+      decoded = await verifyBearerToken(bearerToken);
     } catch {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

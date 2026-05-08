@@ -81,7 +81,7 @@ struct CreateKidInKidsAppView: View {
     private static let dobFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = TimeZone(identifier: "UTC")!
+        f.timeZone = TimeZone(identifier: "UTC") ?? .current
         f.locale = Locale(identifier: "en_US_POSIX")
         return f
     }()

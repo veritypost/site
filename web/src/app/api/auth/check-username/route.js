@@ -49,7 +49,17 @@ async function resolveUsername(request) {
 }
 
 async function handle(request) {
-  const user = await getUser();
+  let user;
+  try {
+    user = await getUser();
+  } catch (err) {
+    // getUser throws a tagged 401 when verifyBearerToken rejects the token
+    // (signature / aud / iss / exp / unsupported alg). Surface it cleanly
+    // — the route is fail-closed: no user, no username check.
+    if (err && err.status === 401) return unauthenticated();
+    console.error('[auth.check-username] resolve user', err);
+    return NextResponse.json({ error: 'Lookup failed' }, { status: 500, headers: NO_STORE });
+  }
   if (!user) return unauthenticated();
 
   const raw = await resolveUsername(request);
@@ -57,22 +67,27 @@ async function handle(request) {
     return badRequest();
   }
 
-  const service = createServiceClient();
-
-  const policy = getRateLimitPolicy('AUTH_USERNAME_CHECK_PER_SESSION');
-  const hit = await checkRateLimit(service, {
-    key: `check_username:user:${user.id}`,
-    policyKey: 'auth_username_check_per_session',
-    ...policy,
-  });
-  if (hit.limited) {
-    return NextResponse.json(
-      { error: 'Too many attempts' },
-      { status: 429, headers: { ...NO_STORE, 'Retry-After': String(policy.windowSec) } }
-    );
-  }
-
+  // BugList #8 — wrap the rest of the handler. createServiceClient,
+  // getRateLimitPolicy, and checkRateLimit are all reachable from the
+  // matrix sweep's 8/8 5xx; a synchronous throw from any of them
+  // (missing SUPABASE_SERVICE_ROLE_KEY, malformed policy table, transient
+  // rate-limit DB hiccup) would otherwise bubble up as an empty 500.
   try {
+    const service = createServiceClient();
+
+    const policy = getRateLimitPolicy('AUTH_USERNAME_CHECK_PER_SESSION');
+    const hit = await checkRateLimit(service, {
+      key: `check_username:user:${user.id}`,
+      policyKey: 'auth_username_check_per_session',
+      ...policy,
+    });
+    if (hit.limited) {
+      return NextResponse.json(
+        { error: 'Too many attempts' },
+        { status: 429, headers: { ...NO_STORE, 'Retry-After': String(policy.windowSec) } }
+      );
+    }
+
     const [{ data: reservedRow }, { data: takenRow }] = await Promise.all([
       service.from('reserved_usernames').select('username').eq('username', raw).maybeSingle(),
       service.from('users').select('id').eq('username', raw).maybeSingle(),

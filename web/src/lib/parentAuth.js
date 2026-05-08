@@ -53,6 +53,12 @@ const TIER3_LOCK_ISO = '9999-12-31T23:59:59.000Z';
 // claims from BOTH top-level and app_metadata for forward-compat with the
 // post-Q3b Supabase-issuer shape.
 //
+// BugList #9 note — HS256 is intentional. Kid tokens are server-minted
+// with SUPABASE_JWT_SECRET; they are NOT Supabase-issued access tokens.
+// Do NOT use this helper to verify a parent SIWA bearer — that's a real
+// Supabase access_token (ES256 in production) and must go through
+// `verifyBearerToken` in lib/auth.
+//
 // Returns { parentUserId, kidProfileId } on success, null on any failure.
 // Never throws — caller decides the response code.
 export function verifyKidToken(token) {

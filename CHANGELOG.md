@@ -6,6 +6,32 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### BugList sweep — final 7 + 2 launch-blockers shipped (plan→review→fix→adversary per item)
+
+Owner-directed workflow: each item gets its own group of agents
+(plan → review → fix → adversary). 7 BugList items closed plus 3
+adversary-found extensions and 2 launch-blockers (#8 / #9).
+
+**#1 — kid-profile ownership consistency.** New `assertKidOwnership` helper at `web/src/lib/kids.js` rejects when kid is missing, owned by someone else, soft-deleted (`is_active=false`), or paused. Wrapped routes: `api/stories/read`, `api/kids/set-pin`, `api/kids/reset-pin`, plus `api/kids/[id]/streak-freeze` (added after adversary surfaced the missed call site).
+
+**#3 — UTC timezone fallback.** Replaced two `TimeZone(identifier: "UTC")!` force-unwraps with `?? .current` at `VerityPost/.../SettingsView.swift:3769` and `VerityPostKids/.../CreateKidInKidsAppView.swift:84`. Code-hygiene win against the no-force-unwrap policy; adversary confirmed no other crash sites in either iOS target.
+
+**#4 — parent session heartbeat.** Added 30s `heartbeat` Task<Void, Never> alongside the one-shot `idleTimer` in `VerityPostKids/.../ParentSessionManager.swift`. `idleTimer` remains the precise expire signal; heartbeat catches the case where `Task.sleep` is starved by system throttling / clock jumps. Cancelled by `purge()`. Adversary found one latent fragility (ordering in `apply`) — non-shipping, noted only.
+
+**#5 — kids deeplink fallback hardening.** `web/src/app/[slug]/page.tsx` now parses `NEXT_PUBLIC_KIDS_APP_URL` with `new URL()` and validates the host against `{apps.apple.com, itunes.apple.com}` before the setTimeout fallback fires. Userinfo / port / IDN tricks all blocked by URL parsing semantics.
+
+**#6 — cron silent-failure surfaces.** Added `captureException` from `@/lib/observability` to per-row catches in 4 crons: `reap-cost-reservations`, `dob-correction-cooldown`, `score-comments`, `subscription-reconcile-stripe`. Adversary surfaced 5 same-class extensions; closed `check-user-achievements` (highest volume — 10k user/day RPC loop) and added a per-run `SENTRY_CAP=5` guard to both `check-user-achievements` and `score-comments` so an Anthropic / Supabase outage can't generate 14k Sentry events/day. Suppressed-count logged at heartbeat 'end'.
+
+**#7 — login-time deleted-account gate.** Anonymized accounts (`deletion_completed_at IS NOT NULL`) whose `auth.users` credential survived a prior cron pass could still mint sessions. Fix: new shared helper `web/src/lib/auth/deletedAccountGate.ts` does best-effort `auth.admin.deleteUser` + stamps `deletion_auth_purged_at` (or increments retry counter). Wired into `api/auth/callback`, `api/auth/verify-magic-code`, `api/account/login-cancel-deletion`. Migration: 3 new columns on `public.users` + partial index + `increment_deletion_auth_retry(uuid)` SECURITY DEFINER RPC. `process-deletions` cron rewritten — query unbounded by `deletion_auth_purged_at IS NULL`, captureException at retry_count >= 5, conditional WHERE on stamp UPDATE. iOS: `AuthViewModel.cancelDeletionOnLogin` now signs out on 401. Adversary surfaced critical iOS bypasses — native SIWA, Google OAuth, and magic-link deep-links all mint sessions client-side without touching the gate routes; closed all three (`completeAppleSignIn`, `signInWithGoogle`, `handleDeepLink` non-recovery branch). Adversary also flagged message-substring `'user not found'` matching as unsafe-direction fragility (would permanently strand auth rows if Supabase reworded the error); switched to `errStatus === 404` primary check in both `deletedAccountGate.ts` and `process-deletions/route.js`.
+
+**#10 — expert thread-chains RLS.** Migration applied: `GRANT SELECT TO authenticated` + `participants read thread chains` policy (USING `asker_user_id = auth.uid() OR expert_user_id = auth.uid()`). Adversary confirmed RLS is enabled, no NULL-id bypass, write paths are SECURITY DEFINER RPC-only, and clarified that the fix benefits iOS only (`StoryDetailView.swift:3739` uses user JWT) since the web read path goes through service-role and was never RLS-blocked.
+
+**#8 — `/api/auth/check-username` 500-vs-401.** Working tree already had the JWKS verifier + getUser try/catch wrap from a prior session. Added defense-in-depth wrap covering `createServiceClient`, `getRateLimitPolicy`, and `checkRateLimit` — anything previously throwing outside the inner try/catch (missing `SUPABASE_SERVICE_ROLE_KEY`, malformed policy, transient rate-limit DB hiccup) now returns 500 with the `Lookup failed` shape rather than an empty 5xx.
+
+**#9 — `verifyBearerToken` HS256 → ES256/RS256 launch-blocker.** Working tree already had the alg-aware verifier in `lib/auth.js` (HS256 via SUPABASE_JWT_SECRET, ES256/RS256 via JWKS keyed on `kid` header, 10-min cache, aud + iss checks, tagged 401 errors). Made `verifyBearerToken` an exported function returning the decoded payload. Migrated `api/kids/pair-direct/route.js` from `jwt.verify(bearerToken, jwtSecret)` to `await verifyBearerToken(bearerToken)` — that route's parent bearer is a real Supabase access_token and was the launch-blocker for iOS Kids parent pairing. Adversary surfaced one more launch-critical site missed in the round: `api/auth/signup-rollback/route.js` (bearer is a real access_token from the just-completed `auth.signUp`); migrated to the same shared verifier. Added clarifying HS256-is-intentional comments to `api/kids/quiz/[id]/route.ts` (kid pair JWT, server-minted) and `lib/parentAuth.js` (kid + elevated-parent tokens, server-minted).
+
+**Cross-platform coverage:** every change spans web + iOS main + iOS kids. iOS main: AuthViewModel SIWA/Google/deep-link gate hooks, SettingsView UTC fallback. iOS Kids: ParentSessionManager heartbeat, CreateKidInKidsAppView UTC fallback. Web: 16+ files across api routes, lib helpers, types, migrations.
+
 ### Kid soft-pause — pause/unpause now takes effect in seconds
 **Files:** see breakdown.
 

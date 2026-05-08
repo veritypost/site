@@ -19,56 +19,99 @@ async function resolveClient(client) {
 // `auth.getUser()` against the GoTrue REST API, which performs server-side
 // signature verification — but that round-trip happens later in the flow,
 // after the client has already been instantiated and (in some paths) used to
-// add the bearer to outbound headers. Verifying locally with the project's
-// JWT secret rejects forged / expired tokens at the boundary, gives us a
-// crisp throw → 401 in `requireAuth`, and avoids one network round-trip on
-// hostile traffic. NOT a replacement for the GoTrue verification — it runs
-// in addition to it.
+// add the bearer to outbound headers. Verifying locally rejects forged /
+// expired tokens at the boundary, gives us a crisp throw → 401 in
+// `requireAuth`, and avoids one network round-trip on hostile traffic. NOT a
+// replacement for the GoTrue verification — it runs in addition to it.
 //
-// Validates: signature (HS256 against SUPABASE_JWT_SECRET), `aud=authenticated`
-// when claim present, `iss` is the Supabase auth URL when claim present,
-// and the standard `exp`/`nbf` time bounds (jsonwebtoken handles these).
-function verifyBearerToken(token) {
-  // Lazy-require so missing env / module never breaks unrelated paths.
-  // jsonwebtoken is already in package.json deps.
+// Algorithms: ES256/RS256 verified via JWKS (Supabase's asymmetric signing
+// keys, default for new projects since 2025); HS256 verified against
+// SUPABASE_JWT_SECRET (legacy + e2e fixtures). Algorithm chosen by the token's
+// own `alg` header — we don't accept tokens whose claimed alg disagrees with
+// the verification path.
+//
+// Validates: signature, `aud=authenticated` when claim present, `iss` is the
+// Supabase auth URL when claim present, and the standard `exp`/`nbf` time
+// bounds (jsonwebtoken handles these).
+let _jwksClientSingleton = null;
+function getJwksClient() {
+  if (_jwksClientSingleton) return _jwksClientSingleton;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
+  const { JwksClient } = require('jwks-rsa');
+  _jwksClientSingleton = new JwksClient({
+    jwksUri: `${supabaseUrl.replace(/\/+$/, '')}/auth/v1/.well-known/jwks.json`,
+    cache: true,
+    cacheMaxEntries: 10,
+    cacheMaxAge: 10 * 60 * 1000, // 10 min — matches Supabase's recommended TTL
+    rateLimit: true,
+    jwksRequestsPerMinute: 30,
+    timeout: 5_000,
+  });
+  return _jwksClientSingleton;
+}
+
+function authError(detail) {
+  const err = new Error('UNAUTHENTICATED');
+  err.status = 401;
+  err.detail = detail;
+  return err;
+}
+
+// Exported for routes that verify a Supabase access_token directly
+// outside of `getUser`/`requireAuth` (e.g. /api/kids/pair-direct,
+// where the parent's SIWA bearer is verified before kid-pairing
+// happens — there's no resolved-user step at that layer). Returns
+// the decoded payload on success, throws a 401-tagged Error on any
+// failure. Same alg-switch + aud/iss semantics as the internal callers.
+export async function verifyBearerToken(token) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
   const jwt = require('jsonwebtoken');
-  const secret = process.env.SUPABASE_JWT_SECRET;
-  if (!secret) {
-    // No secret configured — surface as auth failure so we never silently
-    // accept an unverified bearer. Throw cleanly so requireAuth -> 401.
-    const err = new Error('UNAUTHENTICATED');
-    err.status = 401;
-    err.detail = 'SUPABASE_JWT_SECRET not configured';
-    throw err;
+
+  // Inspect the token's own header to pick the verification path.
+  const decodedHeader = jwt.decode(token, { complete: true });
+  if (!decodedHeader || typeof decodedHeader !== 'object' || !decodedHeader.header) {
+    throw authError('malformed jwt');
   }
+  const alg = decodedHeader.header.alg;
+  const kid = decodedHeader.header.kid;
+
   let decoded;
   try {
-    decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });
+    if (alg === 'HS256') {
+      const secret = process.env.SUPABASE_JWT_SECRET;
+      if (!secret) throw authError('SUPABASE_JWT_SECRET not configured');
+      decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });
+    } else if (alg === 'ES256' || alg === 'RS256') {
+      if (!kid) throw authError('missing kid for asymmetric token');
+      const client = getJwksClient();
+      if (!client) throw authError('NEXT_PUBLIC_SUPABASE_URL not configured');
+      const signingKey = await client.getSigningKey(kid);
+      const publicKey = signingKey.getPublicKey();
+      decoded = jwt.verify(token, publicKey, { algorithms: [alg] });
+    } else {
+      throw authError(`unsupported alg=${alg}`);
+    }
   } catch (e) {
-    const err = new Error('UNAUTHENTICATED');
-    err.status = 401;
-    err.detail = e?.message || 'jwt verify failed';
-    throw err;
+    // Already-tagged authError → re-throw as-is. Anything else → wrap as 401.
+    if (e && e.status === 401) throw e;
+    throw authError(e?.message || 'jwt verify failed');
   }
+
   if (decoded && typeof decoded === 'object') {
     if (decoded.aud && decoded.aud !== 'authenticated') {
-      const err = new Error('UNAUTHENTICATED');
-      err.status = 401;
-      err.detail = `unexpected aud=${decoded.aud}`;
-      throw err;
+      throw authError(`unexpected aud=${decoded.aud}`);
     }
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
     if (decoded.iss && supabaseUrl) {
       const expectedIss = `${supabaseUrl.replace(/\/+$/, '')}/auth/v1`;
       if (decoded.iss !== expectedIss) {
-        const err = new Error('UNAUTHENTICATED');
-        err.status = 401;
-        err.detail = `unexpected iss=${decoded.iss}`;
-        throw err;
+        throw authError(`unexpected iss=${decoded.iss}`);
       }
     }
   }
+  return decoded;
 }
 
 async function resolveAuthedClient(client) {
@@ -85,7 +128,7 @@ async function resolveAuthedClient(client) {
         // T203 — verify signature/aud/iss BEFORE passing the bearer to the
         // Supabase client. Throws on invalid → propagates to requireAuth's
         // catch path → clean 401.
-        verifyBearerToken(token);
+        await verifyBearerToken(token);
         const mod = await import('./supabase/server');
         return mod.createClientFromToken(token);
       }

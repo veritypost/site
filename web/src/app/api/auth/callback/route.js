@@ -11,6 +11,7 @@ import {
   runSignupBookkeeping,
   runReturningUserBookkeeping,
 } from '@/lib/auth/postLoginBookkeeping';
+import { enforceDeletedAccountGate } from '@/lib/auth/deletedAccountGate';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -38,9 +39,31 @@ export async function GET(request) {
 
     const { data: existing } = await supabase
       .from('users')
-      .select('id, username, onboarding_completed_at, email_verified')
+      .select(
+        'id, username, onboarding_completed_at, email_verified, deletion_completed_at, deletion_auth_purged_at'
+      )
       .eq('id', user.id)
       .maybeSingle();
+
+    // BugList #7 — anonymized account whose auth credential survived
+    // the previous cron pass. Best-effort drop the credential, sign
+    // out, and route to the deleted-account surface. Safe to do
+    // before runReturningUserBookkeeping because that helper would
+    // otherwise re-stamp last_login_at and call cancel_account_deletion
+    // on a row that's already past the grace window.
+    if (existing) {
+      const verdict = await enforceDeletedAccountGate(createServiceClient(), {
+        id: existing.id,
+        deletion_completed_at: existing.deletion_completed_at,
+        deletion_auth_purged_at: existing.deletion_auth_purged_at,
+      });
+      if (verdict.kind === 'deleted') {
+        try { await supabase.auth.signOut(); } catch (e) {
+          console.error('[callback] deleted-gate signOut failed:', e);
+        }
+        return NextResponse.redirect(`${siteUrl}/login?error=account_deleted`);
+      }
+    }
 
     if (!existing) {
       // Closed-beta gate for new OAuth signups. The session was already
