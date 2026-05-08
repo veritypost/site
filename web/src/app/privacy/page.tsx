@@ -199,11 +199,15 @@ export default function PrivacyPage() {
               <strong>California residents</strong> have additional rights under the CCPA / CPRA,
               including the right to know what personal information we collect, the right to delete
               it, the right to correct inaccuracies, and the right to opt out of any sale or sharing
-              of personal information. Verity Post does not sell or share personal information for
-              cross-context behavioral advertising; we use Google Analytics and Google AdSense for
-              limited purposes which may be deemed &quot;sharing&quot; under California law. To
-              exercise your rights — including the right to opt out — email legal@veritypost.com
-              with the subject line <em>California Privacy Request</em>. We respond within 45 days.
+              of personal information.
+            </li>
+            <li id="do-not-sell">
+              <strong>Do Not Sell or Share My Personal Information.</strong> Verity Post does not
+              sell or share personal information for cross-context behavioral advertising; we use
+              Google Analytics and Google AdSense for limited purposes which may be deemed
+              &quot;sharing&quot; under California law. To exercise your rights — including the
+              right to opt out — email legal@veritypost.com with the subject line{' '}
+              <em>California Privacy Request</em>. We respond within 45 days.
             </li>
             <li>EU residents are protected under GDPR.</li>
             <li>

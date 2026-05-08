@@ -142,7 +142,7 @@ const SHOW_TOP_BAR = true; // "verity post" wordmark
 // per-route gate below still suppresses it on home, story, auth, admin,
 // and ideas pages so reading + auth + chrome-owning surfaces stay clean.
 const SHOW_BOTTOM_NAV = true; // Home / Notifications / Most Informed / Profile
-const SHOW_FOOTER = true; // Help / Contact / Privacy / Terms / etc.
+const SHOW_FOOTER = true; // Legal/compliance strip only — Privacy / Terms / DMCA / etc.
 
 // Auth / onboarding routes that run fullscreen without any global chrome.
 // Separate from '/' — home now shows the top bar + footer (no bottom nav),
@@ -182,7 +182,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // and broke Next's internal navigation hooks.
   const path = usePathname() || '/';
   const [mounted, setMounted] = useState<boolean>(false);
-  const [unreadCount, setUnreadCount] = useState<number>(0);
   const [canSeeAdmin, setCanSeeAdmin] = useState<boolean>(false);
   // `search.basic` gates the magnifying-glass icon in the top bar. The
   // icon sits next to the wordmark — single discoverable entry point to
@@ -291,39 +290,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  useEffect(() => {
-    if (!loggedIn) {
-      setUnreadCount(0);
-      return;
-    }
-    let cancelled = false;
-    async function poll() {
-      try {
-        const res = await fetch('/api/notifications?unread=1&limit=1');
-        if (!res.ok) return;
-        const raw: unknown = await res.json().catch(() => ({}));
-        // T155 — runtime guard: malformed responses (non-object or
-        // missing numeric `unread_count`) reset the badge to 0 rather
-        // than coercing an unknown shape through `data.unread_count`.
-        const unreadCount =
-          raw &&
-          typeof raw === 'object' &&
-          typeof (raw as { unread_count?: unknown }).unread_count === 'number'
-            ? (raw as { unread_count: number }).unread_count
-            : 0;
-        if (!cancelled) setUnreadCount(unreadCount);
-      } catch (e) {
-        console.error('[nav] notifications poll', e);
-      }
-    }
-    poll();
-    const id = setInterval(poll, 60_000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [loggedIn]);
-
   // Chrome visibility gates. Three surfaces, three rules:
   //   showTopBar  — "verity post" wordmark only. Shown on home AND on all
   //                 standard content pages. Hidden on auth, admin, ideas
@@ -378,7 +344,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   const navItems: NavItem[] = loggedIn
     ? [
         { label: 'Home', href: '/' },
-        { label: 'Saved', href: '/bookmarks' },
+        { label: 'Following', href: '/following' },
         { label: 'Profile', href: '/profile' },
       ]
     : [
@@ -506,35 +472,23 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               }}
             >
               {[
-                // Product surfaces — discovery + conversion entry points.
-                { label: 'About', href: '/about' },
-                { label: 'How it works', href: '/how-it-works' },
-                { label: 'Pricing', href: '/pricing' },
-                // Trust-transparency surfaces (S7-F1 / S7-F2). Required
-                // for AdSense + Apple reviewer signals.
-                { label: 'Editorial standards', href: '/editorial-standards' },
-                { label: 'Corrections', href: '/corrections' },
-                // Support — exposed in BOTH anon and authed states. The
-                // /help page is registered with App Store Connect as the
-                // Support URL; Apple reviewers signed into a test account
-                // need to reach it.
-                { label: 'Help', href: '/help' },
-                { label: 'Contact', href: '/contact' },
-                // Legal + privacy strip.
+                // Legal + compliance strip only. Each item is required by
+                // law (GDPR / CCPA / COPPA / ePrivacy / DMCA safe harbor)
+                // or by an industry-standard accessibility commitment.
+                // Non-legal surfaces (About, How it works, Pricing, Help,
+                // Editorial standards, Corrections, Contact) are reachable
+                // through the About page and direct URLs.
                 { label: 'Privacy', href: '/privacy' },
                 { label: 'Kids Privacy', href: '/privacy/kids' },
-                { label: 'Your California Privacy Rights', href: '/privacy#california' },
-                // CCPA "Do Not Sell" link — required by CCPA when
-                // AdSense rolls out. Routes to the privacy page anchor;
-                // the toggle itself lives in /profile/settings (S8).
+                { label: 'California Privacy', href: '/privacy#california' },
                 {
                   label: 'Do Not Sell or Share My Personal Information',
                   href: '/privacy#do-not-sell',
                 },
                 { label: 'Terms', href: '/terms' },
                 { label: 'Cookies', href: '/cookies' },
-                { label: 'Accessibility', href: '/accessibility' },
                 { label: 'DMCA', href: '/dmca' },
+                { label: 'Accessibility', href: '/accessibility' },
               ].map((link) => (
                 <a
                   key={link.label}
@@ -619,29 +573,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             {topBarActive && <HomeSectionsMenu />}
-            {/* Alerts — text-only top-bar link to the notifications inbox.
-                Dim by default, shifts to accent color when there's unread.
-                No icon, no badge dot — color shift is the entire signal.
-                Hidden on the /notifications page itself to avoid self-link
-                noise. */}
-            {authLoaded && loggedIn && path !== '/notifications' && (
-              <a
-                href="/notifications"
-                aria-label={unreadCount > 0 ? `Alerts, ${unreadCount} unread` : 'Alerts'}
-                style={{
-                  fontSize: 13,
-                  fontWeight: unreadCount > 0 ? 700 : 500,
-                  color: unreadCount > 0 ? C.accent : C.dim,
-                  textDecoration: 'none',
-                  padding: '4px 8px',
-                  minHeight: 44,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                }}
-              >
-                Alerts
-              </a>
-            )}
             {/* Anon-only top-bar entrance. Quiet, type-link only — same scale
                 as the wordmark, no closed-beta scarcity language. The /login
                 page itself surfaces both the OTP form and the invite/access
@@ -676,7 +607,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               readers announce which route is current. */}
           {navItems.map((item) => {
             const active = path === item.href || (item.href !== '/' && path.startsWith(item.href));
-            const showDot = item.href === '/notifications' && unreadCount > 0;
             return (
               <a
                 key={item.href}
@@ -697,20 +627,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 }}
               >
                 {item.label}
-                {showDot && (
-                  <span
-                    aria-label={`${unreadCount} unread`}
-                    style={{
-                      position: 'absolute',
-                      top: 4,
-                      right: 8,
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      background: 'var(--danger)',
-                    }}
-                  />
-                )}
               </a>
             );
           })}

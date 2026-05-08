@@ -98,6 +98,44 @@ export default function AboutPage() {
           </ul>
         </Section>
 
+        <Section title="More">
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: '20px',
+              fontSize: '14px',
+              color: '#111111',
+              lineHeight: '1.8',
+            }}
+          >
+            <li>
+              <Link href="/how-it-works" style={linkStyle}>
+                How it works
+              </Link>
+            </li>
+            <li>
+              <Link href="/pricing" style={linkStyle}>
+                Pricing
+              </Link>
+            </li>
+            <li>
+              <Link href="/help" style={linkStyle}>
+                Help &amp; support
+              </Link>
+            </li>
+            <li>
+              <Link href="/editorial-standards" style={linkStyle}>
+                Editorial standards
+              </Link>
+            </li>
+            <li>
+              <Link href="/corrections" style={linkStyle}>
+                Corrections
+              </Link>
+            </li>
+          </ul>
+        </Section>
+
         <Section title="Policies">
           <ul
             style={{

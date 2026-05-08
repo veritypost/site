@@ -6,6 +6,39 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### Owner cleanup — second batch shipped (2, 4, 10, 11)
+**Files:** see breakdown per item.
+
+Continuing the page-by-page cleanup pass from `/owner cleanup.md`. Medium bucket: Claude implements + post-impl adversary; one round of fixups after the adversary surfaced two blockers.
+
+**Item 2 — Alerts removed; Saved → Following rename + URL change to `/following`.**
+- Web nav: `web/src/app/NavWrapper.tsx` — Alerts top-bar link block deleted (along with the now-unused `unreadCount` state, the polling effect, and the bottom-nav unread-dot rendering). Bottom-nav `Saved → /bookmarks` flipped to `Following → /following`.
+- Web routes: `/notifications` directory deleted entirely; `/bookmarks` → `/following` rename via `git mv`. The pre-existing launch-hidden `/following/page.tsx` ("Active Stories") stays — it's the closer concept match for what owner wants out of "following stories." 301 redirects added in `web/next.config.js`: `/bookmarks → /following` and `/notifications → /` (catches stale push payloads + shared deep links).
+- Web ancillary: `web/src/middleware.js` PROTECTED_PREFIXES + KNOWN_NON_ARTICLE_PATHS swapped `/bookmarks → /following`, dropped `/notifications`. `web/src/app/robots.js` swapped `/bookmarks → /following`, dropped `/notifications`.
+- iOS: `AlertsView.swift` deleted. `ContentView.swift` MainTabView label "Saved" → "Following" (the tab id was already `.following` internally — only the label was wrong). `ProfileView.swift` quickActionChip + quickLink labels flipped from "Saved" to "Following," icon swapped to `heart.fill`. The Alerts quickLink in profile "My stuff" deleted.
+- The `BookmarksView` Swift class name is intentionally unchanged — owner direction was URL + label rename only; component-name cleanup is a separate concern.
+- `/api/bookmarks` API endpoints + `bookmarks` table stay as the data layer. The "saved articles" UI is retired; data + API remain dormant for any future re-expose. Same pattern as the helpful_count column from the previous batch.
+
+**Item 4 — Timeline right-rail restored on web ≥1180px.**
+- `web/src/app/globals.css` — added `@media (min-width: 1180px)` block setting `[data-reader-body]` to CSS Grid `minmax(0, 1fr) 300px` with 32px gap, max-width 1080px. Timeline panel becomes a sticky right rail at `top: calc(var(--vp-top-bar-h, 56px) + 24px)` with `align-self: start` + bounded `max-height` + scroll on the rail itself (so sticky doesn't silently die when ancestor overflow rules change).
+- The previously-mobile-only tab-strip block widened from `@media (max-width: 1023px)` to `@media (max-width: 1179px)` so the tabbed UI covers the awkward 1024–1179 zone (where 25% of viewport collapses below ~280px and timeline entries truncate ugly per the Q4 panel's rationale).
+- TODO-38 comment header rewritten — "the timeline now flows below the article" was no longer true.
+- iOS already shows timeline as a tab; kids has no timeline. Web-only by nature.
+
+**Item 10 — 404 redesign (web only).**
+- `web/src/app/not-found.js` — reduced to a single CTA pointing at the home route, copy flipped to "Nothing here. Probably nothing important." Old "out of date / moved or removed" framing + "Browse categories" second button retired.
+- `web/src/app/[slug]/not-found.tsx` — same shape, slug-context copy: "Couldn't find that one. Maybe it never happened."
+- iOS + kids 404s explicitly out of scope this round (owner direction). Filed as separate items.
+
+**Item 11 — Footer trim to legal-only.**
+- `web/src/app/NavWrapper.tsx` footer cut from 14 links + 1 button to 8 legal/compliance links + the Cookie preferences button: Privacy · Kids Privacy · California Privacy · Do Not Sell or Share My Personal Information · Terms · Cookies · DMCA · Accessibility. Each item is required by GDPR / CCPA / COPPA / ePrivacy / DMCA safe harbor or is an industry-standard accessibility commitment.
+- The non-legal items (About / How it works / Pricing / Editorial standards / Corrections / Help / Contact) relocated. About is reachable directly via header on signed-out flows + `/about` URL. How it works / Pricing / Help / Editorial standards / Corrections added as a "More" section to the About page (`web/src/app/about/page.tsx`). Apple's App Store Connect Support URL (`/help`) stays reachable via the About page.
+- `/privacy#do-not-sell` anchor was missing — added `id="do-not-sell"` on the relevant section in `web/src/app/privacy/page.tsx` (split the California-rights bullet into its own Do-Not-Sell section so the anchor lands cleanly).
+
+Adversary pass after impl found 2 blockers — both fixed before this commit:
+1. The `git mv web/src/app/bookmarks web/src/app/following` placed the bookmarks content as a *nested* `/following/bookmarks/` route because `/following/` already existed (launch-hidden Active Stories page). Resolution: deleted the nested bookmarks dir; the existing `/following/page.tsx` is the destination.
+2. Footer linked to `/privacy#do-not-sell` but no matching anchor existed in the privacy page. Resolution: anchor added.
+
 ### Owner cleanup — first 5 items shipped (1, 3, 5, 8, 9)
 **Files:** see breakdown per item.
 

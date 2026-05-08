@@ -60,6 +60,23 @@ const nextConfig = {
         destination: '/?cat=:slug',
         permanent: true,
       },
+      // Owner cleanup item 2 — bookmarks concept retired in favour of
+      // "following stories" (subscribe to a story timeline). 301 so any
+      // existing browser bookmarks, share-sheet links, or installed iOS
+      // builds with hardcoded URLs land on the new surface.
+      {
+        source: '/bookmarks',
+        destination: '/following',
+        permanent: true,
+      },
+      // Owner cleanup item 2 — `/notifications` page retired (locked
+      // decision: notifications stay security-only, no rich inbox).
+      // 301 catches any stale push payloads and shared deep links.
+      {
+        source: '/notifications',
+        destination: '/',
+        permanent: true,
+      },
     ];
   },
   async headers() {

@@ -479,7 +479,7 @@ struct TextTabBar: View {
         if isLoggedIn {
             return [
                 Item(id: .today,     label: "Home"),
-                Item(id: .following, label: "Saved"),
+                Item(id: .following, label: "Following"),
                 Item(id: .profile,   label: "Profile"),
             ]
         }

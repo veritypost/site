@@ -508,7 +508,7 @@ struct ProfileView: View {
             NavigationLink {
                 BookmarksView().environmentObject(auth)
             } label: {
-                quickActionChip(icon: "bookmark.fill", label: "Saved")
+                quickActionChip(icon: "heart.fill", label: "Following")
             }
             .buttonStyle(.plain)
             .simultaneousGesture(TapGesture().onEnded {
@@ -873,15 +873,11 @@ struct ProfileView: View {
             }
 
             // My stuff — quick-link list. All entries are perm-gated.
-            // Alerts and Rankings live here now that the Notifications and
-            // Most Informed tabs were replaced by Browse and Following
-            // (Wave 4 / Slice 03 IA).
+            // Rankings lives here now that the Notifications and Most
+            // Informed tabs were replaced by Browse and Following.
             VStack(alignment: .leading, spacing: 10) {
                 sectionTitle("My stuff")
                 VStack(spacing: 8) {
-                    quickLink(label: "Alerts",
-                              description: "Breaking news and reply notifications",
-                              destination: AnyView(AlertsView().environmentObject(auth)))
                     quickLink(label: "Rankings",
                               description: "See the most informed readers",
                               destination: AnyView(LeaderboardView().environmentObject(auth)))
@@ -890,8 +886,8 @@ struct ProfileView: View {
                                   description: "Your direct conversations",
                                   destination: AnyView(MessagesView().environmentObject(auth)))
                     }
-                    quickLink(label: "Saved",
-                              description: "Articles you've saved to read",
+                    quickLink(label: "Following",
+                              description: "Story timelines you follow",
                               destination: AnyView(BookmarksView().environmentObject(auth)))
                     if canViewFamily {
                         quickLink(label: "Kids",

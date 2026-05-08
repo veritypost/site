@@ -33,7 +33,7 @@ import { incrementAnonRead } from '@/lib/anonReadCounter';
 const PROTECTED_PREFIXES = [
   '/profile',
   '/messages',
-  '/bookmarks',
+  '/following',
   '/recap',
   '/expert-queue',
   '/billing',
@@ -482,13 +482,13 @@ export async function middleware(request) {
 
   // Anon read counter — increment for article pages only
   const KNOWN_NON_ARTICLE_PATHS = new Set([
-    '/', '/search', '/leaderboard', '/notifications', '/login',
+    '/', '/search', '/leaderboard', '/login',
     '/signup', '/logout', '/welcome', '/beta-locked', '/request-access',
     '/about', '/pricing', '/how-it-works', '/contact', '/help', '/accessibility',
     '/privacy', '/terms', '/cookies', '/dmca', '/corrections',
     '/editorial-standards', '/methodology', '/kids-app', '/preview',
     '/following', '/appeal', '/expert-queue', '/recap', '/billing',
-    '/messages', '/bookmarks',
+    '/messages',
   ]);
   const pathParts = pathname.split('/').filter(Boolean);
   const isLikelyArticlePath =

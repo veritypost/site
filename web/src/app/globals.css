@@ -576,11 +576,13 @@ body {
    a hydration text-content mismatch on the static template literal
    (T222 precedent). Selectors are scoped to [data-reader-*] which
    only appears inside that component. */
-/* Desktop reader layout — single column. The 75/25 split + sticky
-   right rail was killed (TODO-38) because the article body capped at
-   680px inside a 75% column left a wide page off-center. Sources moved
-   inline into the body (TODO-3); the timeline now flows below the
-   article instead of a side rail. Mobile tab UI is preserved below. */
+/* Desktop reader layout. Default is single column (mobile + tablet
+   + 1024–1179 range covered by the @media (max-width: 1179px) block
+   below — that range keeps the tabbed UI). Owner cleanup item 4
+   (2026-05-08) restored the right-rail layout for desktop ≥1180px:
+   article + sticky timeline rail in a CSS Grid. The 1180 cutoff dodges
+   the awkward 1024–1179 zone where 25% of viewport collapses below
+   ~280px and timeline entries truncate ugly. */
 /* Article body content typography. Targets the server-sanitized HTML
    inside [data-article-body]: paragraph rhythm, pull-quote treatment
    for <blockquote>, editorial link underlines, section heading scale.
@@ -667,7 +669,36 @@ body {
 }
 [data-reader-panel="timeline"] > section:first-child { margin-top: 0; }
 
-@media (max-width: 1023px) {
+/* Desktop ≥1180px — restore the right-rail layout (owner cleanup item 4).
+   Article body keeps a measure-protected ~680px content column; the
+   timeline becomes a sticky 300px right rail. The 1180 cutoff dodges the
+   awkward 1024–1179 range where 25% of viewport collapses below ~280px
+   and timeline entries truncate ugly — that range stays on the tabbed UI
+   (handled below). Sticky engages only after the article header clears
+   the viewport via `top: var(--vp-top-bar-h, 56px)`. align-self: start +
+   max-height + overflow-y: auto on the rail itself (not the grid cell)
+   so sticky doesn't silently die when ancestor overflow rules change. */
+@media (min-width: 1180px) {
+  [data-reader-body] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    column-gap: 32px;
+    max-width: 1080px;
+    padding: 0 40px;
+  }
+  [data-reader-main] { min-width: 0; }
+  [data-reader-panel="timeline"] {
+    margin-top: 0;
+    position: sticky;
+    top: calc(var(--vp-top-bar-h, 56px) + 24px);
+    align-self: start;
+    max-height: calc(100vh - var(--vp-top-bar-h, 56px) - 24px);
+    overflow-y: auto;
+  }
+  [data-reader-panel="timeline"] > section:first-child { margin-top: 0; }
+}
+
+@media (max-width: 1179px) {
   [data-reader-tabstrip] {
     display: flex;
     gap: 4px;
