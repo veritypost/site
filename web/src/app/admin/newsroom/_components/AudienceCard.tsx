@@ -86,6 +86,8 @@ function AudienceCard(props: AudienceCardProps) {
   const [articleSlug] = useState<string | null>(initialArticleSlug);
   const [articleTitle] = useState<string | null>(initialArticleTitle);
   const [articleStatus, setArticleStatus] = useState<'draft' | 'published' | 'archived' | null>(null);
+  const [plagiarismStatus, setPlagiarismStatus] = useState<string | null>(null);
+  const [needsManualReview, setNeedsManualReview] = useState<boolean>(false);
   const [errorType, setErrorType] = useState<string | null>(initialErrorType);
   const [errorStep, setErrorStep] = useState<string | null>(initialErrorStep);
   const [currentStep, setCurrentStep] = useState<string | null>(null);
@@ -152,12 +154,19 @@ function AudienceCard(props: AudienceCardProps) {
       const res = await fetch(`/api/admin/articles/${id}`);
       if (!res.ok) return;
       const json = (await res.json().catch(() => null)) as
-        | { article?: { status?: string } }
+        | { article?: { status?: string; plagiarism_status?: string | null; needs_manual_review?: boolean } }
         | null;
       const next = json?.article?.status;
       if (next === 'draft' || next === 'published' || next === 'archived') {
         setArticleStatus(next);
       }
+      // Trust signals — set by the article-gen pipeline at completion.
+      // plagiarism_status takes 'ok' | 'rewritten' | 'rewrite_kept_original'
+      // | 'rewrite_failed'; needs_manual_review goes true on soft-degrade
+      // or sanitizer failure. Surfacing both inline so the operator sees
+      // quality status without opening the article.
+      setPlagiarismStatus(json?.article?.plagiarism_status ?? null);
+      setNeedsManualReview(!!json?.article?.needs_manual_review);
     } catch {
       // ignore
     }
@@ -343,6 +352,50 @@ function AudienceCard(props: AudienceCardProps) {
 
       {actionError && (
         <div style={{ fontSize: F.xs, color: C.danger }}>{actionError}</div>
+      )}
+
+      {/* Trust signals — only render when there's something to flag. The
+          pipeline writes plagiarism_status ('ok' | 'rewritten' |
+          'rewrite_kept_original' | 'rewrite_failed') and
+          needs_manual_review on every generated article; surfacing them
+          inline so the operator sees quality status without opening the
+          article. Editorial meta family (11/600/0.1em uppercase) — text
+          only, no icons / emojis. Empty-good = render nothing.        */}
+      {state === 'generated' && (needsManualReview || (plagiarismStatus && plagiarismStatus !== 'ok')) && (
+        <div style={{ display: 'flex', gap: S[2], flexWrap: 'wrap' }}>
+          {needsManualReview && (
+            <span style={{
+              fontSize: 11, fontWeight: 600, letterSpacing: '0.1em',
+              textTransform: 'uppercase', color: C.warn ?? C.danger,
+            }}>
+              Needs review
+            </span>
+          )}
+          {plagiarismStatus === 'rewritten' && (
+            <span style={{
+              fontSize: 11, fontWeight: 600, letterSpacing: '0.1em',
+              textTransform: 'uppercase', color: C.dim,
+            }}>
+              Rewritten
+            </span>
+          )}
+          {plagiarismStatus === 'rewrite_kept_original' && (
+            <span style={{
+              fontSize: 11, fontWeight: 600, letterSpacing: '0.1em',
+              textTransform: 'uppercase', color: C.danger,
+            }}>
+              Original kept · review
+            </span>
+          )}
+          {plagiarismStatus === 'rewrite_failed' && (
+            <span style={{
+              fontSize: 11, fontWeight: 600, letterSpacing: '0.1em',
+              textTransform: 'uppercase', color: C.danger,
+            }}>
+              Rewrite failed
+            </span>
+          )}
+        </div>
       )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: S[1], marginTop: 'auto' }}>

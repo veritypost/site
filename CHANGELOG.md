@@ -6,6 +6,12 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### TODO 51 Part B — cost hint on model picker + trust signals on AudienceCard
+**Files:** `web/src/lib/newsroomModels.ts`, `web/src/app/admin/newsroom/page.tsx`, `web/src/app/admin/newsroom/_components/AudienceCard.tsx`. Closes 2 of the 8 TODO 51 Part B architectural items in tandem.
+- **Cost hint** — `MODEL_OPTIONS` got a `costPerArticle` field per entry (~$0.05 GPT-4o Mini → ~$10 Claude Opus 4.7), reflecting the all-in cost of a 12-step editorial chain. Select label now reads "Claude Opus 4.7 · ~$10/article" so the 100× delta is visible before the operator clicks Generate. Native `<option>` `title` attribute carries the same string for keyboard nav and tooltip.
+- **Trust signals** — `AudienceCard.fetchArticleStatus` extended to read `plagiarism_status` + `needs_manual_review` from `/api/admin/articles/[id]`. Success state renders an inline pill row (11/600/0.1em uppercase, editorial meta family, text-only — no icons / emojis) with up to one of: **Needs review** (warn), **Rewritten** (dim, neutral), **Original kept · review** (danger), **Rewrite failed** (danger). Empty-good = no pills (no badge spam when all signals are clean).
+- Cross-platform: web admin only. iOS / iOS Kids n/a (no admin newsroom).
+
 ### Editorial typography family — 16-round visual polish pass across the product
 **Files:** every page-shell + section component on web (article, home, profile, leaderboard, messages, search, pricing, login/signup) — see commits below for the per-surface diffs. Pure visual; no schema, no behavior, no chrome additions.
 - **The shipped family:** Page H1s 28–44px / 600 / -0.02em / 1.1–1.15. Body 18px / 1.7 / antialiased + kern + liga. Card-list titles 17px Source Serif 4 / 500 / -0.01em / 1.3. Editorial meta family (byline, eyebrows, timestamps, section labels): 11px / 600 / 0.1em uppercase muted-ink. Comment body 16/1.7. Comment author 14/600/-0.005em. Action chips 12/500-inactive/600-active/pill 20px/32-min-height. Button family 14/600/10r with -0.005em. Reading progress ribbon 2px ink. **Restraint rule: weight 700 and 800 banished — 600 is the heaviest active state.** **Color rule: accent-blue is reserved for the Alerts top-bar slot only**; editorial chrome stays in ink + ink-muted + dim. Card chrome borderRadius 10–12, no heavy shadows.

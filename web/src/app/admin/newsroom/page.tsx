@@ -232,10 +232,16 @@ function DiscoveryTab({ onPanel }: { onPanel: (p: PanelId) => void }) {
             value={String(selectedModelIdx)}
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedModelIdx(Number(e.target.value))}
             block={false}
-            style={{ minWidth: 180, minHeight: 40 }}
+            style={{ minWidth: 220, minHeight: 40 }}
           >
             {MODEL_OPTIONS.map((opt, i) => (
-              <option key={opt.model} value={i}>{opt.label}</option>
+              // Cost in label + native title tooltip so the figure reads
+              // both in the closed picker (operator never forgets) and
+              // in the dropdown list. Native <option> can't be richly
+              // styled, so we lean on the text itself.
+              <option key={opt.model} value={i} title={`${opt.label} — ${opt.costPerArticle}/article`}>
+                {opt.label} · {opt.costPerArticle}/article
+              </option>
             ))}
           </Select>
         </div>
