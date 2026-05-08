@@ -20,12 +20,14 @@ const SECTION_STYLE: React.CSSProperties = {
 };
 
 const HEADING_STYLE: React.CSSProperties = {
-  fontSize: 13,
+  // Aligned to the editorial meta family — matches byline, Sources
+  // heading, NextStoryFooter, mobile reader tab strip.
+  fontSize: 11,
   fontWeight: 600,
-  letterSpacing: '0.06em',
+  letterSpacing: '0.1em',
   textTransform: 'uppercase' as const,
   color: 'var(--p-ink-muted)',
-  margin: '0 0 20px',
+  margin: '0 0 24px',
 };
 
 const SPINE_STYLE: React.CSSProperties = {
@@ -76,23 +78,30 @@ const CONTENT_STYLE: React.CSSProperties = {
 };
 
 const LABEL_STYLE: React.CSSProperties = {
-  fontSize: 14,
-  lineHeight: 1.4,
+  // Serif for timeline labels — each event reads as a small headline.
+  // 14px sans -> 15px Source Serif 4 with -0.005em tracking, 1.35
+  // line-height. Same family as the article body.
+  fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
+  fontSize: 15,
+  lineHeight: 1.35,
+  letterSpacing: '-0.005em',
   color: 'var(--p-ink)',
   margin: '0 0 4px',
 };
 
 const NOW_BADGE_STYLE: React.CSSProperties = {
+  // Weight 700 -> 600, ink color instead of accent. Same restraint
+  // pass: editorial badges shouldn't shout. Tighter padding.
   display: 'inline-block',
   fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: '0.08em',
+  fontWeight: 600,
+  letterSpacing: '0.1em',
   textTransform: 'uppercase' as const,
-  color: 'var(--p-accent)',
-  border: '1px solid var(--p-accent)',
-  padding: '1px 5px',
+  color: 'var(--p-ink)',
+  border: '1px solid var(--p-ink)',
+  padding: '1px 6px',
   borderRadius: 4,
-  marginBottom: 5,
+  marginBottom: 6,
 };
 
 interface TimelineSectionProps {

@@ -766,33 +766,43 @@ export default function CommentComposer({
 }
 
 const containerStyle: CSSProperties = {
+  // Drop the 0 1px 6px box-shadow — the shadow made the composer
+  // look like a floating dialog instead of inline editorial chrome.
+  // Border alone is enough definition. Padding bumped from 14/16 to
+  // 16/20 for breathing room between the cursor and the border.
   border: '1px solid var(--border, #e5e5e5)',
-  borderRadius: 12,
-  padding: '14px 16px',
+  borderRadius: 10,
+  padding: '16px 20px',
   background: 'var(--bg, #fff)',
   marginBottom: 16,
-  boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
 };
 const replyContainerStyle: CSSProperties = {
   border: '1px solid var(--border, #e5e5e5)',
   borderRadius: 10,
-  padding: '14px 16px',
+  padding: '16px 20px',
   background: 'var(--card, #f7f7f7)',
   marginBottom: 12,
   marginTop: 8,
 };
 const editorStyle: CSSProperties = {
+  // 14/1.6 -> 15/1.7. Closer to the comment body's 16/1.7 — what you
+  // type matches what you'll see published. Antialiased + kern/liga
+  // for crisp serif rendering of inline emphasis.
   width: '100%',
   minHeight: 72,
   background: 'transparent',
   color: 'var(--text-primary, #111)',
-  fontSize: 14,
-  lineHeight: 1.6,
+  fontSize: 15,
+  lineHeight: 1.7,
   padding: '4px 0',
   outline: 'none',
   fontFamily: 'inherit',
   wordBreak: 'break-word',
   whiteSpace: 'pre-wrap',
+  WebkitFontSmoothing: 'antialiased',
+  MozOsxFontSmoothing: 'grayscale',
+  textRendering: 'optimizeLegibility',
+  fontFeatureSettings: '"kern" 1, "liga" 1',
 };
 const footerStyle: CSSProperties = {
   display: 'flex',
@@ -812,12 +822,15 @@ const cancelBtnStyle: CSSProperties = {
   cursor: 'pointer',
 };
 const postBtnStyle: CSSProperties = {
-  padding: '7px 16px',
-  borderRadius: 9,
+  // Weight 700 -> 600 — same restraint pass applied across the page.
+  // 700 reads as marketing CTA; 600 reads as editorial action.
+  padding: '8px 18px',
+  borderRadius: 8,
   border: 'none',
   color: '#fff',
   fontSize: 13,
-  fontWeight: 700,
+  fontWeight: 600,
+  letterSpacing: '0.005em',
 };
 const mentionDropdownStyle: CSSProperties = {
   background: '#fff',
