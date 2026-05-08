@@ -759,6 +759,13 @@ struct StoryDetailView: View {
             .padding(.top, 16)
             .padding(.bottom, 24)
 
+            // Ad — wired 2026-05-08. Same article positions as the web
+            // [slug]/page.tsx: article_header (here, between byline and
+            // body), article_in_body (after the body), article_end (just
+            // before the engagement CTA). Each slot self-hides on no-fill.
+            HomeAdSlot(placement: "article_header", page: "article", articleId: story.id)
+                .padding(.bottom, 16)
+
             if canViewBody {
                 if let content = story.content, !content.isEmpty {
                     let paras = content.split(whereSeparator: \.isNewline).map(String.init).filter { !$0.isEmpty }
@@ -772,6 +779,8 @@ struct StoryDetailView: View {
                                 .padding(.horizontal, 20)
                         }
                     }
+                    HomeAdSlot(placement: "article_in_body", page: "article", articleId: story.id)
+                        .padding(.top, 24)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 10) {
@@ -797,6 +806,9 @@ struct StoryDetailView: View {
             }
 
             if canViewSources && !sources.isEmpty { sourcePillsSection.padding(.top, 20) }
+
+            HomeAdSlot(placement: "article_end", page: "article", articleId: story.id)
+                .padding(.top, 24)
 
             // Quiz Gate Brand — make the moat visible at the end of every
             // article. Spec/12_QUIZ_GATE_BRAND.md: "always visible" CTA

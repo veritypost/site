@@ -6,6 +6,17 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### TODO 45 — iOS ads wired end-to-end (home + article)
+**Files:** `VerityPost/VerityPost/HomeFeedSlots.swift` (rewrite), `HomeView.swift`, `StoryDetailView.swift`. Closes TODO 45. Audit-driven plan from a fresh agent verified against the live `serve_ad` RPC + impression/click endpoints.
+- **AdPayload rewritten.** Old shape decoded a flat `{id, title, body, click_url}` from the response root; the API actually returns `{ ad_unit: {...} | null }` wrapping the row. New `AdServeResponse` + `AdPayload` decodes the 9 columns the `serve_ad` RPC emits (`id`, `placement_id`, `ad_format`, `creative_url`, `creative_html`, `click_url`, `alt_text`, `cta_text`, `advertiser_name`). Optional RPC columns (`campaign_id`, `ad_network`, `ad_network_unit_id`, `reduced`) safely ignored.
+- **Impression + click bodies fixed.** Old code POSTed `{ad_id, placement}` to both endpoints — both wrong. Impression now sends `{ ad_unit_id, placement_id, page, position, session_id, article_id? }` (matches `/api/ads/impression`'s required UUID fields). Click captures the impression's returned `impression_id` and POSTs `{ impression_id }` (matches `/api/ads/click`).
+- **Per-launch session id.** New `AdSession.id = UUID().uuidString`; mirrors the EventsClient pattern. Threaded through serve and impression so frequency caps + reporting work.
+- **HomeAdSlot now takes `placement` + `page` + optional `articleId`** (was hardcoded to `placement=home_feed`, a placement that doesn't exist in `ad_placements`). Self-hides on no-fill or any failure so a broken ad never breaks the surface.
+- **HomeView wired** at four positions, mirroring the web feed: `home_top` after hero, `home_in_feed_1` after supporting card index 3 (4th card), `home_in_feed_2` after index 7 (8th card), `home_below_fold` after the supporting list.
+- **StoryDetailView wired** at three positions, mirroring `[slug]/page.tsx`: `article_header` between byline and body, `article_in_body` immediately after the body, `article_end` before the pass-to-comment CTA. Each slot passes `articleId: story.id` so server-side category-targeting works.
+- **All 7 placement names verified in `ad_placements`** via MCP before wiring.
+- iOS Kids: not applicable.
+
 ### TODO 39 — iOS tag-row parity ports the web pattern
 **File:** `VerityPost/VerityPost/StoryDetailView.swift`. Closes the iOS half of TODO 39 (web shipped 2026-05-07, commit `dd73c1ec`).
 - Replaced the old `+ Tag` opens-picker UX in `commentTagChipsRow` with the always-visible heart + three inline pills: `helpful` is a heart-icon button (unicode ♥/♡, matches the web rendering exactly) at the front of the row, followed by `context` / `cite_needed` / `off_topic` as always-visible pill chips. No opener, no picker, no two-step reveal.

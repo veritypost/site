@@ -177,13 +177,6 @@ These are shipped and on Vercel but you haven't confirmed them on production yet
 
 Web mobile is the product standard. These items bring iOS in line.
 
-- 45: **Ads on iOS** — `HomeAdSlot` struct exists in `HomeFeedSlots.swift` but decodes the wrong response shape (missing fields) and is not wired into `HomeView.swift`. Article page has zero ad slots. Complexity: M.
-  - Fix `AdPayload` decode in `HomeFeedSlots.swift` to match the `/api/ads/serve` response shape (check `web/src/app/api/ads/serve/route.ts` for exact fields)
-  - Wire `HomeAdSlot` into `HomeView.swift` at the same positions as web: after the hero card (`home_top`), between cards 4–5 (`home_in_feed_1`), between cards 8–9 (`home_in_feed_2`), and below the last card (`home_below_fold`)
-  - Add article-level ad slots in `StoryDetailView.swift` — check web `[slug]/page.tsx` for placement positions
-  - Register impressions via `/api/ads/impression` and clicks via `/api/ads/click`
-  - iOS Kids: not applicable
-
 - 47: **Advanced search filters on iOS** — `FindView.swift` is keyword-only. Web `/search` supports category, date range, and source publisher filters for `search.advanced` users. Complexity: M.
   - Add a filter panel / sheet to `FindView.swift` with category picker, date range picker, source field — gated by `search.advanced` permission
   - The existing `/api/search` route already accepts the filter params (same API web uses)

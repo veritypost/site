@@ -171,6 +171,11 @@ struct HomeView: View {
                         } else {
                             if let hero = stories.first {
                                 heroBlock(hero)
+                                // Ads — wired 2026-05-08. Same positions as the
+                                // web feed: home_top after hero; home_in_feed_1
+                                // / _2 between cards; home_below_fold below the
+                                // last card. Slot self-hides on no-fill.
+                                HomeAdSlot(placement: "home_top", page: "home")
                             }
 
                             let supporting = Array(stories.dropFirst())
@@ -185,9 +190,19 @@ struct HomeView: View {
                                                 .padding(.horizontal, 20)
                                         }
                                         .buttonStyle(.plain)
+                                        if idx == 3 {
+                                            HomeAdSlot(placement: "home_in_feed_1", page: "home")
+                                                .padding(.top, 24)
+                                        }
+                                        if idx == 7 {
+                                            HomeAdSlot(placement: "home_in_feed_2", page: "home")
+                                                .padding(.top, 24)
+                                        }
                                     }
                                 }
                                 .padding(.top, 40)
+                                HomeAdSlot(placement: "home_below_fold", page: "home")
+                                    .padding(.top, 16)
                             }
 
                             NavigationLink {
