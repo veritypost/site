@@ -307,9 +307,9 @@ export function ProfileApp({ defaultSection }: Props) {
       id: 'bookmarks',
       glyph: '◧',
       group: 'Library',
-      title: 'Following',
-      reason: "Stories you're following.",
-      keywords: ['following', 'saved', 'reading list'],
+      title: 'Saved',
+      reason: "Articles you've saved to read.",
+      keywords: ['saved', 'reading list', 'bookmarks', 'library', 'following'],
       render: () => <BookmarksSection preview={false} />,
     },
     {

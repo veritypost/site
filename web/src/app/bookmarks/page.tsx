@@ -245,7 +245,7 @@ export default function BookmarksPage() {
 
     const toastId = show(
       <span>
-        Removed from Following{' '}
+        Removed from Saved{' '}
         <button
           onClick={() => {
             dismiss(toastId);
@@ -457,7 +457,7 @@ export default function BookmarksPage() {
           }}
         >
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
-            Following ·{' '}
+            Saved ·{' '}
             {/* M14 — when a collection filter is active, show
                 "<filtered> of <total>" so the count matches the visible
                 rows; "<total>" alone hid empty/sparse collections. */}

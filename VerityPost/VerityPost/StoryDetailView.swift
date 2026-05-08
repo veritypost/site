@@ -432,7 +432,7 @@ struct StoryDetailView: View {
                 Button {
                     Task { await attemptBookmark() }
                 } label: {
-                    Text(isBookmarked ? "Following" : "Follow")
+                    Text(isBookmarked ? "Saved" : "Save")
                         .font(.system(.footnote, design: .default, weight: .semibold))
                         .foregroundColor(isBookmarked ? VP.accent : VP.text)
                 }

@@ -284,8 +284,8 @@ struct MainTabView: View {
                         BookmarksView()
                     } else {
                         SignInGate(
-                            feature: "Follow articles",
-                            detail: "Sign up to follow articles and pick up where you left off."
+                            feature: "Save articles",
+                            detail: "Sign up to save articles and pick up where you left off."
                         )
                     }
                 }
@@ -479,7 +479,7 @@ struct TextTabBar: View {
         if isLoggedIn {
             return [
                 Item(id: .today,     label: "Home"),
-                Item(id: .following, label: "Following"),
+                Item(id: .following, label: "Saved"),
                 Item(id: .profile,   label: "Profile"),
             ]
         }

@@ -296,17 +296,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       setUnreadCount(0);
       return;
     }
-    // The bottom nav previously had a /notifications slot that this
-    // poll badged. Slot was removed when notifications moved into the
-    // Profile rail; the poll kept running and hitting /api/notifications
-    // every 60s with nowhere to surface the count. Gate on the nav
-    // actually containing a /notifications item so the machinery stays
-    // dormant until / unless the slot returns — avoids the wasted
-    // network call without deleting the wiring.
-    if (!navItems.some((item) => item.href === '/notifications')) {
-      setUnreadCount(0);
-      return;
-    }
     let cancelled = false;
     async function poll() {
       try {
@@ -389,7 +378,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   const navItems: NavItem[] = loggedIn
     ? [
         { label: 'Home', href: '/' },
-        { label: 'Following', href: '/bookmarks' },
+        { label: 'Saved', href: '/bookmarks' },
         { label: 'Profile', href: '/profile' },
       ]
     : [
@@ -630,6 +619,29 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             {topBarActive && <HomeSectionsMenu />}
+            {/* Alerts — text-only top-bar link to the notifications inbox.
+                Dim by default, shifts to accent color when there's unread.
+                No icon, no badge dot — color shift is the entire signal.
+                Hidden on the /notifications page itself to avoid self-link
+                noise. */}
+            {authLoaded && loggedIn && path !== '/notifications' && (
+              <a
+                href="/notifications"
+                aria-label={unreadCount > 0 ? `Alerts, ${unreadCount} unread` : 'Alerts'}
+                style={{
+                  fontSize: 13,
+                  fontWeight: unreadCount > 0 ? 700 : 500,
+                  color: unreadCount > 0 ? C.accent : C.dim,
+                  textDecoration: 'none',
+                  padding: '4px 8px',
+                  minHeight: 44,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                Alerts
+              </a>
+            )}
             {/* Anon-only top-bar entrance. Quiet, type-link only — same scale
                 as the wordmark, no closed-beta scarcity language. The /login
                 page itself surfaces both the OTP form and the invite/access
