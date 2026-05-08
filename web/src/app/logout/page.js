@@ -24,19 +24,62 @@ export default function LogoutPage() {
   const [status, setStatus] = useState('signing_out'); // signing_out | done | error
   const [recentReads, setRecentReads] = useState([]);
   const [retrying, setRetrying] = useState(false);
+  const [errorCountdown, setErrorCountdown] = useState(null); // null when inactive
   const hasLoggedOut = useRef(false);
+  const redirectTimerRef = useRef(null);
+  const countdownIntervalRef = useRef(null);
+
+  // Centralized timer cleanup — used by StrictMode cleanup, retry, and
+  // manual link clicks. Always safe to call; clears whichever ref is set.
+  const cancelAutoRedirect = () => {
+    if (redirectTimerRef.current) {
+      clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = null;
+    }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setErrorCountdown(null);
+  };
 
   // T101 — once the signout succeeds, fire a delayed redirect to home
   // so the user doesn't end up sitting on a dead-end page. The manual
   // "Sign back in" / "Go to homepage" links remain — clicking either
-  // before the timer fires opts out of the auto-redirect. Only `done`
-  // triggers; `error` keeps the user on the page so they can retry.
+  // before the timer fires opts out of the auto-redirect.
   useEffect(() => {
     if (status !== 'done') return;
     const t = setTimeout(() => {
       router.push('/');
     }, 1500);
-    return () => clearTimeout(t);
+    redirectTimerRef.current = t;
+    return () => {
+      clearTimeout(t);
+      if (redirectTimerRef.current === t) redirectTimerRef.current = null;
+    };
+  }, [status, router]);
+
+  // On `error`, also auto-redirect (4s) so the user isn't stranded if
+  // the signout endpoint is unreachable. StrictMode-safe: refs track
+  // both the timeout and the per-second countdown interval; cleanup
+  // clears both. Manual buttons/links call cancelAutoRedirect().
+  useEffect(() => {
+    if (status !== 'error') return;
+    setErrorCountdown(4);
+    const interval = setInterval(() => {
+      setErrorCountdown((n) => (typeof n === 'number' && n > 1 ? n - 1 : n));
+    }, 1000);
+    const timeout = setTimeout(() => {
+      router.push('/');
+    }, 4000);
+    countdownIntervalRef.current = interval;
+    redirectTimerRef.current = timeout;
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+      if (redirectTimerRef.current === timeout) redirectTimerRef.current = null;
+      if (countdownIntervalRef.current === interval) countdownIntervalRef.current = null;
+    };
   }, [status, router]);
 
   const doLogout = async () => {
@@ -79,8 +122,33 @@ export default function LogoutPage() {
     }
   }, []);
 
+  // If the user backgrounds the tab while the error countdown is running,
+  // Chromium throttles `setInterval` so the visible "Redirecting in Ns…"
+  // counter freezes — but `setTimeout(redirect, 4000)` still fires when its
+  // wall-clock budget elapses. Returning to a frozen page that then suddenly
+  // navigates is disorienting. On hide, cancel both timers and leave the
+  // static error state in place; the user comes back to "what's the state?"
+  // and chooses Retry / a manual link rather than getting auto-bounced.
+  // Lifecycle is intentionally independent of the countdown effect so the
+  // listener stays attached across status transitions.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        cancelAutoRedirect();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, []);
+
   const handleRetry = async () => {
     if (retrying) return;
+    // Cancel both the redirect timeout and countdown interval before
+    // attempting another signout — otherwise the page can navigate away
+    // mid-retry.
+    cancelAutoRedirect();
     setRetrying(true);
     await doLogout();
     setRetrying(false);
@@ -137,6 +205,25 @@ export default function LogoutPage() {
           {status === 'error' &&
             "We couldn't reach our server, but this device has been signed out. Try again if you want to make sure everywhere else is signed out too."}
         </p>
+
+        {status === 'error' && errorCountdown !== null && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              backgroundColor: C.bg,
+              border: `1px solid ${C.border}`,
+              borderRadius: 10,
+              padding: '10px 12px',
+              marginBottom: 12,
+              fontSize: 13,
+              color: C.dim,
+              textAlign: 'center',
+            }}
+          >
+            Redirecting to home in {errorCountdown}s&hellip;
+          </div>
+        )}
 
         {status === 'error' && (
           <button
@@ -212,6 +299,7 @@ export default function LogoutPage() {
 
         <a
           href="/login"
+          onClick={cancelAutoRedirect}
           onMouseEnter={() => setHovered('signin')}
           onMouseLeave={() => setHovered(null)}
           style={{
@@ -238,6 +326,7 @@ export default function LogoutPage() {
 
         <a
           href="/"
+          onClick={cancelAutoRedirect}
           onMouseEnter={() => setHovered('home')}
           onMouseLeave={() => setHovered(null)}
           style={{
