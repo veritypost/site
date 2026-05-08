@@ -25,6 +25,7 @@
 
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import jwt from 'jsonwebtoken';
 
 export async function POST(request) {
@@ -73,6 +74,26 @@ export async function POST(request) {
     }
 
     const service = createServiceClient();
+
+    // Per-IP rate limit. Rollback fires once per failed signup in
+    // legitimate flows; 10/hour/IP catches token-replay loops without
+    // blocking real users behind the same NAT. Per-user axis is
+    // intentionally absent: Supabase access-token TTL is 1h, so
+    // per-user 3/hr collapses to "3 per token lifetime" which is
+    // redundant with the IP cap.
+    const ip = await getClientIp();
+    const rl = await checkRateLimit(service, {
+      key: `signup_rollback_ip:${ip}`,
+      policyKey: 'signup_rollback_ip',
+      max: 10,
+      windowSec: 3600,
+    });
+    if (rl.limited) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(rl.windowSec ?? 3600) } }
+      );
+    }
 
     // Safety rail: refuse to roll back if the account has any child
     // activity (comments, bookmarks, quiz attempts, etc). Signup

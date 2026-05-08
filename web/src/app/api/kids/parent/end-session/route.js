@@ -22,7 +22,7 @@
 
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { getClientIp } from '@/lib/rateLimit';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import {
   verifyElevatedParentToken,
   isElevatedSessionLive,
@@ -53,6 +53,23 @@ export async function POST(request) {
       // Idempotent on the user-visible side, but emit a distinct error
       // code so the client can short-circuit its own "ending session" UI.
       return NextResponse.json({ error: 'session_revoked' }, { status: 401 });
+    }
+
+    // Per-parent rate limit. iOS calls this on the "Done in parent
+    // mode" tap AND on app background, so back-and-forth toggling can
+    // burst legitimately. 30/min covers normal use; tighter caps would
+    // trip on routine foreground/background cycles.
+    const rl = await checkRateLimit(svc, {
+      key: `kids_end_session:${parentUserId}`,
+      policyKey: 'kids_end_session',
+      max: 30,
+      windowSec: 60,
+    });
+    if (rl.limited) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: { 'Retry-After': String(rl.windowSec ?? 60) } }
+      );
     }
 
     const { error: writeErr } = await svc
