@@ -22,6 +22,7 @@ import type { Tables } from '@/types/database-helpers';
 import { Z } from '@/lib/zIndex';
 import { BRAND_NAME, BRAND_LEGAL_ENTITY } from '../lib/brand';
 import ThemeToggle from '../components/ThemeToggle';
+import Avatar from '../components/Avatar';
 import HomeSectionsMenu from './_HomeSectionsMenu';
 
 type ProfileRow = Pick<
@@ -177,6 +178,15 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   const [loggedIn, setLoggedIn] = useState<boolean>(false);
   const [user, setUser] = useState<ProfileRow | null>(null);
   const [authLoaded, setAuthLoaded] = useState<boolean>(false);
+  // Desktop ≥768px hides the bottom nav: top bar already surfaces
+  // home, sections, and (for signed-in users) the profile avatar,
+  // so a bottom strip would duplicate surface and eat vertical
+  // space. Detected on mount + via matchMedia change listener so
+  // a window resize across the breakpoint flips immediately.
+  // Initial value is false (mobile) to keep SSR + first paint
+  // stable on phones — desktop sees a one-frame flicker which is
+  // acceptable for a layout-only signal.
+  const [isDesktop, setIsDesktop] = useState<boolean>(false);
   // DA-038 — use Next's usePathname() instead of monkey-patching
   // history.pushState. The old approach stacked wrappers on remount
   // and broke Next's internal navigation hooks.
@@ -205,6 +215,15 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(min-width: 768px)');
+    setIsDesktop(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
   }, []);
 
   useEffect(() => {
@@ -308,7 +327,8 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   // the wordmark to return home; bottom nav and footer stay off there to
   // keep the reading viewport clean.
   const showTopBar = mounted && SHOW_TOP_BAR && !fullyBare && !isMockup(path);
-  const showNav = mounted && SHOW_BOTTOM_NAV && !fullyBare && !isStory(path) && !isMockup(path);
+  const showNav =
+    mounted && SHOW_BOTTOM_NAV && !isDesktop && !fullyBare && !isStory(path) && !isMockup(path);
   const showFooter = mounted && SHOW_FOOTER && !fullyBare && !isStory(path) && !isMockup(path);
   const onAdminPage = mounted && isAdmin(path);
   // UJ-200 (Pass 17): banner is strictly admin+ territory. Editor and
@@ -592,6 +612,25 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 }}
               >
                 sign in
+              </a>
+            )}
+            {/* Signed-in profile avatar. Surfaces the profile route on
+                every page from the top bar so the bottom nav can be
+                hidden on desktop without stranding signed-in users. */}
+            {authLoaded && loggedIn && (
+              <a
+                href="/profile"
+                aria-label="Profile"
+                aria-current={path.startsWith('/profile') ? 'page' : undefined}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textDecoration: 'none',
+                  borderRadius: '50%',
+                }}
+              >
+                <Avatar user={user} size={28} />
               </a>
             )}
             <ThemeToggle />
