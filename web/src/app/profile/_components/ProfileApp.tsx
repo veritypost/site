@@ -103,14 +103,19 @@ export function ProfileApp({ defaultSection }: Props) {
         if (s) setExpertStatus(s);
         if (exp.rejection_reason) setExpertRejection(exp.rejection_reason);
       }
-      // Fire-and-forget unread count for the rail badge.
-      fetch('/api/notifications?unread=1&limit=1')
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          const n = (data && (data.unread_count ?? data.unread)) ?? 0;
-          if (!cancelled && typeof n === 'number') setUnreadMessages(n);
-        })
-        .catch(() => {});
+      // Fire-and-forget unread DM count for the Messages rail badge.
+      // Was reading /api/notifications, which is general notifications
+      // (comment replies, follower events, etc.) — wrong source for a
+      // badge on the Messages slot. get_unread_counts() returns one row
+      // per conversation with unread bigint; sum to get the total.
+      supabase.rpc('get_unread_counts').then(({ data, error }) => {
+        if (cancelled || error || !Array.isArray(data)) return;
+        const total = data.reduce((sum, row) => {
+          const n = Number((row as { unread?: number | string }).unread ?? 0);
+          return Number.isFinite(n) ? sum + n : sum;
+        }, 0);
+        setUnreadMessages(total);
+      });
       // Prime the perms cache before first render. NavWrapper loads perms in
       // parallel but ProfileApp would otherwise read an empty cache on cold
       // load and lock every perm-gated section until the 60s tick fires.
