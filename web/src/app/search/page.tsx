@@ -203,7 +203,7 @@ function SearchPageContent() {
   if (canView === null) {
     return (
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 16px' }}>Search</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 600, margin: '0 0 16px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>Search</h1>
         <div style={{ height: 44, background: 'var(--card, #f0f0f0)', borderRadius: 10, marginBottom: 16 }} />
       </div>
     );
@@ -212,7 +212,7 @@ function SearchPageContent() {
   if (!canView) {
     return (
       <div style={{ maxWidth: 520, margin: '64px auto', padding: '0 16px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 12px' }}>Search unavailable</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 600, margin: '0 0 12px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>Search unavailable</h1>
         {/* F16: branch copy on auth state */}
         {!isAuthed
           ? <p style={{ fontSize: 13, color: '#666' }}>Sign in to use search.</p>
@@ -224,7 +224,7 @@ function SearchPageContent() {
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 16px' }}>Search</h1>
+      <h1 style={{ fontSize: 28, fontWeight: 600, margin: '0 0 16px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>Search</h1>
 
       {/* F11: visually-hidden live region for screen readers */}
       <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }} aria-live="polite" aria-atomic="true">
@@ -243,7 +243,7 @@ function SearchPageContent() {
               flex: 1,
               padding: '10px 14px',
               borderRadius: 10,
-              border: '1px solid #e5e5e5',
+              border: '1px solid var(--border, #e5e5e5)',
               fontSize: 14,
               // F6: removed outline: 'none' so browser default focus ring shows
             }}
@@ -261,7 +261,7 @@ function SearchPageContent() {
               background: q.trim() && !loading ? 'var(--text)' : 'var(--border)',
               color: 'var(--bg)',
               fontSize: 14,
-              fontWeight: 700,
+              fontWeight: 600,
               cursor: q.trim() && !loading ? 'pointer' : 'default',
             }}
           >
@@ -456,11 +456,21 @@ function SearchPageContent() {
               color: 'var(--text)',
             }}
           >
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{a.title}</div>
+            <div style={{
+              // 15/600 sans -> 17/500 Source Serif 4. Aligned to the
+              // article-card-in-list family (UpNextSheet, NextStoryFooter,
+              // SectionsMenu search results).
+              fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
+              fontSize: 17,
+              fontWeight: 500,
+              lineHeight: 1.3,
+              letterSpacing: '-0.01em',
+              marginBottom: 6,
+            }}>{a.title}</div>
             {a.excerpt && (
-              <div style={{ fontSize: 13, color: '#444', marginBottom: 6 }}>{a.excerpt}</div>
+              <div style={{ fontSize: 14, color: 'var(--p-ink-muted)', lineHeight: 1.5, marginBottom: 6 }}>{a.excerpt}</div>
             )}
-            <div style={{ fontSize: 12, color: 'var(--dim)' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)' }}>
               {a.categories?.name}
               {a.categories?.name && a.published_at ? ' · ' : ''}
               {/* F5: hybrid timestamp — relative if <24h, absolute otherwise */}
@@ -475,7 +485,7 @@ function SearchPageContent() {
         ))}
         {results.length === 0 && !loading && q && (
           <div style={{ padding: 40, textAlign: 'center' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 6 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, color: '#111', marginBottom: 6, letterSpacing: '-0.01em' }}>
               No matches
             </div>
             <div style={{ fontSize: 13, color: '#666', marginBottom: 14, lineHeight: 1.5 }}>
@@ -504,7 +514,7 @@ function SearchPageContent() {
               style={{
                 marginTop: 24,
                 paddingTop: 18,
-                borderTop: '1px solid #e5e5e5',
+                borderTop: '1px solid var(--border, #e5e5e5)',
                 textAlign: 'left',
                 maxWidth: 320,
                 marginLeft: 'auto',
@@ -513,11 +523,11 @@ function SearchPageContent() {
             >
               <div
                 style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#111',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'var(--p-ink-muted)',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
+                  letterSpacing: '0.1em',
                   marginBottom: 8,
                 }}
               >
@@ -554,7 +564,7 @@ export default function SearchPage() {
   return (
     <Suspense fallback={
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 16px' }}>Search</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 600, margin: '0 0 16px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>Search</h1>
         <div style={{ height: 44, background: 'var(--card, #f0f0f0)', borderRadius: 10, marginBottom: 16 }} />
       </div>
     }>
