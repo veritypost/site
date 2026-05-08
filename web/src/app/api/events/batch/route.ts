@@ -29,6 +29,7 @@ import { createHash } from 'crypto';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { isBotUserAgent } from '@/lib/botDetect';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { incrementField } from '@/lib/counters';
 import type { BatchResponseBody } from '@/lib/events/types';
 
 export const runtime = 'nodejs';
@@ -313,41 +314,57 @@ export async function POST(request: Request) {
   // Score article_read_complete events. The web ArticleTracker sends this
   // event when a user finishes reading, but /api/stories/read (the scoring
   // path used by iOS) has no web callers. Handle it here: insert a
-  // reading_log row and call score_on_reading_complete for each completion
-  // that hasn't already been scored for this user+article.
+  // reading_log row, call score_on_reading_complete, and bump
+  // articles.view_count for each first-of-the-day completion.
+  //
+  // Dedup window matches the iOS path (web/src/app/api/stories/read/route.js:54):
+  // first completion per user per article per UTC day. Without this, web
+  // would dedup all-time while iOS deduped same-day → same column,
+  // different semantics on the two platforms.
+  //
+  // Per-completion try/catch so one bad RPC can't poison the rest of the
+  // batch (matches the route's "one bad event can't poison a whole
+  // batch" contract on line 25).
   if (!isBot && authedUserId) {
     const completions = rows.filter((r) => r.event_name === 'article_read_complete' && r.article_id);
+    const todayStart = new Date().toISOString().split('T')[0] + 'T00:00:00Z';
     for (const ev of completions) {
-      const { count: alreadyScored } = await supabase
-        .from('reading_log')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', authedUserId)
-        .eq('article_id', ev.article_id as string)
-        .eq('completed', true);
-      if ((alreadyScored ?? 0) > 0) continue;
-      const { data: logRow } = await supabase
-        .from('reading_log')
-        .insert({
-          user_id: authedUserId,
-          article_id: ev.article_id as string,
-          completed: true,
-          read_percentage: 90,
-          time_spent_seconds: 0,
-          source: 'web',
-          device_type: ev.device_type,
-        })
-        .select('id')
-        .single();
-      if (logRow?.id) {
-        await (supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<unknown> }).rpc(
-          'score_on_reading_complete',
-          {
-            p_user_id: authedUserId,
-            p_kid_profile_id: null,
-            p_article_id: ev.article_id,
-            p_reading_log_id: logRow.id,
-          }
-        );
+      try {
+        const { count: alreadyScoredToday } = await supabase
+          .from('reading_log')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', authedUserId)
+          .eq('article_id', ev.article_id as string)
+          .eq('completed', true)
+          .gte('created_at', todayStart);
+        if ((alreadyScoredToday ?? 0) > 0) continue;
+        const { data: logRow } = await supabase
+          .from('reading_log')
+          .insert({
+            user_id: authedUserId,
+            article_id: ev.article_id as string,
+            completed: true,
+            read_percentage: 90,
+            time_spent_seconds: 0,
+            source: 'web',
+            device_type: ev.device_type,
+          })
+          .select('id')
+          .single();
+        if (logRow?.id) {
+          await (supabase as unknown as { rpc: (fn: string, args: Record<string, unknown>) => Promise<unknown> }).rpc(
+            'score_on_reading_complete',
+            {
+              p_user_id: authedUserId,
+              p_kid_profile_id: null,
+              p_article_id: ev.article_id,
+              p_reading_log_id: logRow.id,
+            }
+          );
+          await incrementField(supabase, 'articles', ev.article_id as string, 'view_count', 1);
+        }
+      } catch (err) {
+        console.error('[events.batch] completion scoring failed', { article_id: ev.article_id, err });
       }
     }
   }

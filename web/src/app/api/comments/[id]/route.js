@@ -546,11 +546,16 @@ export async function DELETE(_request, { params }) {
     // decremented) without routing through the ownership check.
     const { data: row } = await service
       .from('comments')
-      .select('user_id')
+      .select('user_id, article_id, deleted_at')
       .eq('id', id)
       .maybeSingle();
     if (!row) {
       return NextResponse.json({ error: 'not_found' }, { status: 404, headers: NO_STORE });
+    }
+    // Idempotency: if already deleted, skip the row mutation and the
+    // counter decrements (matches soft_delete_comment RPC behaviour).
+    if (row.deleted_at) {
+      return NextResponse.json({ ok: true }, { headers: NO_STORE });
     }
     const { error: delErr } = await service
       .from('comments')
@@ -569,8 +574,9 @@ export async function DELETE(_request, { params }) {
         fallbackStatus: 400,
         headers: NO_STORE,
       });
-    // Mirror the RPC's GREATEST(comment_count - 1, 0) decrement. Admin
-    // deletes are rare so the fetch-then-update race window is acceptable.
+    // Mirror the RPC's GREATEST(comment_count - 1, 0) decrements on
+    // both users and articles. Admin deletes are rare so the
+    // fetch-then-update race window is acceptable.
     const { data: uRow } = await service
       .from('users')
       .select('comment_count')
@@ -581,6 +587,14 @@ export async function DELETE(_request, { params }) {
         .from('users')
         .update({ comment_count: Math.max(0, uRow.comment_count - 1) })
         .eq('id', row.user_id)
+        .catch(() => null);
+    }
+    if (row.article_id) {
+      // Atomic decrement via RPC — avoids the fetch-then-update race
+      // window that two concurrent admin deletes on the same article
+      // would otherwise expose. RPC floors at 0 (GREATEST guard).
+      await service
+        .rpc('increment_comment_count', { article_id: row.article_id, amount: -1 })
         .catch(() => null);
     }
     return NextResponse.json({ ok: true }, { headers: NO_STORE });
