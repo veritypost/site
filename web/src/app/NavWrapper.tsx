@@ -219,7 +219,11 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const mq = window.matchMedia('(min-width: 768px)');
+    // 1180 matches the codebase's existing desktop boundary (globals.css
+    // @media (min-width: 1180px) / (max-width: 1179px)). 768 was too
+    // close to common viewport widths — scrollbar appearing or browser
+    // resize at the edge would flip showNav and shift content by 68px.
+    const mq = window.matchMedia('(min-width: 1180px)');
     setIsDesktop(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
     mq.addEventListener('change', handler);

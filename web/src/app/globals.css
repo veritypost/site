@@ -528,6 +528,19 @@ body {
   }
 }
 
+/* iOS Safari auto-zooms into any form input whose font-size renders
+   below 16px on tap, then stays zoomed until the user manually pinches
+   out. Forcing ≥16px on every text-entry surface on mobile-width
+   viewports stops that without changing desktop density. */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: 16px;
+  }
+}
+
 /* Comment HTML — same editorial type rendering as article body, scaled
    down for the secondary surface. Targets the sanitized HTML inside
    vp-comment-html (CommentRow.tsx:728); composer mirrors via
