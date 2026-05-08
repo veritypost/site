@@ -715,10 +715,20 @@ body {
   [data-reader-tabstrip] {
     display: flex;
     gap: 4px;
-    max-width: 680px;
-    margin: 0 auto;
+    /* max-width left to the inner alignment via margin auto + padding;
+       sticky positioning needs the strip to span full width of the
+       scroll container so its background occludes content underneath. */
+    max-width: none;
+    margin: 0;
     padding: 12px 20px 0;
     border-bottom: 1px solid var(--p-border);
+    /* Pin under the top bar so reader tabs stay touchable while
+       scrolling. iOS app already pins its tab bar above the ScrollView;
+       this brings web mobile to parity. */
+    position: sticky;
+    top: var(--vp-top-bar-h, 56px);
+    z-index: 50;
+    background: var(--p-bg);
   }
   [data-reader-tabstrip] button {
     /* 13/600 -> 11px small-caps, 0.08em letter-spacing. Matches the
