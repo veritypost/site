@@ -374,10 +374,14 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '✦',
       group: 'Family & expert',
       title: 'Expert queue',
-      // Non-experts (and non-owner-mode users) don't need the queue rail at
-      // all — hide the section instead of showing a lock affordance.
-      hidden: !isOwnerMode && !u.is_expert,
-      locked: !isOwnerMode && !(perms.expertQueue && u.is_expert),
+      // Launch-phase hide — owner direction 2026-05-08: Expert queue +
+      // Ask Expert are off until owner manually elevates a curated set
+      // out of the Background pool. Stay hidden for everyone except
+      // owner-mode (so the surface is reachable for QA / future flip).
+      // Data layer + ExpertQueueSection component stay alive — flipping
+      // back is one boolean.
+      hidden: !isOwnerMode,
+      locked: !isOwnerMode,
       bypassed: isOwnerMode && !(perms.expertQueue && u.is_expert),
       reason:
         'Questions waiting on a verified answer in your areas — plus expert chat for verified experts in those areas.',
@@ -389,11 +393,13 @@ export function ProfileApp({ defaultSection }: Props) {
       glyph: '✎',
       group: 'Family & expert',
       title: 'Expert profile',
-      // Hide for non-experts unless they have a pending application (they
-      // need this section to track their application status). Owner-mode
-      // always sees it as a backstage pass.
-      hidden: !isOwnerMode && !u.is_expert && expertStatus !== 'pending',
-      locked: !isOwnerMode && !(u.is_expert || expertStatus === 'pending'),
+      // Launch-phase hide — owner direction 2026-05-08: Expert profile
+      // folds into Background; the standalone section is hidden until
+      // the merge ships. Owner-mode keeps access for QA. Background
+      // (always visible) is the user-facing surface for self-described
+      // expertise during the interim.
+      hidden: !isOwnerMode,
+      locked: !isOwnerMode,
       bypassed: isOwnerMode && !(u.is_expert || expertStatus === 'pending'),
       reason: 'Your credentials, verified areas, and vacation status.',
       keywords: ['credentials', 'watchlist', 'vacation', 'application', 'areas'],

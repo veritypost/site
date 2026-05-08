@@ -532,14 +532,12 @@ struct ProfileView: View {
                     quickActionChip(icon: "figure.2.and.child.holdinghands", label: "Kids")
                 }
                 .buttonStyle(.plain)
-            } else if canViewExpertQueue {
-                NavigationLink {
-                    ExpertQueueView().environmentObject(auth)
-                } label: {
-                    quickActionChip(icon: "checkmark.bubble.fill", label: "Expert")
-                }
-                .buttonStyle(.plain)
             }
+            // Launch-phase hide — owner direction 2026-05-08: Expert Queue
+            // is off until owner manually elevates curated experts out of
+            // the Background pool. Permission state stays live so flipping
+            // back is a one-line change.
+            // else if canViewExpertQueue { ... ExpertQueueView ... }
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
@@ -885,11 +883,11 @@ struct ProfileView: View {
                                   description: "Manage your family plan and kid profiles",
                                   destination: AnyView(FamilyDashboardView().environmentObject(auth)))
                     }
-                    if canViewExpertQueue {
-                        quickLink(label: "Expert Queue",
-                                  description: "Questions from readers",
-                                  destination: AnyView(ExpertQueueView().environmentObject(auth)))
-                    }
+                    // Launch-phase hide — see chip-row note above. Expert
+                    // Queue link returns when owner flips the launch gate.
+                    // if canViewExpertQueue {
+                    //     quickLink(label: "Expert Queue", ...)
+                    // }
                 }
             }
 

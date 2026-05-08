@@ -1113,38 +1113,20 @@ struct SettingsView: View {
     }
 
     private var expertRows: [HubRowSpec] {
+        // Launch-phase hide — owner direction 2026-05-08: Expert profile,
+        // Apply-to-be-expert, and Expert Queue all stay hidden until
+        // owner manually elevates curated experts out of the Background
+        // pool. The Verification row covers public-figure / journalist
+        // checks (separate trust signal). Restoring is a one-line flip:
+        // delete this guard and the original rows return.
         var out: [HubRowSpec] = []
         out.append(HubRowSpec(id: "verification",
-                              keywords: ["verification", "verify", "application", "expert", "journalist", "public figure"]) { isLast, onTap in
+                              keywords: ["verification", "verify", "application", "journalist", "public figure"]) { isLast, onTap in
             AnyView(HubRow(icon: "checkmark.seal.fill", title: "Verification application",
                            showDivider: !isLast,
                            kind: .push(AnyView(VerificationRequestView())),
                            onTap: onTap))
         })
-        if canApplyExpert,
-                  let url = URL(string: SupabaseManager.shared.siteURL
-                                .appendingPathComponent("signup/expert").absoluteString) {
-            out.append(HubRowSpec(id: "apply-expert",
-                                  keywords: ["apply", "expert", "application", "become"]) { isLast, onTap in
-                AnyView(HubRow(icon: "arrow.up.forward.app.fill",
-                               title: "Apply to be an expert",
-                               tone: .accent,
-                               showDivider: !isLast,
-                               kind: .external(url),
-                               onTap: onTap))
-            })
-        }
-        if auth.currentUser?.isExpert == true || expertApplicationStatus == "pending" || expertApplicationStatus == "approved" {
-            out.append(HubRowSpec(id: "expert-profile",
-                                  keywords: ["expert", "profile", "credentials", "vacation", "status"]) { isLast, onTap in
-                AnyView(HubRow(icon: "star.fill",
-                               title: "Expert profile",
-                               subtitle: "Manage your expert account",
-                               showDivider: !isLast,
-                               kind: .push(AnyView(ExpertProfileView().environmentObject(auth))),
-                               onTap: onTap))
-            })
-        }
         return out
     }
 
