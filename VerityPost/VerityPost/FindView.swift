@@ -373,7 +373,7 @@ struct FindView: View {
         VStack(alignment: .leading, spacing: 6) {
             metaLine(for: story)
             Text(story.title ?? "Untitled")
-                .font(.system(size: 17, design: .serif, weight: .medium))
+                .font(.system(size: 17, weight: .medium, design: .serif))
                 .tracking(-0.17)
                 .foregroundColor(VP.text)
                 .multilineTextAlignment(.leading)

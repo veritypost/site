@@ -293,25 +293,38 @@ struct LoginView: View {
 
     @ViewBuilder
     private var oauthButtons: some View {
-        SignInWithAppleButton(
-            .signIn,
-            onRequest: { request in
-                auth.prepareAppleRequest(request)
-            },
-            onCompletion: { result in
-                loading = true
-                Task {
-                    await auth.completeAppleSignIn(result: result)
-                    loading = false
+        if AuthViewModel.canStartAppleSignIn() {
+            SignInWithAppleButton(
+                .signIn,
+                onRequest: { request in
+                    auth.prepareAppleRequest(request)
+                },
+                onCompletion: { result in
+                    loading = true
+                    Task {
+                        await auth.completeAppleSignIn(result: result)
+                        loading = false
+                    }
                 }
-            }
-        )
-        .signInWithAppleButtonStyle(.black)
-        .frame(maxWidth: .infinity)
-        .frame(height: 48)
-        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-        .disabled(loading)
-        .padding(.bottom, 10)
+            )
+            .signInWithAppleButtonStyle(.black)
+            .frame(maxWidth: .infinity)
+            .frame(height: 48)
+            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+            .disabled(loading)
+            .padding(.bottom, 10)
+        } else {
+            // Entropy unavailable — replace the SIWA button with informative
+            // text so the user doesn't tap a button that opens a sheet which
+            // would silently fall back to web OAuth. They can still pick
+            // Google or magic-link instead.
+            Text("Sign in with Apple is temporarily unavailable.")
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .padding(.bottom, 10)
+        }
 
         Button {
             loading = true

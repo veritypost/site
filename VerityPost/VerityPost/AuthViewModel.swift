@@ -967,6 +967,11 @@ final class AuthViewModel: ObservableObject {
         // Clear Owner Mode so a second login as a non-owner account doesn't
         // inherit the previous user's bypass.
         isOwnerMode = false
+        // Drop magic-link cooldown / gated / sentTo state so a subsequent
+        // login as a different account doesn't inherit the prior session's
+        // 30s resend timer. Preserves `authError` because the server-revoke
+        // path above may have just set the post-logout banner.
+        clearMagicLinkStatePreservingError()
         dismissDeepLinkError()
     }
 
@@ -1097,10 +1102,20 @@ final class AuthViewModel: ObservableObject {
 
     /// Configure the Apple ID request with a fresh nonce. Call from
     /// `SignInWithAppleButton(onRequest:)`.
+    ///
+    /// If `randomNonceString()` returns nil (system entropy source
+    /// unavailable), surface a friendly error and leave `request.nonce`
+    /// unset. ASAuthorizationController will then fail downstream and
+    /// the user sees the banner we set here — no crash, no silent
+    /// fallback to a path that may itself be broken.
     func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
-        let nonce = Self.randomNonceString()
-        currentNonce = nonce
         request.requestedScopes = [.fullName, .email]
+        guard let nonce = Self.randomNonceString() else {
+            currentNonce = nil
+            authError = "Sign in with Apple temporarily unavailable. Try again."
+            return
+        }
+        currentNonce = nonce
         request.nonce = Self.sha256(nonce)
     }
 
@@ -1181,15 +1196,41 @@ final class AuthViewModel: ObservableObject {
     /// 32-byte cryptographically-random nonce, base64url-character-set
     /// encoded. Apple requires the SHA256 of this in the request and the
     /// raw value passed to Supabase so the identity token can be verified.
-    private static func randomNonceString(length: Int = 32) -> String {
-        precondition(length > 0)
+    ///
+    /// Returns nil if the system entropy source fails (rare — typically
+    /// only seen on jailbroken devices or in extremely constrained
+    /// environments). Callers must surface a user-visible error rather
+    /// than crashing; see `prepareAppleRequest` for the call-site handling.
+    private static func randomNonceString(length: Int = 32) -> String? {
+        guard length > 0 else { return nil }
         var bytes = [UInt8](repeating: 0, count: length)
         let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-        precondition(status == errSecSuccess, "SecRandomCopyBytes failed: \(status)")
+        guard status == errSecSuccess else { return nil }
         let charset: [Character] = Array(
-            "0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._"
+            "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._"
         )
         return String(bytes.map { charset[Int($0) % charset.count] })
+    }
+
+    /// Process-stable probe for SecRandomCopyBytes availability. If entropy
+    /// is unavailable (rare — jailbroken devices, exotic sandboxes), the
+    /// SIWA flow's `randomNonceString()` returns nil and we'd present a sheet
+    /// with no nonce, leading to a confusing user-completes-then-bounces
+    /// fallback. Probe once at first use and cache; the kernel's CSPRNG
+    /// availability doesn't toggle mid-process. Used by `canStartAppleSignIn`
+    /// to gate the SignInWithAppleButton at view render time.
+    private static let _entropyAvailable: Bool = {
+        var probe = [UInt8](repeating: 0, count: 1)
+        return SecRandomCopyBytes(kSecRandomDefault, 1, &probe) == errSecSuccess
+    }()
+
+    /// Returns true when the system entropy source is available, so the
+    /// SIWA button can mint a nonce and complete a real native sign-in.
+    /// LoginView and SignupView call this to swap the button for an
+    /// informative error string when entropy is unavailable, rather than
+    /// presenting the sheet and silently failing.
+    static func canStartAppleSignIn() -> Bool {
+        return _entropyAvailable
     }
 
     private static func sha256(_ input: String) -> String {
@@ -1273,12 +1314,21 @@ final class AuthViewModel: ObservableObject {
     /// Reset the magic-link UI state (e.g., when the LoginView/SignupView
     /// sheet dismisses or the user taps "Use a different email").
     func clearMagicLinkState() {
+        clearMagicLinkStatePreservingError()
+        authError = nil
+    }
+
+    /// Same resets as `clearMagicLinkState()` but does NOT touch
+    /// `authError`. Used by `logout()` so the post-logout banner
+    /// ("Signed out. Other active sessions...") set on the
+    /// server-revoke-failure path isn't clobbered when we wipe the
+    /// magic-link cooldown state on sign-out.
+    private func clearMagicLinkStatePreservingError() {
         magicLinkCooldownTask?.cancel()
         magicLinkCooldownTask = nil
         magicLinkSentTo = nil
         magicLinkCooldownSec = 0
         magicLinkGated = false
-        authError = nil
     }
 
     private func startMagicLinkCooldown() {
