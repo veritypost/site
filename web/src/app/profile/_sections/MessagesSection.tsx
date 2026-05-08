@@ -52,13 +52,65 @@ export function MessagesSection({ preview }: Props) {
         return;
       }
       try {
-        const res = await fetch('/api/conversations');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        // /api/conversations only exports POST — fetching GET 404s and
+        // caused this section to render "no conversations" even when
+        // the user had threads. Read directly with the same pattern the
+        // /messages page uses: my non-left participant rows → the
+        // conversations table → unread counts via get_unread_counts.
+        const { data: participants, error: pErr } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id')
+          .eq('user_id', user.id)
+          .is('left_at', null);
+        if (pErr) throw pErr;
         if (cancelled) return;
-        setThreads((data.threads ?? data.conversations ?? []) as Thread[]);
+        if (!participants?.length) {
+          setThreads([]);
+          setLoading(false);
+          return;
+        }
+        const convoIds = participants.map((p) => p.conversation_id);
+        const [{ data: convos, error: cErr }, { data: counts }] = await Promise.all([
+          supabase
+            .from('conversations')
+            .select('id, last_message_preview, last_message_at, conversation_participants(user_id, users(id, username, display_name, avatar_url, avatar_color))')
+            .in('id', convoIds)
+            .order('last_message_at', { ascending: false, nullsFirst: false }),
+          supabase.rpc('get_unread_counts'),
+        ]);
+        if (cErr) throw cErr;
+        if (cancelled) return;
+        const unreadByConvo = new Map<string, number>();
+        for (const r of (counts || []) as Array<{ conversation_id: string; unread: number | string }>) {
+          unreadByConvo.set(r.conversation_id, Number(r.unread) || 0);
+        }
+        type ConvoRow = {
+          id: string;
+          last_message_preview: string | null;
+          last_message_at: string | null;
+          conversation_participants?: Array<{
+            user_id: string;
+            users: {
+              id: string;
+              username: string | null;
+              display_name: string | null;
+              avatar_url: string | null;
+              avatar_color: string | null;
+            } | null;
+          }>;
+        };
+        const rows = ((convos || []) as ConvoRow[]).map<Thread>((c) => {
+          const other = c.conversation_participants?.find((p) => p.user_id !== user.id);
+          return {
+            id: c.id,
+            other_user: other?.users ?? null,
+            last_message: c.last_message_preview,
+            last_message_at: c.last_message_at,
+            unread: (unreadByConvo.get(c.id) ?? 0) > 0,
+          };
+        });
+        setThreads(rows);
       } catch {
-        // Soft-fail to empty list; the section still loads.
         toast.error('Could not load conversations.');
       }
       setLoading(false);
