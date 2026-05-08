@@ -181,8 +181,7 @@ struct KidReaderView: View {
                     Button {
                         Task { await toggleFollow(storyId: storyDbId) }
                     } label: {
-                        Label(isFollowing ? "Following" : "Follow",
-                              systemImage: isFollowing ? "heart.fill" : "heart")
+                        Text(isFollowing ? "Following" : "Follow")
                             .font(.system(.caption, design: .rounded, weight: .bold))
                             .foregroundStyle(isFollowing ? .white : K.text)
                             .padding(.horizontal, 12)

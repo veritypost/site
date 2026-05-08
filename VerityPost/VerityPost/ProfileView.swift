@@ -504,16 +504,10 @@ struct ProfileView: View {
     private func quickActionsRow(_ user: VPUser) -> some View {
         let showShare = canShareProfileCard && (user.username?.isEmpty == false)
 
+        // Owner cleanup item 12 (refined 2026-05-08) — Following lives in
+        // HomeSectionsSheet, not the profile shell. Old Following chip
+        // removed; Inbox / Share / Kids stay.
         HStack(spacing: 8) {
-            NavigationLink {
-                BookmarksView().environmentObject(auth)
-            } label: {
-                quickActionChip(icon: "heart.fill", label: "Following")
-            }
-            .buttonStyle(.plain)
-            .simultaneousGesture(TapGesture().onEnded {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            })
             if canViewMessages {
                 NavigationLink {
                     MessagesView().environmentObject(auth)
@@ -886,9 +880,6 @@ struct ProfileView: View {
                                   description: "Your direct conversations",
                                   destination: AnyView(MessagesView().environmentObject(auth)))
                     }
-                    quickLink(label: "Following",
-                              description: "Story timelines you follow",
-                              destination: AnyView(BookmarksView().environmentObject(auth)))
                     if canViewFamily {
                         quickLink(label: "Kids",
                                   description: "Manage your family plan and kid profiles",

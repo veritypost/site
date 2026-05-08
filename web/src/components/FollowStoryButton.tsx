@@ -54,7 +54,6 @@ export default function FollowStoryButton({ storyId, currentUserId }: FollowStor
         onClick={openWall}
         style={baseStyle(false)}
       >
-        <Icon following={false} />
         Follow
       </button>
     );
@@ -90,7 +89,6 @@ export default function FollowStoryButton({ storyId, currentUserId }: FollowStor
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
       <button onClick={handleToggle} disabled={busy} style={baseStyle(following)}>
-        <Icon following={following} />
         {busy ? '…' : following ? 'Following' : 'Follow'}
       </button>
       {error && <span style={{ fontSize: 11, color: 'var(--danger, #b94040)' }}>{error}</span>}
@@ -118,19 +116,3 @@ function baseStyle(active: boolean) {
   };
 }
 
-function Icon({ following }: { following: boolean }) {
-  return following ? (
-    <svg width="12" height="13" viewBox="0 0 12 13" fill="currentColor" aria-hidden="true">
-      <path d="M6 11.5l-.7-.6C2.4 8.4 0 6.4 0 3.9 0 2 1.5.5 3.4.5c1 0 2 .5 2.6 1.3C6.6 1 7.6.5 8.6.5 10.5.5 12 2 12 3.9c0 2.5-2.4 4.5-5.3 7l-.7.6z" />
-    </svg>
-  ) : (
-    <svg width="12" height="13" viewBox="0 0 12 13" fill="none" aria-hidden="true">
-      <path
-        d="M6 11.5l-.7-.6C2.4 8.4 0 6.4 0 3.9 0 2 1.5.5 3.4.5c1 0 2 .5 2.6 1.3C6.6 1 7.6.5 8.6.5 10.5.5 12 2 12 3.9c0 2.5-2.4 4.5-5.3 7l-.7.6z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
