@@ -108,8 +108,10 @@ export async function POST(request) {
   // Owner Mode owner-bypass. An Owner Mode caller skips the seat-cap
   // math entirely (no plan / no seats sold = no cap). The cap is a
   // billing protection, not a safety guard, so this is safe.
+  let seatCheckValues = null;
+  let isOwnerMode = false;
   try {
-    const isOwnerMode = await hasPermissionServer('admin.owner_mode');
+    isOwnerMode = await hasPermissionServer('admin.owner_mode');
     const [{ count: activeKidCount }, subRes] = await Promise.all([
       service
         .from('kid_profiles')
@@ -127,29 +129,17 @@ export async function POST(request) {
     const planMeta = subRes?.data?.plans?.metadata ?? {};
     const maxKids = Number(planMeta.max_kids) || 4;
     const extraKidPriceCents = Number(planMeta.extra_kid_price_cents) || 499;
-    const next = (activeKidCount ?? 0) + 1;
-    if (!isOwnerMode && next > maxKids) {
-      return NextResponse.json(
-        {
-          error: `Plan limit reached: up to ${maxKids} kid profiles per family.`,
-          code: 'kid_cap_reached',
-          max_kids: maxKids,
-        },
-        { status: 400 }
-      );
-    }
-    if (!isOwnerMode && next > seatsPaid) {
-      return NextResponse.json(
-        {
-          error: `Adding this kid increases your subscription by $${(extraKidPriceCents / 100).toFixed(2)}/mo. Confirm seat purchase before retrying.`,
-          code: 'kid_seat_required',
-          current_kid_count: activeKidCount ?? 0,
-          kid_seats_paid: seatsPaid,
-          extra_kid_price_cents: extraKidPriceCents,
-        },
-        { status: 402 }
-      );
-    }
+    // BugList #2 — capture the values; the actual cap check + insert
+    // happens atomically inside the add_kid_with_seat_check RPC below
+    // (advisory-lock per parent_user_id serialises concurrent POSTs).
+    // Owner-mode passes effectively-unbounded cap values so the RPC's
+    // check is a no-op for them.
+    seatCheckValues = {
+      seatsPaid,
+      maxKids,
+      extraKidPriceCents,
+      activeKidCount: activeKidCount ?? 0,
+    };
   } catch (err) {
     // A27 — fail closed. Pre-A27 swallowed the seat-check error and
     // proceeded with the create — letting an over-cap kid land in the
@@ -183,27 +173,58 @@ export async function POST(request) {
     },
   };
 
-  const { data, error } = await service
-    .from('kid_profiles')
-    .insert({
-      parent_user_id: user.id,
-      display_name: b.display_name,
-      avatar_color: b.avatar_color || null,
-      pin_hash: pinCred.pin_hash,
-      pin_salt: pinCred.pin_salt,
-      pin_hash_algo: pinCred.pin_hash_algo,
-      date_of_birth: b.date_of_birth || null,
-      max_daily_minutes: b.max_daily_minutes || null,
-      reading_level: b.reading_level || null,
-      coppa_consent_given: true,
-      coppa_consent_at: nowIso,
-      metadata: consentMetadata,
-    })
-    .select('id')
-    .single();
-  if (error) return safeErrorResponse(NextResponse, error, { route: 'kids', fallbackStatus: 400 });
+  // BugList #2 — atomic cap check + insert via add_kid_with_seat_check RPC.
+  // Owner-mode passes large bypass values so the RPC's cap branches
+  // are no-ops; non-owner gets the real plan/seats values captured
+  // above. The RPC takes a per-parent advisory lock and recounts
+  // inside the same tx, eliminating the read-modify-insert race.
+  const effectiveMax = isOwnerMode
+    ? Math.max(1_000_000, (seatCheckValues?.activeKidCount ?? 0) + 100)
+    : (seatCheckValues?.maxKids ?? 4);
+  const effectiveSeats = isOwnerMode
+    ? effectiveMax
+    : (seatCheckValues?.seatsPaid ?? 1);
 
-  await service.from('users').update({ has_kids_profiles: true }).eq('id', user.id);
+  const { data: rpcRows, error: rpcErr } = await service.rpc('add_kid_with_seat_check', {
+    p_parent_user_id: user.id,
+    p_display_name: b.display_name,
+    p_avatar_color: b.avatar_color || null,
+    p_pin_hash: pinCred.pin_hash,
+    p_pin_salt: pinCred.pin_salt,
+    p_pin_hash_algo: pinCred.pin_hash_algo,
+    p_date_of_birth: b.date_of_birth || null,
+    p_max_daily_minutes: b.max_daily_minutes || null,
+    p_reading_level: b.reading_level || null,
+    p_metadata: consentMetadata,
+    p_max_kids: effectiveMax,
+    p_seats_paid: effectiveSeats,
+    p_extra_kid_price_cents: seatCheckValues?.extraKidPriceCents ?? 499,
+  });
+  if (rpcErr) return safeErrorResponse(NextResponse, rpcErr, { route: 'kids', fallbackStatus: 400 });
+  const r = Array.isArray(rpcRows) ? rpcRows[0] : rpcRows;
 
-  return NextResponse.json({ id: data.id });
+  if (!r?.ok && r?.code === 'kid_cap_reached') {
+    return NextResponse.json(
+      {
+        error: `Plan limit reached: up to ${r.max_kids} kid profiles per family.`,
+        code: 'kid_cap_reached',
+        max_kids: r.max_kids,
+      },
+      { status: 400 }
+    );
+  }
+  if (!r?.ok && r?.code === 'kid_seat_required') {
+    return NextResponse.json(
+      {
+        error: `Adding this kid increases your subscription by $${((r.extra_kid_price_cents ?? 499) / 100).toFixed(2)}/mo. Confirm seat purchase before retrying.`,
+        code: 'kid_seat_required',
+        current_kid_count: r.current_kid_count,
+        kid_seats_paid: r.kid_seats_paid,
+        extra_kid_price_cents: r.extra_kid_price_cents,
+      },
+      { status: 402 }
+    );
+  }
+
+  return NextResponse.json({ id: r.kid_profile_id });
 }

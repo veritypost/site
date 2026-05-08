@@ -6,6 +6,98 @@ Entries are brief — enough for another agent to know what changed and why, and
 
 ## 2026-05-08
 
+### BugList sweep — race & atomicity 4 shipped, 1 refuted
+**Files:** see breakdown.
+
+After the safe-batch 8 + owner-judgment 5 shipped, only 5 race /
+atomicity / cosmetic items remained. Recon-and-adversary pass on
+all 5: 4 shipped, 1 refuted as intentional-by-design.
+
+**Shipped:**
+
+- **#1 reports auto-hide atomic RPC.** Migration
+  `report_and_maybe_autohide_atomic_rpc` adds a SECURITY DEFINER
+  function that does `INSERT … ON CONFLICT DO NOTHING` on `reports`,
+  takes a `FOR UPDATE` row lock on the comment, recounts inside
+  the same tx, and conditionally fires the auto-hide + audit_log
+  insert atomically. Route at `web/src/app/api/reports/route.js`
+  simplified — JS-side count + threshold + update + audit_log
+  block deleted; replaced with a single RPC call. Returns
+  `{ ok: true, alreadyReported: true }` for the constraint-collision
+  branch instead of 500. Urgent escalation channels (Sentry,
+  admin_alerts, email, escalation_failed marker) stay in JS where
+  they touch external systems.
+
+- **#2 kids seat cap atomic RPC.** Migration
+  `add_kid_with_seat_check_rpc` adds a SECURITY DEFINER function
+  that takes `pg_advisory_xact_lock(hashtextextended('kid_seat:'||
+  parent_user_id::text, 0))` per parent, recounts active kids
+  inside the lock, performs the cap + seats checks, inserts the
+  `kid_profiles` row, and flips `users.has_kids_profiles` — all
+  in one transaction. Route at `web/src/app/api/kids/route.js`
+  simplified: the JS-side cap math + direct insert + has_kids
+  flip block deleted; replaced with one RPC call. Owner-mode
+  passes effectively-unbounded values for `p_max_kids` /
+  `p_seats_paid` so the RPC's cap branches are no-ops for them
+  (existing JS-side bypass behavior preserved without needing a
+  separate code path or a trigger-suppression hack the recon
+  agent originally proposed).
+
+- **#4 quiz_attempts client idempotency.** Migration
+  `quiz_attempts_client_attempt_id_idempotency` adds a nullable
+  `client_attempt_id` column + partial UNIQUE index `WHERE
+  client_attempt_id IS NOT NULL` so existing 25 rows stay valid
+  and future inserts dedupe. iOS:
+  `VerityPostKids/VerityPostKids/Models.swift:204` — added
+  `client_attempt_id: String` to `QuizAttemptInsert`.
+  `KidQuizEngineView.swift:67-82` — `PendingQuizWrite.toInsert()`
+  now passes `id.uuidString` (the existing locally-generated,
+  disk-persisted UUID is the right idempotency key — stable
+  across app-kill mid-flight). All 4 insert call sites
+  (lines 194, 595, 604, 613) switched from
+  `.insert(write.toInsert())` to
+  `.upsert(write.toInsert(), onConflict: "client_attempt_id",
+  ignoreDuplicates: true)`. Second insert from a rehydrated
+  pending-write queue is now a no-op at the index level.
+
+- **#5 expert_thread_* tables RLS enabled.** Migration
+  `expert_thread_tables_enable_rls` runs `ENABLE ROW LEVEL
+  SECURITY` on `expert_mention_post_counters`,
+  `expert_mention_quota_counters`, and `expert_thread_chains`,
+  plus three `is_admin_or_above()` SELECT policies. Defense-in-
+  depth: tables had zero anon/authenticated/public grants today,
+  so they were already inaccessible via PostgREST default-deny;
+  the RLS layer covers the case where a future grant is
+  accidentally added. No web behavior change — every existing
+  reader uses the service client. Adversary surfaced one
+  pre-existing bug at `StoryDetailView.swift:3739`
+  (`loadExpertThreadChains` queries with user JWT, currently
+  returns `[]` because no `authenticated` grant; post-RLS still
+  `[]` for the same reason). Filed as new BugList entry; not
+  introduced by this fix.
+
+**Refuted (dropped from BugList):**
+
+- **#3 subscribeToNewComments task overlap — intentional.**
+  Adversary caught what recon missed: the `Task.detached`
+  wrapping `await channel.unsubscribe()` on BOTH branches of the
+  `withTaskCancellationHandler` is documented at
+  `VerityPost/VerityPost/RealtimeHelpers.swift:44-49` —
+  *"Loop drained naturally — fire the unsubscribe inside a
+  detached hop so it actually round-trips to the broker even
+  if the parent Task is mid-cancel."* A non-detached
+  `await channel.unsubscribe()` on the success branch would
+  itself be cancelled by the parent Task mid-cancel, leaving
+  the websocket subscription leaked server-side. The detach
+  is the entire point. Pattern consistency confirmed at
+  `BookmarksView.swift:369-376`. No code change.
+
+BugList drops to 0 risky entries remaining (the original 40 are all
+either shipped or refuted). One new minor entry surfaced during
+the #5 audit: pre-existing iOS chain-state read at
+`StoryDetailView.swift:3739` returns `[]` because of a missing
+`authenticated` grant — not a new regression, just visible now.
+
 ### BugList sweep — owner-judgment 5 + safe-batch 8 + dropped 1
 **Files:** see breakdown.
 

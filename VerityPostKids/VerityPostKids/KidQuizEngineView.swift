@@ -75,7 +75,12 @@ fileprivate struct PendingQuizWrite: Codable, Equatable {
             selected_answer: selected_answer,
             is_correct: is_correct,
             points_earned: points_earned,
-            time_taken_seconds: time_taken_seconds
+            time_taken_seconds: time_taken_seconds,
+            // BugList #4 — stable per-attempt UUID for server-side
+            // dedup. Persisted to disk before the network call, so
+            // a retry after app-kill sends the same key and the
+            // upsert collides on the partial unique index.
+            client_attempt_id: id.uuidString
         )
     }
 }
@@ -191,7 +196,7 @@ fileprivate final class KidQuizPendingHydrator {
         write: PendingQuizWrite
     ) async -> Bool {
         do {
-            try await client.from("quiz_attempts").insert(write.toInsert()).execute()
+            try await client.from("quiz_attempts").upsert(write.toInsert(), onConflict: "client_attempt_id", ignoreDuplicates: true).execute()
             return true
         } catch {
             #if DEBUG
@@ -592,7 +597,7 @@ struct KidQuizEngineView: View {
             //
             // Order: try → sleep 0.5s → try → sleep 1.5s → try → fail.
             do {
-                try await client.from("quiz_attempts").insert(write.toInsert()).execute()
+                try await client.from("quiz_attempts").upsert(write.toInsert(), onConflict: "client_attempt_id", ignoreDuplicates: true).execute()
                 return true
             } catch {
                 #if DEBUG
@@ -601,7 +606,7 @@ struct KidQuizEngineView: View {
             }
             try? await Task.sleep(nanoseconds: 500_000_000)
             do {
-                try await client.from("quiz_attempts").insert(write.toInsert()).execute()
+                try await client.from("quiz_attempts").upsert(write.toInsert(), onConflict: "client_attempt_id", ignoreDuplicates: true).execute()
                 return true
             } catch {
                 #if DEBUG
@@ -610,7 +615,7 @@ struct KidQuizEngineView: View {
             }
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             do {
-                try await client.from("quiz_attempts").insert(write.toInsert()).execute()
+                try await client.from("quiz_attempts").upsert(write.toInsert(), onConflict: "client_attempt_id", ignoreDuplicates: true).execute()
                 return true
             } catch {
                 #if DEBUG

@@ -190,6 +190,11 @@ struct QuizQuestion: Codable, Identifiable, Equatable {
 }
 
 // Table: public.quiz_attempts
+// BugList #4 — `client_attempt_id` is a stable UUID generated locally
+// before the network call and persisted to disk so retries (after
+// app-kill mid-write) collide on the partial unique index
+// `uq_quiz_attempts_client_attempt_id` and the second insert is a
+// no-op via `.upsert(.., ignoreDuplicates: true)`.
 struct QuizAttemptInsert: Encodable {
     let quiz_id: String
     let user_id: String?
@@ -201,6 +206,7 @@ struct QuizAttemptInsert: Encodable {
     let is_correct: Bool
     let points_earned: Int?
     let time_taken_seconds: Int?
+    let client_attempt_id: String
 }
 
 // MARK: - Achievements

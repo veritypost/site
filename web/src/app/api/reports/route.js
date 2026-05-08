@@ -88,22 +88,32 @@ export async function POST(request) {
       };
     }
 
-    const { data: report, error: insertError } = await supabase
-      .from('reports')
-      .insert(insertRow)
-      .select()
-      .single();
-
-    if (insertError) {
-      // 23505 = unique_violation. The new uq_reports_reporter_target
-      // constraint means a user can only report the same (target_type,
-      // target_id) once — an idempotent "thank you, already filed"
-      // is the right shape, not a 500.
-      if (insertError.code === '23505') {
-        return NextResponse.json({ ok: true, alreadyReported: true }, { status: 200 });
-      }
+    // BugList #1 — atomic insert + threshold + auto-hide via RPC.
+    // Without this, a count-then-update read in JS races against
+    // concurrent reporters: two reporters can both observe count=N-1
+    // and either both fire or both miss the auto-hide. The RPC takes
+    // a row lock on the comment + recounts inside the same tx, so
+    // the threshold check serializes correctly. Idempotent on the
+    // UNIQUE(reporter_id, target_type, target_id) constraint —
+    // re-submission returns already_filed=true.
+    const { data: rpcRows, error: rpcErr } = await supabase.rpc('report_and_maybe_autohide', {
+      p_reporter_id: user.id,
+      p_target_type: targetType,
+      p_target_id: targetId,
+      p_reason: reason,
+      p_description: description || null,
+      p_is_escalated: !!urgent,
+      p_metadata: insertRow.metadata,
+    });
+    if (rpcErr) {
+      console.error('[reports] rpc failed', rpcErr.message);
       return NextResponse.json({ error: 'Could not file report' }, { status: 500 });
     }
+    const rpcRow = Array.isArray(rpcRows) ? rpcRows[0] : rpcRows;
+    if (rpcRow?.already_filed) {
+      return NextResponse.json({ ok: true, alreadyReported: true }, { status: 200 });
+    }
+    const report = { id: rpcRow?.report_id };
 
     if (urgent) {
       // Track whether at least one escalation channel succeeded.
@@ -190,42 +200,10 @@ export async function POST(request) {
       }
     }
 
-    // Auto-hide comment if report count meets threshold
-    if (targetType === 'comment') {
-      const settings = await getSettings(supabase);
-      const threshold = Number(settings?.report_autohide_threshold ?? 3);
+    // Auto-hide is now atomic inside report_and_maybe_autohide RPC
+    // above. The RPC writes audit_log itself when it fires.
 
-      const { count } = await supabase
-        .from('reports')
-        .select('id', { count: 'exact', head: true })
-        .eq('target_type', 'comment')
-        .eq('target_id', targetId);
-
-      if ((count || 0) >= threshold) {
-        await supabase.from('comments').update({ status: 'hidden' }).eq('id', targetId);
-
-        // T277 — auto-hide is a system action, not an admin one. Use the
-        // service client to write into `audit_log` directly with
-        // `actor_id: null` so the trail records "system" rather than the
-        // reporter who happened to cross the threshold. recordAdminAction
-        // can't be used here: it's auth.uid()-scoped and writes to
-        // admin_audit_log, which is the wrong table for system events.
-        try {
-          const service = createServiceClient();
-          await service.from('audit_log').insert({
-            actor_id: null,
-            action: 'comment.auto_hide',
-            target_type: 'comment',
-            target_id: targetId,
-            metadata: { threshold, report_count: count || 0 },
-          });
-        } catch (auditErr) {
-          console.error('[reports] audit_log auto_hide insert failed:', auditErr);
-        }
-      }
-    }
-
-    return NextResponse.json({ report });
+    return NextResponse.json({ report, autoHid: !!rpcRow?.auto_hid });
   } catch (err) {
     if (err.status) {
       {
