@@ -531,13 +531,33 @@ body {
 /* iOS Safari auto-zooms into any form input whose font-size renders
    below 16px on tap, then stays zoomed until the user manually pinches
    out. Forcing ≥16px on every text-entry surface on mobile-width
-   viewports stops that without changing desktop density. */
+   viewports stops that without changing desktop density. The
+   !important is load-bearing here — many inputs in this codebase use
+   inline `style={{ fontSize: 14 }}` for desktop density, and inline
+   styles otherwise out-rank a media-query rule. !important lets the
+   media query win on mobile only. */
 @media (max-width: 768px) {
   input,
   textarea,
   select,
   [contenteditable="true"] {
-    font-size: 16px;
+    font-size: 16px !important;
+  }
+}
+
+/* Avatar editor responsive grid. Default is single-column (preview
+   stacks above editor) so the channel selector + spectrum + neutrals
+   row each get full container width on phones. Above ~520 the
+   original two-column layout takes over (preview left, editor right).
+   Without this, the editor column on mobile collapses to ~210px and
+   the Outer/Inner/Letters tab labels and spectrum swatches get
+   squeezed off-screen. */
+.vp-avatar-editor-grid {
+  grid-template-columns: 1fr;
+}
+@media (min-width: 520px) {
+  .vp-avatar-editor-grid {
+    grid-template-columns: min(160px, 40vw) 1fr;
   }
 }
 

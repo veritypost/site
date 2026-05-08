@@ -209,9 +209,9 @@ export function AvatarEditor({ user, preview, onUserUpdated }: Props) {
       }
     >
       <div
+        className="vp-avatar-editor-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'min(160px, 40vw) 1fr',
           gap: S[5],
           alignItems: 'flex-start',
           fontFamily: FONT.sans,
