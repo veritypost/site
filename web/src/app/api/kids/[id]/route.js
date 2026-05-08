@@ -1,6 +1,7 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified kids 2026-04-18
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
@@ -71,9 +72,20 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  // Locked down 2026-05-08 pending parent-mode ceremony web parity; see
+  // Chunk N notes (parent-mode destructive-action gate done-correctly).
+  // Parent-driven kid deletion now flows through the elevated-session +
+  // OTP + confirmation_token ceremony at /api/kids/parent/destructive/
+  // delete-kid (currently 400 not_implemented_yet — to be wired when
+  // delete-kid action ships). Raising the required permission to an
+  // admin-only key kills this entrypoint for parent web callers without
+  // dropping the route entirely (admins can still soft-delete via a
+  // back-office permission). Existing parent flows that hit this DELETE
+  // will surface as 403 Forbidden, which the iOS/web client then
+  // surfaces as a generic error — no quiet successes.
   let user;
   try {
-    user = await requirePermission('kids.profile.delete');
+    user = await requirePermission('kids.profile.delete.admin');
   } catch (err) {
     {
       console.error('[kids.[id].permission]', err?.message || err);
@@ -105,5 +117,60 @@ export async function DELETE(request, { params }) {
     console.error('[kids.delete]', error);
     return NextResponse.json({ error: 'Could not delete kid profile' }, { status: 400 });
   }
+
+  // Revoke active kid_sessions so the kid JWT stops working immediately,
+  // not at natural 24h expiry. Mirrors the destructive/unpair revocation
+  // pattern (web/src/app/api/kids/parent/destructive/[actionKey]/route.js).
+  // Best-effort: failures here are logged but don't unwind the soft-delete.
+  try {
+    const nowIso = new Date().toISOString();
+    const { error: revokeErr } = await service
+      .from('kid_sessions')
+      .update({ revoked_at: nowIso })
+      .eq('kid_profile_id', params.id)
+      .is('revoked_at', null);
+    if (revokeErr) {
+      console.error('[kids.delete.revoke_sessions]', revokeErr.message || revokeErr);
+    }
+
+    // If no rows existed (pair-time insert failed or pre-tracking legacy
+    // pairing), insert a synthetic revoked row so refresh's
+    // row-exists-and-revoked branch fires. Mirrors fix #2 in the
+    // destructive route. Pull parent_user_id from kid_profiles since the
+    // admin caller may not be the kid's parent.
+    const { data: anyRow } = await service
+      .from('kid_sessions')
+      .select('id')
+      .eq('kid_profile_id', params.id)
+      .limit(1)
+      .maybeSingle();
+    if (!anyRow) {
+      const { data: kidRow } = await service
+        .from('kid_profiles')
+        .select('parent_user_id')
+        .eq('id', params.id)
+        .maybeSingle();
+      const parentUserId = kidRow?.parent_user_id;
+      if (parentUserId) {
+        const { error: synthErr } = await service.from('kid_sessions').insert({
+          kid_profile_id: params.id,
+          parent_user_id: parentUserId,
+          device_id: 'reconstructed-on-admin-delete',
+          token: `revoked-${crypto.randomUUID()}`,
+          started_at: nowIso,
+          expires_at: nowIso,
+          revoked_at: nowIso,
+        });
+        if (synthErr) {
+          console.error('[kids.delete.synthetic_insert]', synthErr.message || synthErr);
+        }
+      } else {
+        console.error('[kids.delete.synthetic_insert] missing parent_user_id for kid', params.id);
+      }
+    }
+  } catch (err) {
+    console.error('[kids.delete.revoke_sessions]', err);
+  }
+
   return NextResponse.json({ ok: true, soft_deleted: true });
 }

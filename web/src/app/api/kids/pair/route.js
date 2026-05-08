@@ -188,6 +188,33 @@ export async function POST(request) {
       { algorithm: 'HS256' }
     );
 
+    // Track the live kid session so /api/kids/refresh can enforce
+    // server-side revocation when a parent unpairs (or runs the
+    // destructive ceremony in /api/kids/parent/destructive/unpair).
+    // kid_sessions.parent_user_id, device_id, token, expires_at are all
+    // NOT NULL — feed them from the JWT we just minted. Best-effort: a
+    // kid_sessions write failure must NOT brick pairing; the kid still
+    // gets their JWT and the refresh route falls back to "no row =
+    // graceful proceed" (see refresh route comment).
+    try {
+      const { error: sessionErr } = await svc.from('kid_sessions').insert({
+        kid_profile_id,
+        parent_user_id,
+        device_id:
+          typeof device === 'string' && device.trim().length > 0
+            ? device.trim().slice(0, 128)
+            : 'unknown',
+        token,
+        started_at: new Date().toISOString(),
+        expires_at: new Date(exp * 1000).toISOString(),
+      });
+      if (sessionErr) {
+        console.error('[kids.pair.session_track_err]', sessionErr.message || sessionErr);
+      }
+    } catch (err) {
+      console.error('[kids.pair.session_track_err]', err);
+    }
+
     return NextResponse.json({
       access_token: token,
       kid_profile_id,

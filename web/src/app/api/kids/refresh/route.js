@@ -16,9 +16,24 @@
 // semantics are unchanged across the rotation.
 
 import { NextResponse } from 'next/server';
+import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+
+// Ext-W.1 — placeholder device_ids written by older kid_sessions inserts
+// before iOS started forwarding `device` on /pair-direct + /refresh. Rows
+// tagged with these markers bypass install-id binding enforcement so
+// pre-2026-05-08 paired kids don't get locked out; the next time their
+// session is rotated by an updated client, the column will hold a real
+// device id and enforcement engages from then on.
+const PLACEHOLDER_DEVICE_IDS = new Set(['unknown', 'pair-direct']);
+
+// Hash a device id down to 8 hex chars for log redaction. Never log the
+// raw value — install-scoped UUIDs are PII-ish identifiers per device.
+function hashDevice(value) {
+  return crypto.createHash('sha256').update(String(value)).digest('hex').slice(0, 8);
+}
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 24; // 24 hours — matches /api/kids/pair (T301)
 
@@ -45,6 +60,22 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing bearer token' }, { status: 401 });
     }
     const token = match[1];
+
+    // Ext-W.1 — install-id binding. iOS forwards its install-scoped UUID on
+    // every refresh; we compare against the device_id stored on the live
+    // kid_sessions row. Strict from the start: a request with no device is
+    // refused outright, no lenient bypass — every shipping kids client
+    // sends one.
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
+    const requestDevice = String((body && body.device) || '').trim().slice(0, 128);
+    if (!requestDevice) {
+      return NextResponse.json({ error: 'device_required' }, { status: 401 });
+    }
 
     const jwtSecret = process.env.SUPABASE_JWT_SECRET;
     if (!jwtSecret) {
@@ -110,6 +141,73 @@ export async function POST(request) {
       // Parent reassignment is structurally impossible today, but fail closed
       // if it ever happens — kid device must re-pair against the new parent.
       return NextResponse.json({ error: 'Profile reassigned' }, { status: 401 });
+    }
+
+    // Server-side revocation check. /api/kids/pair and /api/kids/pair-direct
+    // INSERT a kid_sessions row keyed by kid_profile_id; the parent-mode
+    // destructive-unpair flow flips revoked_at on those rows (and inserts
+    // a synthetic revoked row if no live row existed at unpair-time).
+    //
+    // Three-state logic:
+    //   1. Live row (revoked_at IS NULL) exists  → proceed, rotate token.
+    //   2. No live row but at least one revoked row exists
+    //                                             → 401 kid_token_revoked.
+    //      This covers both real unpairs AND the synthetic-row case where
+    //      pair-time INSERT failed initially and unpair reconstructed.
+    //   3. No rows at all (live or revoked)      → graceful pass.
+    //      Legacy tokens minted before kid_sessions started being
+    //      populated (pre-2026-05-08 server-side-revocation work). New
+    //      pairings post-2026-05-08 always have a row, so once in-flight
+    //      24h-TTL kid tokens roll over, every kid is fully covered.
+    // ORDER BY started_at DESC LIMIT 1 — newest live row wins. Multiple
+    // live rows can coexist when a kid re-pairs without an explicit unpair
+    // (the unpair sweep is what flips revoked_at), so picking the newest
+    // makes the device-binding check deterministic.
+    const { data: liveRow, error: liveErr } = await svc
+      .from('kid_sessions')
+      .select('id, device_id')
+      .eq('kid_profile_id', kidProfileId)
+      .is('revoked_at', null)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (liveErr) {
+      console.error('[kids.refresh] kid_sessions live lookup:', liveErr);
+      return NextResponse.json({ error: 'Could not refresh token' }, { status: 500 });
+    }
+    if (liveRow) {
+      // Ext-W.1 — install-id binding enforcement. Skip when the stored
+      // device id is one of the legacy placeholders (no real device id was
+      // captured at pair time); enforce strictly otherwise. Never log the
+      // raw device ids — hash to 8 hex chars first.
+      const isPlaceholder = PLACEHOLDER_DEVICE_IDS.has(liveRow.device_id);
+      if (!isPlaceholder && liveRow.device_id !== requestDevice) {
+        console.warn('[kids.refresh.device_mismatch]', {
+          kid_profile_id: kidProfileId,
+          expected_hash: hashDevice(liveRow.device_id),
+          got_hash: hashDevice(requestDevice),
+        });
+        return NextResponse.json({ error: 'device_mismatch' }, { status: 401 });
+      }
+    }
+    if (!liveRow) {
+      // No live row — check whether any row exists at all. If yes, the
+      // kid was unpaired (real or synthetic revoked row); if no, this is
+      // a legacy token from before kid_sessions tracking — graceful pass.
+      const { data: anyRow, error: anyErr } = await svc
+        .from('kid_sessions')
+        .select('id')
+        .eq('kid_profile_id', kidProfileId)
+        .limit(1)
+        .maybeSingle();
+      if (anyErr) {
+        console.error('[kids.refresh] kid_sessions any lookup:', anyErr);
+        return NextResponse.json({ error: 'Could not refresh token' }, { status: 500 });
+      }
+      if (anyRow) {
+        return NextResponse.json({ error: 'kid_token_revoked' }, { status: 401 });
+      }
+      // anyRow is null — graceful pass for legacy pre-tracking tokens.
     }
 
     const now = Math.floor(Date.now() / 1000);
