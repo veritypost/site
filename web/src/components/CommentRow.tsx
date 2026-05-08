@@ -1167,8 +1167,8 @@ export default function CommentRow({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 4,
-                        fontSize: 13,
-                        fontWeight: isHelpfulTagged ? 700 : 500,
+                        fontSize: 12,
+                        fontWeight: isHelpfulTagged ? 600 : 500,
                         padding: '5px 12px',
                         borderRadius: 20,
                         minHeight: 32,
@@ -1177,7 +1177,7 @@ export default function CommentRow({
                         color: isHelpfulTagged ? 'var(--success-text, #16a34a)' : 'var(--p-ink-muted, #888)',
                         cursor: busy ? 'default' : 'pointer',
                         transition: 'border-color 120ms, background 120ms, color 120ms',
-                        letterSpacing: '-0.01em',
+                        letterSpacing: '0',
                         touchAction: 'manipulation',
                         WebkitTapHighlightColor: 'transparent',
                       }}
@@ -1340,16 +1340,16 @@ export default function CommentRow({
                         onClick={() => doTag(k)}
                         disabled={!!busy}
                         style={{
-                          fontSize: 13,
-                          fontWeight: active ? 700 : 400,
+                          fontSize: 12,
+                          fontWeight: active ? 600 : 500,
                           padding: '5px 12px',
                           borderRadius: 20,
                           minHeight: 32,
                           border: `1px solid ${active ? meta.color : 'var(--border, #e5e5e5)'}`,
                           background: active ? `${meta.color}15` : 'transparent',
-                          color: active ? meta.color : 'var(--p-ink-faint, #bbb)',
+                          color: active ? meta.color : 'var(--p-ink-muted, #888)',
                           cursor: busy ? 'default' : 'pointer',
-                          letterSpacing: '-0.01em',
+                          letterSpacing: '0',
                           touchAction: 'manipulation',
                           WebkitTapHighlightColor: 'transparent',
                           transition: 'border-color 120ms, background 120ms, color 120ms',
@@ -1364,7 +1364,7 @@ export default function CommentRow({
                     <button
                       onClick={() => setRepliesOpen(v => !v)}
                       style={{
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: 500,
                         padding: '5px 12px',
                         borderRadius: 20,
@@ -1373,7 +1373,7 @@ export default function CommentRow({
                         background: repliesOpen ? 'var(--card, #f5f5f5)' : 'transparent',
                         color: 'var(--p-ink-muted, #888)',
                         cursor: 'pointer',
-                        letterSpacing: '-0.01em',
+                        letterSpacing: '0',
                         touchAction: 'manipulation',
                         WebkitTapHighlightColor: 'transparent',
                         transition: 'background 120ms',

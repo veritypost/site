@@ -23,12 +23,14 @@ const SECTION_STYLE: React.CSSProperties = {
 };
 
 const HEADING_STYLE: React.CSSProperties = {
-  fontSize: 13,
+  // Aligned to the editorial meta family — same shape as the byline,
+  // pinned-context label, and NextStoryFooter heading.
+  fontSize: 11,
   fontWeight: 600,
-  letterSpacing: '0.06em',
+  letterSpacing: '0.1em',
   textTransform: 'uppercase' as const,
   color: 'var(--p-ink-muted)',
-  margin: '0 0 12px',
+  margin: '0 0 16px',
 };
 
 const LIST_STYLE: React.CSSProperties = {
