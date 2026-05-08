@@ -614,10 +614,12 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 sign in
               </a>
             )}
-            {/* Signed-in profile avatar. Surfaces the profile route on
-                every page from the top bar so the bottom nav can be
-                hidden on desktop without stranding signed-in users. */}
-            {authLoaded && loggedIn && (
+            {/* Signed-in profile avatar — desktop only. On mobile the
+                bottom nav already carries the Profile slot, so showing
+                this avatar would duplicate the entry point. On desktop
+                ≥768px the bottom nav is hidden, and this avatar is the
+                profile path. */}
+            {authLoaded && loggedIn && isDesktop && (
               <a
                 href="/profile"
                 aria-label="Profile"
