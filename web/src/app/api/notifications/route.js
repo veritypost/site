@@ -8,6 +8,7 @@ import { safeErrorResponse } from '@/lib/apiErrors';
 import { checkRateLimit } from '@/lib/rateLimit';
 
 const MAX_IDS_PER_PATCH = 200;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // T170/T209 — notification inbox is strictly per-user state. Block any
 // CDN/proxy from caching responses by tagging private/no-store on every
@@ -120,7 +121,12 @@ export async function PATCH(request) {
         { status: 413, headers: NO_STORE }
       );
     }
-    q = q.in('id', ids);
+    // Filter to well-formed UUIDs only — silently drop malformed entries.
+    const cleanIds = ids.filter((v) => typeof v === 'string' && UUID_RE.test(v));
+    if (cleanIds.length === 0) {
+      return NextResponse.json({ error: 'ids must be uuids' }, { status: 400, headers: NO_STORE });
+    }
+    q = q.in('id', cleanIds);
   } else {
     return NextResponse.json({ error: 'ids or all required' }, { status: 400, headers: NO_STORE });
   }

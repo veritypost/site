@@ -47,7 +47,11 @@ export async function DELETE(_request, { params }) {
     .eq('id', sessionId)
     .eq('user_id', user.id)
     .eq('is_active', true)
-    .eq('is_current', false)
+    // Protect only is_current = true. Original .eq('is_current', false)
+    // silently no-op'd on NULL rows (Postgres = is three-valued, NULL
+    // never matches), leaking those rows from revoke if the column
+    // ever drifts to nullable. `is.not.true` matches false AND null.
+    .not('is_current', 'is', true)
     .select('id');
 
   if (error) {

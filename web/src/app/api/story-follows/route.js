@@ -26,6 +26,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 
 const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request) {
   let user;
@@ -39,9 +40,9 @@ export async function POST(request) {
   }
 
   const { story_id } = await request.json().catch(() => ({}));
-  if (!story_id || typeof story_id !== 'string') {
+  if (!story_id || typeof story_id !== 'string' || !UUID_RE.test(story_id)) {
     return NextResponse.json(
-      { error: 'story_id required' },
+      { error: 'story_id required (uuid)' },
       { status: 400, headers: NO_STORE }
     );
   }
@@ -74,12 +75,19 @@ export async function POST(request) {
       { status: 400, headers: NO_STORE }
     );
   }
-  // RPC returns a single-row result set; normalize.
+  // RPC returns a single-row result set; normalize and validate shape.
   const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== 'object' || typeof row.following !== 'boolean') {
+    console.error('[story-follows.POST] unexpected RPC shape', row);
+    return NextResponse.json(
+      { error: 'Could not toggle follow' },
+      { status: 500, headers: NO_STORE }
+    );
+  }
   return NextResponse.json(
     {
-      following: !!row?.following,
-      follow_id: row?.follow_id ?? null,
+      following: row.following,
+      follow_id: typeof row.follow_id === 'string' ? row.follow_id : null,
     },
     { headers: NO_STORE }
   );
@@ -177,9 +185,9 @@ export async function PATCH(request) {
     );
   }
   const { story_id } = await request.json().catch(() => ({}));
-  if (!story_id || typeof story_id !== 'string') {
+  if (!story_id || typeof story_id !== 'string' || !UUID_RE.test(story_id)) {
     return NextResponse.json(
-      { error: 'story_id required' },
+      { error: 'story_id required (uuid)' },
       { status: 400, headers: NO_STORE }
     );
   }
@@ -211,9 +219,9 @@ export async function DELETE(request) {
   }
   const { searchParams } = new URL(request.url);
   const storyId = searchParams.get('story_id');
-  if (!storyId) {
+  if (!storyId || !UUID_RE.test(storyId)) {
     return NextResponse.json(
-      { error: 'story_id required' },
+      { error: 'story_id required (uuid)' },
       { status: 400, headers: NO_STORE }
     );
   }

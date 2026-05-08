@@ -67,6 +67,11 @@ function getClientIp(req: Request): string {
   return req.headers.get('x-real-ip') || '0.0.0.0';
 }
 
+// Closed enum for device_type — anything else lands as null. Without
+// the allowlist, downstream dashboards have to accept arbitrary
+// 16-char strings the client invents.
+const ALLOWED_DEVICE_TYPES = new Set(['mobile', 'tablet', 'desktop', 'bot', 'unknown']);
+
 function clampString(s: unknown, max = MAX_STRING_LEN): string | null {
   if (typeof s !== 'string') return null;
   const trimmed = s.trim();
@@ -179,7 +184,7 @@ function sanitize(
     utm_source: clampString(e.utm_source, 128),
     utm_medium: clampString(e.utm_medium, 64),
     utm_campaign: clampString(e.utm_campaign, 128),
-    device_type: clampString(e.device_type, 16),
+    device_type: ALLOWED_DEVICE_TYPES.has(String(e.device_type ?? '').toLowerCase()) ? String(e.device_type).toLowerCase() : null,
     viewport_w: clampInt(e.viewport_w),
     viewport_h: clampInt(e.viewport_h),
     consent_analytics: typeof e.consent_analytics === 'boolean' ? e.consent_analytics : null,

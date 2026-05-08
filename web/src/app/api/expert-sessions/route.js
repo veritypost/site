@@ -5,6 +5,8 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // GET — list upcoming sessions (visible to family accounts; kids list these).
 // POST — editor-only, schedule a new session.
 // Body: { expert_id, category_id?, title, description?, scheduled_at,
@@ -60,6 +62,12 @@ export async function POST(request) {
   const b = await request.json().catch(() => ({}));
   if (!b.expert_id || !b.title || !b.scheduled_at) {
     return NextResponse.json({ error: 'expert_id, title, scheduled_at required' }, { status: 400 });
+  }
+  if (typeof b.expert_id !== 'string' || !UUID_RE.test(b.expert_id)) {
+    return NextResponse.json({ error: 'expert_id must be a uuid' }, { status: 400 });
+  }
+  if (b.category_id != null && (typeof b.category_id !== 'string' || !UUID_RE.test(b.category_id))) {
+    return NextResponse.json({ error: 'category_id must be a uuid' }, { status: 400 });
   }
 
   const service = createServiceClient();

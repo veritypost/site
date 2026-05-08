@@ -83,6 +83,9 @@ export async function POST(request) {
     .catch(() => ({}));
   if (!category_id || !body)
     return NextResponse.json({ error: 'category_id and body required' }, { status: 400 });
+  if (typeof body !== 'string') {
+    return NextResponse.json({ error: 'body must be a string' }, { status: 400 });
+  }
   if (body.length > 2000) {
     console.error('[expert.back_channel] input_too_long', {
       field: 'body',

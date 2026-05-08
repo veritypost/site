@@ -1911,7 +1911,8 @@ struct LoginActivityView: View {
         req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         do {
             let (data, resp) = try await URLSession.shared.data(for: req)
-            if (resp as? HTTPURLResponse)?.statusCode == 200 {
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            if (200..<300).contains(status) {
                 sessions.removeAll { $0.id == id }
             } else {
                 struct ErrBody: Decodable { let error: String? }

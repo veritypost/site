@@ -52,6 +52,9 @@ export async function POST(request) {
     } catch (err) {
       return NextResponse.json({ error: 'invalid reason' }, { status: err.status || 400 });
     }
+    if (description != null && typeof description !== 'string') {
+      return NextResponse.json({ error: 'description must be a string' }, { status: 400 });
+    }
     if (description && description.length > 1000) {
       console.error('[reports] input_too_long', {
         field: 'description',

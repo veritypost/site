@@ -325,14 +325,30 @@ struct LeaderboardView: View {
     // holds display name + slug + color; the pill tap needs category_id for
     // the RPC call in loadCategory).
     private func loadCategoryOptions() async {
+        // Wrap the fetch in a 10s timeout so a slow network (2G, satellite,
+        // captive portal) doesn't leave the category pills permanently empty
+        // with no recovery path. Default URLSession timeout is ~60s; 10s
+        // matches the kid-experience cadence better — they'd rather see
+        // empty pills + retry on tab re-enter than stare at nothing.
         do {
-            let rows: [VPCategory] = try await client
-                .from("categories")
-                .select("id, name, slug, color_hex, icon_name, is_kids_safe, sort_order")
-                .eq("is_kids_safe", value: true)
-                .order("sort_order", ascending: true)
-                .execute()
-                .value
+            let rows: [VPCategory] = try await withThrowingTaskGroup(of: [VPCategory].self) { group in
+                group.addTask {
+                    try await self.client
+                        .from("categories")
+                        .select("id, name, slug, color_hex, icon_name, is_kids_safe, sort_order")
+                        .eq("is_kids_safe", value: true)
+                        .order("sort_order", ascending: true)
+                        .execute()
+                        .value
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 10_000_000_000)
+                    throw URLError(.timedOut)
+                }
+                let result = try await group.next()!
+                group.cancelAll()
+                return result
+            }
             self.categoryOptions = rows
         } catch {
             // Non-fatal — category scope still renders, pills just stay empty
