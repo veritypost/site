@@ -751,40 +751,16 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
 
   const editorBody = (
     <>
-      <Section embedded={embedded} divider={false} title="Tools">
-        <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={async () => {
-              try {
-                const r = await fetch('/api/ai/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ storyId, type: 'kids_story' }) });
-                if (r.status === 503) toast.push({ message: 'AI API key not configured. Add it to .env.local.', variant: 'danger' });
-                else if (r.ok) toast.push({ message: 'Kids content generated — reload to see changes', variant: 'success' });
-                else toast.push({ message: 'AI generation failed', variant: 'danger' });
-              } catch { toast.push({ message: 'AI API key not configured', variant: 'danger' }); }
-            }}
-          >
-            AI generate (kids)
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={async () => {
-              try {
-                const r = await fetch('/api/ai/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ storyId, type: 'simplify' }) });
-                if (r.status === 503) toast.push({ message: 'AI API key not configured', variant: 'danger' });
-                else if (r.ok) toast.push({ message: 'Content simplified', variant: 'success' });
-                else toast.push({ message: 'Simplify failed', variant: 'danger' });
-              } catch { toast.push({ message: 'AI API key not configured', variant: 'danger' }); }
-            }}
-          >
-            Simplify language
-          </Button>
-        </div>
-      </Section>
+      {/* "AI generate (kids)" + "Simplify language" Tools section was
+          removed: both buttons POSTed /api/ai/generate, but that route
+          was never built — empty `web/src/app/api/ai/` directory. The
+          UI 404'd silently behind a "AI API key not configured" toast.
+          Real article generation lives at /api/admin/pipeline/generate
+          with a different shape (cluster→article, not story→kids).
+          Wire to that pipeline if/when this functionality is wanted
+          back. */}
 
-      <Section embedded={embedded} title="Metadata">
+      <Section embedded={embedded} divider={false} title="Metadata">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: S[3] }}>
           <div>
             <label style={labelStyle}>Category</label>
