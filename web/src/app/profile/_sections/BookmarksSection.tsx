@@ -134,7 +134,7 @@ export function BookmarksSection({ preview }: Props) {
                     color: C.ink,
                     textDecoration: 'none',
                     display: 'block',
-                    letterSpacing: '-0.01em',
+                    letterSpacing: '-0.02em',
                   }}
                 >
                   {b.articles?.title ?? 'Untitled article'}
@@ -147,7 +147,7 @@ export function BookmarksSection({ preview }: Props) {
                     fontWeight: 600,
                     color: C.inkMuted,
                     display: 'block',
-                    letterSpacing: '-0.01em',
+                    letterSpacing: '-0.02em',
                   }}
                 >
                   {b.articles?.title ?? 'Untitled article'}

@@ -288,7 +288,7 @@ export function AppShell({ user, preview, defaultSection = 'you', sections }: Pr
                         fontWeight: 600,
                         color: C.inkFaint,
                         textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
+                        letterSpacing: '0.1em',
                       }}
                     >
                       {g.label}
@@ -335,7 +335,7 @@ export function AppShell({ user, preview, defaultSection = 'you', sections }: Pr
                               <span
                                 style={{
                                   fontSize: F.xs,
-                                  fontWeight: 700,
+                                  fontWeight: 600,
                                   padding: '0 6px',
                                   background: isActive ? C.ink : C.surfaceSunken,
                                   color: isActive ? C.bg : C.inkMuted,
@@ -500,7 +500,7 @@ function IdentityRailCard({
                   color: C.expert,
                   padding: '0 6px',
                   borderRadius: 999,
-                  fontWeight: 700,
+                  fontWeight: 600,
                 }}
               >
                 ✦
@@ -514,7 +514,7 @@ function IdentityRailCard({
                   color: C.verified,
                   padding: '0 6px',
                   borderRadius: 999,
-                  fontWeight: 700,
+                  fontWeight: 600,
                 }}
               >
                 ✓

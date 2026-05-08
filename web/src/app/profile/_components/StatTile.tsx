@@ -49,10 +49,14 @@ export function StatTile({ label, value, hint, href }: Props) {
       <div
         className="redesign-stat-value"
         style={{
+          // Original direction was 800 ("data dashboard, not editorial
+          // column"). Dropped to 600 to match the editorial restraint
+          // rule now in effect across the rest of the surface — 800
+          // stuck out as the only weight-800 element on the page.
           fontFamily: FONT.sans,
-          fontWeight: 800,
+          fontWeight: 600,
           color: C.ink,
-          letterSpacing: 0,
+          letterSpacing: '-0.01em',
           lineHeight: 1,
         }}
       >

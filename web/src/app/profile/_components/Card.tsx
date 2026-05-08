@@ -46,7 +46,7 @@ export function Card({ title, description, variant = 'default', footer, children
                 color: variant === 'danger' ? C.danger : C.ink,
                 margin: 0,
                 marginBottom: description ? S[1] : 0,
-                letterSpacing: '-0.01em',
+                letterSpacing: '-0.02em',
               }}
             >
               {title}

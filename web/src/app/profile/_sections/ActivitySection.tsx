@@ -221,6 +221,7 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
                     fontSize: F.xs,
                     color: C.inkMuted,
                     fontWeight: 600,
+                    letterSpacing: '0.1em',
                     textTransform: 'uppercase',
                   }}
                 >
@@ -234,7 +235,7 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
                   fontSize: F.md,
                   fontWeight: 600,
                   color: it.slug ? C.ink : C.inkMuted,
-                  letterSpacing: '-0.01em',
+                  letterSpacing: '-0.02em',
                   display: 'block',
                 }}
               >

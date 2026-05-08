@@ -139,7 +139,7 @@ const sectionHeading: React.CSSProperties = {
   color: C.ink,
   margin: 0,
   marginBottom: S[3],
-  letterSpacing: '-0.01em',
+  letterSpacing: '-0.02em',
 };
 
 function ActionCard({ href, title, body }: { href: string; title: string; body: string }) {
@@ -164,7 +164,7 @@ function ActionCard({ href, title, body }: { href: string; title: string; body: 
           fontWeight: 600,
           color: C.ink,
           marginBottom: S[1],
-          letterSpacing: '-0.01em',
+          letterSpacing: '-0.02em',
         }}
       >
         {title}

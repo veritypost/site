@@ -213,7 +213,7 @@ export function CategoriesSection({ categories, scores, loading }: CategoriesSec
             color: C.inkMuted,
             fontWeight: 600,
             textTransform: 'uppercase',
-            letterSpacing: '0.06em',
+            letterSpacing: '0.1em',
             marginBottom: S[2],
           }}
         >
@@ -360,7 +360,7 @@ export function CategoriesSection({ categories, scores, loading }: CategoriesSec
                       fontSize: F.xs,
                       color: C.inkMuted,
                       textTransform: 'uppercase',
-                      letterSpacing: '0.06em',
+                      letterSpacing: '0.1em',
                     }}
                   >
                     {score?.rank != null ? `#${score.rank.toLocaleString()}` : 'Score'}
@@ -524,7 +524,7 @@ function DrillStat({ label, value }: { label: string; value: string }) {
           fontWeight: 600,
           color: C.inkMuted,
           textTransform: 'uppercase',
-          letterSpacing: '0.06em',
+          letterSpacing: '0.1em',
         }}
       >
         {label}
