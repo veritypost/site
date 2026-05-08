@@ -528,6 +528,37 @@ body {
   }
 }
 
+/* Comment HTML — same editorial type rendering as article body, scaled
+   down for the secondary surface. Targets the sanitized HTML inside
+   vp-comment-html (CommentRow.tsx:728); composer mirrors via
+   data-comment-editor. */
+.vp-comment-html,
+[data-comment-editor] {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+.vp-comment-html p {
+  margin: 0 0 0.6em;
+}
+.vp-comment-html p:last-child {
+  margin-bottom: 0;
+}
+.vp-comment-html a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: var(--p-border);
+  transition: text-decoration-color 0.12s ease;
+}
+.vp-comment-html a:hover {
+  text-decoration-color: var(--p-ink);
+}
+.vp-comment-html em, .vp-comment-html i { font-style: italic; }
+.vp-comment-html strong, .vp-comment-html b { font-weight: 600; }
+
 /* Comment blockquote — quote reply display in composer + thread */
 [data-comment-editor] blockquote,
 .vp-comment-html blockquote {
@@ -537,6 +568,7 @@ body {
   color: var(--p-ink-muted, #888);
   font-size: 0.92em;
   line-height: 1.55;
+  font-style: italic;
 }
 
 /* Article reader tabs — desktop 75/25 split, mobile tabbed.

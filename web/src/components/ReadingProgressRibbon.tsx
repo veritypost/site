@@ -20,11 +20,14 @@ export default function ReadingProgressRibbon() {
     <div
       aria-hidden="true"
       style={{
+        // 3px accent -> 2px ink. Editorial restraint: the ribbon should
+        // be felt, not seen. Ink color sits flat against the page chrome
+        // instead of competing with the accent on links / Alerts.
         position: 'fixed',
         top: 0, left: 0, right: 0,
-        height: 3,
+        height: 2,
         zIndex: 200,
-        background: 'var(--accent, #2563eb)',
+        background: 'var(--p-ink, #111)',
         transformOrigin: 'left',
         transform: `scaleX(${progress})`,
         transition: 'transform 0.1s linear',
