@@ -425,6 +425,12 @@ export async function POST(request) {
     }
     const issuer = `${supabaseUrl.replace(/\/+$/, '')}/auth/v1`;
 
+    const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+    if (!jwtSecret) {
+      console.error('[kids.pair-direct] missing SUPABASE_JWT_SECRET');
+      return NextResponse.json({ error: 'Pairing not configured' }, { status: 503 });
+    }
+
     const token = jwt.sign(
       {
         aud: 'authenticated',
