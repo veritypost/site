@@ -15,6 +15,14 @@
  *   3. REVIEW_PROMPT (snapshot L903-1006) is intentionally EXCLUDED — it
  *      belongs to the review step which is not in F7 scope. See
  *      F7-DECISIONS-LOCKED.md §3.4 divergence D-editorial.
+ *   4. F8 Editorial uplift (2026-05-09): rules added inside existing
+ *      thematic sections — stress position, specificity ladder, rhythm,
+ *      zombie-noun ban, empty-adjective rewrite table, scene opener,
+ *      nut graf, hamburger paragraphs, explicit transitions, anecdotal
+ *      kid lead, comforting-context-paired-with-distress, 70-word adult
+ *      paragraph cap, conditional adult subheadings. New content sits
+ *      inside the existing sections; existing snapshot text was not
+ *      reflowed, normalized, or re-quoted.
  *
  * HEADLINE_PROMPT emits one JSON {title, summary} per snapshot L649-653.
  * Body generation is a separate canonical step owned by Phase 3;
@@ -41,6 +49,12 @@ smart adult in plain English.
 Vary sentence length deliberately. A short sentence lands harder
 after a long one. A three-word sentence after a twenty-word one
 creates emphasis no adjective can buy.
+
+A short sentence after a long one breaks the cadence. After
+a sentence of 20-plus words, the next sentence should be
+under 10 words. Use 3-5 word sentences for emphasis on
+verified outcomes ("The vote was unanimous."). Do not stack
+three same-length sentences in a row.
 
 Push toward the specific noun, every time. "Mayor Garcia" beats
 "the mayor." "The 47 schools in the district" beats "local
@@ -86,8 +100,20 @@ PARAGRAPH 1: What happened. The single most important new fact.
 One to three sentences. This is the lede. A reader who stops
 here knows the news.
 
+You may open with a scene — a real person doing a real thing
+in a real place — IF the scene contains today's news fact.
+"Reuben Brigety, the U.S. ambassador to South Africa, walked
+into the briefing room and accused Pretoria of arming Russia."
+The fact is the news. The scene is the carrier. FACTS ONLY
+still applies — strip framing, do not narrate emotion.
+
 PARAGRAPH 2: The critical details. How it happened, who was
 involved, what the direct consequence is. Two to three sentences.
+
+PARAGRAPH 2 (or 3) carries the nut graf — one sentence that
+states the article's core angle in plain terms. The "so what"
+sentence (see below) may serve as the nut graf when placed
+here. If P1 was a scene lead, the nut graf is REQUIRED in P2.
 
 PARAGRAPH 3 (optional): A secondary development or direct
 consequence. Only include if it adds a genuinely new fact.
@@ -386,12 +412,25 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
 
 2. Active voice always. "The Senate passed" not "was passed."
 
-3. Paragraphs: 2-3 sentences max. No exceptions.
+   No zombie nouns. Verbs disguised as -tion, -ment, -ance, -ity
+   nouns add fog. Rewrite to the verb.
+     BAD:  "The committee made a decision to issue a recommendation."
+     GOOD: "The committee decided to recommend X."
+     BAD:  "The agency's affirmation of the policy..."
+     GOOD: "The agency affirmed the policy..."
 
-4. No subheadings. No bullet points. No numbered lists. No
-   horizontal rules (---). No dividers. Plain prose paragraphs
-   only. The article is one continuous body. Markdown paragraph
-   breaks (\n\n) are allowed; **bold** sparingly is allowed.
+3. Paragraphs: 2-3 sentences max AND ~70 words max. If a
+   paragraph runs past 70 words, split it. Adult only — kids
+   and tweens follow a different paragraph shape.
+
+4. No subheads, no bullet points, no numbered lists, no
+   horizontal rules — UNLESS the article runs ≥ 5 paragraphs
+   AND ≥ 380 words. In that case ONLY, you may insert one or
+   two H3 markdown subheads (### Short label) to act as scan
+   anchors. Subheads must be descriptive, ≤ 6 words, and
+   strip framing same as the body. Do not use subheads on
+   shorter articles. Bullets, numbered lists, and horizontal
+   rules remain banned at all lengths.
 
 5. BANNED ADJECTIVES — never use these:
    sweeping, landmark, controversial, stunning, dramatic,
@@ -399,6 +438,15 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
    massive, huge, enormous, game-changing, revolutionary,
    breakthrough (as adjective), significant, major (when used
    as emphasis rather than factual scale)
+
+   Replace the empty descriptor with a concrete noun and an
+   active verb. Show, do not assess.
+     WEAK:    "the beautiful sunset"
+     CONCRETE: "the sunset glowed orange"
+     WEAK:    "the dramatic vote"
+     CONCRETE: "the vote was 51-49"
+     WEAK:    "the controversial bill"
+     CONCRETE: "the bill cuts $2 billion from Medicaid"
 
 6. BANNED VERBS:
    slammed, blasted, torched, ripped, hammered, championed,
@@ -477,6 +525,22 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
     number" is not a number. If you cannot anchor a paragraph,
     you likely don't have enough information to write it — merge
     it into an adjacent paragraph instead.
+
+    Specificity ladder — climb DOWN, not up:
+      creature  →  animal  →  dog  →  Roxy
+      official  →  agency director  →  EPA director  →  Lee Zeldin
+      weapon    →  rifle  →  AR-15  →  the AR-15 used in the attack
+    Default to the bottom rung that the corpus supports. If the
+    corpus says "Mayor Garcia," do not write "the mayor."
+
+19. STRESS POSITION. Place the strongest word or fact at the end
+    of the sentence. The reader's eye lingers at the period; what
+    lands there is what they remember. Move attribution and
+    background to the front; move the new fact to the close.
+      WEAK:   "Mortgage rates climbed to 7.4 percent, according
+               to Freddie Mac data released today."
+      STRONG: "Mortgage rates, according to Freddie Mac data
+               released today, climbed to 7.4 percent."
 
 ═══════════════════════════════════════════════════════════
 COPYRIGHT — THIS IS NON-NEGOTIABLE
@@ -1216,6 +1280,9 @@ RHYTHM EXAMPLE (do not use these words — use this rhythm):
 SHORT. Then a slightly longer sentence that gives the detail.
 SHORT again. That's the beat.
 
+Vary length. After a 12-word sentence, write a 4-word one.
+Don't stack three same-length sentences in a row.
+
 VOICE RULES:
 - Short sentences. Average 8-12 words.
 - One idea per sentence. No nested clauses.
@@ -1224,11 +1291,34 @@ VOICE RULES:
 - Active voice always.
 - No graphic violence, no political opinion, no fear-mongering. State facts gently.
 - Include at least TWO "wait, really?" moments — surprising facts that make a kid sit up. Don't stack them both at the top; spread them through the piece.
+- End each sentence on the strongest word. Move adjectives
+  and helper clauses to the front; let the noun or verb that
+  matters land at the period.
+- Use real transition words between ideas. After paragraph 1,
+  every paragraph starts with one of: "First," "Next,"
+  "Then," "After that," "Because of that," "But," "Still,"
+  "Here is the wild part." Don't make the kid guess how
+  ideas connect.
 
 LENGTH: 250-450 words. Every sentence earns its place, but cover the full story.
 
 STRUCTURE:
-- Paragraph 1 (1-3 sentences): What happened. The most surprising fact first.
+Each paragraph follows the hamburger shape:
+  1. Topic sentence — the one fact this paragraph is about.
+  2. Three to five supporting sentences — the details, the
+     scale comparison, the named thing.
+  3. Closing sentence — wraps the paragraph cleanly so the
+     reader knows that idea is done.
+Every paragraph has a clean start and a clean stop. No
+paragraph trails off. No paragraph runs past 6 sentences.
+NOTE: kids paragraphs are NOT bound by the adult 70-word
+paragraph cap — supports add up.
+
+- Paragraph 1 (1-3 sentences): Open with a relatable scene or
+  a direct question — a kid in a place doing a thing, OR a
+  "Did you know..." style question. Then deliver the most
+  surprising fact in sentence 2 or 3. Don't lead with the
+  statistic — lead with the hook that makes them want it.
 - Middle paragraphs: How it happened, who was involved, what changed.
 - Final paragraph: The last relevant fact. When you have stated all the facts, stop.
 
@@ -1243,6 +1333,19 @@ Do NOT include any of the following:
 - Any sentence telling the reader what to think about the news or how significant it is
 
 State the facts. Stop when the facts are done. The reader decides what matters to them.
+
+WHEN A FACT IS DISTRESSING:
+Pair it in the SAME paragraph with a factual boundary or
+reassurance. NOT a separate paragraph. NOT absent.
+Reassurance must be FACTUAL, not editorial.
+  GOOD: "The earthquake was 800 miles away from where most
+         American kids live. Rescue teams from twelve countries
+         are already on the ground."
+  BAD:  "Don't be scared." (editorial)
+  BAD:  "Adults are handling it, you don't need to worry."
+        (editorial)
+State what is far, what is being done, who is helping.
+Stop there. Do not tell the kid how to feel.
 
 POLITICAL CONTENT RULES:
 When covering government, elections, laws, or policy:
@@ -1306,10 +1409,34 @@ VOICE RULES:
 - Vocabulary above kids tier — acronyms expanded once on first use, then used freely.
 - Active voice. Direct attribution ("according to [source]") for any contested claim.
 - No graphic violence, no political opinion. State facts; skip lurid detail.
+- End each sentence on the strongest word. Move adjectives
+  and helper clauses to the front; let the noun or verb that
+  matters land at the period.
+- Vary sentence length. After a 16-word sentence, write a
+  6-word one. Don't stack three same-length sentences in
+  a row.
+- Use real transition words between ideas. After the lede,
+  every paragraph starts with a connector — "First," "Next,"
+  "Then," "After that," "However," "Meanwhile," "As a result,"
+  "In contrast," "Still," "Because of that." Don't make the
+  reader guess how ideas connect.
 
 LENGTH: 250-450 words. Tight news writing.
 
 STRUCTURE:
+Each paragraph follows the hamburger shape:
+  1. Topic sentence — the one fact this paragraph is about.
+  2. Three to five supporting sentences — the details, the
+     numbers, the named players, the comparison. Tweens read
+     longer sentences than 7-9 readers, so supports can be
+     denser; pack the facts in.
+  3. Closing sentence — wraps the paragraph cleanly so the
+     reader knows that idea is done.
+Every paragraph has a clean start and a clean stop. No
+paragraph trails off. No paragraph runs past 6 sentences.
+NOTE: tweens paragraphs are NOT bound by the adult 70-word
+paragraph cap — denser supports add up.
+
 - Lede (1-3 sentences): What happened. Lead with the news.
 - Body (2-4 paragraphs): Critical details — how it happened, who was involved, what the immediate consequences are. Follow the natural logic of the story, not a rigid formula. Let the facts dictate the shape.
 - Final paragraph: The last relevant fact. When you have stated all the facts, stop.

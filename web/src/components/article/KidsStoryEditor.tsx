@@ -23,6 +23,7 @@ import Select from '@/components/admin/Select';
 import DatePicker from '@/components/admin/DatePicker';
 import Badge from '@/components/admin/Badge';
 import Spinner from '@/components/admin/Spinner';
+import TTSButton from '@/components/TTSButton';
 import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C, F, S } from '@/lib/adminPalette';
@@ -912,6 +913,9 @@ export default function KidsStoryEditor({ articleId, onArticleChange, embedded =
                         <div>
                           <label style={labelStyle}>Article body</label>
                           <Textarea rows={8} value={entry.content || ''} onChange={(e) => updateEntry(entry.id, 'content', e.target.value)} placeholder="Write in simple, kid-friendly language." />
+                          <div style={{ marginTop: 8 }}>
+                            <TTSButton text={entry.content || ''} title="Read aloud (ear-check)" />
+                          </div>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: S[3] }}>
                           <div>

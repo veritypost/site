@@ -23,6 +23,7 @@ import Select from '@/components/admin/Select';
 import DatePicker from '@/components/admin/DatePicker';
 import Badge from '@/components/admin/Badge';
 import Spinner from '@/components/admin/Spinner';
+import TTSButton from '@/components/TTSButton';
 import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
@@ -55,6 +56,7 @@ type StoryForm = {
   slug: string;
   summary: string;
   body: string;
+  body_html: string;
   published_at: string;
   status: string;
   category: string;
@@ -73,6 +75,7 @@ const EMPTY_STORY: StoryForm = {
   slug: '',
   summary: '',
   body: '',
+  body_html: '',
   published_at: '',
   status: 'draft',
   category: 'Politics',
@@ -381,6 +384,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         slug: cast.stories?.slug || '',
         summary: cast.excerpt || '',
         body: cast.body || '',
+        body_html: cast.body_html || '',
         published_at: cast.published_at ? cast.published_at.split('T')[0] : '',
         status: cast.status || 'draft',
         category: cast.categories?.name || 'Politics',
@@ -1043,11 +1047,22 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
             {story.summary}
           </p>
         )}
-        {story.body && (
-          <div style={{ fontSize: F.lg, color: C.ink, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+        {/* Preview renders body_html (server-sanitized via renderBodyHtml). */}
+        {/* Web admin only; iOS / Kids iOS not applicable (no admin tooling on iOS). */}
+        {story.body_html ? (
+          <div
+            data-article-body
+            style={{ fontSize: F.lg, color: C.ink, lineHeight: 1.8 }}
+            dangerouslySetInnerHTML={{ __html: story.body_html }}
+          />
+        ) : story.body ? (
+          <div style={{ fontSize: F.lg, color: C.dim, lineHeight: 1.8, whiteSpace: 'pre-wrap', fontStyle: 'italic' }}>
             {story.body}
+            <div style={{ marginTop: 16, fontSize: F.sm }}>
+              (Save the article to see the rendered preview with headings, pull quotes, and proper formatting.)
+            </div>
           </div>
-        )}
+        ) : null}
         {(story.sources || []).length > 0 && (
           <div style={{ marginTop: S[8], paddingTop: S[4], borderTop: `1px solid ${C.divider}` }}>
             <div style={labelStyle}>Sources</div>
@@ -1425,6 +1440,9 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                         <div>
                           <label style={labelStyle}>Article body</label>
                           <Textarea rows={8} value={entry.content || ''} onChange={(e) => updateEntry(entry.id, 'content', e.target.value)} placeholder="Write the full article." />
+                          <div style={{ marginTop: 8 }}>
+                            <TTSButton text={entry.content || ''} title="Read aloud (ear-check)" />
+                          </div>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: S[3] }}>
                           <div>

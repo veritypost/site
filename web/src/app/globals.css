@@ -619,9 +619,18 @@ body {
 /* Article body content typography. Targets the server-sanitized HTML
    inside [data-article-body]: paragraph rhythm, pull-quote treatment
    for <blockquote>, editorial link underlines, section heading scale.
-   Pure visual — no chrome additions. */
+   Pure visual — no chrome additions.
+
+   Platform applicability (LockedDecisions #18):
+   - Web: applicable. Public reader (`ArticleSurface`) is the only
+     consumer of body_html on web today.
+   - iOS adult: not applicable — iOS reads `articles.body` (plaintext
+     markdown) directly, not body_html. New HTML elements (<aside>,
+     enhanced <h3>, p.over-cap) never reach iOS.
+   - iOS Kids: not applicable — Kids product is iOS-only and uses the
+     same plaintext body path. */
 [data-article-body] > p {
-  margin: 0 0 1.1em;
+  margin: 0 0 1.4em;
 }
 [data-article-body] > p:last-child {
   margin-bottom: 0;
@@ -635,12 +644,22 @@ body {
   margin: 1.6em 0 0.5em;
   color: var(--p-ink);
 }
+/* H3 is visibly distinct from H2 — small caps tracking, no serif promotion,
+   so it never rivals H2 on scan. Item #12 (clearer H2/H3 hierarchy). */
 [data-article-body] h3 {
-  font-size: 1.15em;
-  font-weight: 700;
-  line-height: 1.3;
-  margin: 1.4em 0 0.4em;
-  color: var(--p-ink);
+  font-size: 1.05em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: inherit;
+  margin-top: 1.8em;
+  margin-bottom: 0.6em;
+}
+/* Tighten the first paragraph after a heading so the heading visually owns
+   its section without an extra line of air. Item #12 rhythm. */
+[data-article-body] h2 + p,
+[data-article-body] h3 + p {
+  margin-top: 0;
 }
 [data-article-body] blockquote {
   margin: 1.5em 0;
@@ -657,6 +676,28 @@ body {
 [data-article-body] blockquote p:last-child {
   margin-bottom: 0;
 }
+/* Pull quote (item #13). Render-side heuristic in render-body.ts emits
+   <aside class="pull-quote"> for one qualifying paragraph in long adult
+   articles. Neutral colors only — currentColor inherits from surrounding
+   body text; never tier-coded (LockedDecision #9). */
+[data-article-body] aside.pull-quote {
+  border-top: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  font-style: italic;
+  font-size: 1.15em;
+  line-height: 1.5;
+  margin: 2em auto;
+  padding: 1em 0;
+  max-width: 26em;
+  text-align: left;
+}
+/* Paragraph-cap warning (item #14). Render-side adds class="over-cap"
+   to paragraphs >70 words. The class ships in body_html for inspection
+   and future admin tooling, but no visual rule fires today — there is
+   no admin preview component yet. When an admin preview surface lands,
+   add a scoped selector here gated on a wrapper class on that
+   component, using neutral styling (currentColor / dashed) per
+   LockedDecisions #9 (no tier hues). */
 [data-article-body] a {
   color: inherit;
   text-decoration: underline;
