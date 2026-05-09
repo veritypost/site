@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 // Live root. Pair-only entry.
 //   - Not paired → PairCodeView
@@ -122,7 +123,7 @@ struct KidsAppRoot: View {
             // / whitespace-padded value at pairing time would silently
             // never match.
             let stream = channel.postgresChange(
-                AnyAction.self,
+                UpdateAction.self,
                 schema: "public",
                 table: "kid_profiles",
                 filter: .eq("id", value: kid.id.lowercased())

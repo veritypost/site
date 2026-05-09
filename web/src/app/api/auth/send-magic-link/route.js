@@ -108,7 +108,7 @@ function gated() {
 // Best-effort audit log. Failures here never propagate to the response
 // (the response shape is generic regardless). audit_log writes go through
 // service-role; an INSERT failure is logged for ops but doesn't leak.
-async function writeAuditRow(service, { email, reason, ipTruncated }) {
+async function writeAuditRow(service, { email, reason, ipTruncated, client }) {
   try {
     await service.from('audit_log').insert({
       actor_id: null,
@@ -119,6 +119,7 @@ async function writeAuditRow(service, { email, reason, ipTruncated }) {
         email_lc: email,
         reason,
         ip_24: ipTruncated,
+        client: client || 'web',
       },
     });
   } catch (err) {
@@ -145,6 +146,16 @@ export async function POST(request) {
     return malformed();
   }
 
+  // Caller-surface tag. 'web' (default) and 'ios' run through the
+  // adult-product flow, including the closed-beta gate. 'kids' is the
+  // kids iOS parent sign-in funnel — distinct surface, NOT subject to
+  // the adult waitlist gate (App Store distribution + on-device parental
+  // gate is the access control). Whitelisted enum, default 'web', no
+  // leak path. Same email may legitimately surface from either app on
+  // different days — `signup_source` is set ONCE at user creation.
+  const rawClient = typeof payload?.client === 'string' ? payload.client.trim().toLowerCase() : '';
+  const client = (rawClient === 'kids' || rawClient === 'ios' || rawClient === 'web') ? rawClient : 'web';
+
   const email = rawEmail.toLowerCase();
   const service = createServiceClient();
 
@@ -161,7 +172,7 @@ export async function POST(request) {
     ...emailPolicy,
   });
   if (emailHit.limited) {
-    await writeAuditRow(service, { email, reason: 'rate_limited_email', ipTruncated });
+    await writeAuditRow(service, { email, reason: 'rate_limited_email', ipTruncated, client });
     return genericOk();
   }
 
@@ -175,7 +186,7 @@ export async function POST(request) {
     ...ipPolicy,
   });
   if (ipHit.limited) {
-    await writeAuditRow(service, { email, reason: 'rate_limited_ip', ipTruncated });
+    await writeAuditRow(service, { email, reason: 'rate_limited_ip', ipTruncated, client });
     return genericOk();
   }
 
@@ -189,7 +200,7 @@ export async function POST(request) {
       .ilike('email', email)
       .maybeSingle();
     if (blocked && (blocked.is_banned || blocked.frozen_at != null || blocked.deleted_at != null)) {
-      await writeAuditRow(service, { email, reason: 'banned_email', ipTruncated });
+      await writeAuditRow(service, { email, reason: 'banned_email', ipTruncated, client });
       return genericOk();
     }
   } catch (err) {
@@ -198,7 +209,7 @@ export async function POST(request) {
     // banned-account signal because the DB blinked than to skip a single
     // ban check.
     console.error('[auth.send-magic-link] ban check threw:', err?.message || err);
-    await writeAuditRow(service, { email, reason: 'ban_check_error', ipTruncated });
+    await writeAuditRow(service, { email, reason: 'ban_check_error', ipTruncated, client });
     return genericOk();
   }
 
@@ -231,7 +242,13 @@ export async function POST(request) {
     } catch (err) {
       console.error('[auth.send-magic-link] approval check threw:', err?.message || err);
     }
-    if (!approvedBypass) {
+    // Kids-surface signup is its own funnel — App Store distribution +
+    // device-level parental gate is the access control. The adult
+    // closed-beta gate exists to throttle the adult-product waitlist;
+    // applying it to a kids parent would silently drop a legitimate
+    // setup attempt (no users row, no approved access_request, no
+    // referral cookie on iOS). Skip the gate entirely for client='kids'.
+    if (!approvedBypass && client !== 'kids') {
       try {
         const gate = await checkSignupGate(service, refCookie);
         if (!gate.allowed) {
@@ -239,12 +256,13 @@ export async function POST(request) {
             email,
             reason: `closed_beta_${gate.reason || 'denied'}`,
             ipTruncated,
+            client,
           });
           return gated();
         }
       } catch (err) {
         console.error('[auth.send-magic-link] beta gate threw:', err?.message || err);
-        await writeAuditRow(service, { email, reason: 'beta_gate_error', ipTruncated });
+        await writeAuditRow(service, { email, reason: 'beta_gate_error', ipTruncated, client });
         return genericOk();
       }
     }
@@ -255,22 +273,35 @@ export async function POST(request) {
   // that mean the row already exists (race or trigger beat us here).
   if (!existingUserId) {
     try {
+      // signup_source is the durable funnel tag. 'kids' here means the
+      // first sign-in attempt arrived via the kids iOS parent flow.
+      // Set ONCE on user creation; downstream sign-ins from the adult
+      // app on the same email don't overwrite it. Same person can use
+      // both apps (one users row per email) — the tag captures origin.
+      //
+      // Stored in user_metadata only (NOT app_metadata): the value is
+      // attacker-chosen via the request body, and app_metadata is the
+      // server-trusted bag — putting an unverified string there would
+      // mean future code that gates on `app_metadata.signup_source` is
+      // trusting the original caller's claim. user_metadata's lower
+      // trust posture matches what we actually have here.
       const { error: createErr } = await service.auth.admin.createUser({
         email,
         email_confirm: true,
+        user_metadata: { signup_source: client },
       });
       if (createErr) {
         const msg = (createErr.message || '').toLowerCase();
         const alreadyExists = msg.includes('already') || msg.includes('registered') || msg.includes('exists');
         if (!alreadyExists) {
           console.error('[NEEDS_CLEANUP] auth.users orphan:', email, createErr.message);
-          await writeAuditRow(service, { email, reason: 'create_user_error', ipTruncated });
+          await writeAuditRow(service, { email, reason: 'create_user_error', ipTruncated, client });
           return genericOk();
         }
       }
     } catch (err) {
       console.error('[NEEDS_CLEANUP] auth.users orphan:', email, err?.message || err);
-      await writeAuditRow(service, { email, reason: 'create_user_error', ipTruncated });
+      await writeAuditRow(service, { email, reason: 'create_user_error', ipTruncated, client });
       return genericOk();
     }
   }
@@ -286,19 +317,24 @@ export async function POST(request) {
     });
     if (linkErr || !linkData?.properties?.email_otp) {
       console.error('[auth.send-magic-link] generateLink error:', linkErr?.message || 'missing email_otp');
-      await writeAuditRow(service, { email, reason: 'generate_link_error', ipTruncated });
+      await writeAuditRow(service, { email, reason: 'generate_link_error', ipTruncated, client });
       return genericOk();
     }
     emailOtp = linkData.properties.email_otp;
   } catch (err) {
     console.error('[auth.send-magic-link] generateLink threw:', err?.message || err);
-    await writeAuditRow(service, { email, reason: 'generate_link_error', ipTruncated });
+    await writeAuditRow(service, { email, reason: 'generate_link_error', ipTruncated, client });
     return genericOk();
   }
 
   // Step 4: Compute days_on_list for new users. Non-fatal.
+  // Skipped for kids surface: the wait-line copy ("you've been on the
+  // list N days") is adult-waitlist branding. A parent who happens to
+  // hold an approved access_request from the adult product but installs
+  // the kids app first would otherwise see waitlist copy in their kids
+  // setup email — wrong context. Kids parents are not waitlisted.
   let daysOnList = null;
-  if (!existingUserId) {
+  if (!existingUserId && client !== 'kids') {
     try {
       const { data: req } = await service
         .from('access_requests')
@@ -334,6 +370,7 @@ export async function POST(request) {
     email,
     reason: existingUserId ? 'sent_signin' : 'sent_signup',
     ipTruncated,
+    client,
   });
   return genericOk();
 }

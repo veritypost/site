@@ -22,7 +22,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { getRateLimitPolicy } from '@/lib/rateLimits';
 import { isAsciiEmail } from '@/lib/emailNormalize';
 import { truncateIpV4 } from '@/lib/apiErrors';
-import { checkSignupGate } from '@/lib/betaGate';
+import { checkSignupGate, type GateResult } from '@/lib/betaGate';
 import { REF_COOKIE_NAME } from '@/lib/referralCookie';
 import { cookies } from 'next/headers';
 import {
@@ -59,7 +59,8 @@ async function writeAuditRow(
     email,
     reason,
     ipTruncated,
-  }: { email: string; reason: string; ipTruncated: string | null }
+    client,
+  }: { email: string; reason: string; ipTruncated: string | null; client?: string }
 ) {
   try {
     await service.from('audit_log').insert({
@@ -67,7 +68,7 @@ async function writeAuditRow(
       action: 'auth:verify_magic_code',
       target_type: 'email',
       target_id: null,
-      metadata: { email_lc: email, reason, ip_24: ipTruncated },
+      metadata: { email_lc: email, reason, ip_24: ipTruncated, client: client || 'web' },
     });
   } catch (err) {
     console.error('[verify-magic-code] audit_log insert failed:', (err as Error)?.message);
@@ -75,7 +76,7 @@ async function writeAuditRow(
 }
 
 export async function POST(request: NextRequest) {
-  let payload: { email?: unknown; token?: unknown } | null = null;
+  let payload: { email?: unknown; token?: unknown; client?: unknown } | null = null;
   try {
     payload = await request.json();
   } catch {
@@ -84,6 +85,12 @@ export async function POST(request: NextRequest) {
 
   const rawEmail = typeof payload?.email === 'string' ? payload.email.trim() : '';
   const rawToken = typeof payload?.token === 'string' ? payload.token.trim() : '';
+  // Caller-surface tag — same enum/whitelist as send-magic-link. Native
+  // clients (ios/kids) get the session in the JSON response body since
+  // they can't read the SSR cookies set by verifyOtp.
+  const rawClient = typeof payload?.client === 'string' ? payload.client.trim().toLowerCase() : '';
+  const client: 'web' | 'ios' | 'kids' =
+    rawClient === 'kids' ? 'kids' : rawClient === 'ios' ? 'ios' : 'web';
 
   if (
     !rawEmail ||
@@ -111,7 +118,7 @@ export async function POST(request: NextRequest) {
     ...emailPolicy,
   });
   if (emailHit.limited) {
-    await writeAuditRow(service, { email, reason: 'rate_limited_email', ipTruncated });
+    await writeAuditRow(service, { email, reason: 'rate_limited_email', ipTruncated, client });
     return genericOk();
   }
 
@@ -122,7 +129,7 @@ export async function POST(request: NextRequest) {
     ...ipPolicy,
   });
   if (ipHit.limited) {
-    await writeAuditRow(service, { email, reason: 'rate_limited_ip', ipTruncated });
+    await writeAuditRow(service, { email, reason: 'rate_limited_ip', ipTruncated, client });
     return genericOk();
   }
 
@@ -133,7 +140,7 @@ export async function POST(request: NextRequest) {
     ...codePolicy,
   });
   if (codeHit.limited) {
-    await writeAuditRow(service, { email, reason: 'rate_limited_code', ipTruncated });
+    await writeAuditRow(service, { email, reason: 'rate_limited_code', ipTruncated, client });
     return genericOk();
   }
 
@@ -158,6 +165,7 @@ export async function POST(request: NextRequest) {
       email,
       reason: `otp_failed:${classifyOtpError(error?.message)}`,
       ipTruncated,
+      client,
     });
     return genericOk();
   }
@@ -201,24 +209,49 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error('[verify-magic-code] deleted-gate cookie-clear failed:', e);
       }
-      await writeAuditRow(service, { email, reason: 'deleted_account', ipTruncated });
+      await writeAuditRow(service, { email, reason: 'deleted_account', ipTruncated, client });
       return genericOk();
     }
   }
 
-  // Build the response that will carry the session cookie set by verifyOtp
-  // (cookies() writes go through Next.js headers, not NextResponse.cookies,
-  // so any response object returned here includes the session automatically).
-  const response = NextResponse.json({ ok: true }, { status: 200, headers: NO_STORE });
+  // Build the response. Web clients pick up the session via the
+  // sb-*-auth-token cookies that verifyOtp() set through next/headers.
+  // Native clients (ios, kids iOS) cannot read those cookies on a
+  // cross-origin URLSession call — they receive an access_token in the
+  // JSON body. Refresh token is intentionally NOT exposed: the kids
+  // parent session is in-memory and naturally short-lived; adult iOS
+  // doesn't consume this body shape today. If a future client needs
+  // refresh, add it back behind that client's tag — don't ship tokens
+  // nobody reads. The body shape is additive: web responses unchanged.
+  const sessionForBody =
+    client !== 'web' && data.session
+      ? {
+          access_token: data.session.access_token,
+          expires_at: data.session.expires_at ?? null,
+          expires_in: data.session.expires_in ?? null,
+          token_type: data.session.token_type ?? 'bearer',
+        }
+      : null;
+  const response = NextResponse.json(
+    sessionForBody ? { ok: true, session: sessionForBody } : { ok: true },
+    { status: 200, headers: NO_STORE }
+  );
 
   if (!existing) {
     // Re-check the beta gate. The OTP may have been issued during an
     // open-beta window or via a referral that has since been revoked.
     // If the gate fails, roll back the auth.users row and return the
     // generic OK — same privacy posture, no leak of why.
+    //
+    // Kids surface bypasses the gate at redemption for the same reason
+    // send-magic-link bypasses it at issuance: kids parents are not part
+    // of the adult waitlist funnel. The auth.users row was created with
+    // signup_source='kids'; runSignupBookkeeping consumes it below.
     const cookieJar = await cookies();
     const refCookie = cookieJar.get(REF_COOKIE_NAME)?.value;
-    const gate = await checkSignupGate(service, refCookie);
+    const gate: GateResult = client === 'kids'
+      ? { allowed: true, viaOwnerLink: false, codeId: null }
+      : await checkSignupGate(service, refCookie);
     if (!gate.allowed) {
       try {
         await service.auth.admin.deleteUser(user.id);
@@ -253,17 +286,26 @@ export async function POST(request: NextRequest) {
         email,
         reason: `gate_denied:${gate.reason || 'unknown'}`,
         ipTruncated,
+        client,
       });
       return genericOk();
     }
 
     const provider = user.app_metadata?.provider || 'email';
     const meta = (user.user_metadata || {}) as Record<string, unknown>;
-    await runSignupBookkeeping(service, user, provider, meta, request, response);
-    await writeAuditRow(service, { email, reason: 'signup_complete', ipTruncated });
+    // Prefer the surface stamp from user_metadata (set by send-magic-link
+    // at createUser) so the funnel tag persists even if a future client
+    // drops the request-body field. Fall back to request-body `client`
+    // for older auth.users rows that pre-date this stamping.
+    const signupSource: string =
+      typeof meta.signup_source === 'string' && meta.signup_source
+        ? meta.signup_source
+        : client;
+    await runSignupBookkeeping(service, user, provider, meta, request, response, { signupSource });
+    await writeAuditRow(service, { email, reason: 'signup_complete', ipTruncated, client: signupSource });
   } else {
     await runReturningUserBookkeeping(service, user, existing, request);
-    await writeAuditRow(service, { email, reason: 'signin_complete', ipTruncated });
+    await writeAuditRow(service, { email, reason: 'signin_complete', ipTruncated, client });
   }
 
   return response;
