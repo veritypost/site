@@ -24,6 +24,11 @@
  */
 
 // Strip HTML tags, entities, and markdown artifacts from text
+//
+// IMPORTANT: do NOT add a regex that strips bracket markers like /\[\[.+?\]\]/g.
+// Kid article interactive-moment markers ([[GLOSS:...]], [[REVEAL:...]],
+// [[PREDICT:...]]) intentionally survive cleanText() and are parsed downstream
+// (server-side render transform for web/adult; native parser on iOS Kids).
 export function cleanText(input: string): string {
   if (!input) return '';
   return input

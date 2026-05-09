@@ -19,8 +19,16 @@
  * restricted to http/https/mailto for hrefs, http/https/data for img src.
  * Inline styles, scripts, iframes, and event handlers are dropped.
  *
- * Pipeline (post markdown parse, pre sanitize):
- *   parse -> insertPullQuote -> markOverCapParagraphs -> sanitize
+ * Pipeline (pre markdown parse through sanitize):
+ *   transformMarkers -> parse -> insertPullQuote -> markOverCapParagraphs -> sanitize
+ *
+ * transformMarkers (Kids interactive-moment markers, Wave A 2026-05-09):
+ * runs BEFORE marked.parse so the resulting tokens [[GLOSS:term::def]] /
+ * [[REVEAL:fact]] / [[PREDICT:q::a||b||correct=N]] are rewritten to inline
+ * prose for web + adult readers. Kid iOS reads articles.body raw and parses
+ * markers natively for tap-card rendering. Markers only ever appear in
+ * articles.body (kid age band); on adult and tween articles the regex set
+ * is a no-op.
  *
  * Pull quote (item #13): purely render-side heuristic; long adult articles
  * (>=5 <p>) get one <aside class="pull-quote"> swapped in for the first
@@ -33,10 +41,15 @@
  * surface exists yet). Public reader leaves them unstyled.
  *
  * Platform applicability (LockedDecisions #18):
- *   - Web: applicable (this is the server-side body_html pipeline).
+ *   - Web: applicable (this is the server-side body_html pipeline). Kid
+ *     interactive-moment markers in articles.body are transformed inline
+ *     here so the rendered body_html reads as plain prose — no [[ tokens
+ *     reach the browser.
  *   - iOS adult: not applicable — iOS reads articles.body (plaintext
  *     markdown), never body_html.
- *   - iOS Kids: not applicable — same plaintext body path.
+ *   - iOS Kids: not applicable for body_html — Kids iOS reads
+ *     articles.body raw markdown and parses markers natively for the
+ *     Deep dive tap-card UI; this transform is the web-only fallback.
  */
 
 // T223 — `sanitize-html` is a Node-native sanitizer (~50KB + parse5
@@ -154,11 +167,68 @@ function markOverCapParagraphs(html: string): string {
   });
 }
 
+// Kids interactive-moment marker patterns (Wave A 2026-05-09).
+// Newline-excluding inner classes for GLOSS/PREDICT prevent runaway
+// matches across paragraph breaks; REVEAL allows multi-line.
+const GLOSS_MARKER_RE = /\[\[GLOSS:([^\n\]]*?)::([^\n\]]*?)\]\]/g;
+const REVEAL_MARKER_RE = /\[\[REVEAL:([\s\S]*?)\]\]/g;
+const PREDICT_MARKER_RE = /\[\[PREDICT:([^\n\]]*?)::([^\n\]]*?)\]\]/g;
+
+/**
+ * Transform Kids interactive-moment markers to inline prose for web + adult
+ * readers. iOS Kids reads articles.body raw and parses markers natively;
+ * everywhere else markers must read as plain text.
+ *
+ *   [[GLOSS:term::definition]]              -> "term — definition"
+ *   [[REVEAL:fact]]                         -> "fact"
+ *   [[PREDICT:question::a||b||correct=N]]   -> "question Answer: <option_N>."
+ *
+ * Malformed markers (missing "::", out-of-range correct=N, options that
+ * contain "||" inside their own text, etc.) pass through as literal text —
+ * the regex either won't match (GLOSS/PREDICT require the "::" separator)
+ * or the inline parser inside falls back gracefully.
+ *
+ * Adult/tween bodies never carry these markers, so this is a no-op there.
+ */
+export function transformInteractiveMomentsForWeb(markdown: string): string {
+  if (!markdown) return markdown;
+  let out = markdown.replace(GLOSS_MARKER_RE, (_full, term: string, def: string) => {
+    return `${term} — ${def}`;
+  });
+  out = out.replace(PREDICT_MARKER_RE, (full, question: string, optionsBlob: string) => {
+    // Options separated by "||"; one option ends with "correct=N".
+    const parts = optionsBlob.split('||');
+    let correctIdx = -1;
+    const options: string[] = [];
+    for (const raw of parts) {
+      const m = raw.match(/^correct=(\d+)$/);
+      if (m) {
+        correctIdx = parseInt(m[1], 10);
+      } else {
+        options.push(raw);
+      }
+    }
+    if (correctIdx < 0 || correctIdx >= options.length) {
+      // Out-of-range or missing correct=N → leave literal so iOS / inspection
+      // can surface the malformation.
+      return full;
+    }
+    return `${question} Answer: ${options[correctIdx]}.`;
+  });
+  out = out.replace(REVEAL_MARKER_RE, (_full, fact: string) => fact);
+  return out;
+}
+
 export function renderBodyHtml(markdown: string): string {
   if (!markdown) return '';
+  // Step 1: transform Kids interactive-moment markers to inline prose
+  // BEFORE marked.parse so they're rendered as ordinary text. iOS Kids
+  // reads articles.body raw and parses markers natively for the Deep
+  // dive tap-card UI; this path is web/adult-only.
+  const transformed = transformInteractiveMomentsForWeb(markdown);
   // marked.parse returns string when `async: false` — cast verified against
   // marked@^18 types (parse can return Promise<string> when awaited async).
-  const raw = marked.parse(markdown, { async: false }) as string;
+  const raw = marked.parse(transformed, { async: false }) as string;
   const withPullQuote = insertPullQuote(raw);
   const withOverCap = markOverCapParagraphs(withPullQuote);
   return sanitizeHtml(withOverCap, SANITIZE_OPTIONS);

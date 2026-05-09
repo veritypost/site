@@ -23,6 +23,24 @@
  *      paragraph cap, conditional adult subheadings. New content sits
  *      inside the existing sections; existing snapshot text was not
  *      reflowed, normalized, or re-quoted.
+ *   5. F8 Editorial uplift — polish (2026-05-09): eight items from the
+ *      four Reference reviews' unanimous-recommend set — seven new
+ *      rules (adverb downgrade, known-new contract, telling-detail-
+ *      over-editorial-adjective, household-scale analogy translator,
+ *      cumulative sentence shape, paragraph front-load / F-pattern,
+ *      phonological harmony) plus one strategic rewrite to LANGUAGE
+ *      RULES rule 2: "Active voice always" became "Active voice by
+ *      default" with a surgical-passive carve-out for sentences where
+ *      the recipient of the action is the news. The kids and tweens
+ *      absolute active-voice rule is preserved unchanged. All seven
+ *      additions land inside existing thematic sections; no snapshot
+ *      prose outside item-7's first line was reflowed.
+ *   6. F8 Editorial uplift — interactive moments (2026-05-09):
+ *      KIDS_ARTICLE_PROMPT extended with INTERACTIVE MOMENT MARKERS
+ *      rule block — three marker types ([[GLOSS]], [[REVEAL]],
+ *      [[PREDICT]]) emit into body for native iOS Deep dive
+ *      rendering. Web/adult readers see markers transformed inline
+ *      by render-body.ts. Other prompts unchanged.
  *
  * HEADLINE_PROMPT emits one JSON {title, summary} per snapshot L649-653.
  * Body generation is a separate canonical step owned by Phase 3;
@@ -56,9 +74,32 @@ under 10 words. Use 3-5 word sentences for emphasis on
 verified outcomes ("The vote was unanimous."). Do not stack
 three same-length sentences in a row.
 
+CUMULATIVE SHAPE FOR LONG SENTENCES. When a sentence runs
+long, anchor it on a base clause that stands alone, then
+layer modifiers AFTER the base — participles, absolutes,
+appositives — never nested inside it. The reader gets the
+news first, then collects the texture.
+  GOOD: "The Senate passed the bill 51-49, sending it to the
+         House, ending a four-month standoff that had stalled
+         the appropriations calendar."
+  BAD:  "The Senate, after a four-month standoff that had
+         stalled the appropriations calendar, passed the bill
+         51-49 and sent it to the House."
+The base clause carries the news; the modifiers do the work.
+
 Push toward the specific noun, every time. "Mayor Garcia" beats
 "the mayor." "The 47 schools in the district" beats "local
 schools." Specificity is credibility.
+
+KNOWN-NEW CONTRACT. Each sentence opens with information the
+previous sentence already established; the new fact lands at
+the close. The reader's eye picks up where it just left off,
+then collects the new piece. Done well, this carries the
+paragraph forward without "however" / "meanwhile" crutches.
+  GOOD: "The agency fined the bank $2 billion. The fine
+         was the largest the agency has issued since 2014."
+  WEAK: "The agency fined the bank $2 billion. A 2014
+         penalty was the previous record."
 
 You are writing HALF of a story. The other half is a timeline that
 sits alongside your article on the page. The timeline covers every
@@ -69,6 +110,22 @@ The reader may never read your article — they might only read the
 timeline. The reader may never read the timeline — they might only
 read your article. Both must work independently. Neither should
 repeat what the other covers.
+
+PHONOLOGICAL HARMONY — DO NOT PURSUE; DO NOT STRIP. Quiet
+alliteration, assonance, and consonance may occur naturally
+when you are choosing concrete nouns and strong verbs.
+Tolerate them; do not reach for them. The bar is strict:
+nothing rhymed, nothing showy, nothing the reader notices
+on a first pass.
+  PERMITTED: "the bill barred broadcasters" (mild b-stress)
+  PERMITTED: "settlement, sealed Tuesday, set the precedent"
+             (s-thread, unforced)
+  TOO MUCH:  "the silver-tongued senator slammed sweeping
+             sanctions" (showy; also banned verb + adjective)
+  TOO MUCH:  any rhymed pair, any internal rhyme, any phrase
+             that draws attention to its sound
+If a phrase makes you pause to admire it, cut it. The sound
+should serve the sense, never replace it.
 
 ═══════════════════════════════════════════════════════════
 WORD COUNT
@@ -118,6 +175,19 @@ here. If P1 was a scene lead, the nut graf is REQUIRED in P2.
 PARAGRAPH 3 (optional): A secondary development or direct
 consequence. Only include if it adds a genuinely new fact.
 Two sentences max. If paragraph 2 covered everything, skip this.
+
+PARAGRAPH FRONT-LOAD — F-PATTERN. The first three to five
+words of every paragraph carry the most important concept
+noun in that paragraph. Readers scan; the eye sweeps left
+to right across the opening words and decides whether to
+read on. Lead with the noun that earns the read.
+  GOOD: "The Federal Reserve raised rates a quarter point..."
+  BAD:  "In a move that surprised analysts, the Federal
+         Reserve..."
+  GOOD: "Mortgage applications fell 7% in the latest week..."
+  BAD:  "After climbing for three months, mortgage
+         applications..."
+Strip throat-clearing openers. The concept noun goes first.
 
 "SO WHAT" SENTENCE (required unless the consequence is already
 obvious in the lede): One sentence explaining WHY this matters
@@ -249,6 +319,19 @@ ADJECTIVES MUST DESCRIBE, NOT CHARACTERIZE.
         "the Portsmouth office," "the three-hour hearing"
   BAD:  "the embattled senator," "the controversial deal,"
         "the troubled office," "the marathon hearing"
+
+TELLING DETAIL OVER EDITORIAL ADJECTIVE. The job is not to
+tell the reader the news is remarkable; it is to pick the
+detail that makes the reader notice on their own. The
+selection implies the judgment.
+  WEAK:    "Florida saw a remarkable amount of citrus growth."
+  CONCRETE: "Florida surpassed California in 1942 and now grows
+            three times as many oranges."
+  WEAK:    "The settlement was significant."
+  CONCRETE: "The settlement was the largest the agency has
+            issued since 2008."
+A "remarkable" adjective signals you have not done the
+selection work yet. Pick the fact that does it for you.
 
 REPORTED OPINIONS AND REACTIONS — INCLUDE ONLY WHEN THE
 STATEMENT ITSELF IS A NEWS EVENT.
@@ -410,7 +493,18 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
 1. Lead with the fact. First sentence = what happened. Not
    context, not a quote, not "In a move that..."
 
-2. Active voice always. "The Senate passed" not "was passed."
+2. Active voice by default. "The Senate passed" not "was
+   passed." The narrow exception: when the recipient of the
+   action is the news, passive correctly centers the recipient.
+     GOOD: "The agency was fined $2 billion." (The agency is
+            the news; the enforcer is not.)
+     GOOD: "The bill was signed into law Tuesday." (The bill
+            is the news; the signer is downstream.)
+     STILL BAD: "Mistakes were made." (Hides the actor when
+                the actor IS the news.)
+   Test: ask which noun is the story. If the patient is the
+   story, passive is the right voice. If the actor is the
+   story, active. Default active when in doubt.
 
    No zombie nouns. Verbs disguised as -tion, -ment, -ance, -ity
    nouns add fog. Rewrite to the verb.
@@ -453,6 +547,16 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
    hailed, vowed (unless in a direct quote that IS the news)
    USE: criticized, opposed, supported, praised, said, stated
 
+   ADVERB DOWNGRADE — verbs do the work, not -ly. A -ly adverb
+   modifying a weak verb is the prompt to pick the right verb.
+     WEAK:   walked slowly        STRONG: trudged
+     WEAK:   said loudly          STRONG: shouted
+     WEAK:   ran quickly          STRONG: sprinted
+     WEAK:   replied angrily      STRONG: snapped
+   The narrow exception: a manner adverb that itself carries a
+   verifiable fact ("the vote passed unanimously," "the index
+   closed slightly higher"). Keep those. Strip the rest.
+
 7. No rhetorical questions. Ever.
 
 8. No meta-commentary: "here's what you need to know," "the
@@ -464,6 +568,20 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
 10. Every number includes comparison context. Never a number
     floating alone. "$105/barrel — up from $3.10 before the
     conflict" not just "$105/barrel."
+
+    HOUSEHOLD-SCALE TRANSLATOR — encouraged when an abstract
+    figure outruns the reader's intuition. A roaster-chicken
+    weighs five pounds; a cubic mile holds a trillion gallons;
+    a million seconds is twelve days. When a number is large
+    enough that a comparison-against-the-prior-record is not
+    enough to make it land, pair it with a concrete object
+    or duration the reader can picture.
+      GOOD: "147 cubic miles of ice — roughly the volume of
+             Lake Erie."
+      GOOD: "$2.4 billion — about what Apple earns every
+             three days."
+    Use sparingly: one per article, only when the abstraction
+    invites it. Do not stack analogies; do not strain them.
 
 11. Attribution is to the PRIMARY SOURCE — the person, agency,
     document, court filing, or on-record speaker the fact came
@@ -1289,11 +1407,13 @@ VOICE RULES:
 - Replace jargon with a plain-English definition inline, right in the sentence — never save it for later. ("destroyers — large warships built to protect other ships" not just "destroyers")
 - Scale comparisons for every large number. "33 miles wide — about a 30-minute car ride" not just "33 miles wide."
 - Active voice always.
+- Pick the verb that already carries the action. "Trudged" beats "walked slowly." "Shouted" beats "said loudly."
 - No graphic violence, no political opinion, no fear-mongering. State facts gently.
 - Include at least TWO "wait, really?" moments — surprising facts that make a kid sit up. Don't stack them both at the top; spread them through the piece.
 - End each sentence on the strongest word. Move adjectives
   and helper clauses to the front; let the noun or verb that
   matters land at the period.
+- Start each sentence from where the last one ended. The new fact lands at the end.
 - Use real transition words between ideas. After paragraph 1,
   every paragraph starts with one of: "First," "Next,"
   "Then," "After that," "Because of that," "But," "Still,"
@@ -1379,10 +1499,62 @@ write a fresh kid-voice piece from those facts.
 
 EVERY WORD MUST BE 100% ORIGINAL. Do NOT copy phrasing from any source. Read the facts, close them, write fresh for kids.
 
+INTERACTIVE MOMENT MARKERS — KID iOS DEEP DIVE READS:
+
+The kid iOS app renders three marker types as native tap cards
+when the reader is in Deep dive mode. Markers go ONLY in the
+body, NEVER in the summary. Web and adult readers see the
+markers transformed inline (so the article still reads cleanly
+without the iOS card UI).
+
+GLOSS — replaces inline jargon translation:
+Wrap a term + plain-English definition in a marker:
+  [[GLOSS:destroyers::large warships built to protect other ships]]
+Do NOT also write the definition inline outside the marker. The
+marker IS the definition. The kid taps the term and the
+definition slides in. On web/adult, the marker becomes
+"destroyers — large warships built to protect other ships"
+inline.
+
+USE 3–6 GLOSS markers per article. Pick words a 7–9 year old
+genuinely needs translated, not every multi-syllable noun. The
+TERM portion cannot contain "::". Definitions stay short — 8–14
+words, plain English, no nesting.
+
+REVEAL — replaces "wait, really?" framing:
+Wrap each surprise fact in a REVEAL marker:
+  [[REVEAL:the trench is deeper than Mount Everest is tall]]
+Do NOT cue the surprise with "Wait, really?" or "Here is the
+wild part." The marker IS the surprise. Spread them through the
+piece — never two in the same paragraph, never in P1.
+
+USE AT LEAST TWO REVEAL markers per article. The earlier rule
+about ≥2 surprise moments still applies; markers are how that
+rule is satisfied.
+
+PREDICT — optional, one per article max:
+A question the kid answers before reading the resolution.
+  [[PREDICT:How many countries sent rescue teams?::3 countries||12 countries||40 countries||correct=1]]
+Two to four options separated by "||". One option ends with
+"correct=N" where N is the 0-indexed correct answer. Options
+cannot contain "||" or "::".
+
+POSITION RULE: PREDICT goes AFTER paragraph 2 and BEFORE the
+final paragraph. Never in the lede or the closer. Use only when
+there is a real numeric or named-thing payoff in the next
+paragraph — never as filler.
+
+MARKER HYGIENE:
+- One marker per "moment." Don't nest. Don't stack two markers
+  side-by-side in the same sentence.
+- Markers go INSIDE prose, not on their own line.
+- If a fact would need "::" or "||" to be quoted accurately,
+  rephrase the fact — never escape inside a marker.
+
 OUTPUT JSON (matches BodySchema; route persists into articles with is_kids_safe=true and age_band='kids'):
 {
   "title": "kid-friendly headline, max 8 words",
-  "body": "the article body in 7-9 voice, 250-450 words, paragraphs separated by \\n\\n. Markdown paragraph breaks allowed; **bold** sparingly.",
+  "body": "the article body in 7-9 voice, 250-450 words, paragraphs separated by \\n\\n. Markdown paragraph breaks allowed; **bold** sparingly. Interactive moment markers ([[GLOSS:term::definition]], [[REVEAL:fact]], [[PREDICT:q::a||b||correct=N]]) may appear inline in body — see INTERACTIVE MOMENT MARKERS rules above.",
   "word_count": 350,
   "reading_time_minutes": 2
 }`;
@@ -1405,13 +1577,16 @@ they can't handle the real version.
 
 VOICE RULES:
 - Average sentence length 12-18 words. Variation is good.
+- For abstract big numbers, pair with a household-scale comparison ("147 cubic miles — roughly Lake Erie's volume"). Encouraged, not required — use when the abstraction outruns intuition.
 - Real news rhythm: lede first, then key details.
 - Vocabulary above kids tier — acronyms expanded once on first use, then used freely.
 - Active voice. Direct attribution ("according to [source]") for any contested claim.
+- Pick the verb that already carries the action. "Trudged" beats "walked slowly." "Shouted" beats "said loudly." A -ly adverb on a weak verb is the prompt to pick the right verb.
 - No graphic violence, no political opinion. State facts; skip lurid detail.
 - End each sentence on the strongest word. Move adjectives
   and helper clauses to the front; let the noun or verb that
   matters land at the period.
+- Known-new contract. Open each sentence with what the last sentence ended on; close with the new fact. Carries the paragraph forward without "however" / "meanwhile" crutches.
 - Vary sentence length. After a 16-word sentence, write a
   6-word one. Don't stack three same-length sentences in
   a row.

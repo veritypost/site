@@ -9935,6 +9935,11 @@ export type Database = {
           device_type: string | null
           id: string
           kid_profile_id: string | null
+          mode_used: 'quick' | 'deep' | null
+          moment_glossary_taps: number
+          moment_predict_correct: boolean | null
+          moment_predict_shown: boolean
+          moment_reveal_taps: number
           points_earned: number
           read_percentage: number
           referrer_url: string | null
@@ -9951,6 +9956,11 @@ export type Database = {
           device_type?: string | null
           id?: string
           kid_profile_id?: string | null
+          mode_used?: 'quick' | 'deep' | null
+          moment_glossary_taps?: number
+          moment_predict_correct?: boolean | null
+          moment_predict_shown?: boolean
+          moment_reveal_taps?: number
           points_earned?: number
           read_percentage?: number
           referrer_url?: string | null
@@ -9967,6 +9977,11 @@ export type Database = {
           device_type?: string | null
           id?: string
           kid_profile_id?: string | null
+          mode_used?: 'quick' | 'deep' | null
+          moment_glossary_taps?: number
+          moment_predict_correct?: boolean | null
+          moment_predict_shown?: boolean
+          moment_reveal_taps?: number
           points_earned?: number
           read_percentage?: number
           referrer_url?: string | null

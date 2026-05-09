@@ -5,6 +5,12 @@ import Supabase
 // Reading is logged when the kid taps "Take the quiz" — completion is recorded
 // at that point. Scroll-progress tracking is deferred.
 
+/// Wave B — two-mode reader. Quick = today's 50-word `kids_summary` (default,
+/// no behavioral change vs. pre-Wave-B). Deep dive = the full kid `body`
+/// parsed for `[[GLOSS]]` / `[[REVEAL]]` / `[[PREDICT]]` markers and rendered
+/// as native tap cards by `KidArticleBodyView`. Per-article, no persistence.
+private enum ReaderMode: String { case quick, deep }
+
 // Apple Kids 1.3 — first-party imagery only.
 private let allowedImageHosts: Set<String> = {
     var hosts: [String] = ["cdn.veritypost.com"]
@@ -30,6 +36,14 @@ struct KidReaderView: View {
     @EnvironmentObject private var auth: KidsAuth
 
     @State private var body_: String = ""
+    /// Wave B — full kid body (with markers). Nil/empty when the article
+    /// pre-dates the kid pipeline writing `body`, in which case the
+    /// Quick/Deep toggle hides entirely and reader behavior matches today.
+    @State private var bodyFull_: String? = nil
+    @State private var mode: ReaderMode = .quick
+    /// Live aggregate of GLOSS / REVEAL / PREDICT engagement during Deep dive.
+    /// Wave C will stamp this into `reading_log` at quiz-tap time.
+    @State private var counters: InteractiveMomentCounters = .zero
     @State private var loading: Bool = true
     @State private var loadError: String? = nil
     @State private var startTime: Date = Date()
@@ -71,21 +85,40 @@ struct KidReaderView: View {
                         // no path forward into a quiz on an unwritten story.
                         notReadyState
                     } else {
-                        // Split on blank-line paragraph breaks so kids get
-                        // visible block spacing instead of one wall of text.
-                        // SwiftUI's default Text collapses `\n\n` to a single
-                        // newline of vertical gap, which reads as cramped.
-                        let paragraphs = body_
-                            .components(separatedBy: "\n\n")
-                            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                            .filter { !$0.isEmpty }
-                        VStack(alignment: .leading, spacing: 14) {
-                            ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, p in
-                                Text(p)
-                                    .font(.system(.body, design: .rounded, weight: .regular))
-                                    .foregroundStyle(K.text)
-                                    .lineSpacing(5)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                        // Wave B — Quick/Deep dive toggle. Only shown when
+                        // the article has a non-empty `body` AND that body
+                        // contains at least one interactive marker. Older
+                        // articles without a kid `body` (or kid bodies that
+                        // happen to carry no markers) fall through to
+                        // Quick-only — same UX as pre-Wave-B.
+                        if hasDeepDiveAvailable {
+                            modeToggle
+                                .padding(.bottom, 4)
+                        }
+
+                        if mode == .deep, let full = bodyFull_, !full.isEmpty {
+                            KidArticleBodyView(
+                                articleBody: full,
+                                categoryColor: categoryColor,
+                                onCountersChange: { counters = $0 }
+                            )
+                        } else {
+                            // Split on blank-line paragraph breaks so kids get
+                            // visible block spacing instead of one wall of text.
+                            // SwiftUI's default Text collapses `\n\n` to a single
+                            // newline of vertical gap, which reads as cramped.
+                            let paragraphs = body_
+                                .components(separatedBy: "\n\n")
+                                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                                .filter { !$0.isEmpty }
+                            VStack(alignment: .leading, spacing: 14) {
+                                ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, p in
+                                    Text(p)
+                                        .font(.system(.body, design: .rounded, weight: .regular))
+                                        .foregroundStyle(K.text)
+                                        .lineSpacing(5)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
                             }
                         }
 
@@ -125,6 +158,11 @@ struct KidReaderView: View {
         // on foreground transition to keep the kid on the live revision.
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
+            // Reset per-session reader state so the kid lands fresh on the
+            // live revision: Quick is the default mode for every load, and
+            // marker tap counters reset alongside the body re-parse.
+            mode = .quick
+            counters = .zero
             Task { await loadArticle() }
         }
     }
@@ -269,6 +307,54 @@ struct KidReaderView: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: Wave B — mode toggle
+
+    /// Show the Quick/Deep toggle only when there's a non-empty `body` AND
+    /// it carries at least one interactive marker. Otherwise Deep dive has
+    /// nothing to offer and the kid sees Quick-only (same as pre-Wave-B).
+    private var hasDeepDiveAvailable: Bool {
+        guard let full = bodyFull_, !full.isEmpty else { return false }
+        // Cheap pre-filter — full regex parse runs only after the kid taps Deep.
+        return full.contains("[[GLOSS:") || full.contains("[[REVEAL:") || full.contains("[[PREDICT:")
+    }
+
+    private var modeToggle: some View {
+        HStack(spacing: 0) {
+            modePill(.quick, label: "Quick")
+            modePill(.deep,  label: "Deep dive")
+        }
+        .padding(4)
+        .background(K.card)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(K.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func modePill(_ target: ReaderMode, label: String) -> some View {
+        let selected = mode == target
+        return Button {
+            guard mode != target else { return }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(K.springSnap) { mode = target }
+        } label: {
+            Text(label)
+                .font(.scaledSystem(
+                    size: 14,
+                    weight: selected ? .heavy : .semibold,
+                    design: .rounded
+                ))
+                .foregroundStyle(selected ? Color.white : K.dim)
+                .frame(maxWidth: .infinity, minHeight: 32)
+                .background(selected ? K.teal : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
     /// A7 — shown when an article has no kids_summary. Friendly placeholder
     /// + back-to-list button. No quiz button since there's no kid-band copy
     /// to quiz on.
@@ -331,6 +417,13 @@ struct KidReaderView: View {
 
         struct Row: Decodable {
             let kids_summary: String?
+            // Wave B — kid `body` is the full 250–450-word kid article that
+            // the server pipeline writes alongside `kids_summary`. Only
+            // surfaced when the kid switches to Deep dive; never shown raw
+            // on Quick. The column is the kid pipeline's own kid-band
+            // rewrite, NOT the adult `body` (those are different columns'
+            // semantics in this kid context — see editorial-guide.ts).
+            let body: String?
         }
 
         do {
@@ -339,13 +432,15 @@ struct KidReaderView: View {
             // adult article by known UUID. Explicit is_kids_safe=true
             // filter catches both cases.
             //
-            // A7 — only `kids_summary` is selected. The adult `body` column
-            // is intentionally not fetched so a future code path can't
-            // accidentally re-introduce the fall-through. Empty result
-            // routes to the notReadyState empty branch in `body`.
+            // A7 — `kids_summary` remains the Quick-mode source of truth.
+            // `body` is fetched for Deep dive (Wave B). Without
+            // `kids_summary` the empty branch still routes to notReadyState
+            // — Deep dive does NOT rescue an unwritten kid story, since
+            // markers in `body` only exist when the kid pipeline actually
+            // ran end-to-end and produced both columns.
             let row: Row = try await client
                 .from("articles")
-                .select("kids_summary")
+                .select("kids_summary, body")
                 .eq("id", value: article.id)
                 .eq("is_kids_safe", value: true)
                 .single()
@@ -353,10 +448,12 @@ struct KidReaderView: View {
                 .value
             self.loadError = nil
             self.body_ = row.kids_summary ?? ""
+            self.bodyFull_ = row.body
             self.startTime = Date()
         } catch {
             self.loadError = "Couldn't load article"
             self.body_ = ""
+            self.bodyFull_ = nil
         }
     }
 
@@ -414,6 +511,11 @@ struct KidReaderView: View {
             throw URLError(.userAuthenticationRequired)
         }
         let elapsed = Int(Date().timeIntervalSince(startTime))
+        // Wave C — stamp the mode the kid was in at quiz-tap time plus the
+        // running interactive-moment aggregate. `mode_used` is read once
+        // here, not at first switch, so a kid who toggles mid-read logs
+        // their final state. `counters` mirrors `KidArticleBodyView`'s
+        // per-session totals via the onCountersChange callback.
         let row = ReadingLogInsert(
             user_id: nil,
             kid_profile_id: kidId,
@@ -422,7 +524,12 @@ struct KidReaderView: View {
             time_spent_seconds: elapsed,
             completed: true,
             source: "kids-ios",
-            device_type: "ios"
+            device_type: "ios",
+            mode_used: mode == .deep ? "deep" : "quick",
+            moment_glossary_taps: counters.glossaryTaps,
+            moment_reveal_taps: counters.revealTaps,
+            moment_predict_shown: counters.predictShown,
+            moment_predict_correct: counters.predictCorrect
         )
         // T-018 — single retry then log. K4 — throw on second failure so the
         // caller (takeQuiz button → KidQuizResult flag) can tell celebration

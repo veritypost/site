@@ -144,6 +144,14 @@ struct ReadingLogInsert: Encodable {
     let completed: Bool
     let source: String?
     let device_type: String?
+    // Wave C — interactive moments aggregate. Optional on Encodable so
+    // the Supabase Swift PostgREST encoder omits null values; the
+    // column defaults take over server-side.
+    let mode_used: String?
+    let moment_glossary_taps: Int?
+    let moment_reveal_taps: Int?
+    let moment_predict_shown: Bool?
+    let moment_predict_correct: Bool?
 }
 
 // MARK: - Quiz + Quiz attempts
