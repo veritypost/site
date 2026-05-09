@@ -47,6 +47,7 @@ import {
   RetryExhaustedError,
   AbortedError,
   PerRunCapExceededError,
+  PlagiarismCheckFailedError,
 } from '@/lib/pipeline/errors';
 import { scrapeArticle } from '@/lib/pipeline/scrape-article';
 import { keywordOverlap } from '@/lib/pipeline/cluster';
@@ -542,6 +543,7 @@ function classifyError(err: unknown): string {
   if (err instanceof RetryExhaustedError) return 'provider_error';
   if (err instanceof AudienceMismatchError) return 'schema_validation';
   if (err instanceof PersistArticleError) return 'persist_conflict';
+  if (err instanceof PlagiarismCheckFailedError) return 'plagiarism_rewrite_failed';
   if (err instanceof z.ZodError) return 'schema_validation';
   const msg = err instanceof Error ? err.message : String(err);
   if (/malformed json/i.test(msg)) return 'json_parse';
@@ -2050,7 +2052,7 @@ Return JSON:
     let finalPlagOverlap = plagResult.maxOverlap;
     // M4 / Q9 — track plagiarism step outcome so we can flag the persisted
     // article for manual review when soft-degrade kept the original body.
-    let plagiarismStatus: 'ok' | 'rewritten' | 'rewrite_kept_original' | 'rewrite_failed' = 'ok';
+    let plagiarismStatus: 'ok' | 'rewritten' = 'ok';
     if (plagResult.maxOverlap >= settings.plagiarism_rewrite_pct) {
       const flaggedOutlets = plagResult.results
         .filter((r) => r.similarity >= settings.plagiarism_rewrite_pct)
@@ -2123,25 +2125,42 @@ Return JSON:
       totalCostUsd += rewriteRes.cost_usd;
       assertPerRunCap(totalCostUsd, perRunCapUsd);
       if (rewriteRes.rewrite_status === 'failed') {
-        plagiarismStatus = 'rewrite_failed';
-      } else if (rewriteRes.rewritten) {
-        const secondCheck = checkPlagiarism(
-          rewriteRes.body,
-          sourceTexts.map((s) => ({ outlet: s.outlet ?? 'Unknown', text: s.text })),
-          settings.plagiarism_ngram_size,
-          settings.plagiarism_flag_pct
+        throw new PlagiarismCheckFailedError(
+          'Plagiarism rewrite call failed',
+          'rewrite_failed',
+          plagResult.maxOverlap,
+          plagResult.maxOverlap,
+          settings.plagiarism_flag_pct,
         );
-        if (secondCheck.maxOverlap < plagResult.maxOverlap) {
-          finalBodyMarkdown = rewriteRes.body;
-          finalPlagOverlap = secondCheck.maxOverlap;
-          plagiarismStatus = 'rewritten';
-        } else {
-          plagiarismStatus = 'rewrite_kept_original';
-        }
-      } else {
-        // 'no_change' — model returned identical/short text
-        plagiarismStatus = 'rewrite_kept_original';
       }
+      if (rewriteRes.rewrite_status === 'no_change') {
+        throw new PlagiarismCheckFailedError(
+          'Plagiarism rewrite returned identical or empty body',
+          'rewrite_no_change',
+          plagResult.maxOverlap,
+          plagResult.maxOverlap,
+          settings.plagiarism_flag_pct,
+        );
+      }
+      // rewrite_status === 'rewritten' — re-check against absolute threshold.
+      const secondCheck = checkPlagiarism(
+        rewriteRes.body,
+        sourceTexts.map((s) => ({ outlet: s.outlet ?? 'Unknown', text: s.text })),
+        settings.plagiarism_ngram_size,
+        settings.plagiarism_flag_pct,
+      );
+      if (secondCheck.maxOverlap > settings.plagiarism_flag_pct) {
+        throw new PlagiarismCheckFailedError(
+          `Rewrite still over flag threshold (${secondCheck.maxOverlap}% > ${settings.plagiarism_flag_pct}%)`,
+          'rewrite_over_threshold',
+          plagResult.maxOverlap,
+          secondCheck.maxOverlap,
+          settings.plagiarism_flag_pct,
+        );
+      }
+      finalBodyMarkdown = rewriteRes.body;
+      finalPlagOverlap = secondCheck.maxOverlap;
+      plagiarismStatus = 'rewritten';
     }
     // Flag for manual review whenever soft-degrade kept original near-dup
     // body OR rewrite errored out. Editors clear before publish (M4 / Q9).
@@ -2149,10 +2168,12 @@ Return JSON:
     // surfaced by the source_grounding Haiku audit) + attributionFlaggedReview
     // (regex hit on the libel-shaped attribution phrasings forbidden by
     // EDITORIAL GUIDE rule NEVER INVENT ATTRIBUTION).
+    // Hard-gate (Plagiarism-Gate-Plan.md, 2026-05-09) throws on
+    // 'rewrite_failed' / 'rewrite_no_change' / 'rewrite_over_threshold' before
+    // we reach this point, so plagiarismStatus is now always 'ok' | 'rewritten'
+    // and finalPlagOverlap <= flag_pct. needsManualReview narrows to the
+    // remaining non-plag triggers.
     const needsManualReview =
-      plagiarismStatus === 'rewrite_failed' ||
-      plagiarismStatus === 'rewrite_kept_original' ||
-      finalPlagOverlap > settings.plagiarism_flag_pct ||
       groundingFlaggedReview ||
       attributionFlaggedReview;
     if (finalPlagOverlap > settings.plagiarism_flag_pct) {
@@ -2945,6 +2966,8 @@ function statusForError(errorType: string | null): number {
       return 500;
     case 'persist_conflict':
       return 500;
+    case 'plagiarism_rewrite_failed':
+      return 422;
     case 'provider_error':
       return 502;
     case 'timeout':
@@ -2971,6 +2994,8 @@ function safeErrorMessage(errorType: string | null): string {
       return 'Model output failed validation';
     case 'persist_conflict':
       return 'Persist failed';
+    case 'plagiarism_rewrite_failed':
+      return 'Originality check failed — could not produce a clean rewrite';
     case 'provider_error':
       return 'Model provider error';
     case 'timeout':

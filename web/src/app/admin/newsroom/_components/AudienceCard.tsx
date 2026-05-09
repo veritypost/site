@@ -165,10 +165,14 @@ function AudienceCard(props: AudienceCardProps) {
         setArticleStatus(next);
       }
       // Trust signals — set by the article-gen pipeline at completion.
-      // plagiarism_status takes 'ok' | 'rewritten' | 'rewrite_kept_original'
-      // | 'rewrite_failed'; needs_manual_review goes true on soft-degrade
-      // or sanitizer failure. Surfacing both inline so the operator sees
-      // quality status without opening the article.
+      // New runs (post Plagiarism-Gate hard-fail, 2026-05-09) only emit
+      // plagiarism_status of 'ok' | 'rewritten' — failed rewrites now abort
+      // the run with no article persisted. Historical rows may still carry
+      // 'rewrite_failed' | 'rewrite_kept_original'; the rendering branches
+      // below handle those legacy values. needs_manual_review goes true on
+      // grounding/attribution flags or sanitizer failure. Surfacing both
+      // inline so the operator sees quality status without opening the
+      // article.
       setPlagiarismStatus(json?.article?.plagiarism_status ?? null);
       setNeedsManualReview(!!json?.article?.needs_manual_review);
     } catch {

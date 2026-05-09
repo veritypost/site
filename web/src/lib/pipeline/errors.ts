@@ -67,3 +67,16 @@ export class PerRunCapExceededError extends Error {
     this.name = 'PerRunCapExceededError';
   }
 }
+
+export class PlagiarismCheckFailedError extends Error {
+  constructor(
+    msg: string,
+    public reason: 'rewrite_failed' | 'rewrite_no_change' | 'rewrite_over_threshold',
+    public first_pass_overlap_pct: number,
+    public final_overlap_pct: number,
+    public flag_threshold_pct: number,
+  ) {
+    super(msg);
+    this.name = 'PlagiarismCheckFailedError';
+  }
+}
