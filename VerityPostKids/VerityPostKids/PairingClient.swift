@@ -21,6 +21,21 @@ struct PairSuccess: Decodable {
     let expires_at: String
 }
 
+struct ExistingKid: Decodable, Identifiable, Equatable {
+    let id: String
+    let display_name: String
+    let avatar_url: String?
+    let avatar_preset: String?
+    let avatar_color: String?
+    let paused_at: String?
+    let is_active: Bool
+    let has_pin: Bool
+}
+
+private struct ExistingKidList: Decodable {
+    let kids: [ExistingKid]
+}
+
 // K2: /api/kids/refresh response shape (no kid_name — only the rotating fields).
 private struct RefreshSuccess: Decodable {
     let access_token: String
@@ -259,6 +274,91 @@ final class PairingClient {
             if code == "seat_check_unavailable" { throw PairError.seatCheckUnavailable }
             throw PairError.notConfigured
         default:   throw PairError.server(msg)
+        }
+    }
+
+    // MARK: List + Adopt Existing (returning-parent flow)
+
+    /// Fetch the parent's active kids for the picker. Bearer is the parent's
+    /// access token from /api/auth/verify-magic-code.
+    func listKids(parentToken: String) async throws -> [ExistingKid] {
+        let url = SupabaseKidsClient.shared.siteURL
+            .appendingPathComponent("api/kids/parent/list")
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.timeoutInterval = 15
+        req.setValue("Bearer \(parentToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: req)
+        } catch {
+            throw PairError.network
+        }
+        guard let http = response as? HTTPURLResponse else {
+            throw PairError.server("Unexpected response")
+        }
+
+        if http.statusCode == 200 {
+            return try JSONDecoder().decode(ExistingKidList.self, from: data).kids
+        }
+        let envelope = (try? JSONDecoder().decode(PairErrorEnvelope.self, from: data))
+        let msg = envelope?.error ?? "Couldn\u{2019}t load readers"
+        switch http.statusCode {
+        case 401: throw PairError.unauthorized
+        case 429: throw PairError.rateLimited
+        case 503: throw PairError.notConfigured
+        default:  throw PairError.server(msg)
+        }
+    }
+
+    /// Mint a kid session for an existing profile the parent owns. Persists
+    /// the kid token to keychain + UserDefaults and applies the bearer to the
+    /// shared Supabase client — identical post-success behaviour to pairDirect.
+    func adoptExistingKid(
+        parentToken: String,
+        kidProfileId: String
+    ) async throws -> PairSuccess {
+        let url = SupabaseKidsClient.shared.siteURL
+            .appendingPathComponent("api/kids/parent/adopt-existing")
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 15
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(parentToken)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try JSONSerialization.data(withJSONObject: [
+            "kid_profile_id": kidProfileId,
+            "device": deviceId,
+        ])
+
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: req)
+        } catch {
+            throw PairError.network
+        }
+        guard let http = response as? HTTPURLResponse else {
+            throw PairError.server("Unexpected response")
+        }
+
+        if http.statusCode == 200 {
+            let success = try JSONDecoder().decode(PairSuccess.self, from: data)
+            persist(success)
+            try await applySession(token: success.access_token)
+            return success
+        }
+        let envelope = (try? JSONDecoder().decode(PairErrorEnvelope.self, from: data))
+        let msg = envelope?.error ?? "Couldn\u{2019}t open this reader"
+        switch http.statusCode {
+        case 400: throw PairError.validation(msg)
+        case 401: throw PairError.unauthorized
+        case 404: throw PairError.validation(msg)
+        case 409: throw PairError.validation(msg)
+        case 429: throw PairError.rateLimited
+        case 503: throw PairError.notConfigured
+        default:  throw PairError.server(msg)
         }
     }
 

@@ -17,6 +17,18 @@ final class KidsAuth: ObservableObject {
     /// throttle, expired parent session). ProfileView renders this as a
     /// transient banner; cleared on the next attempt or on successful unpair.
     @Published var unpairBanner: String? = nil
+    /// Picker state — drives KidsAppRoot's parent-landing branch. `.idle`
+    /// at app start and after sign-out; `.loading` while listKids is in
+    /// flight; `.loaded` with the kids array (may be empty); `.failed`
+    /// with a user-visible message + retry path.
+    @Published var existingKids: ExistingKidsLoad = .idle
+
+    enum ExistingKidsLoad: Equatable {
+        case idle
+        case loading
+        case loaded([ExistingKid])
+        case failed(String)
+    }
 
     struct ParentSession {
         let email: String
@@ -56,7 +68,27 @@ final class KidsAuth: ObservableObject {
     /// Async so callers can `await` it before dismissing into the kid flow.
     func clearParentSession() async {
         self.parentSession = nil
+        self.existingKids = .idle
         await signOutParentGoTrue()
+    }
+
+    /// Hits /api/kids/parent/list with the current parent bearer. Drives the
+    /// ParentKidPickerView state machine via `existingKids`. Idempotent so
+    /// callers can invoke from `.task` and from a retry button.
+    func loadExistingKids() async {
+        guard let token = parentSession?.accessToken else {
+            existingKids = .failed("Parent session expired.")
+            return
+        }
+        existingKids = .loading
+        do {
+            let kids = try await PairingClient.shared.listKids(parentToken: token)
+            existingKids = .loaded(kids)
+        } catch {
+            let msg = (error as? LocalizedError)?.errorDescription
+                ?? "Couldn\u{2019}t load your readers."
+            existingKids = .failed(msg)
+        }
     }
 
     /// Wipe any GoTrue session the kids-app Supabase client may be holding

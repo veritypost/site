@@ -91,7 +91,7 @@ struct KidsAppRoot: View {
                     .environmentObject(state)
                     .transition(.opacity)
             } else if auth.parentSession != nil {
-                CreateKidInKidsAppView()
+                parentLandingBranch
                     .environmentObject(auth)
                     .transition(.opacity)
             } else {
@@ -164,6 +164,66 @@ struct KidsAppRoot: View {
             }
         }
         } // end configValid else
+    }
+
+    // MARK: Returning-parent landing
+
+    // After parent OTP completes the app reaches this branch (parentSession
+    // set, no kid adopted). We fetch /api/kids/parent/list to decide:
+    //   - 0 kids → first-time parent → original CreateKid flow
+    //   - ≥1 kids → returning parent → ParentKidPickerView
+    // Without this branch the app forced every returning sign-in into
+    // CreateKid, which was creating duplicate kid_profiles rows on every
+    // device a parent signed in on.
+    @ViewBuilder
+    private var parentLandingBranch: some View {
+        switch auth.existingKids {
+        case .idle, .loading:
+            launchGate
+                .task(id: auth.parentSession?.accessToken) {
+                    // No `.idle` guard: re-fetching is idempotent and a
+                    // token change means the parent re-authenticated, which
+                    // legitimately invalidates the prior kid list.
+                    await auth.loadExistingKids()
+                }
+        case .loaded(let kids):
+            if kids.isEmpty {
+                CreateKidInKidsAppView()
+            } else {
+                ParentKidPickerView(kids: kids)
+            }
+        case .failed(let msg):
+            parentLandingErrorView(msg)
+        }
+    }
+
+    private func parentLandingErrorView(_ msg: String) -> some View {
+        ZStack {
+            K.bg.ignoresSafeArea()
+            VStack(spacing: 18) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.system(size: 40, weight: .semibold))
+                    .foregroundStyle(K.coralDark)
+                Text("Couldn\u{2019}t load your readers")
+                    .font(.system(.title3, design: .rounded, weight: .heavy))
+                    .foregroundStyle(K.text)
+                Text(msg)
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(K.dim)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                HStack(spacing: 12) {
+                    Button("Sign out") {
+                        Task { await auth.clearParentSession() }
+                    }
+                    .buttonStyle(.bordered)
+                    Button("Try again") {
+                        Task { await auth.loadExistingKids() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+        }
     }
 
     // MARK: Tab-bar app
