@@ -3546,6 +3546,59 @@ export type Database = {
           },
         ]
       }
+      daily_features: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          feature_date: string
+          feature_type: string
+          id: string
+          items: Json
+          label: string
+          published_at: string | null
+          status: string
+          sub_label: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          feature_date: string
+          feature_type?: string
+          id?: string
+          items: Json
+          label?: string
+          published_at?: string | null
+          status?: string
+          sub_label?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          feature_date?: string
+          feature_type?: string
+          id?: string
+          items?: Json
+          label?: string
+          published_at?: string | null
+          status?: string
+          sub_label?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_features_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       discovery_items: {
         Row: {
           article_id: string | null
@@ -7629,6 +7682,152 @@ export type Database = {
             columns: ["parent_user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      home_layouts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          published_at: string | null
+          slug: string
+          status: string
+          updated_at: string
+          variant_of: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          published_at?: string | null
+          slug: string
+          status?: string
+          updated_at?: string
+          variant_of?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          published_at?: string | null
+          slug?: string
+          status?: string
+          updated_at?: string
+          variant_of?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_home_layouts_variant_of"
+            columns: ["variant_of"]
+            isOneToOne: false
+            referencedRelation: "home_layouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "home_layouts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      home_slot_items: {
+        Row: {
+          article_id: string | null
+          content_type: string
+          created_at: string
+          id: string
+          payload: Json
+          position: number
+          ref_id: string | null
+          slot_id: string
+        }
+        Insert: {
+          article_id?: string | null
+          content_type?: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          position: number
+          ref_id?: string | null
+          slot_id: string
+        }
+        Update: {
+          article_id?: string | null
+          content_type?: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          position?: number
+          ref_id?: string | null
+          slot_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_home_slot_items_article_id"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_home_slot_items_slot_id"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "home_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      home_slots: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          key: string
+          kind: string
+          layout_id: string
+          position: number
+          span: number
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          key: string
+          kind: string
+          layout_id: string
+          position: number
+          span?: number
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          key?: string
+          kind?: string
+          layout_id?: string
+          position?: number
+          span?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_home_slots_layout_id"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "home_layouts"
             referencedColumns: ["id"]
           },
         ]

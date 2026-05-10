@@ -22,6 +22,7 @@ const CONTENT_PIPELINE: HubPage[] = [
   { href: '/admin/sources', title: 'Sources', desc: 'No-delete provenance log — every URL we have ever cited; outlet + date filters; CSV export' },
   { href: '/admin/pipeline-config', title: 'Pipeline Config', desc: 'Kill switches, thresholds, prompt presets, categories — all in one place' },
   { href: '/admin/top-stories', title: 'Top Stories', desc: 'Pin up to 5 articles to the front page in fixed positions.' },
+  { href: '/admin/home-v2', title: 'Homepage v2', desc: 'Templated front page with editorial slots — fill them, then flip the live toggle.' },
 ];
 
 const PAGES: HubGroup[] = [
