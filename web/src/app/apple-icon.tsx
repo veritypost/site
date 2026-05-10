@@ -2,7 +2,7 @@
 // served at `/apple-icon` and injects the corresponding
 // <link rel="apple-touch-icon"> tag.
 //
-// Placeholder: solid black background + white "VP" wordmark. Used when
+// Placeholder: solid black background + white "vp" wordmark. Used when
 // the site is added to the iOS home screen — without this Apple uses a
 // blurred page screenshot and the install reads as half-finished, an
 // App Review red flag. Real artwork is a one-line replacement.
@@ -30,7 +30,7 @@ export default function AppleIcon() {
           letterSpacing: '-0.05em',
         }}
       >
-        VP
+        vp
       </div>
     ),
     size,

@@ -437,6 +437,22 @@ struct KidsAppRoot: View {
         ZStack {
             K.bg.ignoresSafeArea()
             VStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(K.tealDark)
+                        .frame(width: 64, height: 64)
+                        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
+                    Text("vp")
+                        .font(.system(.title, design: .rounded, weight: .black))
+                        .foregroundColor(.white)
+                }
+                .accessibilityHidden(true)
+
+                Text("verity post for kids")
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                    .tracking(-0.5)
+                    .foregroundStyle(K.text)
+
                 ProgressView()
                     .controlSize(.large)
                     .tint(K.tealDark)

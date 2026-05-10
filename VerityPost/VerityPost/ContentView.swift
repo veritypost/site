@@ -59,7 +59,7 @@ struct ContentView: View {
                                 .fill(VP.text)
                                 .frame(width: 64, height: 64)
                                 .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
-                            Text("VP")
+                            Text("vp")
                                 .font(.system(.title, design: .default, weight: .black))
                                 .foregroundColor(.white)
                         }

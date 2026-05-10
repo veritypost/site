@@ -2,7 +2,7 @@
 // 32×32 PNG served at `/icon`. It also auto-injects the corresponding
 // <link rel="icon"> tag — no manual wiring in layout.js.
 //
-// Placeholder: solid black background + white "V" wordmark. Replaces
+// Placeholder: solid black background + white "v" wordmark. Replaces
 // the no-icon situation that previously made every browser tab show
 // the default page glyph. Real artwork ships when owner provides PNGs;
 // this file becomes a one-line replacement (or gets deleted in favor
@@ -31,7 +31,7 @@ export default function Icon() {
           letterSpacing: '-0.05em',
         }}
       >
-        V
+        v
       </div>
     ),
     size,
