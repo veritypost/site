@@ -1005,6 +1005,68 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_type: string
+          created_at: string
+          id: string
+          metadata: Json
+          report_id: string | null
+          severity: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          report_id?: string | null
+          severity?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          report_id?: string | null
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_alerts_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_alerts_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_alerts_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_alerts_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_audit_log: {
         Row: {
           action: string
@@ -1582,6 +1644,7 @@ export type Database = {
       }
       articles: {
         Row: {
+          ad_eligible: boolean
           age_band: string | null
           ai_model: string | null
           ai_prompt_id: string | null
@@ -1630,6 +1693,7 @@ export type Database = {
           retraction_reason: string | null
           search_tsv: unknown
           search_vector: unknown
+          sensitivity_tags: string[]
           seo_description: string | null
           seo_keywords: string[] | null
           seo_title: string | null
@@ -1653,6 +1717,7 @@ export type Database = {
           word_count: number | null
         }
         Insert: {
+          ad_eligible?: boolean
           age_band?: string | null
           ai_model?: string | null
           ai_prompt_id?: string | null
@@ -1701,6 +1766,7 @@ export type Database = {
           retraction_reason?: string | null
           search_tsv?: unknown
           search_vector?: unknown
+          sensitivity_tags?: string[]
           seo_description?: string | null
           seo_keywords?: string[] | null
           seo_title?: string | null
@@ -1724,6 +1790,7 @@ export type Database = {
           word_count?: number | null
         }
         Update: {
+          ad_eligible?: boolean
           age_band?: string | null
           ai_model?: string | null
           ai_prompt_id?: string | null
@@ -1772,6 +1839,7 @@ export type Database = {
           retraction_reason?: string | null
           search_tsv?: unknown
           search_vector?: unknown
+          sensitivity_tags?: string[]
           seo_description?: string | null
           seo_keywords?: string[] | null
           seo_title?: string | null
@@ -3017,6 +3085,7 @@ export type Database = {
           disagree_count: number
           downvote_count: number
           edit_count: number
+          edit_history: Json
           edited_at: string | null
           expert_question_status: string | null
           expert_question_target_id: string | null
@@ -3072,6 +3141,7 @@ export type Database = {
           disagree_count?: number
           downvote_count?: number
           edit_count?: number
+          edit_history?: Json
           edited_at?: string | null
           expert_question_status?: string | null
           expert_question_target_id?: string | null
@@ -3127,6 +3197,7 @@ export type Database = {
           disagree_count?: number
           downvote_count?: number
           edit_count?: number
+          edit_history?: Json
           edited_at?: string | null
           expert_question_status?: string | null
           expert_question_target_id?: string | null
@@ -3428,6 +3499,73 @@ export type Database = {
           },
         ]
       }
+      daily_features: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          feature_date: string
+          feature_type: string
+          id: string
+          items: Json
+          label: string
+          published_at: string | null
+          status: string
+          sub_label: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          feature_date: string
+          feature_type?: string
+          id?: string
+          items: Json
+          label?: string
+          published_at?: string | null
+          status?: string
+          sub_label?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          feature_date?: string
+          feature_type?: string
+          id?: string
+          items?: Json
+          label?: string
+          published_at?: string | null
+          status?: string
+          sub_label?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_features_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_features_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_features_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_requests: {
         Row: {
           completed_at: string | null
@@ -3540,59 +3678,6 @@ export type Database = {
           {
             foreignKeyName: "fk_data_requests_user_id"
             columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      daily_features: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          deleted_at: string | null
-          feature_date: string
-          feature_type: string
-          id: string
-          items: Json
-          label: string
-          published_at: string | null
-          status: string
-          sub_label: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          deleted_at?: string | null
-          feature_date: string
-          feature_type?: string
-          id?: string
-          items: Json
-          label?: string
-          published_at?: string | null
-          status?: string
-          sub_label?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          deleted_at?: string | null
-          feature_date?: string
-          feature_type?: string
-          id?: string
-          items?: Json
-          label?: string
-          published_at?: string | null
-          status?: string
-          sub_label?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "daily_features_created_by_fkey"
-            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -6117,6 +6202,339 @@ export type Database = {
         }
         Relationships: []
       }
+      events_20260510: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
+      events_20260511: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
+      events_20260512: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
       events_default: {
         Row: {
           article_id: string | null
@@ -7292,8 +7710,6 @@ export type Database = {
           is_breaking: boolean
           keywords: string[] | null
           last_generation_run_id: string | null
-          locked_at: string | null
-          locked_by: string | null
           primary_article_id: string | null
           primary_kid_article_id: string | null
           primary_tween_article_id: string | null
@@ -7318,8 +7734,6 @@ export type Database = {
           is_breaking?: boolean
           keywords?: string[] | null
           last_generation_run_id?: string | null
-          locked_at?: string | null
-          locked_by?: string | null
           primary_article_id?: string | null
           primary_kid_article_id?: string | null
           primary_tween_article_id?: string | null
@@ -7344,8 +7758,6 @@ export type Database = {
           is_breaking?: boolean
           keywords?: string[] | null
           last_generation_run_id?: string | null
-          locked_at?: string | null
-          locked_by?: string | null
           primary_article_id?: string | null
           primary_kid_article_id?: string | null
           primary_tween_article_id?: string | null
@@ -7358,13 +7770,6 @@ export type Database = {
           {
             foreignKeyName: "feed_clusters_last_gen_run_fkey"
             columns: ["last_generation_run_id"]
-            isOneToOne: false
-            referencedRelation: "pipeline_runs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "feed_clusters_locked_by_fkey"
-            columns: ["locked_by"]
             isOneToOne: false
             referencedRelation: "pipeline_runs"
             referencedColumns: ["id"]
@@ -7688,6 +8093,7 @@ export type Database = {
       }
       home_layouts: {
         Row: {
+          ads_enabled: boolean
           created_at: string
           created_by: string | null
           description: string | null
@@ -7700,6 +8106,7 @@ export type Database = {
           variant_of: string | null
         }
         Insert: {
+          ads_enabled?: boolean
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -7712,6 +8119,7 @@ export type Database = {
           variant_of?: string | null
         }
         Update: {
+          ads_enabled?: boolean
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -7729,6 +8137,20 @@ export type Database = {
             columns: ["variant_of"]
             isOneToOne: false
             referencedRelation: "home_layouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "home_layouts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "home_layouts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -8877,6 +9299,156 @@ export type Database = {
           },
         ]
       }
+      parent_action_tokens: {
+        Row: {
+          action: string
+          consumed_at: string | null
+          consumed_via: string | null
+          created_at: string
+          expires_at: string
+          kid_profile_id: string | null
+          metadata: Json
+          parent_session_id: string | null
+          parent_user_id: string
+          token_hash: string
+        }
+        Insert: {
+          action: string
+          consumed_at?: string | null
+          consumed_via?: string | null
+          created_at?: string
+          expires_at: string
+          kid_profile_id?: string | null
+          metadata?: Json
+          parent_session_id?: string | null
+          parent_user_id: string
+          token_hash: string
+        }
+        Update: {
+          action?: string
+          consumed_at?: string | null
+          consumed_via?: string | null
+          created_at?: string
+          expires_at?: string
+          kid_profile_id?: string | null
+          metadata?: Json
+          parent_session_id?: string | null
+          parent_user_id?: string
+          token_hash?: string
+        }
+        Relationships: []
+      }
+      parent_auth_events: {
+        Row: {
+          event_type: string
+          id: string
+          ip: unknown
+          metadata: Json
+          occurred_at: string
+          parent_user_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          event_type: string
+          id?: string
+          ip?: unknown
+          metadata?: Json
+          occurred_at?: string
+          parent_user_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          event_type?: string
+          id?: string
+          ip?: unknown
+          metadata?: Json
+          occurred_at?: string
+          parent_user_id?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      parent_pending_actions: {
+        Row: {
+          action: string
+          attempts: number
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          extra: Json
+          idempotency_key: string | null
+          kid_profile_id: string | null
+          parent_session_id: string | null
+          parent_user_id: string
+          pending_id: string
+        }
+        Insert: {
+          action: string
+          attempts?: number
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          extra?: Json
+          idempotency_key?: string | null
+          kid_profile_id?: string | null
+          parent_session_id?: string | null
+          parent_user_id: string
+          pending_id?: string
+        }
+        Update: {
+          action?: string
+          attempts?: number
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          extra?: Json
+          idempotency_key?: string | null
+          kid_profile_id?: string | null
+          parent_session_id?: string | null
+          parent_user_id?: string
+          pending_id?: string
+        }
+        Relationships: []
+      }
+      parent_pins: {
+        Row: {
+          active_session_id: string | null
+          created_at: string
+          parent_user_id: string
+          pin_attempts: number
+          pin_hash: string
+          pin_hash_algo: string
+          pin_locked_until: string | null
+          pin_salt: string
+          session_issued_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          active_session_id?: string | null
+          created_at?: string
+          parent_user_id: string
+          pin_attempts?: number
+          pin_hash: string
+          pin_hash_algo?: string
+          pin_locked_until?: string | null
+          pin_salt: string
+          session_issued_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active_session_id?: string | null
+          created_at?: string
+          parent_user_id?: string
+          pin_attempts?: number
+          pin_hash?: string
+          pin_hash_algo?: string
+          pin_locked_until?: string | null
+          pin_salt?: string
+          session_issued_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       parental_consents: {
         Row: {
           consent_ip: string | null
@@ -9849,6 +10421,7 @@ export type Database = {
         Row: {
           article_id: string | null
           attempt_number: number
+          client_attempt_id: string | null
           created_at: string
           id: string
           is_correct: boolean
@@ -9863,6 +10436,7 @@ export type Database = {
         Insert: {
           article_id?: string | null
           attempt_number?: number
+          client_attempt_id?: string | null
           created_at?: string
           id?: string
           is_correct: boolean
@@ -9877,6 +10451,7 @@ export type Database = {
         Update: {
           article_id?: string | null
           attempt_number?: number
+          client_attempt_id?: string | null
           created_at?: string
           id?: string
           is_correct?: boolean
@@ -10134,7 +10709,7 @@ export type Database = {
           device_type: string | null
           id: string
           kid_profile_id: string | null
-          mode_used: 'quick' | 'deep' | null
+          mode_used: string | null
           moment_glossary_taps: number
           moment_predict_correct: boolean | null
           moment_predict_shown: boolean
@@ -10155,7 +10730,7 @@ export type Database = {
           device_type?: string | null
           id?: string
           kid_profile_id?: string | null
-          mode_used?: 'quick' | 'deep' | null
+          mode_used?: string | null
           moment_glossary_taps?: number
           moment_predict_correct?: boolean | null
           moment_predict_shown?: boolean
@@ -10176,7 +10751,7 @@ export type Database = {
           device_type?: string | null
           id?: string
           kid_profile_id?: string | null
-          mode_used?: 'quick' | 'deep' | null
+          mode_used?: string | null
           moment_glossary_taps?: number
           moment_predict_correct?: boolean | null
           moment_predict_shown?: boolean
@@ -10622,6 +11197,34 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "score_rules"
             referencedColumns: ["action"]
+          },
+          {
+            foreignKeyName: "fk_score_events_kid_profile_id"
+            columns: ["kid_profile_id"]
+            isOneToOne: false
+            referencedRelation: "kid_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_score_events_user_id"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_score_events_user_id"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_score_events_user_id"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -11183,6 +11786,69 @@ export type Database = {
             columns: ["research_query_id"]
             isOneToOne: false
             referencedRelation: "research_queries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      story_follows: {
+        Row: {
+          followed_at: string
+          id: string
+          kid_profile_id: string | null
+          last_seen_at: string
+          story_id: string
+          user_id: string | null
+        }
+        Insert: {
+          followed_at?: string
+          id?: string
+          kid_profile_id?: string | null
+          last_seen_at?: string
+          story_id: string
+          user_id?: string | null
+        }
+        Update: {
+          followed_at?: string
+          id?: string
+          kid_profile_id?: string | null
+          last_seen_at?: string
+          story_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_follows_kid_profile_id_fkey"
+            columns: ["kid_profile_id"]
+            isOneToOne: false
+            referencedRelation: "kid_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_follows_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_follows_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_follows_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_follows_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -13467,6 +14133,32 @@ export type Database = {
         Args: { p_days?: number; p_unit_id: string }
         Returns: Json
       }
+      add_kid_with_seat_check: {
+        Args: {
+          p_avatar_color: string
+          p_date_of_birth: string
+          p_display_name: string
+          p_extra_kid_price_cents: number
+          p_max_daily_minutes: number
+          p_max_kids: number
+          p_metadata: Json
+          p_parent_user_id: string
+          p_pin_hash: string
+          p_pin_hash_algo: string
+          p_pin_salt: string
+          p_reading_level: string
+          p_seats_paid: number
+        }
+        Returns: {
+          code: string
+          current_kid_count: number
+          extra_kid_price_cents: number
+          kid_profile_id: string
+          kid_seats_paid: number
+          max_kids: number
+          ok: boolean
+        }[]
+      }
       admin_apply_dob_correction: {
         Args: {
           p_decision: string
@@ -13641,14 +14333,6 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
-      }
-      claim_cluster_lock: {
-        Args: { p_cluster_id: string; p_locked_by: string; p_ttl_sec?: number }
-        Returns: {
-          acquired: boolean
-          locked_at: string
-          locked_by: string
-        }[]
       }
       claim_cluster_lock_v2: {
         Args: {
@@ -13870,6 +14554,10 @@ export type Database = {
         Args: { p_warning_days?: number }
         Returns: number
       }
+      force_release_cluster_lock: {
+        Args: { p_cluster_id: string }
+        Returns: number
+      }
       freeze_kid_trial: { Args: { p_user_id: string }; Returns: undefined }
       generate_kid_pair_code: {
         Args: { p_kid_profile_id: string }
@@ -13985,6 +14673,10 @@ export type Database = {
         Args: { amount?: number; comment_id: string; vote_type: string }
         Returns: undefined
       }
+      increment_deletion_auth_retry: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
       increment_field: {
         Args: {
           amount?: number
@@ -13998,7 +14690,6 @@ export type Database = {
         Args: { article_id: string }
         Returns: undefined
       }
-      increment_deletion_auth_retry: { Args: { p_user_id: string }; Returns: undefined }
       increment_view_count: { Args: { article_id: string }; Returns: undefined }
       invalidate_push_token: { Args: { p_token: string }; Returns: boolean }
       invalidate_user_push_token: {
@@ -14017,9 +14708,12 @@ export type Database = {
       is_expert_or_above: { Args: never; Returns: boolean }
       is_family_owner: { Args: { p_user_id: string }; Returns: boolean }
       is_kid_delegated: { Args: never; Returns: boolean }
+      is_kid_delegated_and_active: { Args: never; Returns: boolean }
       is_mod_or_above: { Args: never; Returns: boolean }
       is_owner_mode_user: { Args: { p_user_id: string }; Returns: boolean }
       is_paid_user: { Args: never; Returns: boolean }
+      is_parent_elevated: { Args: never; Returns: boolean }
+      is_parent_elevated_live: { Args: never; Returns: boolean }
       is_premium: { Args: never; Returns: boolean }
       is_user_expert: { Args: { p_user_id: string }; Returns: boolean }
       kid_family_leaderboard: {
@@ -14036,6 +14730,32 @@ export type Database = {
         Returns: boolean
       }
       kid_visible_bands: { Args: { p_profile_id: string }; Returns: string[] }
+      leaderboard_alltime_top: {
+        Args: { p_limit: number }
+        Returns: {
+          avatar_color: string
+          avatar_url: string
+          comment_count: number
+          quizzes_completed_count: number
+          user_id: string
+          username: string
+          verity_score: number
+        }[]
+      }
+      leaderboard_period_counts: {
+        Args: { p_limit: number; p_since: string }
+        Returns: {
+          avatar_color: string
+          avatar_url: string
+          comment_count: number
+          last_read_at: string
+          quizzes_completed_count: number
+          reads_count: number
+          user_id: string
+          username: string
+          verity_score: number
+        }[]
+      }
       list_active_experts_for_category: {
         Args: {
           p_article_id: string
@@ -14051,6 +14771,7 @@ export type Database = {
           p_ad_unit_id: string
           p_article_id?: string
           p_campaign_id?: string
+          p_device_type?: string
           p_page?: string
           p_placement_id: string
           p_position?: string
@@ -14061,6 +14782,16 @@ export type Database = {
       }
       mark_probation_complete: {
         Args: { p_admin_id: string; p_application_id: string }
+        Returns: undefined
+      }
+      mark_story_seen:
+        | { Args: { p_story_id: string }; Returns: undefined }
+        | {
+            Args: { p_story_id: string; p_user_id: string }
+            Returns: undefined
+          }
+      mark_story_seen_kid: {
+        Args: { p_kid_profile_id: string; p_story_id: string }
         Returns: undefined
       }
       merge_clusters: {
@@ -14249,10 +14980,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      release_cluster_lock: {
-        Args: { p_cluster_id: string; p_locked_by: string }
-        Returns: boolean
-      }
       release_cluster_lock_v2: {
         Args: {
           p_audience_band: string
@@ -14281,6 +15008,24 @@ export type Database = {
       replace_ad_targets: {
         Args: { p_targets: Json; p_unit: string }
         Returns: undefined
+      }
+      report_and_maybe_autohide: {
+        Args: {
+          p_description?: string
+          p_is_escalated?: boolean
+          p_metadata?: Json
+          p_reason: string
+          p_reporter_id: string
+          p_target_id: string
+          p_target_type: string
+        }
+        Returns: {
+          already_filed: boolean
+          auto_hid: boolean
+          report_count: number
+          report_id: string
+          threshold: number
+        }[]
       }
       require_outranks: { Args: { target_user_id: string }; Returns: boolean }
       reserve_cost_or_fail: {
@@ -14484,6 +15229,7 @@ export type Database = {
       }
       sweep_beta_expirations: { Args: never; Returns: Json }
       sweep_expired_deletions: { Args: never; Returns: number }
+      sweep_failed_escalations: { Args: never; Returns: Json }
       sweep_kid_trial_expiries: { Args: never; Returns: number }
       sweep_trial_expiries: { Args: never; Returns: number }
       system_apply_dob_correction: {
@@ -14503,6 +15249,28 @@ export type Database = {
       toggle_follow: {
         Args: { p_follower_id: string; p_target_id: string }
         Returns: Json
+      }
+      toggle_story_follow:
+        | {
+            Args: { p_story_id: string }
+            Returns: {
+              follow_id: string
+              following: boolean
+            }[]
+          }
+        | {
+            Args: { p_story_id: string; p_user_id: string }
+            Returns: {
+              follow_id: string
+              following: boolean
+            }[]
+          }
+      toggle_story_follow_kid: {
+        Args: { p_kid_profile_id: string; p_story_id: string }
+        Returns: {
+          follow_id: string
+          following: boolean
+        }[]
       }
       toggle_vote: {
         Args: { p_comment_id: string; p_user_id: string; p_vote_type: string }
