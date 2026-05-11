@@ -104,36 +104,9 @@ const nextConfig = {
   },
 };
 
-// Sentry wrapper (Chunk 10) — wraps the config with source-map upload
-// + auto-instrumentation when @sentry/nextjs is installed.
-//
-// M-18 — fail loud in production. A Vercel build that silently shipped
-// without Sentry would leave us blind to runtime errors. Production
-// builds now refuse to start if the dependency fails to load; local
-// and preview builds continue to soft-fail so owners can iterate
-// without a full npm install.
-let withSentryConfig = (cfg) => cfg;
-try {
-  // eslint-disable-next-line global-require
-  withSentryConfig = require('@sentry/nextjs').withSentryConfig;
-} catch (err) {
-  const isProd = process.env.VERCEL_ENV === 'production';
-  if (isProd) {
-    throw new Error(
-      `[next.config] @sentry/nextjs failed to load in production: ${err?.message || err}. ` +
-        `Refusing to build without error reporting. Fix the dependency and redeploy.`
-    );
-  }
-  console.warn(
-    '[next.config] @sentry/nextjs not installed; local/preview build continues without Sentry.'
-  );
-}
-
-module.exports = withSentryConfig(nextConfig, {
-  silent: true,
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-  disableLogger: true,
-  automaticVercelMonitors: false,
-});
+// Sentry: deferred until post-launch (no DSN / org / auth token
+// configured anyway). Each build was generating + attempting to upload
+// source maps that went nowhere — pure wasted build time. When error
+// reporting matters again, re-wrap with withSentryConfig and populate
+// the env vars (DSN, ORG, PROJECT, AUTH_TOKEN).
+module.exports = nextConfig;
