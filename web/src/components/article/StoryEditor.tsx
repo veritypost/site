@@ -28,7 +28,7 @@ import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import { formatTimelineDate } from '@/lib/dates';
-import { SENSITIVITY_TAGS } from '@/lib/sensitivityTags';
+import { SENSITIVITY_TAGS, BLOCKING_SENSITIVITY_TAG_IDS } from '@/lib/sensitivityTags';
 
 // Editorial day = America/New_York. Same constant the home page uses
 // to filter today's hero. Returns "YYYY-MM-DD".
@@ -234,7 +234,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
   // `story.slug || fallback`, so the comparison would always be false.
   const lastPersistedSlugRef = useRef<string>('');
   const [expandedEntry, setExpandedEntry] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'edit' | 'preview' | 'timeline'>('edit');
+  const [viewMode, setViewMode] = useState<'edit' | 'preview' | 'timeline' | 'ads'>('edit');
   const [isDirty, setIsDirty] = useState(false);
 
   const [destructive, setDestructive] = useState<DestructiveState>(null);
@@ -1194,6 +1194,38 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
     );
   }
 
+  if (viewMode === 'ads') {
+    const adsBody = (
+      <AdsPreviewPanel
+        articleId={storyId}
+        // Hint to the panel: editorial flags shown at the top banner.
+        // The API also returns its own authoritative values; these are
+        // just for the "save first" empty state.
+        adEligible={story.ad_eligible}
+        sensitivityTags={story.sensitivity_tags}
+      />
+    );
+    if (embedded) {
+      return (
+        <div style={{ padding: `${S[6]}px ${S[4]}px` }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: S[3] }}>
+            <Button variant="secondary" onClick={() => setViewMode('edit')}>Close</Button>
+          </div>
+          {adsBody}
+        </div>
+      );
+    }
+    return (
+      <Page>
+        <PageHeader
+          title="Ads on this story"
+          subtitle="Live diagnostic. Simulated as an anon visitor."
+          actions={<Button variant="secondary" onClick={() => setViewMode('edit')}>Close</Button>}
+        />
+        <PageSection>{adsBody}</PageSection>
+      </Page>
+    );
+  }
 
   const headerActions = (
     <>
@@ -1208,6 +1240,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
           Open article
         </Button>
       )}
+      <Button variant="secondary" size="sm" onClick={() => setViewMode('ads')}>Ads</Button>
       <Button variant="secondary" size="sm" onClick={() => setViewMode('timeline')}>Timeline</Button>
       <Button variant="secondary" size="sm" onClick={() => setViewMode('preview')}>Preview</Button>
       <Button variant="primary" size="sm" loading={saving} onClick={() => saveAll()}>Save</Button>
@@ -1900,3 +1933,363 @@ const labelStyle: React.CSSProperties = {
   color: C.dim,
   marginBottom: S[1],
 };
+
+// ---------------------------------------------------------------------------
+// AdsPreviewPanel — read-only diagnostic showing what serve_ad would return
+// for an anon visitor on each of the four article-page placements, plus the
+// targeting roster pointing at this article. Wave 3.
+// ---------------------------------------------------------------------------
+
+type AdsPreviewWouldServe = {
+  ad_unit_id: string;
+  advertiser_name: string | null;
+  ad_format: string;
+};
+
+type AdsPreviewTargetedUnit = {
+  ad_unit_id: string;
+  advertiser_name: string | null;
+  mode: 'include' | 'exclude';
+  via: 'article' | 'category' | 'subcategory';
+};
+
+type AdsPreviewPlacement = {
+  placement_name: string;
+  display_name: string;
+  would_serve: AdsPreviewWouldServe | null;
+  reason: string | null;
+  targeted_units: AdsPreviewTargetedUnit[];
+};
+
+type AdsPreviewResponse = {
+  article: {
+    id: string;
+    slug: string | null;
+    ad_eligible: boolean;
+    sensitivity_tags: string[];
+    is_kids_safe: boolean;
+  };
+  placements: AdsPreviewPlacement[];
+};
+
+// Reason id → operator-readable copy. Keep in sync with the
+// diagnoseEmpty() reason set in the API route.
+const REASON_COPY: Record<string, string> = {
+  placement_inactive: 'Placement is inactive in ad_placements.',
+  article_ineligible: 'Article ad_eligible is false.',
+  article_sensitive: 'Article has a blocking sensitivity tag.',
+  no_active_unit: 'No active, approved, in-flight ad unit on this placement.',
+  campaigns_paused: 'All eligible ad units belong to paused or ended campaigns.',
+  excluded_by_targeting: 'Every eligible ad unit has an exclude rule that matches this article.',
+  no_include_match: 'No ad unit on this placement includes this article, its category, or subcategory.',
+  unknown: 'No ad served. Reason not classified.',
+};
+
+function reasonCopy(reason: string | null): string {
+  if (!reason) return '';
+  return REASON_COPY[reason] ?? reason;
+}
+
+function AdsPreviewPanel({
+  articleId,
+  adEligible,
+  sensitivityTags,
+}: {
+  articleId: string | null;
+  adEligible: boolean;
+  sensitivityTags: string[];
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<AdsPreviewResponse | null>(null);
+
+  useEffect(() => {
+    if (!articleId) {
+      setData(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/admin/articles/${articleId}/ads-preview`, { cache: 'no-store' })
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(
+            body?.error || `Request failed with status ${r.status}`
+          );
+        }
+        return r.json() as Promise<AdsPreviewResponse>;
+      })
+      .then((json) => {
+        if (!cancelled) setData(json);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [articleId]);
+
+  if (!articleId) {
+    return (
+      <div
+        style={{
+          padding: S[6],
+          border: `1px dashed ${C.divider}`,
+          borderRadius: 10,
+          textAlign: 'center',
+          color: C.dim,
+          fontSize: F.sm,
+        }}
+      >
+        Save the article first. The ads diagnostic needs a persisted
+        article id to simulate serve_ad.
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          padding: S[6],
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: S[2],
+          color: C.dim,
+          fontSize: F.sm,
+        }}
+      >
+        <Spinner size={16} /> Loading ads diagnostic…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        style={{
+          padding: S[4],
+          border: `1px solid ${C.danger}`,
+          borderRadius: 8,
+          background: C.card,
+          color: C.danger,
+          fontSize: F.sm,
+        }}
+      >
+        Could not load ads diagnostic: {error}
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  // Banners — derive from the API response (authoritative) but fall back
+  // to the unsaved form state if the API hasn't picked up an in-flight
+  // toggle yet. The DB row is the source of truth for what would actually
+  // serve; the form state matters only between "edited" and "saved".
+  const apiAdEligible = data.article.ad_eligible;
+  const apiTags = data.article.sensitivity_tags ?? [];
+  const blockingTagsActive = apiTags.filter((t) =>
+    BLOCKING_SENSITIVITY_TAG_IDS.has(t)
+  );
+  // Surface the unsaved-but-dirty case to the operator so they know the
+  // panel reflects the saved row, not the in-progress edit.
+  const formDiffersFromApi =
+    adEligible !== apiAdEligible ||
+    sensitivityTags.slice().sort().join(',') !== apiTags.slice().sort().join(',');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: S[4] }}>
+      {data.article.is_kids_safe && (
+        <AdsPreviewBanner
+          variant="info"
+          title="COPPA article"
+          body="Kids readers never see ads on this article regardless of these results. The simulation below reflects the adult-side serve_ad behavior; the kids reader path bypasses serve_ad entirely."
+        />
+      )}
+
+      {apiAdEligible === false && (
+        <AdsPreviewBanner
+          variant="warn"
+          title="ad_eligible is false"
+          body="This article has its editorial ad override turned off. Every placement below will return no ad."
+        />
+      )}
+
+      {blockingTagsActive.length > 0 && (
+        <AdsPreviewBanner
+          variant="warn"
+          title="Blocking sensitivity tag present"
+          body={`Tags: ${blockingTagsActive.join(', ')}. Every placement below will return no ad regardless of targeting.`}
+        />
+      )}
+
+      {formDiffersFromApi && (
+        <AdsPreviewBanner
+          variant="info"
+          title="Unsaved changes"
+          body="Eligibility / sensitivity tags in the editor differ from the saved article. Save to update this diagnostic."
+        />
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
+        {data.placements.map((p) => (
+          <AdsPreviewPlacementCard key={p.placement_name} placement={p} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdsPreviewBanner({
+  variant,
+  title,
+  body,
+}: {
+  variant: 'info' | 'warn';
+  title: string;
+  body: string;
+}) {
+  const border = variant === 'warn' ? C.danger : C.divider;
+  const tintBg = variant === 'warn' ? C.card : C.card;
+  return (
+    <div
+      style={{
+        padding: `${S[3]}px ${S[4]}px`,
+        border: `1px solid ${border}`,
+        borderLeftWidth: 4,
+        borderRadius: 8,
+        background: tintBg,
+      }}
+    >
+      <div style={{ fontSize: F.sm, fontWeight: 700, color: C.ink, marginBottom: 2 }}>
+        {title}
+      </div>
+      <div style={{ fontSize: F.sm, color: C.soft, lineHeight: 1.5 }}>{body}</div>
+    </div>
+  );
+}
+
+function AdsPreviewPlacementCard({ placement }: { placement: AdsPreviewPlacement }) {
+  const served = placement.would_serve;
+  return (
+    <div
+      style={{
+        border: `1px solid ${C.divider}`,
+        borderRadius: 10,
+        background: C.bg,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Card header */}
+      <div
+        style={{
+          padding: `${S[2]}px ${S[3]}px`,
+          borderBottom: `1px solid ${C.divider}`,
+          background: C.card,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: S[3],
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: S[2] }}>
+          <span
+            style={{
+              fontSize: F.xs,
+              fontWeight: 700,
+              color: C.soft,
+              fontFamily: 'monospace',
+              textTransform: 'uppercase',
+            }}
+          >
+            {placement.placement_name}
+          </span>
+          <span style={{ fontSize: F.sm, color: C.dim }}>{placement.display_name}</span>
+        </div>
+      </div>
+
+      {/* Two-column body: would serve / targeted here */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: 0,
+        }}
+      >
+        {/* Would serve now (live) */}
+        <div
+          style={{
+            padding: `${S[3]}px ${S[3]}px`,
+            borderRight: `1px solid ${C.divider}`,
+            minHeight: 80,
+          }}
+        >
+          <div style={{ ...labelStyle }}>Would serve now (live)</div>
+          {served ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ fontSize: F.base, fontWeight: 600, color: C.ink }}>
+                {served.advertiser_name ?? '(unnamed advertiser)'}
+              </div>
+              <div style={{ fontSize: F.sm, color: C.dim }}>
+                {served.ad_format} · {served.ad_unit_id.slice(0, 8)}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ fontSize: F.sm, color: C.muted, fontStyle: 'italic' }}>
+                — none —
+              </div>
+              <div style={{ fontSize: F.sm, color: C.soft, lineHeight: 1.5 }}>
+                {reasonCopy(placement.reason)}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Targeted here (config) */}
+        <div style={{ padding: `${S[3]}px ${S[3]}px`, minHeight: 80 }}>
+          <div style={{ ...labelStyle }}>
+            Targeted here (config) — {placement.targeted_units.length}
+          </div>
+          {placement.targeted_units.length === 0 ? (
+            <div style={{ fontSize: F.sm, color: C.muted, fontStyle: 'italic' }}>
+              No ad units target this article or its category.
+            </div>
+          ) : (
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {placement.targeted_units.map((u) => (
+                <li
+                  key={`${u.ad_unit_id}-${u.mode}-${u.via}`}
+                  style={{ fontSize: F.sm, color: C.soft, lineHeight: 1.4 }}
+                >
+                  <span style={{ fontWeight: 600, color: C.ink }}>
+                    {u.advertiser_name ?? '(unnamed)'}
+                  </span>
+                  {' — '}
+                  <span style={{
+                    fontWeight: 600,
+                    color: u.mode === 'exclude' ? C.danger : C.accent,
+                  }}>
+                    {u.mode}
+                  </span>
+                  <span style={{ color: C.dim }}> via {u.via}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
