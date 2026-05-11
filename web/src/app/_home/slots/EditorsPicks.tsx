@@ -1,3 +1,5 @@
+import type { ReactElement } from 'react';
+import Ad from '@/components/Ad';
 import {
   C,
   StoryLink,
@@ -17,11 +19,67 @@ export default function EditorsPicks({
   slot: SlotRow;
   ctx: CardCtx;
 }) {
-  const stories = slot.items
-    .map((i) => i.article)
-    .filter((s): s is HomeStory => !!s)
-    .slice(0, 3);
-  if (stories.length === 0) return null;
+  // Per-item dispatch on content_type (mirrors Cluster.tsx). Cap mixed
+  // articles + ads at 3 total so the section keeps its three-up shape.
+  // Cell-count cap. Owner can override via home_slots.config.capacity
+  // (validated 1..30 server-side); default 3 keeps the three-up shape.
+  const cfgCap = slot.config?.capacity;
+  const cap =
+    typeof cfgCap === 'number' && cfgCap > 0 && cfgCap <= 30 ? cfgCap : 3;
+  const items = [...slot.items]
+    .sort((a, b) => a.position - b.position)
+    .slice(0, cap);
+
+  const rendered = items
+    .map((item): ReactElement | null => {
+      if (item.content_type === 'article') {
+        const story = item.article;
+        if (!story) return null;
+        const cat = categoryFor(story, ctx);
+        return (
+          <article key={item.id} className="vp-editors-band__card">
+            <StoryLink story={story} className="vp-editors-band__link">
+              {cat && (
+                <p
+                  className="vp-editors-band__cat"
+                  style={{ color: cat.color_hex || C.dim }}
+                >
+                  {cat.name}
+                </p>
+              )}
+              <h4 className="vp-editors-band__hed">{story.title}</h4>
+              {story.excerpt && (
+                <p className="vp-editors-band__dek">{story.excerpt}</p>
+              )}
+            </StoryLink>
+          </article>
+        );
+      }
+      if (item.content_type === 'ad') {
+        const placement = item.payload?.placement;
+        if (typeof placement !== 'string' || placement.length === 0) {
+          return null;
+        }
+        const page =
+          typeof item.payload?.page === 'string' && item.payload.page
+            ? (item.payload.page as string)
+            : 'home';
+        const position =
+          typeof item.payload?.position === 'string' && item.payload.position
+            ? (item.payload.position as string)
+            : 'editors_picks';
+        return (
+          <div key={item.id} className="vp-rh-card vp-rh-card-ad">
+            <Ad placement={placement} page={page} position={position} />
+          </div>
+        );
+      }
+      return null;
+    })
+    .filter((node): node is ReactElement => node !== null);
+
+  if (rendered.length === 0) return null;
+
   const label =
     typeof slot.config.label === 'string' ? slot.config.label : 'Worth Your Time';
 
@@ -30,29 +88,7 @@ export default function EditorsPicks({
       <header className="vp-section-head">
         <p className="vp-section-head__label">{label}</p>
       </header>
-      <div className="vp-editors-band__grid">
-        {stories.map((story) => {
-          const cat = categoryFor(story, ctx);
-          return (
-            <article key={story.id} className="vp-editors-band__card">
-              <StoryLink story={story} className="vp-editors-band__link">
-                {cat && (
-                  <p
-                    className="vp-editors-band__cat"
-                    style={{ color: cat.color_hex || C.dim }}
-                  >
-                    {cat.name}
-                  </p>
-                )}
-                <h4 className="vp-editors-band__hed">{story.title}</h4>
-                {story.excerpt && (
-                  <p className="vp-editors-band__dek">{story.excerpt}</p>
-                )}
-              </StoryLink>
-            </article>
-          );
-        })}
-      </div>
+      <div className="vp-editors-band__grid">{rendered}</div>
     </section>
   );
 }

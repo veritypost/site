@@ -1,8 +1,11 @@
-// Shared helpers + types used by the server-rendered `page.tsx` and the
-// small client islands it composes (`_HomeBreakingStrip`, `_HomeFooter`,
-// `_HomeFetchFailed`). Lives in its own file so the client islands can
-// import from a non-`'use client'` module without dragging the server
-// component into the client bundle (Next refuses that mix at compile time).
+// Legacy shared helpers + types carried over from the retired
+// hand-curated home. Still imported by `Sidebar.tsx`, `SectionsMenu.tsx`,
+// and several slot renderers (`_home/types.ts`, `_home/slots/_shared.tsx`,
+// `SecondaryPair`, `ListRail`, `WideStrip`). Kept here under the `-legacy`
+// suffix to signal that the contents should eventually be merged into
+// proper homes (`_home/slots/_shared.tsx` already exists separately);
+// this file is here for compatibility, not as the canonical place for
+// these utilities.
 
 import type { Tables } from '@/types/database-helpers';
 

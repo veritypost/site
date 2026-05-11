@@ -12,7 +12,7 @@ import Link from 'next/link';
 import {
   HOME_COLORS as C,
   HOME_SERIF_STACK as serifStack,
-} from './_homeShared';
+} from './_shared-legacy';
 
 export type SidebarCategory = {
   id: string;
@@ -31,7 +31,7 @@ const sortByOrder = (a: SidebarCategory, b: SidebarCategory) => {
   return a.name.localeCompare(b.name);
 };
 
-export default function HomeSidebar({
+export default function Sidebar({
   categories,
   activeCatSlug = null,
   activeSubSlug = null,

@@ -18,6 +18,9 @@ import Promo from './Promo';
 import SecondaryPair from './SecondaryPair';
 import WideStrip from './WideStrip';
 import EditorsPicks from './EditorsPicks';
+import DataTicker from './DataTicker';
+import InsightRow from './InsightRow';
+import DiscoveryFeed from './DiscoveryFeed';
 import EmptySlot from './EmptySlot';
 
 type SlotComponent =
@@ -36,12 +39,21 @@ const REGISTRY: Record<SlotKind, SlotComponent> = {
   secondary_pair: SecondaryPair,
   wide_strip: WideStrip,
   editors_picks: EditorsPicks,
+  data_ticker: DataTicker,
+  insight_row: InsightRow,
+  discovery_feed: DiscoveryFeed,
+  reader_notes: () => null,
 };
 
 // Slots that source their own content (e.g. Feature reads daily_features
 // directly). They aren't driven by home_slot_items, so the empty-check
 // would falsely hide them.
-const SELF_SOURCING: ReadonlySet<SlotKind> = new Set(['feature']);
+const SELF_SOURCING: ReadonlySet<SlotKind> = new Set([
+  'feature',
+  'data_ticker',
+  'insight_row',
+  'discovery_feed',
+]);
 
 function slotIsEmpty(slot: SlotRow): boolean {
   if (SELF_SOURCING.has(slot.kind)) return false;

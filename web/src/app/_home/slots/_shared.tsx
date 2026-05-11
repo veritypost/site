@@ -1,4 +1,4 @@
-// Shared helpers + types for v2 slot components. Pull in v1's color
+// Shared helpers + types for slot components. Pull in v1's color
 // tokens and serif stack so the templated homepage reads as the same
 // publication, just rearranged.
 
@@ -8,9 +8,9 @@ import {
   HOME_COLORS as C,
   HOME_SERIF_STACK as serifStack,
   timeShort,
-} from '../../_homeShared';
+} from '../_shared-legacy';
 import type { Tables } from '@/types/database-helpers';
-// v2's canonical HomeStory (with cover_image fields) lives in types.ts
+// The canonical HomeStory (with cover_image fields) lives in types.ts
 // — re-export here so slot files can import everything they need from
 // `./_shared`.
 import type { HomeStory } from '../types';

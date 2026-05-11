@@ -1,57 +1,29 @@
-// Home v2 page layout. The v2 redesign is semantic instead of span-led:
-//   - the lead story becomes the single command hero
-//   - utility/context modules stay in the right rail on desktop
-//   - article-bearing sections flow as a dense story river underneath
-//
-// The old breaking strip is intentionally hidden in public render so the
-// hero carries urgency by itself.
+// Single-column slot renderer for the bordered-grid home.
+// Slots are sorted by `position` and emitted as direct children of the
+// `vp-rh-grid` container. Slots that need to span the full row (lead,
+// ticker, insight_row, discovery_feed) declare `grid-column: 1 / -1`
+// in their own CSS rules — this layout file applies no per-slot
+// overrides. The breaking_strip kind is intentionally hidden here
+// because the bordered hero carries urgency on its own.
 
-import type { CSSProperties } from 'react';
-import type { LayoutRow, SlotKind, SlotRow } from './types';
+import { IBM_Plex_Sans } from 'next/font/google';
+import type { LayoutRow, SlotKind } from './types';
 import type { Tables } from '@/types/database-helpers';
 import { renderSlot } from './slots/registry';
+import RhStyles from './styles';
+
+const sans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+});
 
 type CategoryRow = Pick<
   Tables<'categories'>,
   'id' | 'name' | 'slug' | 'color_hex' | 'parent_id' | 'sort_order'
 >;
 
-type CSSVarStyle = CSSProperties & { ['--slot-span']?: number };
-
-type RenderArg = {
-  categoryById: Record<string, CategoryRow>;
-  showEmptyPlaceholders?: boolean;
-};
-
 const HIDDEN_KINDS: ReadonlySet<SlotKind> = new Set(['breaking_strip']);
-const RAIL_KINDS: ReadonlySet<SlotKind> = new Set([
-  'list_rail',
-  'feature',
-  'engagement',
-  'promo',
-]);
-
-function SlotItem({
-  slot,
-  ctx,
-}: {
-  slot: SlotRow;
-  ctx: RenderArg;
-}) {
-  const node = renderSlot(slot, ctx);
-  if (!node) return null;
-  const style: CSSVarStyle = { ['--slot-span']: slot.span };
-  return (
-    <div
-      key={slot.id}
-      className="vp-home-slot"
-      data-kind={slot.kind}
-      style={style}
-    >
-      {node}
-    </div>
-  );
-}
 
 export default function HomeLayout({
   layout,
@@ -62,41 +34,25 @@ export default function HomeLayout({
   categoryById: Record<string, CategoryRow>;
   showEmptyPlaceholders?: boolean;
 }) {
-  const ctx: RenderArg = { categoryById, showEmptyPlaceholders };
-  const slots = layout.slots.filter((slot) => !HIDDEN_KINDS.has(slot.kind));
-  const heroSlot = slots.find((slot) => slot.kind === 'lead') ?? null;
-  const heroId = heroSlot?.id ?? null;
-
-  const mainCol: SlotRow[] = [];
-  const railCol: SlotRow[] = [];
-
-  slots.forEach((slot) => {
-    if (slot.id === heroId) return;
-    if (slot.span <= 4 && RAIL_KINDS.has(slot.kind)) {
-      railCol.push(slot);
-      return;
-    }
-    mainCol.push(slot);
-  });
-
-  const orderedMain = heroSlot ? [heroSlot, ...mainCol] : mainCol;
+  const slots = [...layout.slots]
+    .filter((s) => !HIDDEN_KINDS.has(s.kind))
+    .sort((a, b) => a.position - b.position);
 
   return (
-    <div className="vp-home-v2">
-      <div className="vp-home-v2-grid">
-        <div className="vp-home-v2-main">
-          {orderedMain.map((s) => (
-            <SlotItem key={s.id} slot={s} ctx={ctx} />
-          ))}
-        </div>
-        {railCol.length > 0 && (
-          <aside className="vp-home-v2-rail">
-            {railCol.map((s) => (
-              <SlotItem key={s.id} slot={s} ctx={ctx} />
-            ))}
-          </aside>
-        )}
-      </div>
+    <div className={`vp-rh ${sans.className}`}>
+      <h1 className="vp-rh-sr">Verity Post</h1>
+      <main className="vp-rh-grid">
+        {slots.map((s) => {
+          const node = renderSlot(s, { categoryById, showEmptyPlaceholders });
+          if (!node) return null;
+          // Each slot's renderer owns its own outer markup — Lead returns
+          // an <article>, Cluster returns a <Fragment> of <Link> cards,
+          // ticker/insight/discovery return their own outer divs with
+          // `grid-column: 1 / -1` declared in CSS.
+          return <span key={s.id} style={{ display: 'contents' }}>{node}</span>;
+        })}
+      </main>
+      <RhStyles />
     </div>
   );
 }

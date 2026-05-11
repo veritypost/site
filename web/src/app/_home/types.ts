@@ -1,14 +1,14 @@
-// Types for the v2 templated homepage. Slots are first-class rows; items
+// Types for the templated homepage. Slots are first-class rows; items
 // are what's been dropped into a slot by editorial. Article projection
-// matches the v1 `HomeStory` shape so cards can be styled identically.
+// matches the legacy `HomeStory` shape so cards can be styled identically.
 
-import type { HomeStory as HomeStoryV1 } from '../_homeShared';
+import type { HomeStory as HomeStoryLegacy } from './_shared-legacy';
 
-// v2 slots need cover_image_url/alt; v1's `HomeStory` Pick doesn't include
-// them. Extend here so SlotItem.article carries them through to slot
-// components without per-file casts. Exported so slot files can import
-// the canonical v2 shape.
-export type HomeStory = HomeStoryV1 & {
+// Home slots need cover_image_url/alt; the legacy `HomeStory` Pick doesn't
+// include them. Extend here so SlotItem.article carries them through to
+// slot components without per-file casts. Exported so slot files can
+// import the canonical home shape.
+export type HomeStory = HomeStoryLegacy & {
   cover_image_url: string | null;
   cover_image_alt: string | null;
   story_id: string | null;

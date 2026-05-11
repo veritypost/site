@@ -33,7 +33,7 @@ async function fetchTodayFeature(): Promise<FeatureRow | null> {
     .limit(1)
     .maybeSingle<FeatureRow>();
   if (error) {
-    console.error('[home_v2.feature.fetch]', error.message);
+    console.error('[home.feature.fetch]', error.message);
     return null;
   }
   return data;

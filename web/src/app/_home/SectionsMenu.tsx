@@ -11,8 +11,8 @@ import { Z } from '@/lib/zIndex';
 import {
   HOME_COLORS as C,
   HOME_SERIF_STACK as serifStack,
-} from './_homeShared';
-import { HOME_SIDEBAR_BREAKPOINT_PX, type SidebarCategory } from './_HomeSidebar';
+} from './_shared-legacy';
+import { HOME_SIDEBAR_BREAKPOINT_PX, type SidebarCategory } from './Sidebar';
 
 const OVERLAY_ID = 'vp-home-sections-overlay';
 const RESULTS_LISTBOX_ID = 'vp-home-sections-search-results';
@@ -35,7 +35,7 @@ const sortByOrder = (a: SidebarCategory, b: SidebarCategory) => {
   return a.name.localeCompare(b.name);
 };
 
-export default function HomeSectionsMenu() {
+export default function SectionsMenu() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeCatSlug = searchParams?.get('cat') || null;

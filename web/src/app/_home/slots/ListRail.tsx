@@ -1,6 +1,8 @@
+import type { ReactElement } from 'react';
+import Ad from '@/components/Ad';
 import { StoryLink, categoryFor, type CardCtx, type HomeStory } from './_shared';
 import type { SlotRow } from '../types';
-import { HOME_EDITORIAL_TZ, timeShort } from '../../_homeShared';
+import { HOME_EDITORIAL_TZ, timeShort } from '../_shared-legacy';
 
 function relativeDate(iso: string | null): string {
   if (!iso) return '';
@@ -30,11 +32,31 @@ function relativeDate(iso: string | null): string {
 }
 
 export default function ListRail({ slot, ctx }: { slot: SlotRow; ctx: CardCtx }) {
-  const stories = slot.items
-    .map((i) => i.article)
-    .filter((s): s is HomeStory => !!s)
-    .slice(0, 5);
-  if (stories.length === 0) return null;
+  // Per-item dispatch (mirrors Cluster.tsx). The rail is a single
+  // narrow column of list rows — ads render as bare <li> containing the
+  // Ad component, NOT wrapped in vp-rh-card-ad (which is a bordered
+  // card meant for the article-grid slots; would look out of place
+  // inside the dark rail). Cap mixed items at 5 total.
+  // Row-count cap. Owner can override via home_slots.config.capacity
+  // (validated 1..30 server-side); default 5 matches the historic rail.
+  const cfgCap = slot.config?.capacity;
+  const cap =
+    typeof cfgCap === 'number' && cfgCap > 0 && cfgCap <= 30 ? cfgCap : 5;
+  const items = [...slot.items]
+    .sort((a, b) => a.position - b.position)
+    .slice(0, cap);
+
+  // Bail early if nothing renderable. A "renderable" item is an article
+  // with an attached HomeStory, or an ad with a non-empty placement.
+  const hasAny = items.some((i) => {
+    if (i.content_type === 'article') return !!i.article;
+    if (i.content_type === 'ad') {
+      const p = i.payload?.placement;
+      return typeof p === 'string' && p.length > 0;
+    }
+    return false;
+  });
+  if (!hasAny) return null;
 
   const label =
     typeof slot.config.label === 'string' ? slot.config.label : 'More stories';
@@ -47,6 +69,158 @@ export default function ListRail({ slot, ctx }: { slot: SlotRow; ctx: CardCtx })
   const railStyle: React.CSSProperties = numbered
     ? {}
     : ({ ['--rail-dot']: '#f2e7d6' } as React.CSSProperties);
+
+  // Track article index separately so numbered-list rendering keeps
+  // sequential 1/2/3 even when ads sit between articles.
+  let articleIdx = 0;
+
+  const renderItem = (
+    item: (typeof items)[number],
+    rowIdx: number,
+  ): ReactElement | null => {
+    if (item.content_type === 'ad') {
+      const placement = item.payload?.placement;
+      if (typeof placement !== 'string' || placement.length === 0) return null;
+      const page =
+        typeof item.payload?.page === 'string' && item.payload.page
+          ? (item.payload.page as string)
+          : 'home';
+      const position =
+        typeof item.payload?.position === 'string' && item.payload.position
+          ? (item.payload.position as string)
+          : 'list_rail';
+      return (
+        <li key={item.id} style={{ listStyle: 'none' }}>
+          <Ad placement={placement} page={page} position={position} />
+        </li>
+      );
+    }
+    if (item.content_type !== 'article') return null;
+    const story = item.article;
+    if (!story) return null;
+    const idx = articleIdx++;
+    return renderStoryRow(item.id, story, idx, rowIdx);
+  };
+
+  function renderStoryRow(
+    key: string,
+    story: HomeStory,
+    idx: number,
+    _rowIdx: number,
+  ): ReactElement {
+    if (numbered) {
+      const cat = categoryFor(story, ctx);
+      const meta = [cat?.name, timeShort(story.published_at)]
+        .filter(Boolean)
+        .join(' · ');
+      return (
+        <li
+          key={key}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '22px 1fr',
+            gap: 8,
+            alignItems: 'baseline',
+          }}
+        >
+          <span
+            style={{
+              font: '800 26px/1 var(--p-serif)',
+              color: railText,
+            }}
+          >
+            {idx + 1}
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <StoryLink story={story}>
+              <span
+                style={{
+                  font: '600 14px/1.35 var(--p-sans)',
+                  color: railText,
+                  display: 'block',
+                }}
+              >
+                {story.title}
+              </span>
+            </StoryLink>
+            {meta && (
+              <div
+                style={{
+                  font: '500 10px/1 var(--p-sans)',
+                  color: railDim,
+                  marginTop: 4,
+                  letterSpacing: '.04em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {meta}
+              </div>
+            )}
+          </div>
+        </li>
+      );
+    }
+
+    if (showTimestamps) {
+      return (
+        <li
+          key={key}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '76px 1fr',
+            gap: 8,
+            alignItems: 'baseline',
+          }}
+        >
+          <span
+            style={{
+              font: '700 11px/1 var(--p-sans)',
+              letterSpacing: '.04em',
+              textTransform: 'uppercase',
+              color: railDim,
+            }}
+          >
+            {relativeDate(story.published_at)}
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <StoryLink story={story}>
+              <span
+                style={{
+                  font: '600 13px/1.35 var(--p-sans)',
+                  color: railText,
+                  display: 'block',
+                }}
+              >
+                {story.title}
+              </span>
+            </StoryLink>
+          </div>
+        </li>
+      );
+    }
+
+    return (
+      <li key={key}>
+        <StoryLink story={story}>
+          <span
+            style={{
+              font: '600 13px/1.35 var(--p-sans)',
+              color: railSoft,
+              display: 'block',
+            }}
+          >
+            {story.title}
+          </span>
+        </StoryLink>
+      </li>
+    );
+  }
+
+  const rows = items
+    .map((item, i) => renderItem(item, i))
+    .filter((node): node is ReactElement => node !== null);
+
+  if (rows.length === 0) return null;
 
   return (
     <aside className="vp-rail-block" style={railStyle}>
@@ -61,114 +235,7 @@ export default function ListRail({ slot, ctx }: { slot: SlotRow; ctx: CardCtx })
           gap: 12,
         }}
       >
-        {stories.map((story, idx) => {
-          if (numbered) {
-            const cat = categoryFor(story, ctx);
-            const meta = [cat?.name, timeShort(story.published_at)]
-              .filter(Boolean)
-              .join(' · ');
-            return (
-              <li
-                key={`${story.id}-${idx}`}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '22px 1fr',
-                  gap: 8,
-                  alignItems: 'baseline',
-                }}
-              >
-                <span
-                  style={{
-                    font: '800 26px/1 var(--p-serif)',
-                    color: railText,
-                  }}
-                >
-                  {idx + 1}
-                </span>
-                <div style={{ minWidth: 0 }}>
-                  <StoryLink story={story}>
-                    <span
-                      style={{
-                        font: '600 14px/1.35 var(--p-sans)',
-                        color: railText,
-                        display: 'block',
-                      }}
-                    >
-                      {story.title}
-                    </span>
-                  </StoryLink>
-                  {meta && (
-                    <div
-                      style={{
-                        font: '500 10px/1 var(--p-sans)',
-                        color: railDim,
-                        marginTop: 4,
-                        letterSpacing: '.04em',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      {meta}
-                    </div>
-                  )}
-                </div>
-              </li>
-            );
-          }
-
-          if (showTimestamps) {
-            return (
-              <li
-                key={`${story.id}-${idx}`}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '76px 1fr',
-                  gap: 8,
-                  alignItems: 'baseline',
-                }}
-              >
-                <span
-                  style={{
-                    font: '700 11px/1 var(--p-sans)',
-                    letterSpacing: '.04em',
-                    textTransform: 'uppercase',
-                    color: railDim,
-                  }}
-                >
-                  {relativeDate(story.published_at)}
-                </span>
-                <div style={{ minWidth: 0 }}>
-                  <StoryLink story={story}>
-                    <span
-                      style={{
-                        font: '600 13px/1.35 var(--p-sans)',
-                        color: railText,
-                        display: 'block',
-                      }}
-                    >
-                      {story.title}
-                    </span>
-                  </StoryLink>
-                </div>
-              </li>
-            );
-          }
-
-          return (
-            <li key={`${story.id}-${idx}`}>
-              <StoryLink story={story}>
-                <span
-                  style={{
-                    font: '600 13px/1.35 var(--p-sans)',
-                    color: railSoft,
-                    display: 'block',
-                  }}
-                >
-                  {story.title}
-                </span>
-              </StoryLink>
-            </li>
-          );
-        })}
+        {rows}
       </ol>
     </aside>
   );

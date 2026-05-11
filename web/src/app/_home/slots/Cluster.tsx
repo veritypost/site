@@ -1,95 +1,113 @@
-import type { CSSProperties } from 'react';
-import {
-  C,
-  MetaLine,
-  StoryLink,
-  categoryFor,
-  serifStack,
-  type CardCtx,
-} from './_shared';
-import type { SlotRow } from '../types';
+// Cluster slot — emits a fragment of bordered, typographic article cards
+// matching the "reimagined homepage" rest-of-grid aesthetic. The
+// parent HomeLayout grid lays the cards out; this component does not
+// wrap them in a container.
+//
+// Style classes (vp-rh-card, vp-rh-tag, vp-rh-title, vp-rh-summary,
+// vp-rh-arrow) are defined in HomeRoot.tsx's RhStyles() block and will
+// move to HomeLayout.tsx in a follow-up step — so this file ships no
+// <style> tags.
 
-export default function Cluster({
+import { Fragment, type ReactElement } from 'react';
+import Link from 'next/link';
+import { Source_Serif_4, IBM_Plex_Mono } from 'next/font/google';
+import type { SlotRow } from '../types';
+import type { CardCtx, HomeStory } from './_shared';
+import SsrAdCell from '../_SsrAdCell';
+
+const serif = Source_Serif_4({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+  display: 'swap',
+});
+const mono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  display: 'swap',
+});
+
+function articleHref(s: HomeStory): string {
+  const slug = s.stories?.slug;
+  return slug ? `/${slug}` : '#';
+}
+
+function categoryName(
+  story: HomeStory,
+  byId: CardCtx['categoryById'],
+): string {
+  if (!story.category_id) return 'News';
+  const c = byId[story.category_id];
+  return c?.name || 'News';
+}
+
+export default async function Cluster({
   slot,
   ctx,
 }: {
   slot: SlotRow;
   ctx: CardCtx;
 }) {
-  const stories = slot.items
-    .map((i) => i.article)
-    .filter((s): s is NonNullable<typeof s> => !!s);
-  if (stories.length === 0) return null;
+  // Per-item dispatch on content_type. Mixed-type clusters render
+  // articles + ads in declared order; unknown/unsupported types are
+  // silently skipped (no empty grid cells). Cap counts mixed types
+  // together — 12 articles + 4 ads renders 15 total.
+  //
+  // Ad items delegate to <SsrAdCell />, which probes server-side, logs
+  // the impression, rewrites the CTA href, and mounts the beacon. The
+  // cell returns null when no campaign is eligible, so empty bordered
+  // tiles never appear in the grid when ads are off.
+  // Cell-count cap. Owner can override via home_slots.config.capacity
+  // (validated 1..30 server-side); default 15 keeps the historic shape.
+  const cfgCap = slot.config?.capacity;
+  const cap =
+    typeof cfgCap === 'number' && cfgCap > 0 && cfgCap <= 30 ? cfgCap : 15;
+  const items = [...slot.items]
+    .sort((a, b) => a.position - b.position)
+    .slice(0, cap);
 
-  const label =
-    typeof slot.config.label === 'string' ? slot.config.label : null;
-  const compact = slot.config.layout === 'image_left';
-  const cols = compact ? 1 : Math.min(2, Math.max(1, stories.length));
-
-  return (
-    <section className="vp-river-section" style={{ minWidth: 0 }}>
-      {label && (
-        <header className="vp-section-head">
-          <p className="vp-section-head__label">{label}</p>
-        </header>
-      )}
-      <div
-        className={`vp-cluster-grid${compact ? ' is-compact' : ''}`}
-        style={{ '--cluster-cols': cols } as CSSProperties}
-      >
-        {stories.slice(0, compact ? stories.length : cols).map((story) => {
-          const category = categoryFor(story, ctx);
-          const imageUrl = story.cover_image_url ?? null;
-          const imageAlt = story.cover_image_alt ?? story.title ?? '';
-
-          return (
-            <article
-              key={story.id}
-              className={`vp-cluster-card${compact ? ' is-compact' : ''}`}
-            >
-              <StoryLink
-                story={story}
-                className="vp-cluster-card__link"
-                style={{ display: 'grid' }}
-              >
-                {imageUrl && (
-                  <div className="vp-cluster-card__art">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={imageUrl}
-                      alt={imageAlt}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        display: 'block',
-                      }}
-                    />
-                  </div>
-                )}
-                {category && (
-                  <p
-                    className="vp-cluster-card__cat"
-                    style={{ color: category.color_hex || C.dim }}
-                  >
-                    {category.name}
-                  </p>
-                )}
-                <h3
-                  className="vp-cluster-card__hed"
-                  style={{ fontFamily: serifStack }}
-                >
-                  {story.title}
-                </h3>
-                {story.excerpt && (
-                  <p className="vp-cluster-card__dek">{story.excerpt}</p>
-                )}
-                <MetaLine story={story} />
-              </StoryLink>
-            </article>
-          );
-        })}
-      </div>
-    </section>
+  const nodes = await Promise.all(
+    items.map(async (item) => {
+      if (item.content_type === 'article') {
+        const s = item.article;
+        if (!s || !s.stories?.slug) return null;
+        return (
+          <Link key={item.id} href={articleHref(s)} className="vp-rh-card">
+            <span className={`vp-rh-tag ${mono.className}`}>
+              {categoryName(s, ctx.categoryById)}
+            </span>
+            <h2 className={`vp-rh-title ${serif.className}`}>{s.title}</h2>
+            {s.excerpt && <p className="vp-rh-summary">{s.excerpt}</p>}
+            <span className="vp-rh-arrow" aria-hidden="true">
+              →
+            </span>
+          </Link>
+        );
+      }
+      if (item.content_type === 'ad') {
+        const placement = item.payload?.placement;
+        if (typeof placement !== 'string' || placement.length === 0) {
+          return null;
+        }
+        const cell = await SsrAdCell({
+          placement,
+          page: 'home',
+          position: `cluster:${placement}`,
+          wrapperClassName: 'vp-rh-card vp-rh-card-ad',
+          selector: `.vp-rh-card-ad[data-cluster-ad-id="${item.id}"]`,
+          dataAttrs: { 'data-cluster-ad-id': String(item.id) },
+        });
+        if (!cell) return null;
+        return <Fragment key={item.id}>{cell}</Fragment>;
+      }
+      return null;
+    }),
   );
+
+  const rendered = nodes.filter(
+    (node): node is ReactElement => node !== null,
+  );
+
+  if (rendered.length === 0) return null;
+
+  return <Fragment>{rendered}</Fragment>;
 }

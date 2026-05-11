@@ -7,10 +7,10 @@
 // (usePathname, useSearchParams) plus the AuthContext provider, so it
 // mounts inside NavWrapper alongside children.
 //
-// Replaces the prior home-only `usePageViewTrack('home')` mount in
-// `_HomeFooter.tsx`. Story / leaderboard / settings / profile views
-// were captured in GA4 but missing from the custom pipeline; this
-// closes that gap.
+// Replaces the prior home-only `usePageViewTrack('home')` mount that
+// lived in the retired home footer. Story / leaderboard / settings /
+// profile views were captured in GA4 but missing from the custom
+// pipeline; this closes that gap.
 
 'use client';
 
