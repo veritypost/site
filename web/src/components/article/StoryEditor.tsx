@@ -28,6 +28,7 @@ import { confirm, ConfirmDialogHost } from '@/components/admin/ConfirmDialog';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import { formatTimelineDate } from '@/lib/dates';
+import { SENSITIVITY_TAGS } from '@/lib/sensitivityTags';
 
 // Editorial day = America/New_York. Same constant the home page uses
 // to filter today's hero. Returns "YYYY-MM-DD".
@@ -65,6 +66,14 @@ type StoryForm = {
   is_breaking: boolean;
   is_developing: boolean;
   hero_pick_for_date: string | null;
+  // Wave 2 — ad eligibility surface. `ad_eligible` is the editorial
+  // toggle (default ON). `sensitivity_tags` is a small content-tag set;
+  // the serve_ad path treats any tag in SENSITIVITY_TAGS marked blocking
+  // as a hard block regardless of the toggle. Columns are added by a
+  // parallel migration; database.ts will pick them up on regen — until
+  // then we widen the article row type at the load boundary.
+  ad_eligible: boolean;
+  sensitivity_tags: string[];
   created_at?: string;
   author?: string;
   sources: StorySource[];
@@ -84,6 +93,8 @@ const EMPTY_STORY: StoryForm = {
   is_breaking: false,
   is_developing: false,
   hero_pick_for_date: null,
+  ad_eligible: true,
+  sensitivity_tags: [],
   sources: [],
 };
 
@@ -379,6 +390,21 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
 
       const cast = storyData as unknown as ArticleRow;
       lastPersistedSlugRef.current = cast.stories?.slug || '';
+      // Wave 2 — `ad_eligible` and `sensitivity_tags` aren't in the
+      // generated database.ts yet (migration in flight). Widen the row
+      // here rather than touching the generated file. `ad_eligible`
+      // defaults to true (matches DB default) so existing rows that
+      // haven't been touched since the migration still render the
+      // toggle in the ON state.
+      const adRow = cast as unknown as {
+        ad_eligible?: boolean | null;
+        sensitivity_tags?: string[] | null;
+      };
+      const loadedAdEligible = adRow.ad_eligible == null ? true : !!adRow.ad_eligible;
+      const loadedSensitivityTags = Array.isArray(adRow.sensitivity_tags)
+        ? adRow.sensitivity_tags.filter((t): t is string => typeof t === 'string')
+        : [];
+
       setStory({
         title: cast.title || '',
         slug: cast.stories?.slug || '',
@@ -393,6 +419,8 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         is_breaking: cast.is_breaking || false,
         is_developing: cast.is_developing || false,
         hero_pick_for_date: cast.hero_pick_for_date || null,
+        ad_eligible: loadedAdEligible,
+        sensitivity_tags: loadedSensitivityTags,
         created_at: cast.created_at || '',
         sources: (sourceData || []).map((s) => ({
           id: s.id,
@@ -888,6 +916,11 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
             is_developing: effective.is_developing || false,
             hero_pick_for_date: effective.hero_pick_for_date,
             published_at: publishedAtIso,
+            // Wave 2 — ad eligibility surface. The save endpoint
+            // validates sensitivity_tags against the known set and
+            // drops unknowns silently.
+            ad_eligible: effective.ad_eligible,
+            sensitivity_tags: effective.sensitivity_tags,
           },
           timeline_entries: entries.map((entry) => ({
             id: entry.id,
@@ -1052,6 +1085,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         {story.body_html ? (
           <div
             data-article-body
+            className="admin-preview"
             style={{ fontSize: F.lg, color: C.ink, lineHeight: 1.8 }}
             dangerouslySetInnerHTML={{ __html: story.body_html }}
           />
@@ -1338,6 +1372,67 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
               </Button>
             );
           })()}
+        </div>
+      </Section>
+
+      <Section
+        embedded={embedded}
+        title="Ad eligibility"
+        description="Editorial gate. Sensitive-content tags block all ads regardless of toggle."
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: S[3], flexWrap: 'wrap' }}>
+            <Button
+              variant={story.ad_eligible ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => updateStory('ad_eligible', !story.ad_eligible)}
+            >
+              Allow ads on this article{story.ad_eligible ? ' (on)' : ' (off)'}
+            </Button>
+            {!story.ad_eligible && (
+              <span style={{ fontSize: F.sm, color: C.dim, alignSelf: 'center' }}>
+                Ads will not serve on this article regardless of campaign targeting.
+              </span>
+            )}
+          </div>
+
+          <div>
+            <label style={labelStyle}>Sensitivity tags</label>
+            <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>
+              {SENSITIVITY_TAGS.map((tag) => {
+                const selected = story.sensitivity_tags.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => {
+                      const next = selected
+                        ? story.sensitivity_tags.filter((t) => t !== tag.id)
+                        : [...story.sensitivity_tags, tag.id];
+                      updateStory('sensitivity_tags', next);
+                    }}
+                    style={{
+                      fontSize: F.sm,
+                      padding: `${S[1]}px ${S[2]}px`,
+                      borderRadius: 999,
+                      border: `1px solid ${selected ? C.ink : C.divider}`,
+                      background: selected ? C.ink : 'transparent',
+                      color: selected ? C.bg : C.ink,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      lineHeight: 1.2,
+                    }}
+                    aria-pressed={selected}
+                  >
+                    {tag.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: F.sm, color: C.dim, marginTop: S[2] }}>
+              Tags marked blocking will suppress all ads on this article (system-enforced).
+            </div>
+          </div>
         </div>
       </Section>
 

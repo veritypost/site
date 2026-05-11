@@ -14,6 +14,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
+import { sanitizeSensitivityTags } from '@/lib/sensitivityTags';
 
 const SLUG_SAFE = /^[a-z0-9][a-z0-9-]{0,118}[a-z0-9]$|^[a-z0-9]$/;
 
@@ -32,6 +33,10 @@ type ArticleFields = {
   age_band?: string | null;
   hero_pick_for_date?: string | null;
   published_at?: string | null;
+  // Wave 2 — ad eligibility. Columns added via parallel migration; the
+  // generated database.ts will pick them up on next regen.
+  ad_eligible?: boolean;
+  sensitivity_tags?: string[];
   [key: string]: unknown;
 };
 type TimelineEntryPayload = {
@@ -134,6 +139,35 @@ export async function POST(request: Request) {
   // Build article fields (no slug — that's on stories).
   const { slug: _dropSlug, ...articleFieldsWithoutSlug } = body.article as ArticleFields & { slug?: unknown };
   const articleRow: ArticleFields = { ...articleFieldsWithoutSlug };
+
+  // Wave 2 — sanitize ad-eligibility inputs. `ad_eligible` is coerced
+  // to a strict boolean when present (treat undefined as "leave column
+  // alone" so partial saves don't clobber the toggle). `sensitivity_tags`
+  // is filtered to the known set via the shared sanitizer; unknown tags
+  // are dropped silently with a console.warn so we can spot client/server
+  // drift in logs.
+  if (Object.prototype.hasOwnProperty.call(articleRow, 'ad_eligible')) {
+    articleRow.ad_eligible = !!articleRow.ad_eligible;
+  }
+  if (Object.prototype.hasOwnProperty.call(articleRow, 'sensitivity_tags')) {
+    const raw = articleRow.sensitivity_tags;
+    if (raw == null) {
+      articleRow.sensitivity_tags = [];
+    } else if (Array.isArray(raw)) {
+      const { tags, dropped } = sanitizeSensitivityTags(raw);
+      if (dropped.length > 0) {
+        console.warn(
+          '[admin.articles.save] dropped unknown sensitivity_tags:',
+          dropped.join(', ')
+        );
+      }
+      articleRow.sensitivity_tags = tags;
+    } else {
+      // Wrong shape entirely — drop the field so we don't write garbage.
+      console.warn('[admin.articles.save] sensitivity_tags not an array; ignoring');
+      delete articleRow.sensitivity_tags;
+    }
+  }
 
   if (Object.prototype.hasOwnProperty.call(articleRow, 'hero_pick_for_date')) {
     const incoming = (articleRow.hero_pick_for_date as string | null) ?? null;

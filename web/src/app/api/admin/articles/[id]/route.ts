@@ -37,6 +37,7 @@ import { requirePermission, requireAuth } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction, requireAdminOutranks } from '@/lib/adminMutation';
+import { sanitizeSensitivityTags } from '@/lib/sensitivityTags';
 import { renderBodyHtml } from '@/lib/pipeline/render-body';
 import { captureMessage } from '@/lib/observability';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -264,6 +265,14 @@ const PatchSchema = z
     timeline: z.array(TimelineSchema).optional(),
     quizzes: z.array(QuizSchema).optional(),
     browse_only: z.boolean().optional(),
+    // Wave 2 — ad eligibility. `ad_eligible` is the editorial toggle;
+    // `sensitivity_tags` is validated via sanitizeSensitivityTags() (from
+    // @/lib/sensitivityTags) in the update path (unknowns are dropped
+    // silently + logged). Schema accepts any string[] here so a
+    // stale-client request still gets a 200 with the bad tags filtered,
+    // rather than a 400.
+    ad_eligible: z.boolean().optional(),
+    sensitivity_tags: z.array(z.string()).optional(),
   })
   .strict();
 
@@ -288,7 +297,11 @@ function requiredPerms(body: PatchBody, currentStatus: string): string[] {
     body.subcategory_id !== undefined ||
     body.sources !== undefined ||
     body.timeline !== undefined ||
-    body.quizzes !== undefined;
+    body.quizzes !== undefined ||
+    // Wave 2 — ad eligibility is an editorial-edit operation; gate it
+    // behind admin.articles.edit.any like other metadata touches.
+    body.ad_eligible !== undefined ||
+    body.sensitivity_tags !== undefined;
 
   if (touchesContent) perms.add('admin.articles.edit.any');
 
@@ -443,6 +456,20 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   // the dropdown filtered).
   if (body.category_id !== undefined) update.category_id = body.category_id;
   if (body.subcategory_id !== undefined) update.subcategory_id = body.subcategory_id;
+  // Wave 2 — ad eligibility. `ad_eligible` is a strict boolean toggle.
+  // `sensitivity_tags` is filtered via the shared sanitizer; unknown ids
+  // are dropped silently with a console.warn so we can spot drift.
+  if (body.ad_eligible !== undefined) update.ad_eligible = !!body.ad_eligible;
+  if (body.sensitivity_tags !== undefined) {
+    const { tags, dropped } = sanitizeSensitivityTags(body.sensitivity_tags);
+    if (dropped.length > 0) {
+      console.warn(
+        '[admin.articles.patch] dropped unknown sensitivity_tags:',
+        dropped.join(', ')
+      );
+    }
+    update.sensitivity_tags = tags;
+  }
   if (body.body !== undefined) {
     update.body = body.body;
     // Server-side sanitization — the client never sends HTML.
