@@ -48,6 +48,19 @@ export type AdImpressionContext = {
 const BOT_RE =
   /(bot|crawl|spider|preview|facebookexternalhit|whatsapp|slack|linkedin|twitter|googlebot|bingbot|yandex|baidu|duckduck|applebot|amazonbot|claude|perplexity|chatgpt|headless|lighthouse|pagespeed)/i;
 
+// Coarse device-type bucket derived from User-Agent. Matches the
+// values written by the client-side Ad.jsx via /api/ads/impression
+// (web_desktop / web_mobile) so the device_type column is consistent
+// regardless of which path logged the impression. SSR can't see
+// viewport width, so we infer mobile vs desktop from the UA string.
+function deviceTypeFromUA(ua: string): string {
+  if (!ua) return 'web';
+  if (/Mobi|Android.*Mobile|iPhone|iPod|IEMobile|Opera Mini/i.test(ua)) {
+    return 'web_mobile';
+  }
+  return 'web_desktop';
+}
+
 // Per-request memoized via React.cache. Zero-arg so the cache key is
 // stable across all callers on a single page render — the 7 ad probes
 // share ONE DB roundtrip instead of 7. Creates its own service client
@@ -63,7 +76,11 @@ const isAdsEnabled = cache(async (): Promise<boolean> => {
     .limit(2);
   if (error) return false; // fail closed on read error
   if (!data || data.length !== 1) return false; // 0 or 2+ live → disabled
-  return data[0].ads_enabled !== false;
+  // ads_enabled column exists in the live DB (boolean, default true) but
+  // database.ts is stale and doesn't include it; cast the row until the
+  // generated types are regenerated.
+  const row = data[0] as { ads_enabled?: boolean | null };
+  return row.ads_enabled !== false;
 });
 
 export async function resolveAd(placementName: string): Promise<ResolvedAd | null> {
@@ -136,11 +153,13 @@ export async function resolveAdAndLog(
       p_article_id?: string;
       p_page: string;
       p_position: string;
+      p_device_type: string;
     } = {
       p_ad_unit_id: ad.ad_unit_id,
       p_placement_id: ad.placement_id,
       p_page: ctx.page,
       p_position: ctx.position,
+      p_device_type: deviceTypeFromUA(userAgent),
     };
     if (ad.campaign_id) rpcArgs.p_campaign_id = ad.campaign_id;
     if (ctx.articleId) rpcArgs.p_article_id = ctx.articleId;
