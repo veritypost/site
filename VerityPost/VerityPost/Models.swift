@@ -194,6 +194,16 @@ struct Story: Codable, Identifiable, Hashable {
     /// on the home page. Comes back from PostgREST as an ISO date string
     /// ("YYYY-MM-DD"); kept as String to avoid Date-formatter ambiguity.
     var heroPickForDate: String?
+    /// Editorial ad-eligibility flag — `false` when an article is flagged
+    /// as tragedy/obit/etc. and ads must not serve adjacent to it. Home
+    /// feed filters these out so HomeAdSlot placements (which don't pass
+    /// article_id, so serve_ad's per-article gate can't fire) never sit
+    /// next to a blocked headline.
+    var adEligible: Bool?
+    /// Sensitivity tags applied editorially; presence of any tag in the
+    /// blocking set (tragedy, breaking_casualty, suicide_coverage, cw_sa,
+    /// cw_violence, obit) means the article is unfit for ad adjacency.
+    var sensitivityTags: [String]?
 
     enum CodingKeys: String, CodingKey {
         case id, title, status, stories
@@ -207,6 +217,8 @@ struct Story: Codable, Identifiable, Hashable {
         case publishedAt = "published_at"
         case createdAt = "created_at"
         case heroPickForDate = "hero_pick_for_date"
+        case adEligible = "ad_eligible"
+        case sensitivityTags = "sensitivity_tags"
     }
 
     /// Slug lives on the related stories row; this computed property

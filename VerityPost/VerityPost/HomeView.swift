@@ -68,6 +68,27 @@ struct HomeView: View {
         return f
     }()
     private static let loadDataISOFmt = ISO8601DateFormatter()
+
+    // MARK: - Editorial ad gate (Wave 2.5c)
+    //
+    // Sensitivity tags that disqualify an article from appearing next to a
+    // home-page ad slot. Mirrors web/src/app/_home/data.ts and the serve_ad
+    // RPC's per-article block; HomeAdSlot here doesn't pass article_id, so
+    // we have to gate at the feed-fetch layer instead of at ad-serve time.
+    private static let blockingSensitivityTags: Set<String> = [
+        "tragedy",
+        "breaking_casualty",
+        "suicide_coverage",
+        "cw_sa",
+        "cw_violence",
+        "obit",
+    ]
+
+    private static func isHomeBlocked(_ article: Story) -> Bool {
+        if article.adEligible == false { return true }
+        guard let tags = article.sensitivityTags, !tags.isEmpty else { return false }
+        return tags.contains { blockingSensitivityTags.contains($0) }
+    }
     private static let timeShortFmt: DateFormatter = {
         let f = DateFormatter()
         f.timeZone = editorialTimeZone
@@ -578,7 +599,7 @@ struct HomeView: View {
             let todayStartIso = HomeView.loadDataISOFmt.string(from: today.startUtc)
 
             async let storiesReq: [Story] = client.from("articles")
-                .select("*, stories(slug)")
+                .select("*, ad_eligible, sensitivity_tags, stories(slug)")
                 .eq("status", value: "published")
                 .eq("browse_only", value: false)
                 .order("published_at", ascending: false)
@@ -589,7 +610,7 @@ struct HomeView: View {
             // Dedicated breaking query — runs independently of the top-of-feed
             // so a breaking story always surfaces above the masthead.
             async let breakingReq: [Story] = client.from("articles")
-                .select("*, stories(slug)")
+                .select("*, ad_eligible, sensitivity_tags, stories(slug)")
                 .eq("status", value: "published")
                 .eq("is_breaking", value: true)
                 .eq("browse_only", value: false)
@@ -605,15 +626,30 @@ struct HomeView: View {
                 .value
 
             async let topStoriesReq: [TopStoryRow] = client.from("top_stories")
-                .select("position, articles!inner(id, title, story_id, published_at, excerpt, cover_image_url, category_id, is_breaking, is_developing, stories(slug))")
+                .select("position, articles!inner(id, title, story_id, published_at, excerpt, cover_image_url, category_id, is_breaking, is_developing, ad_eligible, sensitivity_tags, stories(slug))")
                 .order("position")
                 .execute()
                 .value
 
-            let raw = try await storiesReq
-            let breakingFirst = try await breakingReq.first
+            let rawAll = try await storiesReq
+            let breakingFirstAll = try await breakingReq.first
             let cats = try await catsReq
-            let topRows = (try? await topStoriesReq) ?? []
+            let topRowsAll = (try? await topStoriesReq) ?? []
+
+            // Wave 2.5c — editorial gate. HomeAdSlot placements (home_top /
+            // home_in_feed_1 / home_in_feed_2 / home_below_fold) don't pass
+            // article_id, so serve_ad's per-article ad_eligible/sensitivity
+            // check can't fire for the home feed. Filter blocked articles
+            // out of the feed itself so ads never sit adjacent to a
+            // tragedy/obit headline. Mirrors web/src/app/_home/data.ts.
+            let raw = rawAll.filter { !HomeView.isHomeBlocked($0) }
+            let breakingFirst = breakingFirstAll.flatMap {
+                HomeView.isHomeBlocked($0) ? nil : $0
+            }
+            let topRows = topRowsAll.filter { row in
+                guard let a = row.articles else { return true }
+                return !HomeView.isHomeBlocked(a)
+            }
 
             // If top_stories has pinned rows, use them in position order.
             // Otherwise fall back to hero_pick_for_date sort on today’s articles.
