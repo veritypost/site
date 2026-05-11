@@ -285,9 +285,8 @@ async function run(request: Request) {
     // generator and archives a cluster whose run is about to write articles.
     const { data: candidates, error: candErr } = await service
       .from('feed_clusters')
-      .select('id, locked_at, generation_state')
+      .select('id, generation_state')
       .is('archived_at', null)
-      .is('locked_at', null)
       .lt('created_at', expiryThresholdIso)
       .limit(CLUSTER_EXPIRY_CAP * 2);
     if (candErr) throw candErr;
