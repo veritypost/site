@@ -1,0 +1,26 @@
+{
+  "generated_at": "2026-05-11",
+  "source": "prod ad_placements table (Supabase project fyiwulqphgmoqullmrfn)",
+  "regenerate_with": "node scripts/audit-ad-placements.mjs --regen (manual paste from MCP execute_sql today; --regen is a stub until service-role wiring is added)",
+  "placements": [
+    { "name": "article_end", "is_active": true, "page": "article", "position": "end" },
+    { "name": "article_header", "is_active": true, "page": "article", "position": "header" },
+    { "name": "article_in_body", "is_active": true, "page": "article", "position": "in_body" },
+    { "name": "article_quiz_sponsor", "is_active": true, "page": "article", "position": "quiz_sponsor" },
+    { "name": "article_rail", "is_active": true, "page": "article", "position": "rail" },
+    { "name": "category_in_feed_1", "is_active": true, "page": "category", "position": "in_feed_1" },
+    { "name": "category_top", "is_active": true, "page": "category", "position": "top" },
+    { "name": "home_below_fold", "is_active": false, "page": "home", "position": "below_fold" },
+    { "name": "home_discovery_1", "is_active": true, "page": "home", "position": "discovery_1" },
+    { "name": "home_discovery_2", "is_active": true, "page": "home", "position": "discovery_2" },
+    { "name": "home_discovery_3", "is_active": true, "page": "home", "position": "discovery_3" },
+    { "name": "home_discovery_4", "is_active": true, "page": "home", "position": "discovery_4" },
+    { "name": "home_in_feed_1", "is_active": false, "page": "home", "position": "in_feed_1" },
+    { "name": "home_in_feed_2", "is_active": false, "page": "home", "position": "in_feed_2" },
+    { "name": "home_insight_row", "is_active": true, "page": "home", "position": "insight_row" },
+    { "name": "home_signup_inline", "is_active": true, "page": "home", "position": "cluster_inline" },
+    { "name": "home_ticker_sponsor", "is_active": true, "page": "home", "position": "ticker_sponsor" },
+    { "name": "home_top", "is_active": false, "page": "home", "position": "top" },
+    { "name": "mobile_sticky_footer", "is_active": true, "page": "global", "position": "sticky_footer" }
+  ]
+}
