@@ -14,7 +14,7 @@ export async function DELETE(
 ) {
   let actor;
   try {
-    actor = await requirePermission('admin.home_v2.manage');
+    actor = await requirePermission('admin.home.manage');
   } catch (err) {
     return permissionError(err);
   }
@@ -22,8 +22,8 @@ export async function DELETE(
   const service = createServiceClient();
 
   const rate = await checkRateLimit(service, {
-    key: `admin.home_v2.mutate:${actor.id}`,
-    policyKey: 'admin.home_v2.mutate',
+    key: `admin.home.mutate:${actor.id}`,
+    policyKey: 'admin.home.mutate',
     max: 60,
     windowSec: 60,
   });
@@ -45,7 +45,7 @@ export async function DELETE(
     .eq('id', id)
     .select('slot_id, position');
   if (error) {
-    console.error('[admin.home_v2.items.delete]', error.message);
+    console.error('[admin.home.items.delete]', error.message);
     return NextResponse.json({ error: 'Could not clear item' }, { status: 500 });
   }
   if (!cleared || cleared.length === 0) {
@@ -53,7 +53,7 @@ export async function DELETE(
   }
 
   await recordAdminAction({
-    action: 'home_v2.slot_item.clear',
+    action: 'home.slot_item.clear',
     targetTable: 'home_slot_items',
     targetId: id,
     oldValue: cleared[0] as Record<string, unknown>,

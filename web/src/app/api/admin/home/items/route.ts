@@ -11,12 +11,12 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ALLOWED_CONTENT_TYPES = ['article', 'quiz', 'feature', 'custom'] as const;
+const ALLOWED_CONTENT_TYPES = ['article', 'quiz', 'feature', 'custom', 'ad'] as const;
 
 export async function POST(request: Request) {
   let actor;
   try {
-    actor = await requirePermission('admin.home_v2.manage');
+    actor = await requirePermission('admin.home.manage');
   } catch (err) {
     return permissionError(err);
   }
@@ -24,8 +24,8 @@ export async function POST(request: Request) {
   const service = createServiceClient();
 
   const rate = await checkRateLimit(service, {
-    key: `admin.home_v2.mutate:${actor.id}`,
-    policyKey: 'admin.home_v2.mutate',
+    key: `admin.home.mutate:${actor.id}`,
+    policyKey: 'admin.home.mutate',
     max: 60,
     windowSec: 60,
   });
@@ -93,6 +93,31 @@ export async function POST(request: Request) {
     }
   }
 
+  if (content_type === 'ad') {
+    if (article_id !== null) {
+      return NextResponse.json(
+        { error: 'article_id must be null for content_type=ad' },
+        { status: 400 },
+      );
+    }
+    const placement = typeof payload.placement === 'string' ? payload.placement.trim() : '';
+    if (!placement) {
+      return NextResponse.json(
+        { error: 'Ad items require a non-empty payload.placement string' },
+        { status: 400 },
+      );
+    }
+    const page =
+      typeof payload.page === 'string' && payload.page.trim() ? payload.page.trim() : 'home';
+    const adPosition =
+      typeof payload.position === 'string' && payload.position.trim()
+        ? payload.position.trim()
+        : 'inline';
+    payload.placement = placement;
+    payload.page = page;
+    payload.position = adPosition;
+  }
+
   // Verify the slot exists.
   const { data: slot } = await service
     .from('home_slots')
@@ -127,12 +152,12 @@ export async function POST(request: Request) {
     .select('id')
     .single();
   if (error) {
-    console.error('[admin.home_v2.items.insert]', error.message);
+    console.error('[admin.home.items.insert]', error.message);
     return NextResponse.json({ error: 'Could not assign slot item' }, { status: 500 });
   }
 
   await recordAdminAction({
-    action: 'home_v2.slot_item.set',
+    action: 'home.slot_item.set',
     targetTable: 'home_slot_items',
     targetId: (inserted as { id: string }).id,
     newValue: insert,

@@ -22,7 +22,8 @@ const CONTENT_PIPELINE: HubPage[] = [
   { href: '/admin/sources', title: 'Sources', desc: 'No-delete provenance log — every URL we have ever cited; outlet + date filters; CSV export' },
   { href: '/admin/pipeline-config', title: 'Pipeline Config', desc: 'Kill switches, thresholds, prompt presets, categories — all in one place' },
   { href: '/admin/top-stories', title: 'Top Stories', desc: 'Pin up to 5 articles to the front page in fixed positions.' },
-  { href: '/admin/home-v2', title: 'Homepage v2', desc: 'Templated front page with editorial slots — fill them, then flip the live toggle.' },
+  { href: '/admin/home', title: 'Homepage', desc: 'Templated front page with editorial slots — fill them, then flip the live toggle.' },
+  { href: '/admin/ads', title: 'Ads', desc: 'Sitewide ad inventory: campaigns, placements, units, analytics.' },
 ];
 
 const PAGES: HubGroup[] = [
@@ -52,8 +53,6 @@ const PAGES: HubGroup[] = [
     { href: '/admin/subscriptions', title: 'Subscriptions & Billing', desc: 'Cancel flow, grace period review, manual cancel' },
     { href: '/admin/promo', title: 'Promo Codes', desc: 'Create and manage promotional codes and usage' },
     { href: '/admin/sponsors', title: 'Sponsors', desc: 'Sponsor accounts, contracts, spend tracking' },
-    { href: '/admin/ad-placements', title: 'Ad Placements & Units', desc: 'Placement slots and per-placement ad creatives' },
-    { href: '/admin/ad-campaigns', title: 'Ad Campaigns', desc: 'Campaign budgets, pricing, status' },
   ]},
   { group: 'Engagement & Growth', desc: 'Keeping users active, informed, and coming back', items: [
     { href: '/admin/streaks', title: 'Streaks & Engagement', desc: 'Streak config, gamification, referrals' },

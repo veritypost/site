@@ -18,7 +18,7 @@ export async function PATCH(
 ) {
   let actor;
   try {
-    actor = await requirePermission('admin.home_v2.manage');
+    actor = await requirePermission('admin.home.manage');
   } catch (err) {
     return permissionError(err);
   }
@@ -26,8 +26,8 @@ export async function PATCH(
   const service = createServiceClient();
 
   const rate = await checkRateLimit(service, {
-    key: `admin.home_v2.mutate:${actor.id}`,
-    policyKey: 'admin.home_v2.mutate',
+    key: `admin.home.mutate:${actor.id}`,
+    policyKey: 'admin.home.mutate',
     max: 60,
     windowSec: 60,
   });
@@ -69,6 +69,26 @@ export async function PATCH(
     ) {
       return NextResponse.json({ error: 'config must be an object' }, { status: 400 });
     }
+    // Validate config.capacity if present: positive integer, 1..30.
+    // Other config keys (label, numbered, timestamps, …) pass through
+    // unchecked — the renderers tolerate missing/unexpected values.
+    // 30 is the hard cap mirrored in the admin UI stepper and in the
+    // public slot renderers.
+    const cfg = body.config as Record<string, unknown>;
+    if (cfg.capacity !== undefined) {
+      const cap = cfg.capacity;
+      if (
+        typeof cap !== 'number' ||
+        !Number.isInteger(cap) ||
+        cap < 1 ||
+        cap > 30
+      ) {
+        return NextResponse.json(
+          { error: 'config.capacity must be an integer between 1 and 30' },
+          { status: 400 },
+        );
+      }
+    }
     update.config = body.config as never;
   }
 
@@ -78,12 +98,12 @@ export async function PATCH(
 
   const { error } = await service.from('home_slots').update(update).eq('id', id);
   if (error) {
-    console.error('[admin.home_v2.slots.patch]', error.message);
+    console.error('[admin.home.slots.patch]', error.message);
     return NextResponse.json({ error: 'Could not update slot' }, { status: 500 });
   }
 
   await recordAdminAction({
-    action: 'home_v2.slot.update',
+    action: 'home.slot.update',
     targetTable: 'home_slots',
     targetId: id,
     newValue: update,
