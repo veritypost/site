@@ -204,6 +204,7 @@ struct HomeAdSlot: View {
             "page": page,
             "position": placement,
             "session_id": AdSession.id,
+            "device_type": "ios_native",
         ]
         if let articleId { body["article_id"] = articleId }
         if let response: ImpressionResponse = await postBeacon(path: "/api/ads/impression", body: body) {

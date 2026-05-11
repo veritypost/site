@@ -25,6 +25,21 @@ function safeShortString(value, max = 80) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+// Device-type allowlist must stay in lockstep with the client helper
+// (Ad.jsx getDeviceType + web/src/lib/track.ts getDeviceType). Anything
+// outside the allowlist is dropped to NULL rather than failing the
+// request — telemetry shouldn't reject impressions for a stale client.
+const ALLOWED_DEVICE_TYPES = new Set(['web_desktop', 'web_mobile', 'web_tablet', 'ios_native']);
+
+function safeDeviceType(value) {
+  if (typeof value !== 'string') return null;
+  if (!ALLOWED_DEVICE_TYPES.has(value)) {
+    console.warn('[ads] unknown device_type:', value);
+    return null;
+  }
+  return value;
+}
+
 export async function POST(request) {
   const blocked = await v2LiveGuard();
   if (blocked) return blocked;
@@ -55,6 +70,8 @@ export async function POST(request) {
       { status: 429, headers: { 'Retry-After': '60' } }
     );
 
+  const deviceType = safeDeviceType(b.device_type);
+
   const { data, error } = await service.rpc('log_ad_impression', {
     p_ad_unit_id: adUnitId,
     p_placement_id: placementId,
@@ -64,6 +81,7 @@ export async function POST(request) {
     p_article_id: safeUuid(b.article_id),
     p_page: safeShortString(b.page, 80) || 'unknown',
     p_position: safeShortString(b.position, 40) || 'unknown',
+    p_device_type: deviceType,
   });
   if (error)
     return safeErrorResponse(NextResponse, error, { route: 'ads/impression', fallbackStatus: 400 });

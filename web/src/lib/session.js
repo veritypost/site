@@ -35,12 +35,3 @@ export function clearAnonArticleViews() {
     console.error('[session] clearAnonArticleViews', e);
   }
 }
-
-// Session quiz-completion counter for the D23 "interstitial every 3rd quiz".
-export function bumpQuizCount() {
-  if (typeof window === 'undefined') return 0;
-  const k = 'vp_quiz_count_session';
-  const n = parseInt(sessionStorage.getItem(k) || '0', 10) + 1;
-  sessionStorage.setItem(k, String(n));
-  return n;
-}

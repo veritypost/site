@@ -15,10 +15,9 @@ import Ad from '@/components/Ad';
 
 // Surface → placement key mapping (mirrors actual ad slot definitions).
 const SURFACE_PLACEMENTS: Record<string, string[]> = {
-  home: ['home_top', 'home_in_feed_1', 'home_in_feed_2', 'home_below_fold'],
-  browse: ['browse_top'],
+  home: ['home_in_feed_1', 'home_in_feed_2'],
   category: ['category_top', 'category_in_feed_1'],
-  article: ['article_header', 'article_in_body', 'article_end', 'article_rail', 'article_quiz_interstitial'],
+  article: ['article_header', 'article_in_body', 'article_end', 'article_rail'],
   mobile: ['mobile_sticky_footer'],
 };
 

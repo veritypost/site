@@ -5,6 +5,18 @@ import { useEffect, useState, useRef } from 'react';
 import { getSessionId } from '../lib/session';
 import AdSenseSlot from './AdSenseSlot';
 
+// Mirrors web/src/lib/track.ts getDeviceType so impression telemetry
+// records the same device buckets as page-view telemetry. Kept inline
+// here (rather than imported from track.ts) because track.ts isn't a
+// public module surface and we want this stable for the ad pipeline.
+function getDeviceType() {
+  if (typeof window === 'undefined') return 'web_desktop';
+  const w = window.innerWidth || 0;
+  if (w < 600) return 'web_mobile';
+  if (w < 1024) return 'web_tablet';
+  return 'web_desktop';
+}
+
 const ADSENSE_PUBLISHER_ID = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID || '';
 
 // D23: tier-aware ad slot. Hidden entirely when the server-side
@@ -72,6 +84,7 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
         article_id: articleId,
         page,
         position,
+        device_type: getDeviceType(),
       }),
     })
       .then((r) => r.json())
@@ -206,10 +219,32 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
     );
   }
 
-  // HTML creative (networks) renders inside a sandboxed iframe so third-
-  // party markup cannot access document.cookie, localStorage, or the
-  // parent DOM. `srcdoc` lets admins paste raw ad tags while keeping the
-  // iframe same-origin-isolated from the page.
+  // House creatives are written by Verity Post staff and styled to
+  // integrate natively with the page (e.g., a ticker sponsor line, a
+  // discovery-feed card matching the surrounding chumbox aesthetic).
+  // Render inline so the creative inherits page typography and sits
+  // visually flush — no iframe sandbox (we trust our own copy), no
+  // "Sponsored" label (these are our own house promos, not paid
+  // sponsorships). Click logging still fires via handleClick on the
+  // wrapper; the creative's inner <a> handles navigation.
+  if (ad.ad_network === 'house' && ad.creative_html) {
+    // Native render — drop wrapStyle entirely. The creative_html is
+    // self-styled to fit its slot (ticker sponsor cell, insight row,
+    // discovery cell, cluster inline card). Adding a gray bordered
+    // 728px card around it would break every one of those layouts.
+    return (
+      <div
+        ref={containerRef}
+        onClick={handleClick}
+        dangerouslySetInnerHTML={{ __html: ad.creative_html }}
+      />
+    );
+  }
+
+  // HTML creative (third-party networks) renders inside a sandboxed
+  // iframe so external markup cannot access document.cookie,
+  // localStorage, or the parent DOM. `srcdoc` lets admins paste raw ad
+  // tags while keeping the iframe same-origin-isolated from the page.
   if (ad.creative_html) {
     return (
       <div ref={containerRef} style={wrapStyle} onClick={handleClick}>

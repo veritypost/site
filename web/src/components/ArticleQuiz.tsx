@@ -1,7 +1,5 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import Interstitial from './Interstitial';
-import { bumpQuizCount } from '../lib/session';
 import { hasPermission } from '@/lib/permissions';
 import { useTrack } from '@/lib/useTrack';
 import { useRegistrationWall } from '@/components/RegistrationWall';
@@ -89,7 +87,6 @@ export default function ArticleQuiz({
   const [attemptMeta, setAttemptMeta] = useState<AttemptMeta | null>(null);
   const [result, setResult] = useState<QuizResult | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
-  const [showInterstitial, setShowInterstitial] = useState<boolean>(false);
   const [passRevealed, setPassRevealed] = useState<boolean>(false);
   const submittingRef = useRef(false);
   const trackEvent = useTrack();
@@ -103,7 +100,6 @@ export default function ArticleQuiz({
   }, [stage, result?.passed]);
 
   const canRetake = hasPermission('quiz.retake');
-  const seeInterstitialAd = !hasPermission('article.view.ad_free');
 
   async function startAttempt() {
     if (!currentUserId) {
@@ -194,18 +190,6 @@ export default function ArticleQuiz({
           : [];
         onPass(achievements);
       }
-      if (seeInterstitialAd) {
-        const n = bumpQuizCount();
-        // T30 — let the score-reveal land before the interstitial. The
-        // ad component takes over the screen; firing it synchronously
-        // with setStage('result') buries the score moment under a modal.
-        // 1500ms matches the existing reveal-ceremony timing on the
-        // story page so the ad lands at the same beat as the discussion
-        // unlock instead of competing with it.
-        if (n > 0 && n % 3 === 0) {
-          setTimeout(() => setShowInterstitial(true), 1500);
-        }
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStage('answering');
@@ -228,20 +212,10 @@ export default function ArticleQuiz({
     }, 350);
   }
 
-  const interstitialNode = (
-    <Interstitial
-      open={showInterstitial}
-      onClose={() => setShowInterstitial(false)}
-      variant="ad"
-      adPlacement="quiz_interstitial"
-    />
-  );
-
   if (stage === 'passed') {
     const isKid = !!kidProfileId;
     return (
       <>
-        {interstitialNode}
         <div
           style={{
             background: 'var(--p-success-soft, #ecfdf5)',
@@ -502,7 +476,6 @@ export default function ArticleQuiz({
     if (passed) {
       return (
         <>
-          {interstitialNode}
           <div
             role="status"
             aria-live="polite"
@@ -547,7 +520,6 @@ export default function ArticleQuiz({
 
     return (
       <>
-        {interstitialNode}
         <div
           style={{
             background: C.card,

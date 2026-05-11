@@ -308,13 +308,9 @@ export default async function ArticleSlugPage({
       {!isCoppa && article.status === 'published' && (
         <ArticleTracker articleId={article.id} articleSlug={story.slug} />
       )}
-      {pickerArticles.length > 1 && (
-        <StoryArticlePicker
-          articles={pickerArticles}
-          currentArticleId={article.id}
-          storySlug={story.slug}
-        />
-      )}
+      {/* StoryArticlePicker hidden — sibling articles are still
+          reachable via the "Continue the story" footer at the end of
+          the article. The top-of-page tab strip felt redundant. */}
       <ArticleReaderTabs
         articleSlot={
           <>
@@ -365,9 +361,9 @@ export default async function ArticleSlugPage({
         timelineSlot={
           <>
             <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} showTease={false} articleCountReached={anonReadCount >= WALL_THRESHOLD} currentArticleId={article.id} />
-            {/* article_rail: ad slot — was sticky right-rail on desktop;
-                with the rail dropped (TODO-38) it now flows below the
-                timeline on desktop and inside the Timeline tab on mobile. */}
+            {/* article_rail: sticky right-rail on desktop ≥1180px (globals.css:828);
+                tabbed inside the Timeline panel on mobile/tablet (display:none under
+                the default Article tab — wasted serve calls on <1180px viewports). */}
             {!isCoppa && <Ad placement="article_rail" page="article" position="rail" articleId={article.id} />}
           </>
         }

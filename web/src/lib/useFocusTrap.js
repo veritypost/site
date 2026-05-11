@@ -17,7 +17,7 @@ import { useEffect, useRef } from 'react';
 // On deactivation (isActive flips to false, or unmount): restores focus
 // to the recorded trigger element when it's still in the DOM.
 //
-// Used by: Interstitial, LockModal, kids/profile exit-PIN, messages
+// Used by: LockModal, kids/profile exit-PIN, messages
 // new-message search overlay, story/[slug] regwall, story/[slug] report.
 
 const FOCUSABLE = [
