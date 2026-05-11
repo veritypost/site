@@ -29,14 +29,17 @@ export const dynamic = 'force-dynamic';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Four article-page placements covered by the diagnostic. The fifth slot
-// (article_quiz_sponsor) is wave 4 territory — left off until the
-// placement row exists in ad_placements.
+// Five article-page placements covered by the diagnostic. Wave 4 added
+// `article_quiz_sponsor` (native eyebrow over the quiz idle card). The
+// placement row lives in ad_placements (see
+// 20260511140000_article_quiz_sponsor_placement.sql) so the same
+// serve_ad → diagnoseEmpty pipeline applies here without special-casing.
 const PLACEMENT_NAMES = [
   'article_header',
   'article_in_body',
   'article_rail',
   'article_end',
+  'article_quiz_sponsor',
 ] as const;
 
 type PlacementName = (typeof PLACEMENT_NAMES)[number];

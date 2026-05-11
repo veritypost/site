@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { hasPermission } from '@/lib/permissions';
 import { useTrack } from '@/lib/useTrack';
 import { useRegistrationWall } from '@/components/RegistrationWall';
+import Ad from '@/components/Ad';
+import { getSessionId } from '@/lib/session';
 
 interface QuizOption {
   text: string;
@@ -256,6 +258,22 @@ export default function ArticleQuiz({
 
   if (stage === 'idle' || stage === 'loading-start') {
     return (
+      <>
+        {/*
+          Wave 4 — article_quiz_sponsor eyebrow. Renders ABOVE the quiz
+          entry card on the idle state only (intentionally absent on
+          answering/result — sponsor lockup belongs on the entry, not
+          mid-quiz). QuizSponsorEyebrow self-hides entirely when
+          serve_ad returns no unit, so an unsold surface contributes
+          zero visual weight (no dangling "PRESENTED BY" label over an
+          empty middle). The "PRESENTED BY" label and the disclosure
+          are fixed editorial text; only the sponsor mark inside <Ad>
+          rotates. Disclosure language is the PBS-underwriting model —
+          sponsors have no role in editorial content. Industry
+          conflicts are enforced manually via ad_targets exclude
+          rules (not gated in schema), per the design lock.
+        */}
+        <QuizSponsorEyebrow articleId={articleId} dim={C.dim} />
       <div style={{
         background: 'var(--bg)',
         border: `1px solid ${C.border}`,
@@ -307,6 +325,7 @@ export default function ArticleQuiz({
           {stage === 'loading-start' ? 'Loading…' : 'Take the quiz'}
         </button>
       </div>
+      </>
     );
   }
 
@@ -617,3 +636,82 @@ export default function ArticleQuiz({
 
   return null;
 }
+
+// Wave 4 — sponsor eyebrow above the quiz idle card. Probes /api/ads/serve
+// once on mount; only renders the "PRESENTED BY" label + <Ad> + disclosure
+// stack when a unit is actually available. This keeps the "no sold sponsor"
+// state visually neutral (the surface contributes zero pixels) rather than
+// showing a dangling editorial frame around nothing. The <Ad> component
+// does its own serve call afterwards — that re-fetch is intentional: the
+// extra request keeps impression/click logging inside the <Ad> wiring
+// unchanged, and a single duplicated serve_ad RPC per quiz idle render is
+// not a hot path. Avoids needing a generic "did-render" signal protocol
+// from <Ad>.
+function QuizSponsorEyebrow({ articleId, dim }: { articleId: string; dim: string }) {
+  const [hasAd, setHasAd] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const sessionId = getSessionId();
+    const params = new URLSearchParams({ placement: 'article_quiz_sponsor' });
+    if (articleId) params.set('article_id', articleId);
+    if (sessionId) params.set('session_id', sessionId);
+    fetch(`/api/ads/serve?${params}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setHasAd(!!d?.ad_unit);
+      })
+      .catch(() => {
+        if (!cancelled) setHasAd(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [articleId]);
+
+  if (!hasAd) return null;
+
+  return (
+    <div
+      style={{
+        marginTop: 40,
+        textAlign: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 4,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase' as const,
+          color: dim,
+          opacity: 0.7,
+        }}
+      >
+        Presented by
+      </div>
+      <Ad
+        placement="article_quiz_sponsor"
+        page="article"
+        position="quiz_sponsor"
+        articleId={articleId}
+      />
+      <div
+        style={{
+          fontSize: 11,
+          fontStyle: 'italic',
+          color: dim,
+          opacity: 0.5,
+          lineHeight: 1.4,
+        }}
+      >
+        Sponsors have no role in editorial content.
+      </div>
+    </div>
+  );
+}
+

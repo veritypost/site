@@ -17,7 +17,7 @@ import Ad from '@/components/Ad';
 const SURFACE_PLACEMENTS: Record<string, string[]> = {
   home: ['home_in_feed_1', 'home_in_feed_2'],
   category: ['category_top', 'category_in_feed_1'],
-  article: ['article_header', 'article_in_body', 'article_end', 'article_rail'],
+  article: ['article_header', 'article_in_body', 'article_end', 'article_rail', 'article_quiz_sponsor'],
   mobile: ['mobile_sticky_footer'],
 };
 

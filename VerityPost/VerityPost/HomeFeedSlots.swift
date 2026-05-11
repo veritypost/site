@@ -262,3 +262,84 @@ struct ImpressionResponse: Decodable {
 }
 
 private struct EmptyAck: Decodable {}
+
+// MARK: - QuizSponsorEyebrow (Wave 4)
+//
+// Native "Presented by X" surface that sits above the article quiz idle
+// card on iOS. Mirrors the web ArticleQuiz.tsx eyebrow: same placement
+// name (`article_quiz_sponsor`), same disclosure copy (sponsors have no
+// role in editorial content — PBS-underwriting model, not Geico-on-
+// Jeopardy). Whole eyebrow self-hides when serve_ad returns null so
+// unsold sponsor surfaces add zero visual weight to the idle card.
+//
+// Reuses HomeAdSlot for the actual ad render + impression / click
+// logging — the only thing this view adds is the editorial frame
+// (eyebrow label + disclosure).
+//
+// COPPA: not applicable. The engagement zone that holds the quiz card
+// is already hidden upstream for COPPA articles, so this view never
+// mounts in a kids context. The placement row carries is_kids_safe=false
+// as a defense-in-depth signal but no extra gate is needed here.
+struct QuizSponsorEyebrow: View {
+    let articleId: String?
+
+    @State private var hasAd: Bool = false
+
+    var body: some View {
+        Group {
+            if hasAd {
+                VStack(alignment: .center, spacing: 4) {
+                    Text("PRESENTED BY")
+                        .font(.system(.caption2, design: .default, weight: .bold))
+                        .tracking(1.4)
+                        .foregroundColor(VP.dim.opacity(0.7))
+                    HomeAdSlot(
+                        placement: "article_quiz_sponsor",
+                        page: "article",
+                        articleId: articleId
+                    )
+                    Text("Sponsors have no role in editorial content.")
+                        .font(.system(.caption2, design: .default))
+                        .italic()
+                        .foregroundColor(VP.dim.opacity(0.55))
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                EmptyView()
+            }
+        }
+        .task(id: articleId ?? "") { await probe() }
+    }
+
+    // Probe /api/ads/serve once on mount — if no unit comes back, hide
+    // the whole eyebrow (label + disclosure included) rather than
+    // showing an empty editorial frame. HomeAdSlot self-hides on null
+    // too, but we want the surrounding chrome to go with it.
+    private func probe() async {
+        let site = SupabaseManager.shared.siteURL
+        var components = URLComponents(
+            url: site.appendingPathComponent("api/ads/serve"),
+            resolvingAgainstBaseURL: false
+        )
+        var items: [URLQueryItem] = [
+            URLQueryItem(name: "placement", value: "article_quiz_sponsor"),
+            URLQueryItem(name: "session_id", value: AdSession.id),
+        ]
+        if let articleId { items.append(URLQueryItem(name: "article_id", value: articleId)) }
+        components?.queryItems = items
+        guard let url = components?.url else { return }
+        let client = SupabaseManager.shared.client
+        var req = URLRequest(url: url)
+        if let session = try? await client.auth.session {
+            req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        }
+        do {
+            let (data, _) = try await URLSession.shared.data(for: req)
+            let response = try JSONDecoder().decode(AdServeResponse.self, from: data)
+            await MainActor.run { hasAd = (response.ad_unit != nil) }
+        } catch {
+            // Self-hide on probe failure — same policy as HomeAdSlot.
+        }
+    }
+}

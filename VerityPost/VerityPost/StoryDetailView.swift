@@ -1194,6 +1194,21 @@ struct StoryDetailView: View {
     }
 
     @ViewBuilder private var quizIdleCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Wave 4 — article_quiz_sponsor eyebrow. Renders only on the
+            // idle entry card (not while answering / on the result card —
+            // sponsor lockup belongs on the entry beat, not mid-quiz).
+            // QuizSponsorEyebrow self-hides when serve_ad returns null,
+            // so an unsold surface contributes zero visual weight and
+            // the idle card looks unchanged. Disclosure language is the
+            // PBS-underwriting model; industry conflicts are enforced
+            // via the ad_targets exclude rule, not in schema.
+            QuizSponsorEyebrow(articleId: story.id)
+            quizIdleCardBody
+        }
+    }
+
+    @ViewBuilder private var quizIdleCardBody: some View {
         HStack(alignment: .top, spacing: 0) {
             // Leading accent bar
             Rectangle()
