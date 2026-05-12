@@ -32,9 +32,15 @@ export default function RhStyles() {
       display: grid;
       grid-template-columns: 1fr;
       gap: 0;
+      max-width: 1440px;
+      margin-left: auto;
+      margin-right: auto;
     }
     @media (min-width: 720px) {
-      .vp-rh-grid { grid-template-columns: 1fr 1fr; }
+      .vp-rh-grid {
+        grid-template-columns: 1fr 1fr;
+        border-left: 1px solid var(--rh-ink);
+      }
     }
     @media (min-width: 1100px) {
       .vp-rh-grid { grid-template-columns: 1fr 1fr 1fr; }
