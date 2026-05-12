@@ -36,6 +36,15 @@ const TYPOGRAPHY_SETTINGS: ReaderItem[] = [
   { k: 'column_width', l: 'Column width control', desc: 'Narrow / Default / Wide column widths', on: false, num: 'col_narrow', num2: 'col_default', num3: 'col_wide', unit: 'ch' },
 ];
 
+// Settings keys that are *also* read by the iOS app (via SettingsService)
+// and by the public article page (web/src/app/[slug]/page.tsx). The rest of
+// the keys on this admin page live in a `reader_config_` / `reader_num_`
+// namespace because they're web-only reader UX tuning. These two need to
+// be stored under their bare key names so a single DB row controls all
+// three surfaces. iOS treats absence of the row as "wall off" by default.
+const SHARED_BOOL_KEYS = new Set(['registration_wall']);
+const SHARED_NUM_KEYS = new Set(['free_article_limit']);
+
 const READING_SETTINGS: ReaderItem[] = [
   { k: 'reading_log', l: 'Reading log tracking', desc: 'Track articles read based on scroll depth + minimum time', on: true, num: 'read_scroll_pct', num2: 'read_min_sec', unit: '% scroll, sec min' },
   { k: 'registration_wall', l: 'Registration wall', desc: 'Require signup after N free articles', on: true, num: 'free_article_limit', unit: 'articles' },
@@ -109,14 +118,30 @@ function ReaderInner() {
         .filter((n): n is string => typeof n === 'string');
       if (!profile || !roleNames.some((r) => ADMIN_ROLES.has(r))) { router.push('/'); return; }
 
-      const { data: settingsRows } = await supabase.from('settings').select('key, value').like('key', 'reader_%');
+      // Pull reader-namespaced rows + the cross-platform shared rows in
+      // one trip. PostgREST `.or()` lets us union "reader_%" with an
+      // explicit `in (...)` list for the bare-key shared settings.
+      const sharedKeysList = [
+        ...Array.from(SHARED_BOOL_KEYS),
+        ...Array.from(SHARED_NUM_KEYS),
+      ].join(',');
+      const { data: settingsRows } = await supabase
+        .from('settings')
+        .select('key, value')
+        .or(`key.like.reader_%,key.in.(${sharedKeysList})`);
       if (settingsRows) {
         const cfg: Record<string, boolean> = {};
         const n: Record<string, number> = {};
         (settingsRows as Array<{ key: string; value: string | null }>).forEach((row) => {
-          const k = row.key.replace('reader_config_', '').replace('reader_num_', '');
-          if (row.key.startsWith('reader_config_')) cfg[k] = row.value === 'true';
-          if (row.key.startsWith('reader_num_')) n[k] = parseFloat(row.value || '') || 0;
+          if (SHARED_BOOL_KEYS.has(row.key)) {
+            cfg[row.key] = row.value === 'true';
+          } else if (SHARED_NUM_KEYS.has(row.key)) {
+            n[row.key] = parseFloat(row.value || '') || 0;
+          } else if (row.key.startsWith('reader_config_')) {
+            cfg[row.key.replace('reader_config_', '')] = row.value === 'true';
+          } else if (row.key.startsWith('reader_num_')) {
+            n[row.key.replace('reader_num_', '')] = parseFloat(row.value || '') || 0;
+          }
         });
         if (Object.keys(cfg).length) setConfig((prev) => ({ ...prev, ...cfg }));
         if (Object.keys(n).length) setNums((prev) => ({ ...prev, ...n }));
@@ -168,7 +193,9 @@ function ReaderInner() {
     const prev = config[k];
     const next = !prev;
     setConfig((p) => ({ ...p, [k]: next }));
-    const settingKey = 'reader_config_' + k;
+    // Shared keys (read by iOS + the article page) skip the
+    // reader_config_ prefix so all three surfaces see the same row.
+    const settingKey = SHARED_BOOL_KEYS.has(k) ? k : 'reader_config_' + k;
     const { error: auditErr } = await supabase.rpc('record_admin_action', {
       p_action: 'reader.config_update',
       p_target_table: 'settings',
@@ -200,7 +227,7 @@ function ReaderInner() {
     const val = typeof v === 'number' ? v : parseFloat(v as string) || 0;
     const prev = nums[k];
     setNums((p) => ({ ...p, [k]: val }));
-    const settingKey = 'reader_num_' + k;
+    const settingKey = SHARED_NUM_KEYS.has(k) ? k : 'reader_num_' + k;
     const res = await fetch('/api/admin/settings/upsert', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

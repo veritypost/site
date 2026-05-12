@@ -150,7 +150,29 @@ export default async function ArticleSlugPage({
     ? getAnonReadCount(cookieStore.get('vp_anon_reads')?.value)
     : 0;
   const wallSuppressed = cookieStore.get('vp_wall_supp')?.value === '1';
-  const WALL_THRESHOLD = 2;
+
+  // Read wall behavior from the settings table. Both keys are also read by
+  // iOS SettingsService — flipping a row from /admin (or directly in the
+  // DB) controls both platforms. Web reads fresh on every request (this
+  // page is force-dynamic); iOS caches for 60s. If the query fails or the
+  // rows are missing, wallEnabled stays false → no tease, fail-open.
+  const { data: wallSettingsRows } = await supabase
+    .from('settings')
+    .select('key, value')
+    .in('key', ['registration_wall', 'free_article_limit']);
+  const wallEnabled =
+    wallSettingsRows?.find((r) => r.key === 'registration_wall')?.value === 'true';
+  const rawWallThreshold = wallSettingsRows?.find(
+    (r) => r.key === 'free_article_limit'
+  )?.value;
+  const parsedThreshold = Number.parseInt(rawWallThreshold ?? '2', 10);
+  // Guard against a hand-edited DB row containing junk ("abc", "5.5", "").
+  // parseInt would yield NaN and `0 >= NaN` is always false — fail-open
+  // but silently — so fall back to the same default we use when the row
+  // is missing entirely.
+  const wallThreshold = Number.isFinite(parsedThreshold) ? parsedThreshold : 2;
+  const articleCountReached =
+    wallEnabled && isAnon && anonReadCount >= wallThreshold;
 
   const service = createServiceClient();
   const fetchResult = await (async () => {
@@ -335,7 +357,7 @@ export default async function ArticleSlugPage({
                 Lives inside the article body so readers see provenance in
                 the same scroll, not in a side rail they often miss.
                 Logo-driven rows with click-to-expand headlines. */}
-            <SourcesSection sources={!isAnon ? sources : []} showTease={false} articleCountReached={anonReadCount >= WALL_THRESHOLD} />
+            <SourcesSection sources={!isAnon ? sources : []} showTease={false} articleCountReached={articleCountReached} />
             {/* End-of-body quiz teaser. Renders only for non-COPPA published
                 articles that have a quiz the viewer hasn't passed yet. On
                 mobile the engagement zone lives behind a tab, so this gives
@@ -351,7 +373,7 @@ export default async function ArticleSlugPage({
         }
         timelineSlot={
           <>
-            <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} showTease={false} articleCountReached={anonReadCount >= WALL_THRESHOLD} currentArticleId={article.id} />
+            <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} showTease={false} articleCountReached={articleCountReached} currentArticleId={article.id} />
             {/* article_rail: sticky right-rail on desktop ≥1180px (globals.css:828);
                 tabbed inside the Timeline panel on mobile/tablet (display:none under
                 the default Article tab — wasted serve calls on <1180px viewports). */}
