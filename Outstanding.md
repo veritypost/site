@@ -87,12 +87,14 @@ iOS has a formal scale (`VP.Spacing.s0–s10`, 4-base). Web has no central scale
 **Prompt for the agent team:**
 > Introduce a CSS custom property spacing scale on web that mirrors iOS's `VP.Spacing` (`--s0` through `--s10`, 4-base). Audit every hardcoded spacing value in `web/src/components/` and `web/src/app/_home/` and either migrate or leave with a `// magic` note explaining why it's intentional. Don't migrate everything in one pass — start with the highest-traffic components (CommentRow, ArticleSurface, HomeLayout) and ship gradually.
 
-## 17. `--p-success` redesign tokens largely unused
+## 17. `--p-success` redesign tokens — finish migration or unify with iOS
 
-The redesign palette tokens (`--p-success: #15803d`, etc.) are defined in `globals.css` and exported from `profile/palette.ts`, but the only places that actually use them in production code are `ArticleQuiz.tsx` and the palette export. The token system claims adoption it doesn't have.
+**Updated 2026-05-12 after a Group F attempt found the old framing was wrong.** The redesign tokens (`--p-success`, `--p-warn`, `--p-danger`, `--p-info`) are NOT unused — they're consumed via `profile/_lib/palette.ts` (`C.success`, `C.warn`, `C.danger`) by at least 8 profile settings cards: MFACard, PasswordCard, BackgroundCard, EmailsCard, DataCard, BillingCard, PrivacyCard. Dropping the tokens would visually break the 2FA indicator, password strength meter, email verification badge, character-count warnings, and danger toggles.
+
+The real drift: web's `--p-success` is `#15803d` (deep green), iOS's `VP.success` is `#22c55e` (brighter green). Web uses `--p-warn: #b45309` (rust), iOS uses `VP.warn: #f59e0b` (amber). Different shades for the same semantic intent.
 
 **Prompt for the agent team:**
-> Audit every redesign palette token (`--p-*`) for actual adoption. For each token, list every file that uses it. Decide: finish the migration (replace remaining legacy color variables with the `--p-*` set across all live components), or roll the redesign tokens back if they were aspirational. Lean toward finishing — partial adoption is worse than either complete state. Cover: iOS `Theme.swift` mirror — iOS uses semantic system colors for ink/surface and named hex for brand. Decide whether iOS should also adopt the redesign palette or keep its current system.
+> Decide the harmonization direction. Two options: (a) iOS adopts web's hex values for success/warn/danger/info to unify the semantic palette. Cheap and visible — same color across both platforms. (b) Web's profile settings cards migrate from `--p-success` to legacy `--success` (`#22c55e`) so the redesign tokens become unused, then they can be dropped from globals.css. Web would change visible color from #15803d to #22c55e on the affected cards. Cover the four full CSS blocks in `globals.css` (light `:root`, system-dark `@media`, explicit dark `[data-theme="dark"]`, explicit light `[data-theme="light"]`). Also: `--p-success-soft` etc. are used by ArticleQuiz with hex fallbacks — keep those regardless of which option wins.
 
 ## 18. Admin rate-limit cleanup (deferred — owner-paused)
 
@@ -121,13 +123,6 @@ After the OTP success path lands in commit `e4cad79d`, `client.auth.setSession(.
 
 **Prompt for the agent team:**
 > Confirm Supabase Swift SDK 2.43.1's event emission timing on `setSession`. If `.signedIn` is fired synchronously, the listener and explicit `loadUser` race. Options: (a) leave it (idempotent, ~50ms of wasted bandwidth per signup); (b) gate the listener's `loadUser` behind a "didExplicitlyAuthenticate" flag that the OTP path sets; (c) drop the explicit `loadUser` and let the listener handle it. Lean toward (a) if the SDK's event is reliably synchronous, since the listener will see the same state and exit early. Pressure-test by adding instrumentation to log both `loadUser` callsites and observe in TestFlight.
-
-## 22. Refresh-token decode brittleness
-
-`AuthViewModel.verifyMagicCode`'s `SessionShape` declares `refresh_token: String` (non-optional). If the server ever returns `{ refresh_token: null }` instead of omitting the field, JSONDecoder throws and the user sees "Invalid code." Defensive null guard would degrade gracefully.
-
-**Prompt for the agent team:**
-> Make `SessionShape.refresh_token` optional (`String?`) and add an explicit guard before calling `setSession`. If `refresh_token` is missing, surface a server-error message ("Couldn't complete sign-in; please try again") rather than the misleading "Invalid code." Pressure-test: deliberately respond with `refresh_token: null` from a staging server and confirm the new error message appears. Cross-check the Supabase verifyOtp contract documentation to confirm whether `null` is a realistic shape.
 
 ## 23. Regenerate `web/src/types/database.ts` after recent migrations
 
