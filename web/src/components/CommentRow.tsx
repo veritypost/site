@@ -167,6 +167,7 @@ function applyFormatting(text: string, baseKey: string | number): ReactNode[] {
     if (m[2] !== undefined)      out.push(<strong key={k} style={{ fontWeight: 700 }}>{m[2]}</strong>);
     else if (m[3] !== undefined) out.push(<em key={k} style={{ fontStyle: 'italic', fontWeight: 'inherit' }}>{m[3]}</em>);
     else if (m[4] !== undefined) out.push(<span key={k} style={{ textDecoration: 'line-through' }}>{m[4]}</span>);
+    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 1px 5px tunes the inline-code chip; off-grid by design
     else if (m[5] !== undefined) out.push(<code key={k} style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.88em', background: 'rgba(0,0,0,0.06)', borderRadius: 3, padding: '1px 5px' }}>{m[5]}</code>);
     last = m.index + m[0].length;
   }
@@ -462,24 +463,27 @@ export default function CommentRow({
       id={`comment-${comment.id}`}
       style={{
         ...(depth === 0 && !showExpertChrome ? {
-          paddingTop: 28,
-          paddingBottom: 24,
+          paddingTop: 28, // magic — intentional (between --s6 24 and --s7 32)
+          paddingBottom: 'var(--s6)',
           borderBottom: '1px solid var(--border, #e5e5e5)',
         } : {}),
         ...(isThreadedReply ? {
+          // eslint-disable-next-line no-restricted-syntax -- 14px is intentional off-grid for the threaded-reply container
           padding: '14px 16px',
           background: replyTintBg,
           borderLeft: `3px solid ${replyTintBorder}`,
-          marginTop: 4,
-          marginBottom: 4,
+          marginTop: 'var(--s1)',
+          marginBottom: 'var(--s1)',
         } : {}),
         ...(showExpertChrome ? {
           background: '#f0faf4',
           borderLeft: '3px solid var(--success-text)',
+          // eslint-disable-next-line no-restricted-syntax -- 8px is intentional off-grid radius
           borderRadius: '0 8px 8px 0',
+          // eslint-disable-next-line no-restricted-syntax -- 14px is intentional off-grid for the expert-chrome container
           padding: '14px 16px',
-          marginTop: 4,
-          marginBottom: 4,
+          marginTop: 'var(--s1)',
+          marginBottom: 'var(--s1)',
         } : {}),
       }}
     >
@@ -582,6 +586,7 @@ export default function CommentRow({
                     color: menuOpen ? 'var(--p-ink)' : 'var(--p-ink-faint)',
                     cursor: 'pointer',
                     fontSize: 15,
+                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 2x6 tunes the kebab-menu hit-target
                     padding: '2px 6px',
                     lineHeight: 1,
                     letterSpacing: '0.06em',
@@ -662,8 +667,9 @@ export default function CommentRow({
           {editing ? (
             <div style={{
               borderLeft: '3px solid var(--p-ink)',
-              borderRadius: '0 10px 10px 0',
+              borderRadius: '0 var(--r-md) var(--r-md) 0',
               border: '1px solid var(--p-border)',
+              // eslint-disable-next-line no-restricted-syntax -- 10px is intentional off-grid (between --s2 8 and --s3 12)
               padding: '10px 12px',
               background: 'var(--card, #f7f7f7)',
               marginBottom: 2,
@@ -683,6 +689,7 @@ export default function CommentRow({
                   outline: 'none',
                   fontFamily: 'inherit',
                   resize: 'vertical',
+                  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: tight 2px inset for the inline edit textarea
                   padding: '2px 0',
                 }}
               />
@@ -692,6 +699,7 @@ export default function CommentRow({
                   disabled={busy === 'edit' || !editBody.trim()}
                   style={{
                     fontSize: 13,
+                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 7px vertical matches the editor's compact toolbar
                     padding: '7px 16px',
                     borderRadius: 9,
                     border: 'none',
@@ -710,6 +718,7 @@ export default function CommentRow({
                   }}
                   style={{
                     fontSize: 13,
+                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 7x14 sits a hair tighter than Save for visual rhythm
                     padding: '7px 14px',
                     borderRadius: 9,
                     border: 'none',
@@ -1054,8 +1063,9 @@ export default function CommentRow({
                       style={{
                         fontSize: 12,
                         fontWeight: 600,
+                        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: compact 30pt-min control padding off the 4-grid
                         padding: '4px 10px',
-                        borderRadius: 6,
+                        borderRadius: 'var(--r-sm)',
                         minHeight: 30,
                         border: '1px solid var(--success-text)',
                         background: 'rgba(22,163,74,0.06)',
@@ -1085,8 +1095,9 @@ export default function CommentRow({
                       style={{
                         fontSize: 12,
                         fontWeight: 600,
+                        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: compact 30pt-min control padding off the 4-grid
                         padding: '4px 10px',
-                        borderRadius: 6,
+                        borderRadius: 'var(--r-sm)',
                         minHeight: 30,
                         border: '1px solid var(--p-border)',
                         background: 'transparent',
@@ -1118,8 +1129,9 @@ export default function CommentRow({
                       style={{
                         fontSize: 12,
                         fontWeight: 600,
+                        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: compact 30pt-min control padding off the 4-grid
                         padding: '4px 10px',
-                        borderRadius: 6,
+                        borderRadius: 'var(--r-sm)',
                         minHeight: 30,
                         border: '1px solid var(--p-border)',
                         background: 'transparent',
@@ -1216,13 +1228,13 @@ function MenuItem({ children, onClick, danger }: MenuItemProps) {
         display: 'block',
         width: '100%',
         textAlign: 'left',
-        padding: '8px 12px',
+        padding: 'var(--s2) var(--s3)',
         fontSize: 13,
         background: 'transparent',
         border: 'none',
         color: danger ? '#dc2626' : 'var(--p-ink)',
         cursor: 'pointer',
-        borderRadius: 6,
+        borderRadius: 'var(--r-sm)',
       }}
     >
       {children}
@@ -1238,7 +1250,7 @@ function ScorePopoverRow({ label, value }: { label: string; value: number | null
         alignItems: 'baseline',
         justifyContent: 'space-between',
         gap: 16,
-        padding: '4px 0',
+        padding: 'var(--s1) var(--s0)',
       }}
     >
       <span style={{ fontSize: 12, color: 'var(--p-ink-muted, #71717a)' }}>{label}</span>
@@ -1389,7 +1401,8 @@ function AvatarWithScoreCard({
             minWidth: 232,
             background: 'var(--card, #ffffff)',
             border: '1px solid var(--border, #e5e5e5)',
-            borderRadius: 12,
+            borderRadius: 12, // magic — intentional (between --r-md 10 and --r-lg 14 for the score card)
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 14/16/10 tuned for the score-card popover insets
             padding: '14px 16px 10px',
             boxShadow: '0 12px 32px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)',
             fontSize: 13,
@@ -1431,8 +1444,9 @@ function AvatarWithScoreCard({
                 textDecoration: 'none',
                 fontSize: 13,
                 fontWeight: 500,
+                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px vertical inset for the View profile row
                 padding: '6px 0',
-                borderRadius: 6,
+                borderRadius: 'var(--r-sm)',
               }}
             >
               <span>View profile</span>

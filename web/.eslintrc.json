@@ -19,6 +19,28 @@
     "react/no-unescaped-entities": "warn",
     "@next/next/no-img-element": "warn"
   },
+  "overrides": [
+    {
+      "files": [
+        "src/components/CommentRow.tsx",
+        "src/components/article/ArticleSurface.tsx",
+        "src/app/_home/HomeLayout.tsx"
+      ],
+      "rules": {
+        "no-restricted-syntax": [
+          "warn",
+          {
+            "selector": "Property[key.name='borderRadius'] > Literal[value=/\\d+px/]",
+            "message": "Use var(--r-sm/md/lg/xl/pill) tokens instead of hardcoded pixel strings. Tag intentional off-grid with `// eslint-disable-next-line no-restricted-syntax -- magic, intentional`."
+          },
+          {
+            "selector": "Property[key.name='padding'] > Literal[value=/\\d+px/]",
+            "message": "Use var(--s0..--s10) tokens instead of hardcoded pixel strings. Tag intentional off-grid with `// eslint-disable-next-line no-restricted-syntax -- magic, intentional`."
+          }
+        ]
+      }
+    }
+  ],
   "ignorePatterns": [
     "node_modules",
     ".next",

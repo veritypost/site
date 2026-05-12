@@ -1395,7 +1395,9 @@ struct StoryDetailView: View {
 
     private func dotColor(for i: Int) -> Color {
         if quizStage == .result, let rows = quizResult?.results, i < rows.count {
-            return rows[i].is_correct ? VP.right : VP.wrong
+            // Decorative quiz-result dot (10×5, no overlay text) — `successBright`
+            // restores the punch the deeper `right` hex would lose. Q-D4 (2026-05-12).
+            return rows[i].is_correct ? VP.successBright : VP.wrong
         }
         if i == quizCurrent && (quizStage == .answering || quizStage == .submitting) {
             return VP.accent

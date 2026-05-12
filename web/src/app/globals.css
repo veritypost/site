@@ -123,7 +123,7 @@
   /* Semantic states */
   --p-success: #15803d;
   --p-success-soft: #dcfce7;
-  --p-warn: #b45309;
+  --p-warn: #92400e;
   --p-warn-soft: #fef3c7;
   --p-danger: #b91c1c;
   --p-danger-soft: #fee2e2;
@@ -137,6 +137,24 @@
   /* Focus ring */
   --p-ring: rgba(11, 92, 255, 0.30);
   --p-ring-strong: rgba(11, 92, 255, 0.60);
+  /* Radius scale — Q-D2 (2026-05-12). Mirrors iOS VP.Radius. */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+  /* Spacing scale — Q-D3 (2026-05-12). Mirrors iOS VP.Spacing (4-base, 8-grid). */
+  --s0: 0;
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s7: 32px;
+  --s8: 40px;
+  --s9: 56px;
+  --s10: 72px;
 }
 
 /* System dark: only fires when the OS is dark AND the user has not
@@ -230,6 +248,24 @@
     --rank-silver: #A0AEC0;
     --rank-bronze: #ED8936;
     --tab-active-bg: rgba(255, 255, 255, 0.12);
+    /* Radius scale — Q-D2 (2026-05-12). Mirrors iOS VP.Radius. */
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 14px;
+    --r-xl: 20px;
+    --r-pill: 999px;
+    /* Spacing scale — Q-D3 (2026-05-12). Mirrors iOS VP.Spacing. */
+    --s0: 0;
+    --s1: 4px;
+    --s2: 8px;
+    --s3: 12px;
+    --s4: 16px;
+    --s5: 20px;
+    --s6: 24px;
+    --s7: 32px;
+    --s8: 40px;
+    --s9: 56px;
+    --s10: 72px;
   }
 }
 
@@ -315,6 +351,24 @@
   --rank-silver: #A0AEC0;
   --rank-bronze: #ED8936;
   --tab-active-bg: rgba(255, 255, 255, 0.12);
+  /* Radius scale — Q-D2 (2026-05-12). Mirrors iOS VP.Radius. */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+  /* Spacing scale — Q-D3 (2026-05-12). Mirrors iOS VP.Spacing. */
+  --s0: 0;
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s7: 32px;
+  --s8: 40px;
+  --s9: 56px;
+  --s10: 72px;
 }
 
 /* Explicit light override — allows OS-dark users who chose "Light"
@@ -343,7 +397,7 @@
   /* Semantic states */
   --p-success: #15803d;
   --p-success-soft: #dcfce7;
-  --p-warn: #b45309;
+  --p-warn: #92400e;
   --p-warn-soft: #fef3c7;
   --p-danger: #b91c1c;
   --p-danger-soft: #fee2e2;
@@ -357,6 +411,24 @@
   /* Focus ring */
   --p-ring: rgba(11, 92, 255, 0.30);
   --p-ring-strong: rgba(11, 92, 255, 0.60);
+  /* Radius scale — Q-D2 (2026-05-12). Mirrors iOS VP.Radius. */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+  /* Spacing scale — Q-D3 (2026-05-12). Mirrors iOS VP.Spacing. */
+  --s0: 0;
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s7: 32px;
+  --s8: 40px;
+  --s9: 56px;
+  --s10: 72px;
 }
 
 /* Opt-in scope for the pages that adopt the vp-views layout so existing pages

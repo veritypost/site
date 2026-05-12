@@ -36,7 +36,7 @@ export type ArticleSurfaceProps = {
 const PAGE_STYLE: React.CSSProperties = {
   maxWidth: 680,
   margin: '0 auto',
-  padding: '32px 20px 16px',
+  padding: 'var(--s7) var(--s5) var(--s4)',
   // Tight type rendering for prose. Kerning + ligatures opt-in via
   // font-feature-settings; antialiasing + legibility hint for crisp
   // serif glyphs at body sizes. Whole-tree default — child components
@@ -54,7 +54,7 @@ const TITLE_STYLE: React.CSSProperties = {
   fontWeight: 600,
   lineHeight: 1.1,
   letterSpacing: '-0.02em',
-  margin: '0 0 8px',
+  margin: '0 0 var(--s2)',
   color: 'var(--p-ink)',
 };
 
@@ -64,6 +64,7 @@ const SUBTITLE_STYLE: React.CSSProperties = {
   fontSize: 19,
   lineHeight: 1.45,
   fontStyle: 'italic',
+  // eslint-disable-next-line no-restricted-syntax -- 28px is intentional off-grid (between --s6 24 and --s7 32)
   margin: '0 0 28px',
   color: 'var(--p-ink-muted)',
 };
@@ -73,7 +74,7 @@ const BYLINE_STYLE: React.CSSProperties = {
   fontWeight: 600,
   textTransform: 'uppercase',
   letterSpacing: '0.1em',
-  marginBottom: 24,
+  marginBottom: 'var(--s6)',
   color: 'var(--p-ink-muted)',
 };
 
@@ -126,14 +127,15 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
     <ReadingProgressRibbon />
     <article style={PAGE_STYLE}>
       {canEdit && (
-        <div style={{ textAlign: 'right', marginBottom: 16 }}>
+        <div style={{ textAlign: 'right', marginBottom: 'var(--s4)' }}>
           <Link
             href={editHref}
             style={{
               fontSize: 12,
+              // eslint-disable-next-line no-restricted-syntax -- 10px is intentional off-grid for the compact Edit pill
               padding: '4px 10px',
               border: '1px solid var(--p-border)',
-              borderRadius: 4,
+              borderRadius: 4, // magic — intentional (smaller than --r-sm 6 for a compact admin link)
               color: 'var(--p-ink-muted)',
               textDecoration: 'none',
               fontFamily: 'inherit',
@@ -167,19 +169,19 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
       ) : (
         <div
           style={{
-            padding: '32px 0',
+            padding: 'var(--s7) var(--s0)',
             textAlign: 'center',
             color: 'var(--p-ink-muted)',
             fontSize: 14,
           }}
         >
-          <p style={{ margin: '0 0 12px' }}>{isSignedIn ? 'Upgrade your plan to read this article.' : 'Sign in to read this article.'}</p>
+          <p style={{ margin: '0 0 var(--s3)' }}>{isSignedIn ? 'Upgrade your plan to read this article.' : 'Sign in to read this article.'}</p>
           <a
             href={isSignedIn ? '/pricing' : '/login'}
             style={{
               display: 'inline-block',
-              padding: '8px 20px',
-              borderRadius: 8,
+              padding: 'var(--s2) var(--s5)',
+              borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for a chunkier CTA)
               background: 'var(--p-accent)',
               color: 'var(--p-bg)',
               fontWeight: 600,

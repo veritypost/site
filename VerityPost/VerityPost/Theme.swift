@@ -17,18 +17,54 @@ enum VP {
     static let dim = Color(UIColor.secondaryLabel)
     static let muted = Color(UIColor.tertiaryLabel)
     static let accent = Color(UIColor.label)
-    static let success = Color(hex: "22c55e")
-    static let right = Color(hex: "22c55e")
-    static let warn = Color(hex: "f59e0b")
-    static let amber = Color(hex: "f59e0b")
-    // C10 / DA-055 — canonical `--danger` matches web globals.css. `#ef4444`
-    // fails AA on the pale-red backgrounds used for error copy (`#fef2f2`);
-    // `#b91c1c` pushes the ratio above 7:1. The saturated alert-red now
-    // lives on `breaking` for the home banner and other "breaking news"
-    // signals that want the punchier hue.
-    static let danger = Color(hex: "b91c1c")
-    static let wrong = Color(hex: "b91c1c")
+    // Q-D4 (2026-05-12) — semantic colors are DYNAMIC. Light mode uses the
+    // deeper hexes that clear WCAG AA on tinted `*Soft` backgrounds; dark
+    // mode flips to the brighter web-dark counterparts (mirroring
+    // globals.css `--p-success`/`warn`/`danger`/`info` dark-block values)
+    // so text on near-black system surfaces also clears AA. Without this
+    // closure form, the deeper light hexes drop to ~3:1 in dark mode and
+    // fail AA on every callsite that puts success/warn/info text directly
+    // on `VP.bg` / `systemBackground`. Aliases `right`/`amber`/`wrong`
+    // track their semantic parent (lazy reference to the same Color).
+    //
+    // Bright variants (`successBright`, `warnBright`) stay STATIC and are
+    // for decoration-only fills (dots, accent bars) — already luminous
+    // enough on either background, no contrast burden.
+    static let success = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x22/255.0, green: 0xc5/255.0, blue: 0x5e/255.0, alpha: 1)  // #22c55e
+            : UIColor(red: 0x15/255.0, green: 0x80/255.0, blue: 0x3d/255.0, alpha: 1)  // #15803d
+    })
+    static let right = success
+    // Warn light hex deepened to #92400e (amber-800) — `#b45309` came in at
+    // 4.34:1 on `#fef3c7`, falling 0.16 short of AA normal. `#92400e`
+    // clears 6.35:1.
+    static let warn = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0xfb/255.0, green: 0xbf/255.0, blue: 0x24/255.0, alpha: 1)  // #fbbf24
+            : UIColor(red: 0x92/255.0, green: 0x40/255.0, blue: 0x0e/255.0, alpha: 1)  // #92400e
+    })
+    static let amber = warn
+    // C10 / DA-055 — `#b91c1c` light pushes danger-on-tint above 7:1;
+    // `#f87171` dark mirrors web's dark-block `--p-danger`. Saturated
+    // alert-red lives on `breaking` for home banner / "breaking news".
+    static let danger = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0xf8/255.0, green: 0x71/255.0, blue: 0x71/255.0, alpha: 1)  // #f87171
+            : UIColor(red: 0xb9/255.0, green: 0x1c/255.0, blue: 0x1c/255.0, alpha: 1)  // #b91c1c
+    })
+    static let wrong = danger
+    static let info = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x60/255.0, green: 0xa5/255.0, blue: 0xfa/255.0, alpha: 1)  // #60a5fa
+            : UIColor(red: 0x1d/255.0, green: 0x4e/255.0, blue: 0xd8/255.0, alpha: 1)  // #1d4ed8
+    })
     static let breaking = Color(hex: "ef4444")
+    // Bright variants for decoration-only fills (no text overlay). Static
+    // because they're already AA on either background as a fill, and they
+    // need to stay punchy across both modes.
+    static let successBright = Color(hex: "22c55e")
+    static let warnBright    = Color(hex: "f59e0b")
     static let tlLine = Color(UIColor.separator)
     static let tlDot = Color(UIColor.separator)
 
@@ -160,12 +196,16 @@ enum VP {
         static let pill: CGFloat = 999
     }
 
-    // Radius scale
-    static let radiusXS:   CGFloat = 4   // badges, tiny labels
-    static let radiusSM:   CGFloat = 8   // text fields, small buttons, stat cells
-    static let radiusMD:   CGFloat = 12  // cards, action buttons, list rows
-    static let radiusLG:   CGFloat = 16  // sections, overlays
-    static let radiusFull: CGFloat = 99  // pills, capsule elements
+    // Legacy radius scale — Q-D2 (2026-05-12) aliased the legacy ramp onto
+    // the canonical `Radius.*` enum. 268 callsites still reference these;
+    // a dedicated sweep wave will migrate them post-launch, at which point
+    // these constants get deleted. Do not add new callers — reach for
+    // `VP.Radius.sm`/`md`/`lg`/`xl`/`pill` directly on new views.
+    static let radiusXS:   CGFloat = Radius.sm   // 4 → 6
+    static let radiusSM:   CGFloat = Radius.sm   // 8 → 6
+    static let radiusMD:   CGFloat = Radius.md   // 12 → 10
+    static let radiusLG:   CGFloat = Radius.lg   // 16 → 14
+    static let radiusFull: CGFloat = Radius.pill // 99 → 999 (visually identical)
 
     // Kid-specific radii
     static let kidRadius:     CGFloat = 22  // kid category tiles

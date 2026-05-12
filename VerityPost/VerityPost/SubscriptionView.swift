@@ -304,7 +304,7 @@ struct SubscriptionView: View {
                 ForEach(features, id: \.self) { feature in
                     HStack(alignment: .top, spacing: 10) {
                         Rectangle()
-                            .fill(VP.success)
+                            .fill(VP.successBright)
                             .frame(width: 3)
                             .padding(.vertical, 2)
                         Text(feature)
