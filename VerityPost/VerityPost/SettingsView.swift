@@ -4297,20 +4297,32 @@ struct BlockedAccountsView: View {
 // MARK: - Appearance settings
 
 struct AppearanceSettingsView: View {
+    @Environment(\.horizontalSizeClass) private var hSize
     @AppStorage("vp_theme") private var vpTheme: String = "system"
+    // Layout-mode picker (Outstanding.md items 5 + 6, Session 3, locked
+    // 2026-05-12). Hidden as `expanded` row on `.compact` size class —
+    // phone-class viewports can't render 3-col / 2-col without overflow.
+    @AppStorage(VP.layoutModeKey) private var layoutMode: String = VPLayoutMode.auto.rawValue
 
-    private let options: [(value: String, label: String, icon: String)] = [
+    private let themeOptions: [(value: String, label: String, icon: String)] = [
         ("light",  "Light",  "sun.max.fill"),
         ("system", "System", "circle.lefthalf.filled"),
         ("dark",   "Dark",   "moon.fill"),
     ]
 
+    private var availableLayoutModes: [VPLayoutMode] {
+        // Q-iPad6 (2026-05-12) — phone-width hides `expanded`. `.compact`
+        // size class captures every iPhone and iPad split-thirds; iPad
+        // full-screen and 1/2 split stay `.regular` and show the full set.
+        hSize == .compact ? [.auto, .compact] : VPLayoutMode.allCases
+    }
+
     var body: some View {
         SettingsPageShell(title: "Appearance") {
             SettingsSectionHeader(title: "Color scheme", tone: .normal)
             SettingsCard {
-                ForEach(Array(options.enumerated()), id: \.offset) { idx, option in
-                    let isLast = idx == options.count - 1
+                ForEach(Array(themeOptions.enumerated()), id: \.offset) { idx, option in
+                    let isLast = idx == themeOptions.count - 1
                     Button {
                         vpTheme = option.value
                     } label: {
@@ -4324,6 +4336,46 @@ struct AppearanceSettingsView: View {
                                 .foregroundColor(VP.text)
                             Spacer()
                             if vpTheme == option.value {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: VP.Size.base, weight: .semibold))
+                                    .foregroundColor(VP.brand)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .frame(minHeight: 56)
+                        .contentShape(Rectangle())
+                        .overlay(alignment: .bottom) {
+                            if !isLast {
+                                Rectangle()
+                                    .fill(VP.border.opacity(0.6))
+                                    .frame(height: 1)
+                                    .padding(.leading, 16)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            SettingsSectionHeader(title: "Layout", tone: .normal)
+            SettingsCard {
+                let modes = availableLayoutModes
+                ForEach(Array(modes.enumerated()), id: \.element.id) { idx, mode in
+                    let isLast = idx == modes.count - 1
+                    Button {
+                        layoutMode = mode.rawValue
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: mode.icon)
+                                .font(.system(size: VP.Size.base))
+                                .foregroundColor(VP.brand)
+                                .frame(width: 22)
+                            Text(mode.label)
+                                .font(.system(size: VP.Size.md, weight: .medium))
+                                .foregroundColor(VP.text)
+                            Spacer()
+                            if layoutMode == mode.rawValue {
                                 Image(systemName: "checkmark")
                                     .font(.system(size: VP.Size.base, weight: .semibold))
                                     .foregroundColor(VP.brand)

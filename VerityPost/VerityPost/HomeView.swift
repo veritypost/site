@@ -55,6 +55,14 @@ struct HomeView: View {
     // theme attribute), letting users cycle light/dark/system without
     // diving into Settings.
     @AppStorage("vp_theme") private var vpTheme: String = "system"
+    // Q-NEW3 (2026-05-12) — iPad cap + 2-col grid. Width fed by a passive
+    // `.background(GeometryReader)` on the outer body so layout reflows
+    // through Split View / Slide Over / Stage Manager width changes.
+    @Environment(\.horizontalSizeClass) private var hSize
+    @State private var viewportWidth: CGFloat = 0
+    private var isGridMode: Bool {
+        hSize == .regular && viewportWidth > VP.LayoutBreak.homeGrid
+    }
 
     private static let editorialTimeZone = TimeZone(identifier: "America/New_York") ?? .current
 
@@ -207,27 +215,60 @@ struct HomeView: View {
 
                             let supporting = Array(stories.dropFirst())
                             if !supporting.isEmpty {
-                                VStack(spacing: 0) {
-                                    ForEach(Array(supporting.enumerated()), id: \.element.id) { idx, story in
-                                        if idx > 0 {
-                                            hairline.padding(.horizontal, 20)
-                                        }
-                                        NavigationLink(value: story) {
-                                            supportingCard(story)
-                                                .padding(.horizontal, 20)
-                                        }
-                                        .buttonStyle(.plain)
-                                        if idx == 3 {
-                                            HomeAdSlot(placement: "home_in_feed_1", page: "home")
-                                                .padding(.top, 24)
-                                        }
-                                        if idx == 7 {
-                                            HomeAdSlot(placement: "home_in_feed_2", page: "home")
-                                                .padding(.top, 24)
+                                // Q-NEW3 (2026-05-12) — single-column stays
+                                // 680pt-capped (phone + iPad portrait + iPad
+                                // Pro 12.9" portrait at 1024pt); flips to a
+                                // 2-col `LazyVGrid` when `.regular` size
+                                // class AND viewport >1100pt (iPad Pro 11"
+                                // landscape, iPad Pro 12.9" landscape).
+                                // Inter-feed ad slots drop in grid mode —
+                                // they're authored as full-width column
+                                // breaks; `home_below_fold` stays.
+                                if isGridMode {
+                                    LazyVGrid(
+                                        columns: [
+                                            GridItem(.flexible(), spacing: 24),
+                                            GridItem(.flexible(), spacing: 24),
+                                        ],
+                                        alignment: .leading,
+                                        spacing: 32
+                                    ) {
+                                        ForEach(supporting) { story in
+                                            NavigationLink(value: story) {
+                                                supportingCard(story)
+                                            }
+                                            .buttonStyle(.plain)
                                         }
                                     }
+                                    .padding(.horizontal, 20)
+                                    .frame(maxWidth: VP.LayoutBreak.homeGrid, alignment: .leading)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, 40)
+                                } else {
+                                    VStack(spacing: 0) {
+                                        ForEach(Array(supporting.enumerated()), id: \.element.id) { idx, story in
+                                            if idx > 0 {
+                                                hairline.padding(.horizontal, 20)
+                                            }
+                                            NavigationLink(value: story) {
+                                                supportingCard(story)
+                                                    .padding(.horizontal, 20)
+                                            }
+                                            .buttonStyle(.plain)
+                                            if idx == 3 {
+                                                HomeAdSlot(placement: "home_in_feed_1", page: "home")
+                                                    .padding(.top, 24)
+                                            }
+                                            if idx == 7 {
+                                                HomeAdSlot(placement: "home_in_feed_2", page: "home")
+                                                    .padding(.top, 24)
+                                            }
+                                        }
+                                    }
+                                    .frame(maxWidth: VP.LayoutBreak.readingColumn, alignment: .leading)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, 40)
                                 }
-                                .padding(.top, 40)
                                 HomeAdSlot(placement: "home_below_fold", page: "home")
                                     .padding(.top, 16)
                             }
@@ -276,6 +317,13 @@ struct HomeView: View {
                 registrationWallOverlay
             }
         }
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .preference(key: HomeViewportWidthKey.self, value: proxy.size.width)
+            }
+        )
+        .onPreferenceChange(HomeViewportWidthKey.self) { viewportWidth = $0 }
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -438,9 +486,13 @@ struct HomeView: View {
                     .foregroundColor(.white.opacity(0.55))
                     .padding(.top, 10)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // Q-NEW3 (2026-05-12) — content capped at 680pt centered;
+            // colored hero background still runs edge-to-edge as a banner
+            // via `ignoresSafeArea(edges: .horizontal)` below.
+            .frame(maxWidth: VP.LayoutBreak.readingColumn, alignment: .leading)
             .padding(.horizontal, 20)
             .padding(.vertical, 40)
+            .frame(maxWidth: .infinity)
             .background(bg.ignoresSafeArea(edges: .horizontal))
         }
         .buttonStyle(.plain)
@@ -1675,5 +1727,14 @@ struct CategoryFeedView: View {
         } catch {
             stories = []
         }
+    }
+}
+
+// Q-NEW3 (2026-05-12) — viewport-width measurement for the grid-mode
+// threshold. Reads ScrollView area width (== viewport width on iOS).
+private struct HomeViewportWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

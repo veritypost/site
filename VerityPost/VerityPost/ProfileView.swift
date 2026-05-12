@@ -38,6 +38,16 @@ struct ProfileView: View {
     @ObservedObject private var perms = PermissionStore.shared
     private let client = SupabaseManager.shared.client
     @Environment(\.accessibilityReduceMotion) var reduceMotion
+    // Q-NEW5 (2026-05-12, owner-revised) — viewport >= 700pt + `.regular`
+    // size class bumps the hero avatar to 96pt. `.regular` alone fires in
+    // iPad Split-View thirds (320pt+) where the 96pt avatar overflows;
+    // pairing it with a width gate keeps thirds at iPhone-sized 68pt but
+    // catches iPad mini portrait full-screen (744pt) and every larger iPad.
+    @Environment(\.horizontalSizeClass) private var hSize
+    @State private var viewportWidth: CGFloat = 0
+    private var shouldBumpHero: Bool {
+        hSize == .regular && viewportWidth >= VP.LayoutBreak.avatarBump
+    }
 
     // Permission-gated flags. Populated in a `.task(id: perms.changeToken)`.
     @State private var canShareProfileCard: Bool = false
@@ -176,6 +186,13 @@ struct ProfileView: View {
             }
         }
         .background(VP.bg.ignoresSafeArea())
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .preference(key: ProfileViewportWidthKey.self, value: proxy.size.width)
+            }
+        )
+        .onPreferenceChange(ProfileViewportWidthKey.self) { viewportWidth = $0 }
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {
@@ -359,11 +376,12 @@ struct ProfileView: View {
                             ? user.displayName
                             : user.username) ?? "Reader"
 
-        HStack(alignment: .center, spacing: 14) {
+        let bump = shouldBumpHero
+        HStack(alignment: .center, spacing: bump ? 18 : 14) {
             Button {
                 showAvatarEdit = true
             } label: {
-                AvatarView(user: user, size: 68)
+                AvatarView(user: user, size: bump ? 96 : 68)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Edit avatar color and display name")
@@ -371,7 +389,7 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Text(displayTitle)
-                        .font(.system(size: VP.Size.xl, weight: .semibold, design: .serif))
+                        .font(.system(size: bump ? VP.Size.xxl : VP.Size.xl, weight: .semibold, design: .serif))
                         .foregroundColor(VP.ink)
                         .lineLimit(1)
                     VerifiedBadgeView(user: user, size: 11)
@@ -1938,5 +1956,15 @@ struct UserFollowListView: View {
             loadError = true
             loaded = true
         }
+    }
+}
+
+// Q-NEW5 (2026-05-12) — viewport-width measurement for the hero-avatar
+// bump gate. ProfileView's body is a ScrollView so this reads the scroll
+// area's width (== viewport width on iOS).
+private struct ProfileViewportWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

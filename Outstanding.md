@@ -196,6 +196,27 @@ A returning web user who installs iOS and signs in will produce audit_log rows t
 
 **Definition of done:** PR merged. Closes items 5 and 6.
 
+**SHIPPED Session 3 part 1 (2026-05-12) — 5 of 7 surfaces, rail + scroll-restore deferred.**
+
+- `VPLayoutMode.swift` (new) — `enum VPLayoutMode { auto, compact, expanded }`, `VP.layoutModeKey = "ui.layoutMode"`, `VP.LayoutBreak.{hideExpanded:720, avatarBump:700, homeGrid:1100, rail:1180, readingColumn:680}`, `vpEffectiveLayoutMode(...)` helper. File registered in `VerityPost.xcodeproj/project.pbxproj` (PBXBuildFile + PBXFileReference + group `CF66644855F4DA2BB0A67C2E` + sources phase `128B4E44D8C2C11E5668D82B`).
+- `SettingsView.swift:4299-4400` — `AppearanceSettingsView` extended with Layout section below Color scheme. Picker hides `expanded` row when `@Environment(\.horizontalSizeClass) == .compact` (spirit match for the locked 720pt phone-width threshold; `.compact` captures every iPhone + iPad split-thirds; iPad full-screen and 1/2 split stay `.regular` and show the full set).
+- `HomeView.swift:57-66, 282-292, 440-454, 209-281, 1736-1744` — hero content capped at 680pt centered with `bg.ignoresSafeArea(edges: .horizontal)` for edge-to-edge banner; supporting cards stay 680pt-capped in single-column OR flip to a 2-col `LazyVGrid` when `isGridMode` (`.regular` && viewport > 1100pt). Inter-feed ad slots `home_in_feed_1/_2` drop in grid mode (authored as full-width column breaks; `home_top` and `home_below_fold` stay). Viewport-width measured via passive `.background(GeometryReader)` + `HomeViewportWidthKey` preference key so reflows are clean through Split View / Slide Over / Stage Manager width changes.
+- `ProfileView.swift:40-50, 184-191, 366-380, 1962-1970` — hero avatar bumps from 68pt → 96pt and name from `VP.Size.xl` → `VP.Size.xxl` when `shouldBumpHero` (`.regular` && viewport >= 700pt). Owner revised the locked >768pt threshold to >=700pt on 2026-05-12 to capture iPad mini portrait (744pt full-screen, `.regular` class). Stats/tabs/quick-actions stay at iPhone sizes per Q-NEW5.
+- `StoryDetailView.swift:408-425, 463-471, 654-661` — linked-article swapped from `.sheet` to `.fullScreenCover` (kills the iPad 540×620 formSheet that would override the 680pt cap; swipe-down-to-bail goes away, back button dismisses); `SubscriptionView` + `LoginView` sheets get `.presentationDetents([.large])` (no-op on iPhone; iPad gets full-height sheet instead of formSheet).
+
+**Deferred to Session 4 (owner-approved 2026-05-12, follows Q-iPad5 spike-first precedent):**
+
+- Rail-landscape rendering (Q-iPad2/Q-NEW1). `StoryDetailView`'s 3-tab switch (`activeTab` enum, `:80-81`) needs structural refactor to render `storyContent | timelineContent` side-by-side at iPad landscape ≥1180pt. Session 4 lands `NavigationSplitView` for Profile master/detail anyway — the same primitive naturally handles the article+timeline split. The `VP.LayoutBreak.rail = 1180` constant ships now as scaffolding.
+- Scroll-restore spike (Q-iPad5). Coupled to the rail rendering — the only structural layout flip is the rail flip; AppStorage changes alone don't invalidate view identity, so SwiftUI preserves state automatically.
+- Snapshot tests at 320/375/414/768/1024/1180/1366pt. No `SnapshotTesting` library wired yet; explicit defer to Session 4 alongside the rail.
+
+**Cross-platform footnote:**
+
+- Web: N/A — iPad-specific iOS layout work. Verified no web `ui.layoutMode` shadow key exists.
+- Kids iOS: N/A — `VerityPostKids/VerityPostKids/Info.plist:50-55` locks portrait + `UIRequiresFullScreen=true`; effectively iPhone-only regardless of `TARGETED_DEVICE_FAMILY = "1,2"` in the pbxproj.
+
+**Build verification status:** Xcode build did not run — sandbox environment has CoreSimulator out of date and iOS 26.5 SDK not installed (`xcodebuild` returns "Unable to find a destination" / "iOS 26.5 is not installed"). Owner to run an iPad simulator build before merge — first launch on iPhone should show "Automatic" picker selection with `expanded` row hidden; first launch on iPad mini portrait should show 96pt avatar bump and capped HomeView content; iPad Pro 12.9" landscape should show 2-col grid.
+
 ### Q-iPad1 — Default iPad layout: target web's outcomes, use native primitives
 - **Question:** Does iPad mirror web desktop's breakpoint *outcomes* (2-col reader, 3-col home, sidebar profile) using native iOS primitives (`NavigationSplitView`, `LazyVGrid`, size-class branches), rather than a literal CSS-breakpoint port?
 - **Why it matters:** Adult iOS today has zero `horizontalSizeClass`, zero `NavigationSplitView`, zero `userInterfaceIdiom` branches (grep confirmed), so iPad runs phone UI stretched — a literal web port would force iPad to inherit the "awkward zone" comment at `globals.css:613-618` where rails collapse below ~280px.

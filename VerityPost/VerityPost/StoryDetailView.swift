@@ -405,7 +405,12 @@ struct StoryDetailView: View {
         }
         .background(VP.bg)
         .sheet(isPresented: $showUpNext) { upNextSheet }
-        .sheet(isPresented: Binding(
+        // Q-NEW2 (2026-05-12) — linked-article opens a whole reader; iPad
+        // formSheet (540×620) would override the 680pt reading-column cap.
+        // `.fullScreenCover` makes it edge-to-edge on iPad; iPhone keeps a
+        // full-screen modal too. Tradeoff: swipe-down-to-bail goes away,
+        // back button dismisses instead.
+        .fullScreenCover(isPresented: Binding(
             get: { linkedArticle != nil },
             set: { if !$0 { linkedArticle = nil } }
         )) {
@@ -454,7 +459,14 @@ struct StoryDetailView: View {
                 .accessibilityLabel("More options")
             }
         }
-        .sheet(isPresented: $showSubscription) { SubscriptionView().environmentObject(auth) }
+        // Q-NEW2 (2026-05-12) — `.large` detent prevents the iPad formSheet
+        // postage-stamp default; iPhone behavior unchanged (`.large` is the
+        // iPhone sheet default).
+        .sheet(isPresented: $showSubscription) {
+            SubscriptionView()
+                .environmentObject(auth)
+                .presentationDetents([.large])
+        }
         .sheet(isPresented: $showRegistrationSheet) {
             RegistrationSheetView()
         }
@@ -635,8 +647,12 @@ struct StoryDetailView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
         .padding(.horizontal, 16)
+        // Q-NEW2 (2026-05-12) — `.large` detent prevents the iPad formSheet
+        // postage-stamp default; iPhone behavior unchanged.
         .sheet(isPresented: $showLogin) {
-            LoginView().environmentObject(auth)
+            LoginView()
+                .environmentObject(auth)
+                .presentationDetents([.large])
         }
     }
 
