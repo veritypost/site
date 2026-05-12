@@ -17,13 +17,6 @@ Every item below is a research-and-fix task, not a code instruction. Run it thro
 
 ---
 
-## 1. Registration wall — DB toggle
-
-The article reader shows a "sign up" nudge on Timeline and Sources after 2 anon reads (`WALL_THRESHOLD = 2` constant in `web/src/app/[slug]/page.tsx`). Owner confirmed: keep the behavior at launch, but make it switchable from the database without a code change. Threshold should also be tunable (2 → 5 → off) from the same row.
-
-**Prompt for the agent team:**
-> Wire the registration wall to a `site_settings` (or equivalent) DB row so it can be toggled on/off and have its read threshold tuned via a single value flip — no code change required for future changes. Investigate first: does a settings table already exist, or is this the first runtime-tunable flag? Survey downstream consumers (TimelineSection, SourcesSection, RegistrationWall context provider, anon read-count cookie). Confirm cache/revalidation behavior — the wall reads on every `/[slug]` request, but `page.tsx` is server-rendered with `force-dynamic`, so DB reads per request should be fine. After server-side wiring lands, add an admin toggle in the existing admin UI so owner doesn't have to edit SQL directly. Run a full agents+adversary review per the methodology above. Confirm web mobile + web desktop both honor the flag; iOS does not surface this wall, so iOS = N/A.
-
 ## 2. Apple submission readiness for the just-shipped auth changes
 
 The waitlist removal + OTP session-body fix in commit `e4cad79d` is committed locally and not pushed. Before it goes to production and TestFlight, the iOS binary needs to be built, the Swift SDK behavior of `setSession` on iOS 17+ confirmed, and the API change tested end-to-end against the live deploy.
@@ -101,12 +94,12 @@ Web uses fixed-pixel typography (18px body / 1.7 line-height for article prose, 
 **Prompt for the agent team:**
 > Decide whether web should adopt a clamp-based scale (e.g., `clamp(16px, 1rem + 0.2vw, 20px)` and respect user font-size preferences) or whether iOS should pin to a fixed-pixel scale for parity with web. Lean toward web adopting a responsive scale — locking iOS away from Dynamic Type would regress accessibility, which the platform requires for App Store review. Investigate every fixed-pixel value in web's article surface and propose a translation table. Pressure-test at the iOS Dynamic Type extremes (xxxLarge accessibility size) to confirm web's new scale matches.
 
-## 13. iOS BookmarksView — revive or delete
+## 13. iOS BookmarksView — delete (decision locked)
 
-`VerityPostKids/VerityPostKids` is out of scope. In the adult iOS app, `BookmarksView.swift` is a full-featured bookmarks UI (free 10-cap, Verity+ unlimited, collections, notes, undo banner) that queries the `bookmarks` table — which is dead per project memory. Web has no `/bookmarks` route at all (intentionally removed). Either revive the feature server-side or delete the iOS view.
+Owner-locked 2026-05-12: no bookmarks anywhere. Story-follow (`FollowStoryButton` → `story_follows`) is the only reading-list primitive. The iOS `BookmarksView.swift` and every reference to it needs to come out.
 
 **Prompt for the agent team:**
-> Decide: bookmarks dead or alive? If dead, delete `BookmarksView.swift` and every reference, including the Profile quick-action that links to it. If alive, plan the revival: revive the bookmarks table use server-side, add a web `/bookmarks` route to match, and confirm the iOS feature still compiles against current schema. Investigate the current relationship between `bookmarks` and `story_follows` (the live follow primitive) — are they redundant, or do they cover different use cases? Use Supabase MCP to confirm whether the `bookmarks` table has any live writes or RLS policies in production.
+> Decision is locked — do not revisit. Delete `VerityPost/VerityPost/BookmarksView.swift` and every reference: the `NavigationLink` / route that opens it, the Profile quick-action that links to it, the empty-state CTA pointing at it (`auth.pendingHomeJump = true`), any `bookmarks`-table query the iOS app still issues, and any deep-link target. Audit web too even though there's no `/bookmarks` route — there may be admin counters or analytics that expect to see bookmark activity. Use Supabase MCP to check whether the `bookmarks` table has any live writes coming in from anywhere (web API, iOS API, kids API); if it's truly dead, queue a separate migration to drop the table after this code change lands. Cross-platform: kids iOS is out of scope (kids product doesn't have a bookmarks surface).
 
 ## 14. Web mobile has no visible search entry point
 
