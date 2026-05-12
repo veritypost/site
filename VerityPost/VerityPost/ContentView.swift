@@ -134,9 +134,6 @@ struct ContentView: View {
                         .foregroundColor(VP.dim)
                     }
                 }
-            } else if auth.needsEmailVerification {
-                VerifyEmailView()
-                    .environmentObject(auth)
             } else if auth.currentUser?.needsOnboarding == true && !auth.bypassOnboardingLocally {
                 // WelcomeView handles the onboarding stamp + user reload
                 // itself. When the reload flips `needsOnboarding` false

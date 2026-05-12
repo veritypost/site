@@ -49,6 +49,12 @@ struct HomeView: View {
     @State private var showSectionsMenu = false
     // "New since last visit" pill — tracks when home was last opened.
     @State private var lastVisitDate: Date? = nil
+    // Theme preference — shares storage with SettingsView's Appearance row
+    // and VerityPostApp's .preferredColorScheme(). The top-bar button below
+    // mirrors web's NavWrapper theme toggle (vp_theme localStorage / data-
+    // theme attribute), letting users cycle light/dark/system without
+    // diving into Settings.
+    @AppStorage("vp_theme") private var vpTheme: String = "system"
 
     private static let editorialTimeZone = TimeZone(identifier: "America/New_York") ?? .current
 
@@ -321,6 +327,39 @@ struct HomeView: View {
                 .accessibilityLabel("Search")
                 .buttonStyle(.plain)
             }
+            // Theme cycle — mirrors web's tap-to-cycle ThemeToggle. Icon
+            // represents the CURRENT mode (so the accessibility label
+            // matches what the user is on). Tap order: system → light →
+            // dark → system, identical to web. Persistence + app-wide
+            // .preferredColorScheme() are already wired through
+            // VerityPostApp + the existing Settings row.
+            Button {
+                switch vpTheme {
+                case "system": vpTheme = "light"
+                case "light":  vpTheme = "dark"
+                default:       vpTheme = "system"
+                }
+            } label: {
+                Image(systemName: {
+                    switch vpTheme {
+                    case "light": return "sun.max.fill"
+                    case "dark":  return "moon.fill"
+                    default:      return "circle.lefthalf.filled"
+                    }
+                }())
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(VP.text)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel({
+                switch vpTheme {
+                case "light": return "Theme: Light"
+                case "dark":  return "Theme: Dark"
+                default:      return "Theme: System"
+                }
+            }())
             Button {
                 showSectionsMenu = true
             } label: {

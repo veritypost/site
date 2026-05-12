@@ -73,14 +73,6 @@ final class AuthViewModel: ObservableObject {
     @Published var magicLinkCooldownSec: Int = 0
     private var magicLinkCooldownTask: Task<Void, Never>?
 
-    /// True when signup completed but the email has not yet been verified.
-    /// ContentView uses this to show VerifyEmailView instead of the tab bar.
-    @Published var needsEmailVerification = false
-
-    /// Email the user signed up with, surfaced on the verify screen so they
-    /// know which inbox to check.
-    @Published var pendingVerificationEmail: String?
-
     /// True when a Supabase password-recovery deep link has been opened and
     /// a recovery session is active. ContentView uses this to present the
     /// ResetPasswordView.
@@ -684,17 +676,20 @@ final class AuthViewModel: ObservableObject {
             // user_roles has admin-only INSERT RLS, so the client cannot
             // write here — and does not need to.
 
-            // When Supabase has email confirmation enabled, signUp returns a
-            // user but no active session — the UI must hold on VerifyEmailView
-            // until the confirmation link is clicked. If confirmation is off,
-            // the session is already active and we can treat signup like login.
+            // The OTP flow is the only signup path the UI actually invokes;
+            // it creates auth.users with email_confirm=true server-side via
+            // /api/auth/send-magic-link, so a session is always present
+            // after the verifyOtp redemption. This legacy password-signup
+            // path is unreachable from the current UI but kept for future
+            // OAuth/native flows; if a caller does reach it without a
+            // session, we surface a friendly error rather than gate on a
+            // "check your email" screen that no longer exists.
             let hasSession = (try? await client.auth.session) != nil
             if hasSession {
                 await loadUser(id: userId)
                 isLoggedIn = true
             } else {
-                needsEmailVerification = true
-                pendingVerificationEmail = email
+                authError = "Signup needs email confirmation. Try the OTP flow instead."
             }
         } catch {
             authError = Self.friendlyAuthError(error)
@@ -712,10 +707,13 @@ final class AuthViewModel: ObservableObject {
         return uname.isEmpty
     }
 
-    /// Resend the email verification link. Called from VerifyEmailView when
-    /// the user didn't receive the first email.
+    /// Resend the email verification link. Called from ProfileView and
+    /// AccountStateBannerView when a signed-in user's `email_verified`
+    /// flag is false. Sources the email from the signed-in user record
+    /// directly so it works regardless of which signup path created the
+    /// user.
     func resendVerificationEmail() async -> Bool {
-        guard let email = pendingVerificationEmail else { return false }
+        guard let email = currentUser?.email else { return false }
         let url = SupabaseManager.shared.siteURL.appendingPathComponent("api/auth/resend-verification")
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -773,8 +771,6 @@ final class AuthViewModel: ObservableObject {
                 await loadUser(id: session.user.id.uuidString)
                 isLoggedIn = true
                 wasLoggedIn = true
-                needsEmailVerification = false
-                pendingVerificationEmail = nil
                 return
             } catch {
                 Log.d("Deep link PKCE exchange failed: \(error)")
@@ -845,8 +841,6 @@ final class AuthViewModel: ObservableObject {
                 await loadUser(id: session.user.id.uuidString)
                 isLoggedIn = true
                 wasLoggedIn = true
-                needsEmailVerification = false
-                pendingVerificationEmail = nil
             }
         } catch {
             Log.d("Deep link session failed: \(error)")
@@ -959,8 +953,6 @@ final class AuthViewModel: ObservableObject {
         // as a different account doesn't inherit stale state (Bug 27).
         currentUser = nil
         isLoggedIn = false
-        needsEmailVerification = false
-        pendingVerificationEmail = nil
         isRecoveringPassword = false
         bypassOnboardingLocally = false
         pendingHomeJump = false
@@ -1437,8 +1429,6 @@ final class AuthViewModel: ObservableObject {
                 clearMagicLinkState()
                 isLoggedIn = true
                 wasLoggedIn = true
-                needsEmailVerification = false
-                pendingVerificationEmail = nil
                 return true
             } catch {
                 authError = "Invalid code. Please try again or request a new one."
