@@ -43,6 +43,12 @@ export type TagKind = 'i_agree' | 'helpful';
 
 export type Intent = 'question' | 'add_context' | 'different_take';
 
+// DB column comments.intent is plain text; narrow it to the 3-value Intent
+// union at the boundary. Any unknown string collapses to null so the
+// EnrichedComment shape stays honest about what UIs can handle.
+export const isIntent = (v: string | null | undefined): v is Intent =>
+  v === 'question' || v === 'add_context' || v === 'different_take';
+
 const TAG_META: Record<TagKind, { label: string }> = {
   i_agree: { label: 'I agree' },
   helpful: { label: 'Helpful' },

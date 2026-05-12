@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { createClient } from '../lib/supabase/client';
 import CommentComposer from './CommentComposer';
-import CommentRow, { EnrichedComment } from './CommentRow';
+import CommentRow, { EnrichedComment, isIntent } from './CommentRow';
 import { useFocusTrap } from '../lib/useFocusTrap';
 import { hasPermission, refreshIfStale } from '@/lib/permissions';
 import type { Database } from '@/types/database';
@@ -922,6 +922,7 @@ export default function CommentThread({
     const kids = (childrenByParent[c.id] || []).map((child) => renderWithReplies(child, depth + 1));
     const enriched: EnrichedComment = {
       ...c,
+      intent: isIntent(c.intent) ? c.intent : null,
       _your_tags: yourTags.get(c.id) ?? new Set<TagKind>(),
     };
     return (
