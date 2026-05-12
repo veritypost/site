@@ -146,13 +146,13 @@ export async function POST(request) {
     return malformed();
   }
 
-  // Caller-surface tag. 'web' (default) and 'ios' run through the
-  // adult-product flow, including the closed-beta gate. 'kids' is the
-  // kids iOS parent sign-in funnel — distinct surface, NOT subject to
-  // the adult waitlist gate (App Store distribution + on-device parental
-  // gate is the access control). Whitelisted enum, default 'web', no
-  // leak path. Same email may legitimately surface from either app on
-  // different days — `signup_source` is set ONCE at user creation.
+  // Caller-surface tag. 'web' (default) runs through the closed-beta
+  // gate. 'ios' and 'kids' are App Store distributions — the store's
+  // own review + (for kids) the on-device parental gate are the access
+  // control, so the adult waitlist gate does not apply to either.
+  // Whitelisted enum, default 'web', no leak path. Same email may
+  // legitimately surface from any surface on different days —
+  // `signup_source` is set ONCE at user creation.
   const rawClient = typeof payload?.client === 'string' ? payload.client.trim().toLowerCase() : '';
   const client = (rawClient === 'kids' || rawClient === 'ios' || rawClient === 'web') ? rawClient : 'web';
 
@@ -242,13 +242,12 @@ export async function POST(request) {
     } catch (err) {
       console.error('[auth.send-magic-link] approval check threw:', err?.message || err);
     }
-    // Kids-surface signup is its own funnel — App Store distribution +
-    // device-level parental gate is the access control. The adult
-    // closed-beta gate exists to throttle the adult-product waitlist;
-    // applying it to a kids parent would silently drop a legitimate
-    // setup attempt (no users row, no approved access_request, no
-    // referral cookie on iOS). Skip the gate entirely for client='kids'.
-    if (!approvedBypass && client !== 'kids') {
+    // The closed-beta gate is the adult-web waitlist throttle. App
+    // Store surfaces (ios + kids) are gated by Apple review instead
+    // and ship open — applying the web waitlist to them would silently
+    // drop legitimate first-time installs (no users row, no approved
+    // access_request, no referral cookie). Only run the gate for web.
+    if (!approvedBypass && client === 'web') {
       try {
         const gate = await checkSignupGate(service, refCookie);
         if (!gate.allowed) {
@@ -328,13 +327,13 @@ export async function POST(request) {
   }
 
   // Step 4: Compute days_on_list for new users. Non-fatal.
-  // Skipped for kids surface: the wait-line copy ("you've been on the
-  // list N days") is adult-waitlist branding. A parent who happens to
-  // hold an approved access_request from the adult product but installs
-  // the kids app first would otherwise see waitlist copy in their kids
-  // setup email — wrong context. Kids parents are not waitlisted.
+  // Web-only: the wait-line copy ("you've been on the list N days") is
+  // adult-waitlist branding. Neither App Store surface is waitlisted,
+  // so an iOS or kids signup that happens to match an approved
+  // access_request would otherwise see waitlist copy in the wrong
+  // context. Skip for any non-web client.
   let daysOnList = null;
-  if (!existingUserId && client !== 'kids') {
+  if (!existingUserId && client === 'web') {
     try {
       const { data: req } = await service
         .from('access_requests')

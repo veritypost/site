@@ -217,16 +217,21 @@ export async function POST(request: NextRequest) {
   // Build the response. Web clients pick up the session via the
   // sb-*-auth-token cookies that verifyOtp() set through next/headers.
   // Native clients (ios, kids iOS) cannot read those cookies on a
-  // cross-origin URLSession call — they receive an access_token in the
-  // JSON body. Refresh token is intentionally NOT exposed: the kids
-  // parent session is in-memory and naturally short-lived; adult iOS
-  // doesn't consume this body shape today. If a future client needs
-  // refresh, add it back behind that client's tag — don't ship tokens
-  // nobody reads. The body shape is additive: web responses unchanged.
+  // cross-origin URLSession call — they receive the session in the
+  // JSON body and install it into their local SDK directly.
+  //
+  // refresh_token is shipped only to adult iOS. Adult sessions must
+  // outlive the app process (users expect to stay signed in across
+  // launches), and the Swift SDK's setSession refreshes on its own
+  // once it has both tokens. Kids parent sessions are intentionally
+  // short-lived and in-memory only — they receive access_token and
+  // re-prompt when it expires, so we don't ship a refresh token there.
+  // The body shape is additive: web responses unchanged.
   const sessionForBody =
     client !== 'web' && data.session
       ? {
           access_token: data.session.access_token,
+          refresh_token: client === 'ios' ? data.session.refresh_token : undefined,
           expires_at: data.session.expires_at ?? null,
           expires_in: data.session.expires_in ?? null,
           token_type: data.session.token_type ?? 'bearer',
@@ -243,13 +248,15 @@ export async function POST(request: NextRequest) {
     // If the gate fails, roll back the auth.users row and return the
     // generic OK — same privacy posture, no leak of why.
     //
-    // Kids surface bypasses the gate at redemption for the same reason
-    // send-magic-link bypasses it at issuance: kids parents are not part
-    // of the adult waitlist funnel. The auth.users row was created with
-    // signup_source='kids'; runSignupBookkeeping consumes it below.
+    // App Store surfaces (ios + kids) bypass the gate at redemption for
+    // the same reason send-magic-link bypasses it at issuance: neither
+    // is part of the adult-web waitlist funnel — Apple review is the
+    // access control. The auth.users row was created with
+    // signup_source set to the originating client; runSignupBookkeeping
+    // consumes it below.
     const cookieJar = await cookies();
     const refCookie = cookieJar.get(REF_COOKIE_NAME)?.value;
-    const gate: GateResult = client === 'kids'
+    const gate: GateResult = (client === 'kids' || client === 'ios')
       ? { allowed: true, viaOwnerLink: false, codeId: null }
       : await checkSignupGate(service, refCookie);
     if (!gate.allowed) {

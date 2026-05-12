@@ -68,8 +68,6 @@ struct SignupView: View {
 
                     if let sentTo = auth.magicLinkSentTo {
                         sentCard(email: sentTo)
-                    } else if auth.magicLinkGated {
-                        gatedCard
                     } else {
                         if VPOAuthEnabled {
                             oauthButtons
@@ -292,32 +290,6 @@ struct SignupView: View {
         }
         .frame(maxWidth: .infinity)
         .onAppear { otpFocused = true }
-    }
-
-    @ViewBuilder
-    private var gatedCard: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "clock.badge.checkmark")
-                .font(.largeTitle)
-                .foregroundColor(VP.accent)
-                .accessibilityHidden(true)
-            Text("You're on the waitlist.")
-                .font(.system(.title3, design: .default, weight: .bold))
-                .foregroundColor(VP.text)
-            Text("We'll email you when your spot opens up. If you have an invite link from a friend, tap it to skip the line.")
-                .font(.footnote)
-                .foregroundColor(VP.dim)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 8)
-            Button("Use a different email") {
-                auth.clearMagicLinkState()
-            }
-            .font(.system(.footnote, design: .default, weight: .semibold))
-            .foregroundColor(VP.accent)
-            .frame(minHeight: 44)
-        }
-        .padding(.vertical, 24)
-        .frame(maxWidth: .infinity)
     }
 
     // MARK: - OAuth (gated)

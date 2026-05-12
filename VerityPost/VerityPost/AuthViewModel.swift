@@ -72,10 +72,6 @@ final class AuthViewModel: ObservableObject {
     /// successful send. UI disables the resend button while > 0.
     @Published var magicLinkCooldownSec: Int = 0
     private var magicLinkCooldownTask: Task<Void, Never>?
-    /// True when the endpoint returned invite_required (beta gate blocked
-    /// this email). LoginView / SignupView should show the waitlist card.
-    /// No cooldown is started in this state — no email was sent.
-    @Published var magicLinkGated: Bool = false
 
     /// True when signup completed but the email has not yet been verified.
     /// ContentView uses this to show VerifyEmailView instead of the tab bar.
@@ -971,8 +967,8 @@ final class AuthViewModel: ObservableObject {
         // Clear Owner Mode so a second login as a non-owner account doesn't
         // inherit the previous user's bypass.
         isOwnerMode = false
-        // Drop magic-link cooldown / gated / sentTo state so a subsequent
-        // login as a different account doesn't inherit the prior session's
+        // Drop magic-link cooldown + sentTo state so a subsequent login
+        // as a different account doesn't inherit the prior session's
         // 30s resend timer. Preserves `authError` because the server-revoke
         // path above may have just set the post-logout banner.
         clearMagicLinkStatePreservingError()
@@ -1310,10 +1306,13 @@ final class AuthViewModel: ObservableObject {
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        struct Body: Encodable { let email: String }
-        req.httpBody = try? JSONEncoder().encode(Body(email: trimmed))
+        // `client: "ios"` tags the request as adult-iOS, which the server
+        // uses to bypass the closed-beta gate. iOS launches open; web
+        // continues to run the gate.
+        struct Body: Encodable { let email: String; let client: String }
+        req.httpBody = try? JSONEncoder().encode(Body(email: trimmed, client: "ios"))
         do {
-            let (data, response) = try await URLSession.shared.data(for: req)
+            let (_, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse else {
                 authError = "Network error. Try again."
                 return false
@@ -1324,11 +1323,6 @@ final class AuthViewModel: ObservableObject {
             }
             if !(200...299).contains(http.statusCode) {
                 authError = "Couldn\u{2019}t send the link. Try again."
-                return false
-            }
-            if let parsed = try? JSONDecoder().decode(MagicLinkResponse.self, from: data),
-               parsed.ok == false, parsed.reason == "invite_required" {
-                magicLinkGated = true
                 return false
             }
             magicLinkSentTo = trimmed
@@ -1357,7 +1351,6 @@ final class AuthViewModel: ObservableObject {
         magicLinkCooldownTask = nil
         magicLinkSentTo = nil
         magicLinkCooldownSec = 0
-        magicLinkGated = false
     }
 
     private func startMagicLinkCooldown() {
@@ -1390,8 +1383,13 @@ final class AuthViewModel: ObservableObject {
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        struct Body: Encodable { let email: String; let token: String }
-        req.httpBody = try? JSONEncoder().encode(Body(email: email, token: token))
+        // `client: "ios"` tags the redemption so the server bypasses
+        // the beta-gate re-check and returns the session (access +
+        // refresh tokens) in the JSON body — the only way to hand a
+        // session to a native client whose URLSession can't read the
+        // SSR auth cookies.
+        struct Body: Encodable { let email: String; let token: String; let client: String }
+        req.httpBody = try? JSONEncoder().encode(Body(email: email, token: token, client: "ios"))
         do {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse else {
@@ -1406,22 +1404,46 @@ final class AuthViewModel: ObservableObject {
                 authError = "Invalid code. Please try again."
                 return false
             }
-            struct OTPResponse: Decodable { let ok: Bool? }
-            if let parsed = try? JSONDecoder().decode(OTPResponse.self, from: data),
-               parsed.ok == false {
+            struct SessionShape: Decodable {
+                let access_token: String
+                let refresh_token: String
+            }
+            struct OTPResponse: Decodable {
+                let ok: Bool?
+                let session: SessionShape?
+            }
+            // 200 + ok:true + no session is the privacy-posture path
+            // (wrong/expired code). Surface as "Invalid code" so the
+            // user retypes instead of waiting on a session that won't
+            // arrive.
+            guard let parsed = try? JSONDecoder().decode(OTPResponse.self, from: data),
+                  parsed.ok == true,
+                  let s = parsed.session else {
                 authError = "Invalid code. Please try again."
                 return false
             }
-            guard let session = try? await client.auth.session else {
+            // Install the session into the Swift SDK so `client.auth.session`
+            // returns it for the rest of the app lifecycle and the SDK
+            // refreshes the token on its own.
+            do {
+                let session = try await client.auth.setSession(
+                    accessToken: s.access_token,
+                    refreshToken: s.refresh_token
+                )
+                await loadUser(id: session.user.id.uuidString)
+                // Clear the "Check your inbox" card + 30s resend cooldown
+                // so a re-open of the login sheet doesn't show the stale
+                // sent-card after the code has already been redeemed.
+                clearMagicLinkState()
+                isLoggedIn = true
+                wasLoggedIn = true
+                needsEmailVerification = false
+                pendingVerificationEmail = nil
+                return true
+            } catch {
                 authError = "Invalid code. Please try again or request a new one."
                 return false
             }
-            await loadUser(id: session.user.id.uuidString)
-            isLoggedIn = true
-            wasLoggedIn = true
-            needsEmailVerification = false
-            pendingVerificationEmail = nil
-            return true
         } catch {
             authError = "Network error. Try again."
             return false
@@ -1483,10 +1505,5 @@ final class AuthViewModel: ObservableObject {
         guard let uid = (try? await client.auth.session)?.user.id.uuidString else { return }
         await loadUser(id: uid)
     }
-}
-
-private struct MagicLinkResponse: Decodable {
-    let ok: Bool?
-    let reason: String?
 }
 
