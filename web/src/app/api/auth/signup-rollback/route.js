@@ -87,12 +87,12 @@ export async function POST(request) {
     }
 
     // Safety rail: refuse to roll back if the account has any child
-    // activity (comments, bookmarks, quiz attempts, etc). Signup
+    // activity (comments, reading log, follows, quiz attempts). Signup
     // rollback is only valid for the transient window between
     // auth.signUp success and the public.users upsert failure —
     // nothing else should have happened yet. If activity exists, the
     // account is established and rollback is not the right tool.
-    const activityTables = ['comments', 'bookmarks', 'reading_log', 'follows', 'quiz_attempts'];
+    const activityTables = ['comments', 'reading_log', 'follows', 'quiz_attempts'];
     let totalActivity = 0;
     for (const table of activityTables) {
       const { count: activityCount, error: countError } = await service
