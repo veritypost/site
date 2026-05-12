@@ -87,13 +87,6 @@ Web uses fixed-pixel typography (18px body / 1.7 line-height for article prose, 
 **Prompt for the agent team:**
 > Decide whether web should adopt a clamp-based scale (e.g., `clamp(16px, 1rem + 0.2vw, 20px)` and respect user font-size preferences) or whether iOS should pin to a fixed-pixel scale for parity with web. Lean toward web adopting a responsive scale — locking iOS away from Dynamic Type would regress accessibility, which the platform requires for App Store review. Investigate every fixed-pixel value in web's article surface and propose a translation table. Pressure-test at the iOS Dynamic Type extremes (xxxLarge accessibility size) to confirm web's new scale matches.
 
-## 13. iOS BookmarksView — delete (decision locked)
-
-Owner-locked 2026-05-12: no bookmarks anywhere. Story-follow (`FollowStoryButton` → `story_follows`) is the only reading-list primitive. The iOS `BookmarksView.swift` and every reference to it needs to come out.
-
-**Prompt for the agent team:**
-> Decision is locked — do not revisit. Delete `VerityPost/VerityPost/BookmarksView.swift` and every reference: the `NavigationLink` / route that opens it, the Profile quick-action that links to it, the empty-state CTA pointing at it (`auth.pendingHomeJump = true`), any `bookmarks`-table query the iOS app still issues, and any deep-link target. Audit web too even though there's no `/bookmarks` route — there may be admin counters or analytics that expect to see bookmark activity. Use Supabase MCP to check whether the `bookmarks` table has any live writes coming in from anywhere (web API, iOS API, kids API); if it's truly dead, queue a separate migration to drop the table after this code change lands. Cross-platform: kids iOS is out of scope (kids product doesn't have a bookmarks surface).
-
 ## 14. Web mobile has no visible search entry point
 
 `NavWrapper.tsx` computes `canSearch` from `hasPermission('search.basic')` (line 199, 283) but never renders a search button. Mobile users can only reach `/search` via direct URL or through the SectionsMenu's internal results listing. iOS does surface a magnifier icon in the top bar (permission-gated).
