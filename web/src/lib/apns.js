@@ -95,6 +95,7 @@ function buildAlertPayload({
   threadId,
   metadata,
   interruptionLevel,
+  priority,
 }) {
   const aps = {
     alert: { title: title || '' },
@@ -109,6 +110,13 @@ function buildAlertPayload({
   // we never ship a malformed payload that APNs would 400.
   if (interruptionLevel && VALID_INTERRUPTION_LEVELS.has(interruptionLevel)) {
     aps['interruption-level'] = interruptionLevel;
+  } else if (interruptionLevel === undefined && priority === 5) {
+    // Default policy: priority=5 (the new default, see sendOnSession) pairs
+    // with interruption-level='active' so the OS still surfaces the push
+    // promptly without breaking Focus/DND. priority=10 callers are opting
+    // into a louder push — leave the field unset so Apple's default applies
+    // and the caller's explicit interruptionLevel (if any) wins.
+    aps['interruption-level'] = 'active';
   }
 
   const payload = { aps };
@@ -126,9 +134,14 @@ function buildAlertPayload({
 // result object). It does throw for local crypto / config errors.
 // opts:
 //   priority           — APNs `apns-priority` header. 10 for immediate / urgent
-//                        delivery, 5 for power-conserving. Defaults to 10 for
-//                        back-compat; new callers should pass the value mapped
-//                        from notifications.priority.
+//                        delivery, 5 for power-conserving.
+//                        ── Default changed from 10 to 5 on 2026-05-12. ──
+//                        All urgent callers now explicitly resolve their
+//                        apns-priority via lib/pushPriority.js (which gates
+//                        priority=10 to the server-side allowlist of urgent
+//                        notification types). priority=10 is now opt-in:
+//                        anything that doesn't pass it gets the power-
+//                        conserving default plus interruption-level='active'.
 //   expiration         — `apns-expiration` header. 0 = drop if undeliverable.
 //   collapseId         — `apns-collapse-id` header.
 //   interruptionLevel  — aps `interruption-level` field. One of
@@ -139,8 +152,13 @@ function buildAlertPayload({
 function sendOnSession(session, deviceToken, notification, opts = {}) {
   const jwt = signAppleJwt();
   const topic = apnsTopic();
+  const resolvedPriority = Number(opts.priority ?? 5);
   const body = Buffer.from(
-    JSON.stringify(buildAlertPayload({ ...notification, interruptionLevel: opts.interruptionLevel })),
+    JSON.stringify(buildAlertPayload({
+      ...notification,
+      interruptionLevel: opts.interruptionLevel,
+      priority: resolvedPriority,
+    })),
     'utf8'
   );
 
@@ -150,7 +168,7 @@ function sendOnSession(session, deviceToken, notification, opts = {}) {
     authorization: `bearer ${jwt}`,
     'apns-topic': topic,
     'apns-push-type': 'alert',
-    'apns-priority': String(opts.priority ?? 10),
+    'apns-priority': String(opts.priority ?? 5),
     'apns-expiration': String(opts.expiration ?? 0),
     'content-type': 'application/json',
     'content-length': String(body.length),
