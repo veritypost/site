@@ -183,7 +183,7 @@ export default function AddKidUpsellModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 16,
+        padding: 'var(--s4)',
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) onClose();
@@ -193,20 +193,21 @@ export default function AddKidUpsellModal({
         ref={dialogRef}
         style={{
           background: '#ffffff',
-          borderRadius: 14,
+          borderRadius: 'var(--r-lg)',
           maxWidth: 460,
           width: '100%',
-          padding: 22,
+          padding: 22, // magic — intentional (between --s5 20 and --s6 24 for modal body)
           boxShadow: '0 10px 40px rgba(0,0,0,0.25)',
         }}
       >
+        {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px tight title-to-body gap */}
         <h2
           id="upsell-dialog-title"
           style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 800, color: C.text }}
         >
           Add a kid seat
         </h2>
-        <p style={{ margin: '0 0 16px', fontSize: 13.5, color: C.dim, lineHeight: 1.55 }}>
+        <p style={{ margin: '0 0 var(--s4)', fontSize: 13.5, color: C.dim, lineHeight: 1.55 }}>
           Adding <strong style={{ color: C.text }}>{kidName || 'this kid'}</strong> requires an
           additional kid seat. The Verity Family plan includes one kid; each additional kid is $
           {priceFormatted}/month, billed prorated through your current period.
@@ -216,9 +217,10 @@ export default function AddKidUpsellModal({
           style={{
             background: '#f8fafc',
             border: `1px solid ${C.border}`,
-            borderRadius: 10,
+            borderRadius: 'var(--r-md)',
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 14px horizontal on price-line chip
             padding: '12px 14px',
-            marginBottom: 16,
+            marginBottom: 'var(--s4)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -237,10 +239,10 @@ export default function AddKidUpsellModal({
               background: 'var(--danger-bg)',
               border: `1px solid ${C.danger}`,
               color: C.danger,
-              borderRadius: 10,
-              padding: 10,
+              borderRadius: 'var(--r-md)',
+              padding: 10, // magic — intentional (between --s2 8 and --s3 12 for compact error banner)
               fontSize: 12.5,
-              marginBottom: 14,
+              marginBottom: 14, // magic — intentional (between --s3 12 and --s4 16 for error spacing)
               lineHeight: 1.5,
             }}
             role="alert"
@@ -256,11 +258,12 @@ export default function AddKidUpsellModal({
             onClick={onClose}
             disabled={busy}
             style={{
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 9x16 pill matches admin modal pattern
               padding: '9px 16px',
               fontSize: 13,
               fontWeight: 600,
               border: `1px solid ${C.border}`,
-              borderRadius: 8,
+              borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for dialog buttons)
               background: '#ffffff',
               color: C.text,
               cursor: busy ? 'not-allowed' : 'pointer',
@@ -273,11 +276,12 @@ export default function AddKidUpsellModal({
             onClick={submit}
             disabled={busy || !payload}
             style={{
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 9x16 pill matches admin modal pattern
               padding: '9px 16px',
               fontSize: 13,
               fontWeight: 700,
               border: 'none',
-              borderRadius: 8,
+              borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for dialog buttons)
               background: C.accent,
               color: '#ffffff',
               cursor: busy || !payload ? 'not-allowed' : 'pointer',

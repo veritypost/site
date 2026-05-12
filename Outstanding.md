@@ -80,6 +80,8 @@ Items 2, 4, 18, 19, 20, 23 are unaffected by this arc and remain independently s
 - **Tradeoff:** Admin pages keep off-grid radius values until those screens get rewritten; intentional inconsistency that needs a "// freeform" policy.
 - **ANSWERED 2026-05-12 — High-traffic only (option b, REVISED framing).** Sweep high-traffic surfaces in execution session. Admin / mockup / legacy `borderRadius:` callsites are **prelaunch-parked**, not freeform-forever — schedule a single sweep session post-launch (after AdSense/Apple approval), following the kill-switch-inventory pattern.
 
+**SHIPPED Session 2 (2026-05-12):** Migrated 14 high-traffic files to `var(--r-*)` / `var(--s*)` tokens — `CommentRow`, `CommentThread`, `CommentComposer`, `ConfirmDialog`, `LockModal`, `ArticleSurface`, `StoryEditor`, `WelcomeModal`, `AddKidUpsellModal`, `HomeLayout`, `leaderboard/page.tsx`, `profile/kids/page.tsx`, `u/[username]/page.tsx`. `profile/[id]/page.tsx` was a 19-line redirect — no styles. Off-grid values tagged `magic, intentional` with scoped `eslint-disable-next-line` comments. ESLint `no-restricted-syntax` rule scope extended to cover all 13 migrated files (HomeLayout has no inline styles). Final lint: zero `no-restricted-syntax` warnings across the entire scope. Admin / mockup / legacy `category/[id]/page.js` remain parked per the lock.
+
 ### Q-NEW9 — Token sync mechanism after Group D
 - **Question:** Hand-sync forever, single JSON source with codegen, or shared TS module with a CI step?
 - **Why it matters:** Current state is hand-sync and already drifting — `Theme.swift:155-161` matches web (new scale) but `:163-168` keeps legacy `radiusXS/SM/MD/LG/Full` (4/8/12/16/99); 982 of 985 web callsites don't consume tokens, so codegen has no consumers today.
@@ -287,7 +289,7 @@ Folded into Group D above (Q-D1). Locked: leave both as-is. Web stays fixed-px (
 
 ---
 
-## 14. Web mobile has no visible search entry point (LOCKED — Session 2)
+## 14. Web mobile has no visible search entry point — CLOSED 2026-05-12
 
 ### Q-Misc1 — Web mobile search button: global top bar, both mobile and desktop
 - **Question:** Does the magnifying-glass search button render in the global top bar on every page (gated on `canSearch`) for both mobile and desktop?
@@ -298,6 +300,8 @@ Folded into Group D above (Q-D1). Locked: leave both as-is. Web stays fixed-px (
 
 **Execution prompt:**
 > Ships in Session 2 alongside the high-traffic radius sweep. Use the new `--r-pill` token from Session 1 for the icon button radius. Snapshot test at 320 / 360 / 375 / 414 / 768 viewports — three right-cluster icons on a 320px viewport may need the wordmark to truncate; confirm before merging.
+
+**SHIPPED Session 2 (2026-05-12):** Added 36×36 magnifying-glass `<a href="/search">` Link to `NavWrapper.tsx` right cluster, immediately left of `<ThemeToggle />`. Inline SVG matches existing Feather-style icon convention (strokeWidth 2). Radius uses `var(--r-pill)`. Gated on existing `canSearch` (`hasPermission('search.basic')`) — anon users do not see the icon, matching the existing permission contract. `/search` route already exists and handles anon visits gracefully. Visual snapshot testing across 320/360/375/414/768 deferred to manual QA. **iOS parity:** adult iOS HomeView already has a contextual `if canSearch` search button (`HomeView.swift:317`); a global iOS top-bar search affordance is deferred to a follow-up session. Kids iOS N/A — kids product does not support search.
 
 ---
 

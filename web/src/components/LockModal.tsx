@@ -107,21 +107,22 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: 'var(--s4)',
   };
   const panelStyle: CSSProperties = {
     background: 'var(--card)',
     color: 'var(--text-primary)',
     border: '1px solid var(--border)',
-    borderRadius: 14,
+    borderRadius: 'var(--r-lg)',
     maxWidth: 420,
     width: '100%',
-    padding: 24,
+    padding: 'var(--s6)',
     textAlign: 'center',
   };
   const secondaryBtnStyle: CSSProperties = {
+    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 9x16 pill matches admin modal pattern
     padding: '9px 16px',
-    borderRadius: 8,
+    borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for dialog buttons)
     background: 'transparent',
     color: 'var(--text-primary)',
     border: '1px solid var(--border)',
@@ -130,8 +131,9 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
     cursor: 'pointer',
   };
   const primaryBtnStyle: CSSProperties = {
+    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 9x18 matches primary CTA pattern
     padding: '9px 18px',
-    borderRadius: 8,
+    borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for dialog buttons)
     background: 'var(--accent)',
     color: '#fff',
     border: 'none',

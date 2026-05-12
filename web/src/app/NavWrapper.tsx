@@ -639,6 +639,44 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 <Avatar user={user} size={28} />
               </a>
             )}
+            {/* Q-Misc1 (2026-05-12) — Permission-gated global search entry.
+                Sits immediately left of ThemeToggle on every page so mobile
+                viewers have a search affordance outside the home feed. The
+                /search route gates server-side too; this icon is a UI gate
+                for users with `search.basic`. Anon users do not see this
+                icon, matching the existing permission contract. */}
+            {canSearch && (
+              <a
+                href="/search"
+                aria-label="Search"
+                aria-current={path === '/search' ? 'page' : undefined}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 'var(--r-pill)',
+                  color: C.text,
+                  textDecoration: 'none',
+                }}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.35-4.35" />
+                </svg>
+              </a>
+            )}
             <ThemeToggle />
           </div>
         </header>

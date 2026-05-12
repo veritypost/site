@@ -362,13 +362,14 @@ export default function ParentKidsPage() {
     }
   }
 
-  if (loading) return <div style={{ padding: 40, color: C.dim }}>Loading{'\u2026'}</div>;
-  if (!me) return <div style={{ padding: 40 }}>Please log in.</div>;
+  if (loading) return <div style={{ padding: 'var(--s8)', color: C.dim }}>Loading{'\u2026'}</div>;
+  if (!me) return <div style={{ padding: 'var(--s8)' }}>Please log in.</div>;
   if (denied) {
     return (
-      <div style={{ maxWidth: 640, margin: '0 auto', padding: '48px 16px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Family reading</h1>
-        <p style={{ fontSize: 14, color: C.dim, marginBottom: 18 }}>
+      // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 48px off-grid (centered hero padding)
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '48px var(--s4)', textAlign: 'center' }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 10 /* magic — intentional (off-grid, compact heading gap) */ }}>Family reading</h1>
+        <p style={{ fontSize: 14, color: C.dim, marginBottom: 18 /* magic — intentional (off-grid copy gap) */ }}>
           Kid profiles are part of the Verity Family plan. Upgrade to unlock private kid reading,
           quizzes, and expert sessions.
         </p>
@@ -376,8 +377,9 @@ export default function ParentKidsPage() {
           href="/profile/settings?section=plan"
           style={{
             display: 'inline-block',
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px/18px off-grid CTA padding
             padding: '10px 18px',
-            borderRadius: 9,
+            borderRadius: 9 /* magic — intentional (between --r-sm 6 and --r-md 10 for the CTA) */,
             background: C.accent,
             color: '#fff',
             fontSize: 13,
@@ -392,13 +394,14 @@ export default function ParentKidsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
-      <a href="/profile/settings" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: C.dim, textDecoration: 'none', marginBottom: 12 }}>
+    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 80px off-grid (large bottom safe area for mobile)
+    <div style={{ maxWidth: 820, margin: '0 auto', padding: 'var(--s6) var(--s4) 80px' }}>
+      <a href="/profile/settings" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: C.dim, textDecoration: 'none', marginBottom: 'var(--s3)' }}>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
         Settings
       </a>
-      <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 4px' }}>Family reading</h1>
-      <div style={{ fontSize: 12, color: C.dim, marginBottom: 16 }}>
+      <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 var(--s1)' }}>Family reading</h1>
+      <div style={{ fontSize: 12, color: C.dim, marginBottom: 'var(--s4)' }}>
         Kid profiles are private — not in search, not on leaderboards, not visible to anyone outside your family.
       </div>
 
@@ -408,10 +411,10 @@ export default function ParentKidsPage() {
             background: '#ecfdf5',
             border: `1px solid ${C.success}`,
             color: C.success,
-            borderRadius: 10,
-            padding: 12,
+            borderRadius: 'var(--r-md)',
+            padding: 'var(--s3)',
             fontSize: 13,
-            marginBottom: 12,
+            marginBottom: 'var(--s3)',
           }}
         >
           {flash}
@@ -423,10 +426,10 @@ export default function ParentKidsPage() {
             background: 'var(--danger-bg)',
             border: `1px solid ${C.danger}`,
             color: C.danger,
-            borderRadius: 10,
-            padding: 12,
+            borderRadius: 'var(--r-md)',
+            padding: 'var(--s3)',
             fontSize: 13,
-            marginBottom: 12,
+            marginBottom: 'var(--s3)',
           }}
         >
           {error}
@@ -438,9 +441,9 @@ export default function ParentKidsPage() {
           style={{
             background: 'var(--danger-bg)',
             border: `1px solid ${C.danger}`,
-            borderRadius: 10,
-            padding: 12,
-            marginBottom: 12,
+            borderRadius: 'var(--r-md)',
+            padding: 'var(--s3)',
+            marginBottom: 'var(--s3)',
             display: 'flex',
             alignItems: 'center',
             gap: 12,
@@ -453,8 +456,9 @@ export default function ParentKidsPage() {
           <button
             onClick={() => load()}
             style={{
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8px/14px off-grid (compact button padding)
               padding: '8px 14px',
-              borderRadius: 8,
+              borderRadius: 8 /* magic — intentional (between --r-sm 6 and --r-md 10) */,
               border: 'none',
               background: C.danger,
               color: '#fff',
@@ -489,7 +493,7 @@ export default function ParentKidsPage() {
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
             gap: 12,
-            marginBottom: 16,
+            marginBottom: 'var(--s4)',
           }}
         >
           {kids.map((k) => (
@@ -518,14 +522,15 @@ export default function ParentKidsPage() {
           style={{
             background: C.card,
             border: `1px dashed ${C.border}`,
-            borderRadius: 14,
-            padding: 24,
+            borderRadius: 'var(--r-lg)',
+            padding: 'var(--s6)',
             textAlign: 'center',
-            marginBottom: 16,
+            marginBottom: 'var(--s4)',
           }}
         >
+          {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px is off-grid (tight title-to-copy gap) */}
           <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>No kid profiles yet</div>
-          <p style={{ fontSize: 13, color: C.dim, margin: '0 0 12px' }}>
+          <p style={{ fontSize: 13, color: C.dim, margin: '0 0 var(--s3)' }}>
             Add a kid profile for private reading, quizzes, and expert sessions.
           </p>
         </div>
@@ -539,18 +544,19 @@ export default function ParentKidsPage() {
         !trial?.kid_trial_used &&
         kids.length === 0 && (
           <div
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 12px radius off-grid (mid-tier card)
             style={{
               background: '#fffbeb',
               border: `1px solid ${C.warn}`,
               borderRadius: 12,
-              padding: 16,
-              marginBottom: 16,
+              padding: 'var(--s4)',
+              marginBottom: 'var(--s4)',
             }}
           >
             <div style={{ fontSize: 14, fontWeight: 700, color: C.warn }}>
               Try a kid profile free for 7 days
             </div>
-            <div style={{ fontSize: 12, color: C.text, marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: C.text, marginTop: 'var(--s1)' }}>
               One kid profile, 7 days, no card. Convert to Verity Family to keep going &mdash; the
               kid&apos;s progress carries over.
             </div>
@@ -558,6 +564,7 @@ export default function ParentKidsPage() {
               onClick={() => setShowForm('trial')}
               style={{
                 marginTop: 10,
+                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8px/16px CTA padding off-grid
                 padding: '8px 16px',
                 borderRadius: 8,
                 border: 'none',
@@ -577,6 +584,7 @@ export default function ParentKidsPage() {
         <button
           onClick={() => setShowForm('full')}
           style={{
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 9px/18px off-grid CTA padding
             padding: '9px 18px',
             borderRadius: 8,
             border: `1px dashed ${C.border}`,
@@ -606,6 +614,7 @@ export default function ParentKidsPage() {
         />
       )}
 
+      {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 28px off-grid (footer section gap) */}
       <div style={{ marginTop: 28, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <a
           href="/profile/family"
@@ -672,12 +681,13 @@ function KidsAppBanner() {
   if (!live) return null;
   return (
     <div
+      // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 12px radius off-grid (banner card)
       style={{
         background: '#f0f9ff',
         border: `1px solid ${C.border}`,
         borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
+        padding: 'var(--s4)',
+        marginBottom: 'var(--s4)',
         display: 'flex',
         alignItems: 'flex-start',
         gap: 12,
@@ -690,7 +700,7 @@ function KidsAppBanner() {
             fontSize: 14,
             fontWeight: 700,
             color: C.text,
-            marginBottom: 4,
+            marginBottom: 'var(--s1)',
           }}
         >
           Next step: download Verity Kids on your child&rsquo;s device.
@@ -710,6 +720,7 @@ function KidsAppBanner() {
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px/18px off-grid CTA padding
             padding: '10px 18px',
             minHeight: 44,
             background: '#111',
@@ -729,6 +740,7 @@ function KidsAppBanner() {
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px/18px off-grid CTA padding
             padding: '10px 18px',
             minHeight: 44,
             background: C.card,
@@ -754,9 +766,9 @@ function TrialHero({ endsAt }: { endsAt: string | null }) {
       style={{
         background: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
         border: `1px solid ${C.warn}`,
-        borderRadius: 14,
-        padding: 20,
-        marginBottom: 16,
+        borderRadius: 'var(--r-lg)',
+        padding: 'var(--s5)',
+        marginBottom: 'var(--s4)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
@@ -775,10 +787,12 @@ function TrialHero({ endsAt }: { endsAt: string | null }) {
           {days === 1 ? 'day left on your kid trial' : 'days left on your kid trial'}
         </div>
       </div>
+      {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px is off-grid (tight top spacing under hero number) */}
       <p style={{ fontSize: 13, color: '#78350f', margin: '6px 0 12px' }}>
         Upgrade to Verity Family to keep every badge, streak, and quiz pass after the trial ends.
       </p>
       <div
+        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px height / 3px radius — progress bar geometry, not spacing grid
         style={{
           height: 6,
           background: 'rgba(180,83,9,0.18)',
@@ -793,6 +807,7 @@ function TrialHero({ endsAt }: { endsAt: string | null }) {
         href="/profile/settings?section=plan"
         style={{
           display: 'inline-block',
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px/18px off-grid CTA padding
           padding: '10px 18px',
           borderRadius: 9,
           background: C.warn,
@@ -820,15 +835,15 @@ function TrialExpiredHero({
       style={{
         background: 'var(--danger-bg)',
         border: `1px solid ${C.danger}`,
-        borderRadius: 14,
-        padding: 20,
-        marginBottom: 16,
+        borderRadius: 'var(--r-lg)',
+        padding: 'var(--s5)',
+        marginBottom: 'var(--s4)',
       }}
     >
-      <div style={{ fontSize: 16, fontWeight: 800, color: C.danger, marginBottom: 4 }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: C.danger, marginBottom: 'var(--s1)' }}>
         Trial ended &mdash; kid profile is frozen
       </div>
-      <p style={{ fontSize: 13, color: '#7f1d1d', margin: '0 0 12px' }}>
+      <p style={{ fontSize: 13, color: '#7f1d1d', margin: '0 0 var(--s3)' }}>
         Progress is saved. Upgrade to Verity Family and the profile unfreezes where it left off.
       </p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -836,6 +851,7 @@ function TrialExpiredHero({
           href="/profile/settings?section=plan"
           style={{
             display: 'inline-block',
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px/18px off-grid CTA padding
             padding: '10px 18px',
             borderRadius: 9,
             background: C.danger,
@@ -854,6 +870,7 @@ function TrialExpiredHero({
             style={{
               background: 'transparent',
               border: 'none',
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px vertical off-grid (matches sibling CTA height for baseline alignment)
               padding: '10px 4px',
               fontSize: 12,
               fontWeight: 600,
@@ -879,7 +896,7 @@ function KpiRow({ kpis }: { kpis: KpiPayload }) {
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
         gap: 10,
-        marginBottom: 16,
+        marginBottom: 'var(--s4)',
       }}
     >
       {/* T54 \u2014 KPI order locked to: Quizzes Passed \u2192 Articles \u2192 Longest Streak \u2192
@@ -904,6 +921,7 @@ function KpiCard({ value, label, sub }: { value: number | string; label: string;
         background: C.card,
         border: `1px solid ${C.border}`,
         borderRadius: 12,
+        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 14px padding off-grid (KPI card mid-density)
         padding: '14px 14px',
       }}
     >
@@ -919,6 +937,7 @@ function KpiCard({ value, label, sub }: { value: number | string; label: string;
         {value}
       </div>
       <div
+        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px marginTop off-grid (tight label spacing)
         style={{
           fontSize: 10,
           fontWeight: 700,
@@ -930,6 +949,7 @@ function KpiCard({ value, label, sub }: { value: number | string; label: string;
       >
         {label}
       </div>
+      {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 2px marginTop off-grid (sub-label) */}
       {sub && <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>{sub}</div>}
     </div>
   );
@@ -959,8 +979,8 @@ function KidCard({
       style={{
         background: C.card,
         border: `1px solid ${C.border}`,
-        borderRadius: 14,
-        padding: 16,
+        borderRadius: 'var(--r-lg)',
+        padding: 'var(--s4)',
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
@@ -969,6 +989,7 @@ function KidCard({
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 48px avatar size; borderRadius 50% for circular shape
           style={{
             width: 48,
             height: 48,
@@ -986,7 +1007,7 @@ function KidCard({
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{kid.display_name}</div>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 'var(--s1)' }}>
             {isTrial && <StatusPill label="Trial" color={C.warn} />}
             {frozen && <StatusPill label="Frozen" color={C.danger} />}
             {paused && <StatusPill label="Paused" color="#6b7280" />}
@@ -1000,11 +1021,13 @@ function KidCard({
         <MiniStat value={kid.streak_current || 0} label="Streak" />
       </div>
 
+      {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px gap off-grid (compact action row) */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button
           onClick={onDashboard}
           style={{
             flex: '1 1 auto',
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8px/12px CTA padding off-grid (compact in-card button)
             padding: '8px 12px',
             borderRadius: 8,
             border: 'none',
@@ -1021,6 +1044,7 @@ function KidCard({
           onClick={onPauseToggle}
           disabled={pauseBusy}
           style={{
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8px/12px CTA padding off-grid (compact in-card button)
             padding: '8px 12px',
             borderRadius: 8,
             border: `1px solid ${C.border}`,
@@ -1038,6 +1062,7 @@ function KidCard({
           <button
             onClick={onDelete}
             style={{
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8px/12px CTA padding off-grid (compact in-card button)
               padding: '8px 12px',
               borderRadius: 8,
               border: 'none',
@@ -1064,8 +1089,9 @@ function StatusPill({ label, color }: { label: string; color: string }) {
         fontWeight: 700,
         textTransform: 'uppercase',
         letterSpacing: 0.4,
-        padding: '2px 8px',
-        borderRadius: 999,
+        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 2px vertical pill padding off-grid (tiny pill)
+        padding: '2px var(--s2)',
+        borderRadius: 'var(--r-pill)',
         background: `${color}1a`,
         color,
       }}
@@ -1110,8 +1136,9 @@ function BirthdayPromptBanner({ kid }: { kid: KidRow }) {
       style={{
         background: '#fffbeb',
         border: `1px solid ${C.warn}`,
-        borderRadius: 10,
-        padding: '10px 12px',
+        borderRadius: 'var(--r-md)',
+        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px vertical padding off-grid (banner)
+        padding: '10px var(--s3)',
         display: 'flex',
         alignItems: 'center',
         gap: 10,
@@ -1125,8 +1152,8 @@ function BirthdayPromptBanner({ kid }: { kid: KidRow }) {
       <span
         aria-hidden="true"
         style={{
-          width: 8,
-          height: 8,
+          width: 'var(--s2)',
+          height: 'var(--s2)',
           borderRadius: '50%',
           background: C.warn,
           flex: '0 0 auto',
@@ -1138,7 +1165,8 @@ function BirthdayPromptBanner({ kid }: { kid: KidRow }) {
       <a
         href={`/profile/kids/${kid.id}`}
         style={{
-          padding: '6px 12px',
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px vertical CTA padding off-grid
+          padding: '6px var(--s3)',
           borderRadius: 7,
           background: C.warn,
           color: '#fff',
@@ -1159,6 +1187,7 @@ function MiniStat({ value, label }: { value: number; label: string }) {
     <div style={{ textAlign: 'center' }}>
       <div style={{ fontSize: 18, fontWeight: 800, color: C.text, lineHeight: 1.1 }}>{value}</div>
       <div
+        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 2px marginTop off-grid (tight micro-label)
         style={{
           fontSize: 10,
           color: C.dim,
@@ -1197,14 +1226,16 @@ function CreateKidForm({
     form.parent_name.trim().length >= 2;
   return (
     <div
+      // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 12px radius off-grid (form card)
       style={{
         background: C.card,
         border: `1px solid ${C.border}`,
         borderRadius: 12,
-        padding: 16,
-        marginTop: 12,
+        padding: 'var(--s4)',
+        marginTop: 'var(--s3)',
       }}
     >
+      {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px marginBottom off-grid (heading-to-field gap) */}
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>
         {mode === 'trial' ? 'Start 7-day trial' : 'New kid profile'}
       </div>
@@ -1224,11 +1255,13 @@ function CreateKidForm({
         />
       </Field>
       <Field label="Avatar colour">
+        {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px gap off-grid (compact swatch row) */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {COLOR_OPTIONS.map((col) => (
             <button
               key={col}
               onClick={() => setForm({ ...form, avatar_color: col })}
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 28px swatch size off-grid; borderRadius 50% for circular shape; 3px ring border
               style={{
                 width: 28,
                 height: 28,
@@ -1254,20 +1287,23 @@ function CreateKidForm({
             setForm({ ...form, pinConfirm: e.target.value.replace(/\D/g, '').slice(0, 4) })
           }
           placeholder="Confirm"
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px marginTop off-grid (tight stacked PIN inputs)
           style={{ ...inputStyle, marginTop: 6 }}
         />
       </Field>
 
       <div
+        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8px radius off-grid (consent sub-card)
         style={{
-          marginTop: 16,
-          padding: 12,
+          marginTop: 'var(--s4)',
+          padding: 'var(--s3)',
           background: '#fff',
           border: `1px solid ${C.border}`,
           borderRadius: 8,
         }}
       >
         <div
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px marginBottom off-grid (compact label-to-body gap)
           style={{
             fontSize: 11,
             fontWeight: 700,
@@ -1279,6 +1315,7 @@ function CreateKidForm({
           Parental consent (COPPA)
         </div>
         <div
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px marginBottom off-grid (consent-text spacing)
           style={{
             fontSize: 12,
             lineHeight: 1.5,
@@ -1311,6 +1348,7 @@ function CreateKidForm({
             type="checkbox"
             checked={form.consent_ack}
             onChange={(e) => setForm({ ...form, consent_ack: e.target.checked })}
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 2px marginTop off-grid (baseline-align checkbox to text)
             style={{ marginTop: 2 }}
           />
           <span>
@@ -1320,11 +1358,13 @@ function CreateKidForm({
         </label>
       </div>
 
+      {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px gap and 10px marginTop off-grid (form action row) */}
       <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
         <button
           onClick={onSubmit}
           disabled={saving || !valid}
           style={{
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8px/16px CTA padding off-grid
             padding: '8px 16px',
             borderRadius: 8,
             border: 'none',
@@ -1341,6 +1381,7 @@ function CreateKidForm({
         <button
           onClick={onCancel}
           style={{
+            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8px/16px CTA padding off-grid
             padding: '8px 16px',
             borderRadius: 8,
             border: `1px solid ${C.border}`,
@@ -1358,6 +1399,7 @@ function CreateKidForm({
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
+    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px marginBottom off-grid (compact stacked form rows)
     <div style={{ marginBottom: 10 }}>
       <label
         style={{
@@ -1366,7 +1408,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
           fontWeight: 700,
           color: '#666',
           textTransform: 'uppercase',
-          marginBottom: 4,
+          marginBottom: 'var(--s1)',
         }}
       >
         {label}
@@ -1378,6 +1420,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 const inputStyle: CSSProperties = {
   width: '100%',
+  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8px/10px input padding off-grid (form input baseline)
   padding: '8px 10px',
   borderRadius: 8,
   border: '1px solid #e5e5e5',

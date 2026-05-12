@@ -23,8 +23,18 @@
     {
       "files": [
         "src/components/CommentRow.tsx",
+        "src/components/CommentThread.tsx",
+        "src/components/CommentComposer.tsx",
+        "src/components/ConfirmDialog.tsx",
+        "src/components/LockModal.tsx",
         "src/components/article/ArticleSurface.tsx",
-        "src/app/_home/HomeLayout.tsx"
+        "src/components/article/StoryEditor.tsx",
+        "src/components/welcome/WelcomeModal.tsx",
+        "src/components/family/AddKidUpsellModal.tsx",
+        "src/app/_home/HomeLayout.tsx",
+        "src/app/leaderboard/page.tsx",
+        "src/app/profile/kids/page.tsx",
+        "src/app/u/[username]/page.tsx"
       ],
       "rules": {
         "no-restricted-syntax": [

@@ -96,7 +96,7 @@ export default function ConfirmDialog({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 16,
+        padding: 'var(--s4)',
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose?.();
@@ -106,17 +106,17 @@ export default function ConfirmDialog({
         ref={dialogRef}
         style={{
           background: '#ffffff',
-          borderRadius: 14,
+          borderRadius: 'var(--r-lg)',
           maxWidth: 420,
           width: '100%',
-          padding: 20,
+          padding: 'var(--s5)',
           boxShadow: '0 10px 40px rgba(0,0,0,0.25)',
         }}
       >
         <h2
           id="confirm-dialog-title"
           style={{
-            margin: '0 0 8px 0',
+            margin: '0 0 var(--s2) 0',
             fontSize: 18,
             fontWeight: 700,
             color: '#111111',
@@ -125,6 +125,7 @@ export default function ConfirmDialog({
           {title}
         </h2>
         {message && (
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 18px below message body for the dialog
           <p style={{ margin: '0 0 18px 0', fontSize: 14, color: '#5a5a5a', lineHeight: 1.5 }}>
             {message}
           </p>
@@ -136,11 +137,12 @@ export default function ConfirmDialog({
             onClick={onClose}
             disabled={busy}
             style={{
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 14px horizontal padding on dialog buttons
               padding: '8px 14px',
               fontSize: 14,
               fontWeight: 500,
               border: '1px solid #e5e5e5',
-              borderRadius: 8,
+              borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for dialog buttons)
               background: '#ffffff',
               color: '#111111',
               cursor: busy ? 'not-allowed' : 'pointer',
@@ -153,11 +155,12 @@ export default function ConfirmDialog({
             onClick={onConfirm}
             disabled={busy}
             style={{
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 14px horizontal padding on dialog buttons
               padding: '8px 14px',
               fontSize: 14,
               fontWeight: 600,
               border: 'none',
-              borderRadius: 8,
+              borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for dialog buttons)
               background: danger ? '#b91c1c' : '#111111',
               color: '#ffffff',
               cursor: busy ? 'not-allowed' : 'pointer',

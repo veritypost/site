@@ -199,7 +199,7 @@ function Section({ title, description, aside, divider, embedded, children }: Sec
               <div style={{ fontSize: F.base, fontWeight: 700, color: C.ink }}>{title}</div>
             )}
             {description && (
-              <div style={{ fontSize: F.sm, color: C.dim, marginTop: 2 }}>{description}</div>
+              <div style={{ fontSize: F.sm, color: C.dim, marginTop: 2 /* magic — intentional (2px sub-grid nudge) */ }}>{description}</div>
             )}
           </div>
           {aside && (
@@ -1092,7 +1092,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
         ) : story.body ? (
           <div style={{ fontSize: F.lg, color: C.dim, lineHeight: 1.8, whiteSpace: 'pre-wrap', fontStyle: 'italic' }}>
             {story.body}
-            <div style={{ marginTop: 16, fontSize: F.sm }}>
+            <div style={{ marginTop: 'var(--s4)', fontSize: F.sm }}>
               (Save the article to see the rendered preview with headings, pull quotes, and proper formatting.)
             </div>
           </div>
@@ -1134,7 +1134,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
 
   if (viewMode === 'timeline') {
     const timelineBody = (
-      <div style={{ maxWidth: 560, margin: '0 auto', position: 'relative', paddingLeft: 52 }}>
+      <div style={{ maxWidth: 560, margin: '0 auto', position: 'relative', paddingLeft: 52 /* magic — intentional (off-grid; aligns timeline body with absolute-positioned date stamps left of the rail) */ }}>
         <div style={{ position: 'absolute', left: 28, top: 8, bottom: 40, width: 2, background: C.divider }} />
         {sortedEntries.map((e) => {
           const hasContent = !!e.content?.trim();
@@ -1155,11 +1155,13 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                 }}
               />
               {e.is_current ? (
-                <span style={{ position: 'absolute', left: -80, top: 2, fontSize: F.xs, fontWeight: 700, color: C.now, background: C.nowBg, padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase' }}>
+                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 2x6 tight pill inset for the timeline "Now" marker
+                <span style={{ position: 'absolute', left: -80, top: 2, fontSize: F.xs, fontWeight: 700, color: C.now, background: C.nowBg, padding: '2px 6px', borderRadius: 4 /* magic — intentional (smaller than --r-sm 6 for the compact pill) */, textTransform: 'uppercase' }}>
                   Now
                 </span>
               ) : isAnchor ? (
-                <span style={{ position: 'absolute', left: -80, top: 2, fontSize: F.xs, fontWeight: 700, color: C.ink, background: C.card, padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase' }}>
+                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 2x6 tight pill inset for the timeline "Article" marker
+                <span style={{ position: 'absolute', left: -80, top: 2, fontSize: F.xs, fontWeight: 700, color: C.ink, background: C.card, padding: '2px 6px', borderRadius: 4 /* magic — intentional (smaller than --r-sm 6 for the compact pill) */, textTransform: 'uppercase' }}>
                   Article
                 </span>
               ) : null}
@@ -1274,7 +1276,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                 style={{
                   padding: S[3],
                   border: `1px solid ${C.divider}`,
-                  borderRadius: 8,
+                  borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10)
                   background: C.card,
                   display: 'flex',
                   flexDirection: 'column',
@@ -1292,7 +1294,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                     background: C.bg,
                     color: C.ink,
                     border: `1px solid ${C.divider}`,
-                    borderRadius: 6,
+                    borderRadius: 'var(--r-sm)',
                     padding: `${S[2]}px ${S[2]}px`,
                     fontSize: F.sm,
                     fontFamily: 'ui-monospace, monospace',
@@ -1447,7 +1449,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                     style={{
                       fontSize: F.sm,
                       padding: `${S[1]}px ${S[2]}px`,
-                      borderRadius: 999,
+                      borderRadius: 'var(--r-pill)',
                       border: `1px solid ${selected ? C.ink : C.divider}`,
                       background: selected ? C.ink : 'transparent',
                       color: selected ? C.bg : C.ink,
@@ -1496,7 +1498,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
             const doneCount = dots.filter(Boolean).length;
 
             return (
-              <div key={entry.id} style={{ border: `1px solid ${entry.is_current ? C.now : C.divider}`, borderRadius: 10, overflow: 'hidden', background: C.bg }}>
+              <div key={entry.id} style={{ border: `1px solid ${entry.is_current ? C.now : C.divider}`, borderRadius: 'var(--r-md)', overflow: 'hidden', background: C.bg }}>
                 <div
                   onClick={() => setExpandedEntry(isExpanded ? null : entry.id)}
                   style={{
@@ -1523,7 +1525,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                     {dots.map((d, i) => (
                       <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: d ? C.success : C.divider }} />
                     ))}
-                    <span style={{ fontSize: F.xs, color: C.muted, marginLeft: 4 }}>{doneCount}/4</span>
+                    <span style={{ fontSize: F.xs, color: C.muted, marginLeft: 'var(--s1)' }}>{doneCount}/4</span>
                   </div>
                   <span style={{ fontSize: F.sm, color: C.muted }}>{isExpanded ? 'Hide' : 'Show'}</span>
                 </div>
@@ -1568,7 +1570,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                         <div>
                           <label style={labelStyle}>Article body</label>
                           <Textarea rows={8} value={entry.content || ''} onChange={(e) => updateEntry(entry.id, 'content', e.target.value)} placeholder="Write the full article." />
-                          <div style={{ marginTop: 8 }}>
+                          <div style={{ marginTop: 'var(--s2)' }}>
                             <TTSButton text={entry.content || ''} title="Read aloud (ear-check)" />
                           </div>
                         </div>
@@ -1617,21 +1619,21 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
                             {factCheckData.conflicts.map((f, i) => (
-                              <div key={i} style={{ padding: S[2], background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, fontSize: F.sm }}>
+                              <div key={i} style={{ padding: S[2], background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 'var(--r-sm)', fontSize: F.sm }}>
                                 <div style={{ fontWeight: 600, color: '#92400e', marginBottom: 2 }}>Conflict</div>
                                 <div style={{ color: '#78350f', marginBottom: 2 }}>&ldquo;{f.claim}&rdquo;</div>
                                 <div style={{ color: '#92400e' }}>{f.note}</div>
                               </div>
                             ))}
                             {factCheckData.single_source.map((f, i) => (
-                              <div key={i} style={{ padding: S[2], background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: F.sm }}>
+                              <div key={i} style={{ padding: S[2], background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 'var(--r-sm)', fontSize: F.sm }}>
                                 <div style={{ fontWeight: 600, color: '#1e40af', marginBottom: 2 }}>Single source</div>
                                 <div style={{ color: '#1e3a8a', marginBottom: 2 }}>&ldquo;{f.claim}&rdquo;</div>
                                 <div style={{ color: '#1e40af' }}>{f.note}</div>
                               </div>
                             ))}
                             {factCheckData.implausibilities.map((f, i) => (
-                              <div key={i} style={{ padding: S[2], background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 6, fontSize: F.sm }}>
+                              <div key={i} style={{ padding: S[2], background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 'var(--r-sm)', fontSize: F.sm }}>
                                 <div style={{ fontWeight: 600, color: '#9f1239', marginBottom: 2 }}>Plausibility</div>
                                 <div style={{ color: '#881337', marginBottom: 2 }}>&ldquo;{f.claim}&rdquo;</div>
                                 <div style={{ color: '#9f1239' }}>{f.note}</div>
@@ -1670,7 +1672,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                                 alignItems: 'flex-start',
                                 padding: S[2],
                                 border: `1px solid ${C.divider}`,
-                                borderRadius: 8,
+                                borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the source-row card)
                                 background: C.card,
                                 flexWrap: 'wrap',
                               }}
@@ -1691,7 +1693,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                             </div>
                           ))}
                           {(story.sources || []).length === 0 && (
-                            <div style={{ padding: S[3], border: `1px dashed ${C.divider}`, borderRadius: 8, textAlign: 'center', color: C.dim, fontSize: F.sm }}>
+                            <div style={{ padding: S[3], border: `1px dashed ${C.divider}`, borderRadius: 8 /* magic — intentional (between --r-sm 6 and --r-md 10) */, textAlign: 'center', color: C.dim, fontSize: F.sm }}>
                               No sources yet.
                             </div>
                           )}
@@ -1734,7 +1736,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                                 style={{
                                   padding: S[3],
                                   border: `1px solid ${C.divider}`,
-                                  borderRadius: 8,
+                                  borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the quiz-question card)
                                   background: C.card,
                                   display: 'flex',
                                   flexDirection: 'column',
@@ -1819,7 +1821,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
                               </div>
                             ))}
                             {entryQuizzes.length === 0 && (
-                              <div style={{ padding: S[3], border: `1px dashed ${C.divider}`, borderRadius: 8, textAlign: 'center', color: C.dim, fontSize: F.sm }}>
+                              <div style={{ padding: S[3], border: `1px dashed ${C.divider}`, borderRadius: 8 /* magic — intentional (between --r-sm 6 and --r-md 10) */, textAlign: 'center', color: C.dim, fontSize: F.sm }}>
                                 No questions yet. Add up to {MAX_QUIZ_QUESTIONS}.
                               </div>
                             )}
@@ -1833,7 +1835,7 @@ export default function StoryEditor({ articleId, onArticleChange, embedded = fal
             );
           })}
           {entries.length === 0 && (
-            <div style={{ padding: S[6], border: `1px dashed ${C.divider}`, borderRadius: 10, textAlign: 'center', color: C.dim }}>
+            <div style={{ padding: S[6], border: `1px dashed ${C.divider}`, borderRadius: 'var(--r-md)', textAlign: 'center', color: C.dim }}>
               No timeline entries yet. Add an event if this article is part of a larger timeline.
             </div>
           )}
@@ -2043,7 +2045,7 @@ function AdsPreviewPanel({
         style={{
           padding: S[6],
           border: `1px dashed ${C.divider}`,
-          borderRadius: 10,
+          borderRadius: 'var(--r-md)',
           textAlign: 'center',
           color: C.dim,
           fontSize: F.sm,
@@ -2079,7 +2081,7 @@ function AdsPreviewPanel({
         style={{
           padding: S[4],
           border: `1px solid ${C.danger}`,
-          borderRadius: 8,
+          borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the ads-diagnostic error card)
           background: C.card,
           color: C.danger,
           fontSize: F.sm,
@@ -2166,8 +2168,8 @@ function AdsPreviewBanner({
       style={{
         padding: `${S[3]}px ${S[4]}px`,
         border: `1px solid ${border}`,
-        borderLeftWidth: 4,
-        borderRadius: 8,
+        borderLeftWidth: 4, // magic — intentional (chunky left accent bar for the AdsPreviewBanner)
+        borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the AdsPreviewBanner)
         background: tintBg,
       }}
     >
@@ -2185,7 +2187,7 @@ function AdsPreviewPlacementCard({ placement }: { placement: AdsPreviewPlacement
     <div
       style={{
         border: `1px solid ${C.divider}`,
-        borderRadius: 10,
+        borderRadius: 'var(--r-md)',
         background: C.bg,
         overflow: 'hidden',
       }}

@@ -382,13 +382,17 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, target?.id, followListRetry]);
 
-  if (loading) return <div style={{ padding: 40, color: '#666' }}>Loading…</div>;
+  if (loading) return <div style={{ padding: 'var(--s8)', color: '#666' }}>Loading…</div>;
   if (loadError)
     return (
-      <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--dim)' }}>
-        <p style={{ marginBottom: 16 }}>Something went wrong loading this profile.</p>
+      <div
+        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 60px is off-grid hero padding
+        style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--dim)' }}
+      >
+        <p style={{ marginBottom: 'var(--s4)' }}>Something went wrong loading this profile.</p>
         <button
           onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 18px horizontal padding off-grid; radius 8 off-grid (sits between --r-sm 6 and --r-md 10)
           style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}
         >
           Retry
@@ -410,9 +414,13 @@ export default function ProfilePage() {
     const nextPath = `/u/${username}`;
     const nextEnc = encodeURIComponent(nextPath);
     return (
-      <div style={{ maxWidth: 520, margin: '60px auto', padding: '0 16px', textAlign: 'center' }}>
+      <div
+        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 60px hero top margin off-grid
+        style={{ maxWidth: 520, margin: '60px auto', padding: '0 var(--s4)', textAlign: 'center' }}
+      >
         <div
           aria-hidden="true"
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 18px bottom margin under 64px glyph off-grid
           style={{
             width: 64,
             height: 64,
@@ -431,14 +439,21 @@ export default function ProfilePage() {
         >
           [@]
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 10px', color: C.text }}>
+        <h1
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px bottom margin off-grid for tight H1→body rhythm
+          style={{ fontSize: 22, fontWeight: 800, margin: '0 0 10px', color: C.text }}
+        >
           Sign up to see @{username}&apos;s profile
         </h1>
-        <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px', lineHeight: 1.55 }}>
+        <p
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 22px bottom margin off-grid for body→CTA rhythm
+          style={{ fontSize: 14, color: C.dim, margin: '0 0 22px', lineHeight: 1.55 }}
+        >
           Profiles show Verity Scores, achievements, and more.
         </p>
         <a
           href={`/signup?next=${nextEnc}`}
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 11x22 CTA padding + radius 9 are off-grid (between --r-sm 6 and --r-md 10)
           style={{
             display: 'inline-block',
             padding: '11px 22px',
@@ -452,7 +467,7 @@ export default function ProfilePage() {
         >
           Sign up
         </a>
-        <div style={{ marginTop: 14, fontSize: 13, color: C.dim }}>
+        <div style={{ marginTop: 14 /* magic — intentional (off-grid: between --s3 12 and --s4 16) */, fontSize: 13, color: C.dim }}>
           Already have an account?{' '}
           <a
             href={`/login?next=${nextEnc}`}
@@ -466,11 +481,14 @@ export default function ProfilePage() {
   }
   if (privateProfile)
     return (
-      <main style={{ padding: '60px 20px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: 20, marginBottom: 12, color: 'var(--text)' }}>
+      <main
+        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 60px is off-grid hero padding
+        style={{ padding: '60px 20px', textAlign: 'center' }}
+      >
+        <h1 style={{ fontSize: 20, marginBottom: 'var(--s3)', color: 'var(--text)' }}>
           This profile is private
         </h1>
-        <p style={{ color: 'var(--dim)', marginBottom: 24 }}>
+        <p style={{ color: 'var(--dim)', marginBottom: 'var(--s6)' }}>
           This user has set their profile to private.
         </p>
         <a href="/" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
@@ -548,7 +566,10 @@ export default function ProfilePage() {
   }
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 0 80px' }}>
+    <div
+      // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 80px bottom padding for tab-bar overlap clearance off-grid
+      style={{ maxWidth: 760, margin: '0 auto', padding: '0 0 80px' }}
+    >
       <div
         style={{
           height: 180,
@@ -557,7 +578,7 @@ export default function ProfilePage() {
             : 'linear-gradient(135deg, #111, #333)',
         }}
       />
-      <div style={{ padding: '0 16px', marginTop: -40 }}>
+      <div style={{ padding: '0 var(--s4)', marginTop: -40 }}>
         <div
           style={{
             width: 80,
@@ -576,7 +597,7 @@ export default function ProfilePage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginTop: 10,
+            marginTop: 10, // magic — intentional (off-grid: between --s2 8 and --s3 12)
             flexWrap: 'wrap',
             gap: 10,
           }}
@@ -594,6 +615,7 @@ export default function ProfilePage() {
               {target.display_name || target.username || 'Anonymous'}
               <VerifiedBadge user={target} />
               {me && me.id === target.id && hasPermission('admin.owner_mode') && (
+                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: radius 4 + 2x6 inset tune the compact Owner Mode chip
                 <span style={{
                   fontSize: 12,
                   fontWeight: 600,
@@ -601,7 +623,7 @@ export default function ProfilePage() {
                   background: 'var(--accent-subtle)',
                   borderRadius: 4,
                   padding: '2px 6px',
-                  marginLeft: 8,
+                  marginLeft: 'var(--s2)',
                   letterSpacing: '0.03em',
                 }}>
                   Owner Mode
@@ -613,7 +635,7 @@ export default function ProfilePage() {
               {target.created_at ? ` · Member since ${formatMemberSince(target.created_at)}` : ''}
             </div>
             {target.is_expert && (canSeeExpert || (me && me.id === target.id)) && (
-              <div style={{ fontSize: 12, color: 'var(--success-text, #16a34a)', fontWeight: 700, marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--success-text, #16a34a)', fontWeight: 700, marginTop: 2 /* magic — intentional (tight 2px lift under name row) */ }}>
                 {target.expert_title ? `${target.expert_title}` : 'Expert'}
                 {target.expert_organization ? ` · ${target.expert_organization}` : ''}
               </div>
@@ -682,14 +704,14 @@ export default function ProfilePage() {
         {showFollowControls && reportOpen && (
           <div
             style={{
-              marginTop: 10,
-              padding: 12,
+              marginTop: 10, // magic — intentional (off-grid: between --s2 8 and --s3 12)
+              padding: 'var(--s3)',
               border: '1px solid #e5e5e5',
-              borderRadius: 10,
+              borderRadius: 'var(--r-md)',
               background: '#fafafa',
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 'var(--s2)' }}>
               Report @{target.username}
             </div>
             {/* T278 — Profile-report reasons centralized in
@@ -700,6 +722,7 @@ export default function ProfilePage() {
               value={reportReason}
               onChange={(e) => setReportReason(e.target.value)}
               disabled={reportBusy}
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8x10 select padding (10px off-grid) + radius 8 off-grid between --r-sm 6 and --r-md 10
               style={{
                 width: '100%',
                 padding: '8px 10px',
@@ -708,7 +731,7 @@ export default function ProfilePage() {
                 borderRadius: 8,
                 background: '#fff',
                 color: '#111',
-                marginBottom: 10,
+                marginBottom: 10, // magic — intentional (off-grid: between --s2 8 and --s3 12)
                 fontFamily: 'inherit',
               }}
             >
@@ -731,6 +754,7 @@ export default function ProfilePage() {
                 type="button"
                 onClick={handleSubmitReport}
                 disabled={reportBusy}
+                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 7x12 padding + radius 7 match the secondary action chrome (compact form rhythm)
                 style={{
                   padding: '7px 12px',
                   borderRadius: 7,
@@ -750,7 +774,7 @@ export default function ProfilePage() {
         )}
 
         {target.bio && (
-          <div style={{ fontSize: 14, color: '#333', marginTop: 10 }}>{target.bio}</div>
+          <div style={{ fontSize: 14, color: '#333', marginTop: 10 /* magic — intentional (off-grid: between --s2 8 and --s3 12) */ }}>{target.bio}</div>
         )}
 
         {/* Background — self-described context (TODO-50 Piece A read side).
@@ -772,7 +796,7 @@ export default function ProfilePage() {
         ) && me?.id === target.id && (
           <div
             style={{
-              marginTop: 14,
+              marginTop: 14, // magic — intentional (off-grid: between --s3 12 and --s4 16)
               fontFamily: 'var(--font-serif), Georgia, serif',
               fontStyle: 'italic',
               fontSize: 13,
@@ -796,7 +820,7 @@ export default function ProfilePage() {
           bgEducation.length > 0 ||
           bgLinks.length > 0 ||
           bgTopics.length > 0) && (
-          <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
+          <div style={{ marginTop: 14 /* magic — intentional (off-grid: between --s3 12 and --s4 16) */, display: 'grid', gap: 10 }}>
             {target.background_oneline && (
               <div
                 style={{
@@ -830,7 +854,7 @@ export default function ProfilePage() {
                 style={{
                   fontSize: 13,
                   color: '#333',
-                  paddingLeft: 10,
+                  paddingLeft: 10, // magic — intentional (off-grid: between --s2 8 and --s3 12)
                   borderLeft: '2px solid var(--p-divider, #f1f1f3)',
                   whiteSpace: 'pre-wrap',
                 }}
@@ -908,11 +932,12 @@ export default function ProfilePage() {
                   {bgTopics.map((t) => (
                     <span
                       key={t.id}
+                      // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 3x9 topic-pill padding tuned for compact pill density (off-grid)
                       style={{
                         fontSize: 12,
                         fontWeight: 500,
                         padding: '3px 9px',
-                        borderRadius: 999,
+                        borderRadius: 'var(--r-pill)',
                         border: '1px solid var(--p-border, #e4e4e7)',
                         color: 'var(--p-ink-soft, #27272a)',
                       }}
@@ -933,7 +958,7 @@ export default function ProfilePage() {
                     letterSpacing: '0.05em',
                     textTransform: 'uppercase',
                     color: 'var(--p-ink-faint, #a1a1aa)',
-                    marginRight: 8,
+                    marginRight: 'var(--s2)',
                   }}
                 >
                   Languages
@@ -943,7 +968,7 @@ export default function ProfilePage() {
             )}
 
             {bgLinks.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 2 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 2 /* magic — intentional (tight 2px lift below stacked sections) */ }}>
                 {bgLinks.map((l, i) => (
                   <a
                     key={i}
@@ -955,7 +980,7 @@ export default function ProfilePage() {
                       color: 'var(--p-accent, #0b5cff)',
                       textDecoration: 'none',
                       borderBottom: '1px solid currentColor',
-                      paddingBottom: 1,
+                      paddingBottom: 1, // magic — intentional (1px underline-clearance for ↗ link)
                     }}
                   >
                     ↗ {l.label || new URL(l.url).hostname.replace(/^www\./, '')}
@@ -978,7 +1003,7 @@ export default function ProfilePage() {
             (me && me.id === target.id);
           return canSeeStat && showActivity;
         })() && (
-          <div style={{ display: 'flex', gap: 18, marginTop: 14, fontSize: 13, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 18, marginTop: 14 /* magic — intentional (off-grid: between --s3 12 and --s4 16) */, fontSize: 13, flexWrap: 'wrap' }}>
             <div>
               <b>{(target.quizzes_completed_count ?? 0).toLocaleString()}</b>{' '}
               <span style={{ color: '#666' }}>Quizzes passed</span>
@@ -998,7 +1023,7 @@ export default function ProfilePage() {
           </div>
         )}
         {(canSeeVerityScore || (me && me.id === target.id)) && (
-          <div style={{ marginTop: 8, fontSize: 13 }}>
+          <div style={{ marginTop: 'var(--s2)', fontSize: 13 }}>
             <b>{(target.verity_score ?? 0).toLocaleString()}</b>{' '}
             <span style={{ color: '#666' }}>Verity Score</span>
           </div>
@@ -1007,7 +1032,7 @@ export default function ProfilePage() {
         {/* Shareable profile card link — D32; shows on own profile when
          *  viewer has profile.card_share permission. */}
         {me && me.id === target.id && canShareCard && (
-          <div style={{ marginTop: 12, fontSize: 12 }}>
+          <div style={{ marginTop: 'var(--s3)', fontSize: 12 }}>
             <a
               href={`/card/${target.username || ''}`}
               onClick={async (e) => {
@@ -1029,7 +1054,7 @@ export default function ProfilePage() {
               Copy shareable profile card link
             </a>
             {copyFailed && (
-              <span style={{ display: 'block', marginTop: 4, color: 'var(--dim)' }}>
+              <span style={{ display: 'block', marginTop: 'var(--s1)', color: 'var(--dim)' }}>
                 Copy failed — paste the URL manually:{' '}
                 <span style={{ userSelect: 'all', color: 'var(--text)' }}>
                   {typeof window !== 'undefined' && target.username
@@ -1041,13 +1066,14 @@ export default function ProfilePage() {
           </div>
         )}
 
-        <div role="tablist" aria-label="Profile sections" style={{ display: 'flex', gap: 6, margin: '20px 0 12px' }}>
+        <div role="tablist" aria-label="Profile sections" style={{ display: 'flex', gap: 6, margin: 'var(--s5) 0 var(--s3)' }}>
           {(['followers', 'following'] as const).map((t) => (
             <button
               key={t}
               role="tab"
               aria-selected={tab === t}
               onClick={() => setTab(t)}
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6x14 tab-pill padding + radius 8 (between --r-sm 6 and --r-md 10) tuned for the compact tab strip
               style={{
                 padding: '6px 14px',
                 borderRadius: 8,
@@ -1065,11 +1091,11 @@ export default function ProfilePage() {
         </div>
 
         {followListError ? (
-          <p style={{ color: 'var(--dim)', fontSize: 13, padding: '16px 0' }}>
+          <p style={{ color: 'var(--dim)', fontSize: 13, padding: 'var(--s4) 0' }}>
             Couldn&apos;t load —{' '}
             <button
               onClick={() => { setFollowListError(false); setFollowListRetry((c) => c + 1); }}
-              style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 0, textDecoration: 'underline' }}
+              style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 'var(--s0)', textDecoration: 'underline' }}
             >
               try again
             </button>
@@ -1100,7 +1126,7 @@ export default function ProfilePage() {
 function UserList({ users, listType }: { users: UserListItem[]; listType: FollowsTab }) {
   if (!users?.length) {
     return (
-      <p style={{ color: 'var(--dim)', fontSize: 14, padding: '20px 0' }}>
+      <p style={{ color: 'var(--dim)', fontSize: 14, padding: 'var(--s5) 0' }}>
         {listType === 'followers' ? 'No followers yet.' : 'Not following anyone yet.'}
       </p>
     );
@@ -1111,6 +1137,7 @@ function UserList({ users, listType }: { users: UserListItem[]; listType: Follow
         <a
           key={u.id}
           href={`/u/${u.username || ''}`}
+          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px vertical inset off-grid (between --s2 8 and --s3 12) for the follower-row hit target
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1118,7 +1145,7 @@ function UserList({ users, listType }: { users: UserListItem[]; listType: Follow
             padding: '10px 12px',
             background: '#f7f7f7',
             border: '1px solid #e5e5e5',
-            borderRadius: 10,
+            borderRadius: 'var(--r-md)',
             textDecoration: 'none',
             color: '#111',
           }}
@@ -1132,6 +1159,7 @@ function UserList({ users, listType }: { users: UserListItem[]; listType: Follow
 }
 
 const dmLinkStyle: CSSProperties = {
+  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 7x12 padding + radius 7 are the canonical compact action chrome (DM/Block/Report buttons)
   padding: '7px 12px',
   borderRadius: 7,
   border: '1px solid #e5e5e5',
@@ -1145,6 +1173,7 @@ const dmLinkStyle: CSSProperties = {
 
 function secondaryActionStyle(busy: boolean): CSSProperties {
   return {
+    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 7x12 padding + radius 7 match dmLinkStyle (canonical compact action chrome)
     padding: '7px 12px',
     borderRadius: 7,
     border: '1px solid #e5e5e5',

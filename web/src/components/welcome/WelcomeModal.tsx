@@ -138,13 +138,14 @@ export default function WelcomeModal({ nextPath }: Props) {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '16px',
+    padding: 'var(--s4)',
   };
 
   const cardStyle: CSSProperties = {
     backgroundColor: C.card,
     border: `1px solid ${C.border}`,
-    borderRadius: 14,
+    borderRadius: 'var(--r-lg)',
+    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 36px horizontal is off-grid, kept for modal proportions
     padding: '40px 36px',
     width: '100%',
     maxWidth: '440px',
@@ -167,12 +168,13 @@ export default function WelcomeModal({ nextPath }: Props) {
     return (
       <div style={overlayStyle} role="dialog" aria-modal="true" aria-label="Invite a friend">
         <div style={cardStyle}>
-          <div style={{ fontSize: '20px', fontWeight: 800, color: C.accent, letterSpacing: '-0.5px', marginBottom: '24px' }}>
+          <div style={{ fontSize: '20px', fontWeight: 800, color: C.accent, letterSpacing: '-0.5px', marginBottom: 'var(--s6)' }}>
             verity post
           </div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: C.text, margin: '0 0 8px 0' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, color: C.text, margin: '0 0 var(--s2) 0' }}>
             invite someone.
           </h1>
+          {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 22px bottom margin tuned for hero-to-body rhythm */}
           <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px 0', lineHeight: 1.55 }}>
             this is your personal invite link. anyone who signs up through it gets in, and you'll see who joined.
           </p>
@@ -181,11 +183,12 @@ export default function WelcomeModal({ nextPath }: Props) {
               display: 'flex',
               alignItems: 'center',
               gap: 8,
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 14px horizontal on invite-url chip
               padding: '12px 14px',
               background: C.bg,
               border: `1.5px solid ${C.border}`,
-              borderRadius: 10,
-              marginBottom: 16,
+              borderRadius: 'var(--r-md)',
+              marginBottom: 'var(--s4)',
               fontFamily: 'ui-monospace, monospace',
               fontSize: 13,
               color: C.text,
@@ -200,7 +203,8 @@ export default function WelcomeModal({ nextPath }: Props) {
                 flexShrink: 0,
                 background: 'none',
                 border: `1px solid ${C.border}`,
-                borderRadius: 6,
+                borderRadius: 'var(--r-sm)',
+                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px horizontal on compact copy pill
                 padding: '4px 10px',
                 fontSize: 12,
                 fontWeight: 600,
@@ -218,13 +222,14 @@ export default function WelcomeModal({ nextPath }: Props) {
             onClick={() => { window.location.href = nextPath || '/'; }}
             style={{
               width: '100%',
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 13px CTA padding hits 44px minHeight target
               padding: '13px',
               fontSize: '15px',
               fontWeight: 600,
               color: '#fff',
               backgroundColor: C.accent,
               border: 'none',
-              borderRadius: '10px',
+              borderRadius: 'var(--r-md)',
               cursor: 'pointer',
               fontFamily: 'inherit',
               minHeight: '44px',
@@ -246,15 +251,16 @@ export default function WelcomeModal({ nextPath }: Props) {
             fontWeight: 800,
             color: C.accent,
             letterSpacing: '-0.5px',
-            marginBottom: '24px',
+            marginBottom: 'var(--s6)',
           }}
         >
           verity post
         </div>
 
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: C.text, margin: '0 0 8px 0' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 700, color: C.text, margin: '0 0 var(--s2) 0' }}>
           you&rsquo;re in.
         </h1>
+        {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 22px bottom margin tuned for hero-to-body rhythm */}
         <p style={{ fontSize: 14, color: C.dim, margin: '0 0 22px 0', lineHeight: 1.55 }}>
           welcome to verity post. pick a handle &mdash; this is what shows up next to your
           comments and on leaderboards. lowercase letters, numbers, and underscores, 3&ndash;20
@@ -267,9 +273,10 @@ export default function WelcomeModal({ nextPath }: Props) {
             style={{
               backgroundColor: 'var(--danger-bg)',
               border: '1px solid var(--danger-border)',
-              borderRadius: '10px',
+              borderRadius: 'var(--r-md)',
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 14px horizontal on inline error banner
               padding: '12px 14px',
-              marginBottom: '16px',
+              marginBottom: 'var(--s4)',
             }}
           >
             <p style={{ margin: 0, fontSize: '13px', color: C.danger }}>{saveError}</p>
@@ -277,7 +284,7 @@ export default function WelcomeModal({ nextPath }: Props) {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 'var(--s5)' }}>
             <label
               htmlFor="username"
               style={{
@@ -285,6 +292,7 @@ export default function WelcomeModal({ nextPath }: Props) {
                 fontSize: '13px',
                 fontWeight: 600,
                 color: C.text,
+                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 7px label-to-input gap is tighter than --s2 (8) to fit field block
                 marginBottom: '7px',
               }}
             >
@@ -304,12 +312,13 @@ export default function WelcomeModal({ nextPath }: Props) {
               maxLength={20}
               style={{
                 width: '100%',
+                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 14px horizontal on username input
                 padding: '12px 14px',
                 fontSize: '15px',
                 color: C.text,
                 backgroundColor: C.bg,
                 border: `1.5px solid ${avail === 'taken' || saveError ? C.danger : avail === 'available' ? C.success : C.border}`,
-                borderRadius: '10px',
+                borderRadius: 'var(--r-md)',
                 outline: 'none',
                 boxSizing: 'border-box',
                 fontFamily: 'inherit',
@@ -319,6 +328,7 @@ export default function WelcomeModal({ nextPath }: Props) {
             {availText && (
               <p
                 style={{
+                  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 5px top margin keeps availability hint close to input
                   margin: '5px 0 0 0',
                   fontSize: '12px',
                   color: availColor,
@@ -336,13 +346,14 @@ export default function WelcomeModal({ nextPath }: Props) {
             disabled={!canSubmit}
             style={{
               width: '100%',
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 13px CTA padding hits 44px minHeight target
               padding: '13px',
               fontSize: '15px',
               fontWeight: 600,
               color: '#fff',
               backgroundColor: canSubmit ? C.accent : C.dim,
               border: 'none',
-              borderRadius: '10px',
+              borderRadius: 'var(--r-md)',
               cursor: canSubmit ? 'pointer' : 'not-allowed',
               fontFamily: 'inherit',
               minHeight: '44px',

@@ -531,10 +531,12 @@ function LeaderboardPageContent() {
   return (
     // Ext-NN1 — main landmark for screen readers.
     <main className="vp-dark">
+      {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 80px bottom padding clears the fixed sticky rank bar (see T-093 comment) */}
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px 16px 80px' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600, margin: '0 0 20px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 600, margin: 'var(--s0) var(--s0) var(--s5)', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
           Most Informed
         </h1>
+        {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: visually-hidden sr-only recipe — 1px clip + margin:-1 are a fixed pattern */}
         <h2 style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
           Your ranking
         </h2>
@@ -542,14 +544,14 @@ function LeaderboardPageContent() {
         {me && fullAccess && !me.is_banned && !me.frozen_at && !(activeTab === 'Rising Stars' && !myRank) && (
           <div
             style={{
-              padding: '12px 16px',
-              borderRadius: 10,
+              padding: 'var(--s3) var(--s4)',
+              borderRadius: 'var(--r-md)',
               border: '1px solid var(--border)',
               background: 'var(--card)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: 20,
+              marginBottom: 'var(--s5)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -558,7 +560,7 @@ function LeaderboardPageContent() {
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
                   Your rank
                 </span>
-                <span style={{ fontSize: 13, color: 'var(--dim)', marginLeft: 6 }}>
+                <span style={{ fontSize: 13, color: 'var(--dim)', marginLeft: 6 /* magic — intentional (between --s1 4 and --s2 8 for inline metadata gap) */ }}>
                   {/* M15 — say WHICH view to make "unranked" actionable.
                       "This view" was ambiguous; users couldn't tell whether
                       changing tab/category/period would surface their rank. */}
@@ -585,7 +587,7 @@ function LeaderboardPageContent() {
             style={{
               display: 'flex',
               gap: 6,
-              marginBottom: 16,
+              marginBottom: 'var(--s4)',
               overflowX: 'auto',
               scrollbarWidth: 'none',
             }}
@@ -601,8 +603,9 @@ function LeaderboardPageContent() {
                   setActiveSub(null);
                 }}
                 style={{
+                  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 18px horizontal padding is mixed (12 on-grid, 18 off-grid) for tab proportions
                   padding: '12px 18px',
-                  borderRadius: 20,
+                  borderRadius: 'var(--r-xl)',
                   border: 'none',
                   minHeight: 44,
                   background: activeTab === t ? 'var(--tab-active-bg)' : 'var(--card)',
@@ -622,15 +625,16 @@ function LeaderboardPageContent() {
 
         {/* Period filter — non-"All Time" windows only show to verified. */}
         {me && activeTab === 'Top Verifiers' && !activeCat && (
-          <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 'var(--s5)' }}>
             {PERIODS.filter((p) => fullAccess || p === 'All time').map((p) => (
               <button
                 key={p}
                 aria-pressed={period === p}
                 onClick={() => setPeriod(p)}
                 style={{
+                  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 5px vertical (off-grid) gives period pills a tighter compact size
                   padding: '5px 12px',
-                  borderRadius: 14,
+                  borderRadius: 'var(--r-lg)',
                   border: period === p ? 'none' : '1px solid var(--border)',
                   background: period === p ? 'var(--text-primary)' : 'transparent',
                   color: period === p ? 'var(--bg)' : 'var(--dim)',
@@ -647,7 +651,7 @@ function LeaderboardPageContent() {
           </div>
         )}
         {activeCat && (
-          <span style={{ fontSize: 12, color: 'var(--dim)', marginLeft: 8 }}>(All time)</span>
+          <span style={{ fontSize: 12, color: 'var(--dim)', marginLeft: 'var(--s2)' }}>(All time)</span>
         )}
 
         {/* Categories — D5/D31: paid only. Invisible to free/anon. Top Verifiers only. */}
@@ -657,8 +661,8 @@ function LeaderboardPageContent() {
               display: 'flex',
               gap: 6,
               flexWrap: 'wrap',
-              paddingBottom: visibleActiveSubs.length > 0 ? 8 : 16,
-              marginBottom: visibleActiveSubs.length > 0 ? 0 : 4,
+              paddingBottom: visibleActiveSubs.length > 0 ? 'var(--s2)' : 'var(--s4)',
+              marginBottom: visibleActiveSubs.length > 0 ? 'var(--s0)' : 'var(--s1)',
             }}
           >
             <button
@@ -667,8 +671,9 @@ function LeaderboardPageContent() {
                 setActiveSub(null);
               }}
               style={{
+                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 5px vertical (off-grid) gives category pills a tighter compact size
                 padding: '5px 12px',
-                borderRadius: 14,
+                borderRadius: 'var(--r-lg)',
                 border: !activeCat ? '1px solid var(--accent)' : '1px solid var(--border)',
                 background: !activeCat ? 'rgba(0,0,0,0.06)' : 'transparent',
                 color: !activeCat ? 'var(--accent)' : 'var(--dim)',
@@ -689,8 +694,9 @@ function LeaderboardPageContent() {
                   setActiveSub(null);
                 }}
                 style={{
+                  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 5px vertical (off-grid) gives category pills a tighter compact size
                   padding: '5px 12px',
-                  borderRadius: 14,
+                  borderRadius: 'var(--r-lg)',
                   border:
                     activeCat === cat.id ? '1px solid var(--accent)' : '1px solid var(--border)',
                   background: activeCat === cat.id ? 'rgba(0,0,0,0.06)' : 'transparent',
@@ -720,15 +726,16 @@ function LeaderboardPageContent() {
                 display: 'flex',
                 gap: 6,
                 flexWrap: 'wrap',
-                paddingBottom: 16,
-                marginBottom: 4,
+                paddingBottom: 'var(--s4)',
+                marginBottom: 'var(--s1)',
               }}
             >
               <button
                 onClick={() => setActiveSub(null)}
                 style={{
+                  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 5px vertical (off-grid) gives subcategory pills a tighter compact size
                   padding: '5px 12px',
-                  borderRadius: 14,
+                  borderRadius: 'var(--r-lg)',
                   border: !activeSub ? '1px solid var(--accent)' : '1px solid var(--border)',
                   background: !activeSub ? 'rgba(0,0,0,0.06)' : 'transparent',
                   color: !activeSub ? 'var(--accent)' : 'var(--dim)',
@@ -746,8 +753,9 @@ function LeaderboardPageContent() {
                   key={sub.id}
                   onClick={() => setActiveSub(sub.id)}
                   style={{
+                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 5px vertical (off-grid) gives subcategory pills a tighter compact size
                     padding: '5px 12px',
-                    borderRadius: 14,
+                    borderRadius: 'var(--r-lg)',
                     border:
                       activeSub === sub.id ? '1px solid var(--accent)' : '1px solid var(--border)',
                     background: activeSub === sub.id ? 'rgba(0,0,0,0.06)' : 'transparent',
@@ -765,19 +773,20 @@ function LeaderboardPageContent() {
             </div>
         )}
 
+        {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: visually-hidden sr-only recipe — 1px clip + margin:-1 are a fixed pattern */}
         <h2 style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
           {activeTab === 'Rising Stars' ? 'Rising Stars' : 'Top Verifiers'}
         </h2>
         {/* List */}
-        <div style={{ borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
+        <div style={{ borderRadius: 12 /* magic — intentional (between --r-md 10 and --r-lg 14 for the list container) */, border: '1px solid var(--border)', overflow: 'hidden' }}>
           {loading && (
             <>
               {[0,1,2,3,4].map((i) => (
                 <div key={i} style={{
                   height: 56,
                   background: 'var(--card)',
-                  borderRadius: 8,
-                  marginBottom: 4,
+                  borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the skeleton row)
+                  marginBottom: 'var(--s1)',
                   opacity: 0.5,
                   animation: 'pulse 1.5s ease-in-out infinite'
                 }} />
@@ -788,11 +797,11 @@ function LeaderboardPageContent() {
             <ErrorState message={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
           )}
           {!loading && !loadError && visibleUsers.length === 0 && (
-            <div style={{ padding: '24px 20px', textAlign: 'center' }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, letterSpacing: '-0.01em' }}>
+            <div style={{ padding: 'var(--s6) var(--s5)', textAlign: 'center' }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 /* magic — intentional (between --s1 4 and --s2 8 for tight headline gap) */, letterSpacing: '-0.01em' }}>
                 {!me ? 'Leaderboard is warming up' : 'No results'}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 14, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 14 /* magic — intentional (between --s3 12 and --s4 16) */, lineHeight: 1.5 }}>
                 {!me
                   ? 'No readers have earned points yet. Sign in to follow along — your reads, quizzes, and contributions will rank you here.'
                   : activeTab === 'Rising Stars'
@@ -804,10 +813,11 @@ function LeaderboardPageContent() {
                   href="/signup"
                   style={{
                     display: 'inline-block',
+                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px vertical (off-grid) for compact CTA, 24px horizontal on-grid
                     padding: '10px 24px',
                     background: 'var(--accent)',
                     color: 'var(--bg)',
-                    borderRadius: 10,
+                    borderRadius: 'var(--r-md)',
                     fontSize: 13,
                     fontWeight: 600,
                     textDecoration: 'none',
@@ -823,11 +833,11 @@ function LeaderboardPageContent() {
                   }}
                   aria-label="Clear category and subcategory filters"
                   style={{
-                    padding: '8px 16px',
+                    padding: 'var(--s2) var(--s4)',
                     background: 'var(--accent)',
                     color: 'var(--bg)',
                     border: 'none',
-                    borderRadius: 8,
+                    borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for a chunkier button)
                     fontSize: 12,
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -844,7 +854,7 @@ function LeaderboardPageContent() {
               know there's more to see. Previously every row rendered
               blurred, which contradicted the comment and the spec. */}
           {!me && visibleUsers.length > 0 && (
-            <p style={{ fontSize: 13, color: 'var(--dim)', marginBottom: 12, textAlign: 'center' }}>
+            <p style={{ fontSize: 13, color: 'var(--dim)', marginBottom: 'var(--s3)', textAlign: 'center' }}>
               Top readers by Verity Score — sign in to see the full ranking.
             </p>
           )}
@@ -862,25 +872,26 @@ function LeaderboardPageContent() {
               ))}
               <div
                 style={{
-                  padding: '24px 20px',
+                  padding: 'var(--s6) var(--s5)',
                   textAlign: 'center',
                   borderTop: '1px solid var(--rule)',
                 }}
               >
-                <p style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                <p style={{ margin: 'var(--s0) var(--s0) var(--s1)', fontSize: 18, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em' }}>
                   Sign up to see the full leaderboard
                 </p>
-                <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--dim)' }}>
+                <p style={{ margin: 'var(--s0) var(--s0) var(--s4)', fontSize: 13, color: 'var(--dim)' }}>
                   Sign up and verify your email to see the full ranking.
                 </p>
                 <a
                   href="/signup"
                   style={{
                     display: 'inline-block',
+                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px vertical (off-grid) and 28px horizontal (off-grid) for the prominent CTA
                     padding: '10px 28px',
                     background: 'var(--accent)',
                     color: 'var(--bg)',
-                    borderRadius: 10,
+                    borderRadius: 'var(--r-md)',
                     fontSize: 14,
                     fontWeight: 600,
                     textDecoration: 'none',
@@ -929,40 +940,40 @@ function LeaderboardPageContent() {
                    visibleUsers never exceeds 3. */
                 <div
                   style={{
-                    padding: '24px 20px',
+                    padding: 'var(--s6) var(--s5)',
                     textAlign: 'center',
                     borderTop: '1px solid var(--rule)',
                   }}
                 >
-                  <p style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                  <p style={{ margin: 'var(--s0) var(--s0) var(--s1)', fontSize: 18, fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.01em' }}>
                     Verify your email to see ranks beyond top 3.
                   </p>
                   {resendState === 'sent' ? (
-                    <p style={{ marginTop: 8, fontSize: 14, color: 'var(--accent)', fontWeight: 600 }}>
+                    <p style={{ marginTop: 'var(--s2)', fontSize: 14, color: 'var(--accent)', fontWeight: 600 }}>
                       Check your inbox for a verification link.
                     </p>
                   ) : resendState === 'rate-limited' ? (
-                    <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
+                    <p style={{ marginTop: 'var(--s2)', fontSize: 14, color: 'var(--dim)' }}>
                       You&apos;ve already requested a verification email recently. Check your inbox.
                     </p>
                   ) : resendState === 'no-pending' ? (
-                    <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
+                    <p style={{ marginTop: 'var(--s2)', fontSize: 14, color: 'var(--dim)' }}>
                       Your email is already up to date. Sign out and back in to refresh your status.
                     </p>
                   ) : resendState === 'error' ? (
                     <>
-                      <p style={{ marginTop: 8, fontSize: 14, color: 'var(--dim)' }}>
+                      <p style={{ marginTop: 'var(--s2)', fontSize: 14, color: 'var(--dim)' }}>
                         Something went wrong. Try again in a moment.
                       </p>
                       <button
                         onClick={() => setResendState('idle')}
                         style={{
-                          marginTop: 8,
-                          padding: '8px 16px',
+                          marginTop: 'var(--s2)',
+                          padding: 'var(--s2) var(--s4)',
                           background: 'var(--accent)',
                           color: 'var(--bg)',
                           border: 'none',
-                          borderRadius: 6,
+                          borderRadius: 'var(--r-sm)',
                           cursor: 'pointer',
                           fontSize: 13,
                         }}
@@ -976,11 +987,12 @@ function LeaderboardPageContent() {
                       disabled={resendState === 'sending'}
                       style={{
                         display: 'inline-block',
-                        marginTop: 8,
+                        marginTop: 'var(--s2)',
+                        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px vertical (off-grid) and 28px horizontal (off-grid) for the prominent CTA
                         padding: '10px 28px',
                         background: resendState === 'sending' ? 'var(--dim)' : 'var(--accent)',
                         color: 'var(--bg)',
-                        borderRadius: 10,
+                        borderRadius: 'var(--r-md)',
                         fontSize: 14,
                         fontWeight: 600,
                         border: 'none',
@@ -1015,6 +1027,7 @@ function LeaderboardPageContent() {
             style={{
               maxWidth: 800,
               margin: '0 auto',
+              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px vertical (off-grid) keeps the sticky rank bar compact, 16px horizontal on-grid
               padding: '10px 16px',
               display: 'flex',
               alignItems: 'center',
@@ -1041,7 +1054,7 @@ function LeaderboardPageContent() {
               <span style={{ fontSize: 14, fontWeight: 600, color: rankAccentColor(myRank) }}>
                 #{myRank}
                 {myPercentile != null ? (
-                  <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--dim)', marginLeft: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--dim)', marginLeft: 6 /* magic — intentional (between --s1 4 and --s2 8 for inline metadata gap) */ }}>
                     top {myPercentile}%
                   </span>
                 ) : null}
@@ -1059,7 +1072,7 @@ function LeaderboardPageContent() {
 
 export default function LeaderboardPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 40 }}>Loading…</div>}>
+    <Suspense fallback={<div style={{ padding: 'var(--s8)' }}>Loading…</div>}>
       <LeaderboardPageContent />
     </Suspense>
   );
@@ -1092,6 +1105,7 @@ function LeaderRow({
   return (
     <div
       style={{
+        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 14px vertical (off-grid) gives podium rows a slightly taller hit-area
         padding: isPodium ? '14px 20px' : '12px 20px',
         display: 'flex',
         alignItems: 'center',
