@@ -362,7 +362,7 @@ export function PrivacyCard({ user, preview }: Props) {
 
       <Card
         title="Hide my activity"
-        description="Don’t show my reading log, comment history, or bookmarks on my public profile."
+        description="Don’t show my reading log or comment history on my public profile."
       >
         <div
           style={{

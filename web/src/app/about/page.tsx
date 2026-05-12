@@ -55,8 +55,8 @@ export default function AboutPage() {
             We cover general news across categories including politics, business, science, health,
             world, and technology. Each article is paired with editor-reviewed context, a
             comprehension quiz, and a community-moderated discussion. We offer free reading for
-            everyone and paid subscription tiers that add features like unlimited bookmarks, ad-free
-            reading, and expert question-and-answer access.
+            everyone and paid subscription tiers that add features like ad-free reading
+            and expert question-and-answer access.
           </p>
         </Section>
 

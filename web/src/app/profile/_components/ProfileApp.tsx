@@ -188,7 +188,6 @@ export function ProfileApp({ defaultSection }: Props) {
       milestones: hasPermission('profile.achievements'),
       cardShare: hasPermission('profile.card_share'),
       messagesInbox: hasPermission('messages.inbox.view'),
-      bookmarksList: hasPermission('bookmarks.list.view'),
       family: hasPermission('settings.family.view'),
       expertQueue: hasPermission('expert.queue.view'),
       followersView: hasPermission('profile.followers.view.own'),
@@ -303,10 +302,7 @@ export function ProfileApp({ defaultSection }: Props) {
       ),
     },
     // Owner cleanup item 12 (2026-05-08, refined) — Following lives in
-    // the home Sections menu only, not in the profile shell. The
-    // BookmarksSection component still exists (still rendered if any
-    // future caller wires it back in), but no profile entry surfaces
-    // it.
+    // the home Sections menu only, not in the profile shell.
     {
       id: 'messages',
       glyph: '✉',

@@ -101,7 +101,7 @@ function resolvePrompt(
  * Keep LockModal for hard-interrupt gates (quiz required to post, etc.).
  *
  * @example
- * // Plan upsell in bookmarks
+ * // Plan upsell in a paid-only surface
  * <LockedFeatureCTA gateType="plan" />
  *
  * // Email verification nudge with custom copy

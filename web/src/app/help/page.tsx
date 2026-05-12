@@ -111,7 +111,7 @@ export default async function HelpPage() {
       q: 'What is the difference between free, Verity, Pro, and Family?',
       a: (
         <span>
-          Reading is free. Verity ({verityMonthly}/mo) adds reduced ads, unlimited bookmarks, quiz
+          Reading is free. Verity ({verityMonthly}/mo) adds reduced ads, quiz
           retakes, text-to-speech, DMs, and follows. Pro ({proMonthly}/mo) is ad-free and adds
           Ask-an-Expert. Family ({familyMonthly}/mo) covers two adults and up to
           two kid profiles with age-tiered content and a family leaderboard.

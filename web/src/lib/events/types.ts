@@ -81,7 +81,6 @@ export type KnownEventName =
   | 'quiz_completed'
   | 'score_earned'
   | 'comment_post'
-  | 'bookmark_add'
   | 'signup_start'
   | 'signup_complete'
   | 'verify_email_complete'

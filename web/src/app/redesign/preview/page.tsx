@@ -83,12 +83,8 @@ export default function PreviewPage() {
           <YouFixture />
         </Section>
 
-        <Section title="Activity" subtitle="Reading log, comments, bookmarks — filterable.">
+        <Section title="Activity" subtitle="Reading log and comments — filterable.">
           <ActivityFixture />
-        </Section>
-
-        <Section title="Bookmarks" subtitle="The pieces you saved, with notes.">
-          <BookmarksFixture />
         </Section>
 
         <Section title="Messages" subtitle="Inbox with unread state.">
@@ -299,12 +295,6 @@ function ActivityFixture() {
       title: 'How the H5N1 dairy outbreak got missed for six weeks',
     },
     {
-      kind: 'Bookmark',
-      when: 'Yesterday',
-      title: 'Why fab-policy decisions get made in the dark',
-      note: 'Re-read this when working on the Q3 brief.',
-    },
-    {
       kind: 'Read',
       when: '3 days ago',
       title: 'A reading list for understanding tariff politics',
@@ -319,7 +309,7 @@ function ActivityFixture() {
   return (
     <div>
       <div style={{ display: 'flex', gap: S[1], marginBottom: S[3], flexWrap: 'wrap' }}>
-        {['All', 'Reads', 'Comments', 'Bookmarks'].map((l, i) => (
+        {['All', 'Reads', 'Comments'].map((l, i) => (
           <span
             key={l}
             style={{
@@ -393,100 +383,10 @@ function ActivityFixture() {
                 {it.body}
               </p>
             ) : null}
-            {it.note ? (
-              <p style={{ margin: `${S[1]}px 0 0`, fontSize: F.sm, color: C.inkMuted }}>
-                {it.note}
-              </p>
-            ) : null}
           </li>
         ))}
       </ul>
     </div>
-  );
-}
-
-// ─── Bookmarks ──────────────────────────────────────────────────────────
-function BookmarksFixture() {
-  const rows = [
-    {
-      title: 'Why fab-policy decisions get made in the dark',
-      subtitle: 'Industry capture, classified line items, and the new chips race.',
-      note: 'Re-read this when working on the Q3 brief.',
-      saved: 'Yesterday',
-    },
-    {
-      title: 'The quiet collapse of regional newsrooms',
-      subtitle: 'Where local accountability journalism actually went.',
-      note: null,
-      saved: '3 days ago',
-    },
-    {
-      title: 'A short history of inflation expectations',
-      subtitle: 'How the Volcker era still shapes Fed thinking.',
-      note: 'Cite for the macro segment.',
-      saved: '1 week ago',
-    },
-    {
-      title: 'The state of state-level pre-K research',
-      subtitle: 'What we know vs what gets quoted.',
-      note: null,
-      saved: '2 weeks ago',
-    },
-  ];
-  return (
-    <Card>
-      <ul
-        style={{
-          listStyle: 'none',
-          margin: 0,
-          padding: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: S[2],
-        }}
-      >
-        {rows.map((b, i) => (
-          <li
-            key={i}
-            style={{
-              background: C.surfaceSunken,
-              border: `1px solid ${C.border}`,
-              borderRadius: R.md,
-              padding: S[3],
-            }}
-          >
-            <div
-              style={{
-                fontFamily: FONT.serif,
-                fontSize: F.md,
-                fontWeight: 600,
-                color: C.ink,
-              }}
-            >
-              {b.title}
-            </div>
-            <div style={{ fontSize: F.sm, color: C.inkMuted, marginTop: S[1], lineHeight: 1.5 }}>
-              {b.subtitle}
-            </div>
-            {b.note ? (
-              <div
-                style={{
-                  marginTop: S[2],
-                  fontSize: F.sm,
-                  color: C.inkSoft,
-                  fontStyle: 'italic',
-                }}
-              >
-                {b.note}
-              </div>
-            ) : null}
-            <div style={{ fontSize: F.xs, color: C.inkFaint, marginTop: S[2] }}>
-              Saved {b.saved}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </Card>
   );
 }
 

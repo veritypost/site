@@ -100,7 +100,7 @@ export function DataCard({ user, preview }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: S[5] }}>
       <Card
         title="Your data"
-        description="Get a copy of everything we have on file — articles read, comments, bookmarks, account metadata."
+        description="Get a copy of everything we have on file — articles read, comments, account metadata."
       >
         <button
           type="button"
@@ -168,7 +168,7 @@ export function DataCard({ user, preview }: Props) {
                 fontFamily: FONT.sans,
               }}
             >
-              This deletes your profile, comments, bookmarks, and reading history after a 30-day
+              This deletes your profile, comments, and reading history after a 30-day
               grace period. Type <strong>DELETE</strong> to confirm.
             </p>
             <input

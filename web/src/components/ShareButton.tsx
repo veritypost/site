@@ -22,8 +22,8 @@ export default function ShareButton() {
     <button
       onClick={handleCopy}
       style={{
-        // Match BookmarkButton + the article-page button family (14/600/10r)
-        // since these two sit side-by-side in the ArticleActions row.
+        // Match the article-page button family (14/600/10r) so it lines
+        // up with the other action buttons in the ArticleActions row.
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,

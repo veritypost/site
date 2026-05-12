@@ -1016,8 +1016,8 @@ function MessagesPageInner() {
                 }}
               >
                 <li>Direct messages</li>
-                <li>Unlimited bookmarks</li>
                 <li>Ad-free reading</li>
+                <li>Ask an Expert</li>
               </ul>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

@@ -1,5 +1,5 @@
 // Generic "this section is a launchpad to another page" treatment. Used
-// for surfaces where the canonical UX lives elsewhere (Bookmarks, Messages,
+// for surfaces where the canonical UX lives elsewhere (Messages,
 // Expert queue, Family kids, Categories, Milestones, Help, Sign out).
 // The rail entry feels like every other section, but the panel is a
 // focused hand-off card.

@@ -14,7 +14,6 @@ const CODE_MAP: Record<string, string> = {
   edit_window_expired: 'The edit window has closed for this comment.',
   comment_too_long: 'Your comment is too long.',
   'payload too large': 'Your comment is too long.',
-  bookmark_cap_reached: "You've reached your bookmark limit.",
   already_following: "You're already following this person.",
   user_blocked_recipient: "You can't message this user.",
 };

@@ -44,7 +44,7 @@ export default function AnonArticleCtaBanner() {
           lineHeight: 1.5,
           color: 'var(--p-ink)',
         }}>
-          Sign up free to bookmark, follow topics, and comment after the quiz.
+          Sign up free to follow stories, follow topics, and comment after the quiz.
         </p>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>

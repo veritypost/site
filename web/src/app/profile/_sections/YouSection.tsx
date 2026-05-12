@@ -1,8 +1,8 @@
 // "You" — the new home of the profile experience. Replaces the legacy
 // dashboard tabs. Three blocks:
 //   1. Numbers grid (score / quizzes / comments / followers)
-//   2. What's next — contextual nudges that swap based on bookmarks,
-//      expert queue, etc.
+//   2. What's next — contextual nudges that swap based on expert queue,
+//      family setup, etc.
 // Activity / Categories / Milestones aren't tabs anymore — they're sections
 // of their own in the rail, reachable directly.
 
@@ -20,7 +20,6 @@ type UserRow = Tables<'users'>;
 interface Props {
   user: UserRow;
   perms: {
-    bookmarksList: boolean;
     messagesInbox: boolean;
     expertQueue: boolean;
     family: boolean;
@@ -83,8 +82,8 @@ export function YouSection({ user, perms }: Props) {
 
       <section>
         <h2 style={sectionHeading}>Polish your profile</h2>
-        {/* T341 — replaced the outbound nudge cards (/, /bookmarks,
-            /messages, /expert-queue, /profile/family) with profile-internal
+        {/* T341 — replaced the outbound nudge cards (/, /messages,
+            /expert-queue, /profile/family) with profile-internal
             CTAs. The old set drove users OUT of the profile experience
             mid-edit; the new set keeps them inside the rail-shell so they
             can finish what they came here to do. Outbound nudges (read

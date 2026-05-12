@@ -23,7 +23,7 @@ import { incrementAnonRead } from '@/lib/anonReadCounter';
 // middleware-bounced to /login, so a tap on the nav lands on the page
 // itself with a contextual signup pitch instead of a generic auth wall.
 // Surfaces that only exist as per-user private state (profile settings,
-// messages, bookmarks, billing, appeal, expert queue, recap) remain
+// messages, billing, appeal, expert queue, recap) remain
 // sign-in-gated because they have nothing to render for anon. Block
 // surfaces are NOT 404s — they redirect to /login?next=<path> so the
 // value is preserved for the post-login bounce.

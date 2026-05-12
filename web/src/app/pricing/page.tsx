@@ -230,7 +230,7 @@ export default async function PricingPage() {
             'One reader',
             'Unlimited reading',
             'Take quizzes, join discussions',
-            '10 bookmarks',
+            'Follow stories for updates',
             'One breaking-news alert per day',
           ]}
           cta={freeCta}
@@ -245,7 +245,6 @@ export default async function PricingPage() {
           features={[
             'Everything in Free',
             'Ad-free',
-            'Unlimited bookmarks + collections',
             'Direct messages, follows, mentions',
             'Listen to articles (TTS)',
             'Ask an Expert',

@@ -11,10 +11,8 @@
 // rather than substituting a generic string. P0001 (RAISE EXCEPTION) is
 // the only Postgres error code where this is safe — trigger authors
 // write the message intentionally for end users (e.g. enforce_max_kids:
-// "Kid profile limit reached for this plan", enforce_bookmark_cap:
-// "Free accounts are capped at 10 bookmarks. Upgrade to Verity for
-// unlimited."). Constraint names, RLS names, column-level details never
-// surface through P0001.
+// "Kid profile limit reached for this plan"). Constraint names, RLS
+// names, column-level details never surface through P0001.
 const PASSTHROUGH = Symbol('passthrough');
 
 const PG_ERROR_MAP = Object.freeze({

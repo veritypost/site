@@ -183,7 +183,7 @@ export function RegistrationWallProvider({
               }}
             >
               {[
-                'Bookmark articles to read later',
+                'Follow stories to come back to them later',
                 'Join discussions after passing the quiz',
                 'Follow topics you care about',
               ].map((text) => (

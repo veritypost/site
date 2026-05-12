@@ -293,7 +293,7 @@ export function PublicProfileSection({ user, preview, onUserUpdated }: Props) {
                   onChange={(e) => setHideActivity(e.target.checked)}
                 />
                 <span style={{ fontSize: F.sm, color: C.inkSoft, lineHeight: 1.5 }}>
-                  Don&apos;t show my reading log, comment history, or bookmarks on my public
+                  Don&apos;t show my reading log or comment history on my public
                   profile.
                 </span>
               </label>

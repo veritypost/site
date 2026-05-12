@@ -32,14 +32,6 @@ export async function incrementCommentCount(supabase, articleId, amount = 1) {
   if (error) throw new Error(`increment_comment_count failed: ${error.message}`);
 }
 
-export async function incrementBookmarkCount(supabase, articleId, amount = 1) {
-  const { error } = await supabase.rpc('increment_bookmark_count', {
-    article_id: articleId,
-    amount,
-  });
-  if (error) throw new Error(`increment_bookmark_count failed: ${error.message}`);
-}
-
 export async function incrementCommentVote(supabase, commentId, voteType, amount = 1) {
   const { error } = await supabase.rpc('increment_comment_vote', {
     comment_id: commentId,
