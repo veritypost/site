@@ -1433,12 +1433,22 @@ final class AuthViewModel: ObservableObject {
             // Install the session into the Swift SDK so `client.auth.session`
             // returns it for the rest of the app lifecycle and the SDK
             // refreshes the token on its own.
+            //
+            // Q-Misc2 (Outstanding.md, locked 2026-05-12) — no explicit
+            // loadUser here. `setSession` emits `.signedIn` which wakes the
+            // auth listener at `:466`, which already calls `loadUser` for
+            // every sign-in path (password, deep link, token refresh,
+            // initial session). Calling it twice raced — both paths kicked
+            // a `PermissionService.invalidate() + loadAll()` cycle. Both
+            // callers (`LoginView.swift:356`, `SignupView.swift:408`)
+            // discard the return value with `_ = await ...`, so the
+            // ~10–50ms gap between this returning `true` and `currentUser`
+            // populating is invisible to callers.
             do {
-                let session = try await client.auth.setSession(
+                _ = try await client.auth.setSession(
                     accessToken: s.access_token,
                     refreshToken: refreshToken
                 )
-                await loadUser(id: session.user.id.uuidString)
                 // Clear the "Check your inbox" card + 30s resend cooldown
                 // so a re-open of the login sheet doesn't show the stale
                 // sent-card after the code has already been redeemed.

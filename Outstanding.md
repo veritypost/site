@@ -396,7 +396,7 @@ Per memory `project_verity_monthly_stripe_pending.md`: pricing page shows "Subsc
 
 ---
 
-## 21. iOS verifyMagicCode setSession race (LOCKED — ships out-of-band)
+## 21. iOS verifyMagicCode setSession race — SHIPPED 2026-05-12
 
 ### Q-Misc2 — iOS verifyMagicCode setSession race: drop the explicit loadUser
 - **Question:** In `verifyMagicCode`, do we drop the explicit `loadUser` at `AuthViewModel.swift:1441` and rely solely on the auth listener's `loadUser` at `AuthViewModel.swift:466`, or keep both (idempotent) or gate the listener (option b)?
@@ -407,6 +407,14 @@ Per memory `project_verity_monthly_stripe_pending.md`: pricing page shows "Subsc
 
 **Execution prompt:**
 > Single-line iOS change. Ships out-of-band any time (no dependencies). Delete `await loadUser(...)` at line 1441 of `AuthViewModel.swift`. Add an XCTest that asserts `currentUser != nil` within 200ms of `verifyMagicCode` returning `true` to validate the listener-only contract.
+
+**SHIPPED 2026-05-12.** Deleted the `await loadUser(id: session.user.id.uuidString)` line from `verifyMagicCode`'s `setSession` block. `setSession`'s return value was unused outside the dropped call, so the binding became `_ = try await client.auth.setSession(...)`. Added a 9-line comment block above the call locking the contract: listener at `:466` is single source of truth, both callers discard return value, ~10–50ms gap between return and `currentUser` populating is invisible. The auth listener block at `:466` was unchanged — its `await self.loadUser(id: uid)` on `.signedIn / .initialSession / .tokenRefreshed` is the surviving path.
+
+**XCTest deferred.** No unit test target exists today — only `VerityPostUITests/SmokeTests.swift` (UI tests run against the installed app and can't directly invoke `AuthViewModel.verifyMagicCode`). Creating a unit test target + mocking the Supabase auth listener stream is its own scope (likely bundled with the Session 3 part 1 deferred snapshot-test infrastructure when that work opens). The contract is captured in code comments and the locked Q-Misc2 entry; runtime validation continues via owner TestFlight on OTP sign-in.
+
+**Cross-platform footnote:**
+- Web: N/A — web has no `setSession` race; the JS SDK's session-install flow and auth listener already coordinate via a single Promise chain.
+- Kids iOS: N/A — kids product uses parent-installed iCloud-based auth, not the OTP / `verifyMagicCode` path.
 
 ---
 
