@@ -1133,9 +1133,23 @@ struct SettingsView: View {
 
     private var aboutRows: [HubRowSpec] {
         var out: [HubRowSpec] = []
+        // Q-E5 (Outstanding.md, locked 2026-05-12) — close the iOS↔web Help
+        // parity gap. Web's Profile rail Help section has two rows: an FAQ
+        // link and a contact form. iOS picks them up in the About hub for
+        // now (Session 4 part 1); a dedicated Help destination view ships
+        // in Session 4 part 2 alongside the full Profile section list.
+        if let helpURL = URL(string: "https://veritypost.com/help") {
+            out.append(HubRowSpec(id: "help-center",
+                                  keywords: ["help", "faq", "questions", "support center"]) { isLast, onTap in
+                AnyView(HubRow(icon: "questionmark.circle.fill", title: "Help center",
+                               showDivider: !isLast,
+                               kind: .external(helpURL),
+                               onTap: onTap))
+            })
+        }
         out.append(HubRowSpec(id: "feedback",
-                              keywords: ["feedback", "send feedback", "bug", "feature", "support", "help"]) { isLast, onTap in
-            AnyView(HubRow(icon: "paperplane.fill", title: "Send feedback",
+                              keywords: ["feedback", "contact", "support", "bug", "feature"]) { isLast, onTap in
+            AnyView(HubRow(icon: "paperplane.fill", title: "Contact support",
                            showDivider: !isLast,
                            kind: .action({ self.showFeedback = true }),
                            onTap: onTap))
@@ -3988,26 +4002,68 @@ struct FeedbackSheet: View {
     private let client = SupabaseManager.shared.client
     @Environment(\.dismiss) private var dismiss
 
-    @State private var category = "bug"
+    // 11-category parity with web's /contact form (web/src/app/contact/page.tsx:20-32).
+    // Server (`api/support/route.js:41`) accepts category as a free string and forwards
+    // to the `create_support_ticket` RPC, so values are simply mirrored from web.
+    // iOS skips web's email field — every iOS session is signed-in, so identity
+    // is known via the bearer token (`api/support` uses `requireAuth(supabase)`).
+    struct SupportTopic: Identifiable, Hashable {
+        let value: String
+        let label: String
+        var id: String { value }
+    }
+    static let topics: [SupportTopic] = [
+        .init(value: "account",       label: "Account Issue"),
+        .init(value: "billing",       label: "Billing & Subscription"),
+        .init(value: "bug",           label: "Report a Bug"),
+        .init(value: "content",       label: "Content Concern"),
+        .init(value: "feature",       label: "Feature Request"),
+        .init(value: "kids",          label: "Kids Mode"),
+        .init(value: "expert",        label: "Expert Verification"),
+        .init(value: "feedback",      label: "App Feedback"),
+        .init(value: "accessibility", label: "Accessibility"),
+        .init(value: "appeal",        label: "Ban Appeal"),
+        .init(value: "other",         label: "Other"),
+    ]
+
+    @State private var category: String = "bug"
     @State private var message: String = ""
     @State private var submitting = false
+
+    private var currentLabel: String {
+        FeedbackSheet.topics.first { $0.value == category }?.label ?? "Choose a topic"
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 0) {
-                    SettingsSectionHeader(title: "Category", tone: .normal)
+                    SettingsSectionHeader(title: "Topic", tone: .normal)
                     SettingsCard {
-                        Picker("", selection: $category) {
-                            Text("Bug").tag("bug")
-                            Text("Feature").tag("feature_request")
-                            Text("Other").tag("other")
+                        Menu {
+                            Picker("Topic", selection: $category) {
+                                ForEach(FeedbackSheet.topics) { topic in
+                                    Text(topic.label).tag(topic.value)
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text(currentLabel)
+                                    .font(.system(size: VP.Size.base))
+                                    .foregroundColor(VP.text)
+                                Spacer()
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: VP.Size.sm, weight: .semibold))
+                                    .foregroundColor(VP.dim)
+                            }
+                            .frame(minHeight: 44)
+                            .padding(.horizontal, 16)
+                            .contentShape(Rectangle())
                         }
-                        .pickerStyle(.segmented)
-                        .padding(16)
+                        .accessibilityLabel("Select a topic")
                     }
 
-                    SettingsSectionHeader(title: "Your feedback", tone: .normal)
+                    SettingsSectionHeader(title: "Your message", tone: .normal)
                     SettingsCard {
                         TextField("Tell us what\u{2019}s up...", text: $message, axis: .vertical)
                             .font(.system(size: VP.Size.base))
@@ -4035,7 +4091,7 @@ struct FeedbackSheet: View {
                 }
             }
             .background(VP.bg.ignoresSafeArea())
-            .navigationTitle("Send feedback")
+            .navigationTitle("Contact support")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
