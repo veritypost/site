@@ -2161,6 +2161,13 @@ struct StoryDetailView: View {
                     .padding(.vertical, 2)
                     .background(RoundedRectangle(cornerRadius: VP.radiusXS).fill(VP.expertColor.opacity(0.12)))
                 }
+                // Threaded-reply header — depth > 0 only. Mono uppercase
+                // tag above the body, matches web's CommentRow.tsx pattern
+                // where reply rows get an intent header bar instead of an
+                // inline chip in the meta row.
+                if depth > 0 {
+                    threadedReplyHeaderView(comment.intent)
+                }
                 HStack(spacing: 6) {
                     if let uname = u?.username {
                         NavigationLink {
@@ -2180,18 +2187,19 @@ struct StoryDetailView: View {
                     if Self.SHOW_EXPERT_CHROME_ON_COMMENTS {
                         VerifiedBadgeView(isExpert: u?.isExpert, isVerifiedPublicFigure: u?.isVerifiedPublicFigure)
                     }
-                    // Unified author intent chip (Question / Add Context /
-                    // Different Take). Irrevocable, set at most once on insert.
-                    // Same visual treatment for top-level + reply rows; chip
-                    // color matches the left-edge accent.
-                    if let intentLabel = intentLabel(comment.intent),
-                       let intentColor = intentAccent(comment.intent) {
-                        Text(intentLabel)
-                            .font(.system(.caption2, design: .default, weight: .semibold))
-                            .foregroundColor(intentColor)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(RoundedRectangle(cornerRadius: VP.radiusXS).fill(intentColor.opacity(0.12)))
+                    // Top-level intent chip — mono uppercase tagLabel
+                    // ("? Question" / "+ Adding to this" / "↻ A different
+                    // take"), matches web CommentRow.tsx inline chip on
+                    // depth=0. Threaded replies (depth > 0) get the chip
+                    // as a separate header above the body instead, so
+                    // we skip the inline chip in that case.
+                    if depth == 0, comment.intent != nil {
+                        let header = threadedReplyHeader(comment.intent)
+                        Text(header.label)
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .tracking(1.5)
+                            .textCase(.uppercase)
+                            .foregroundColor(header.color)
                     }
                     if comment.isEdited == true && !comment.isDeleted {
                         Text("(edited)")
@@ -2281,12 +2289,13 @@ struct StoryDetailView: View {
                     .padding(.top, 6)
                 }
                 if !comment.isDeleted && !isEditing {
-                    // Tag chips — always visible when any tag is active (cast or count > 0).
-                    // Self-tag blocked by the API (403); we hide for own comments to avoid tease.
-                    if comment.userId != auth.currentUser?.id {
-                        commentTagChipsRow(for: comment)
-                            .padding(.top, 6)
-                    }
+                    // Tally line — mono uppercase counts row mirroring
+                    // web's "AGREED BY N · HELPFUL M · X REPLIES". Renders
+                    // for all viewers (anon + signed-in), including the
+                    // comment author (web does the same). Hidden when all
+                    // three counts are zero.
+                    commentTallyLine(for: comment)
+
                     // EXPERT_THREADS Wave 5 — thread-mode action row.
                     // Adds: Close / Reopen on root, Allow another reply on
                     // expert's own replies in a thread, "N replies left"
@@ -2295,65 +2304,40 @@ struct StoryDetailView: View {
 
                     let isThreadClosed = (threadRoot(for: comment)?.expertThreadClosedAt) != nil
 
-                    // Action row: Reply · Edit (own only)
-                    // Unified-intent redesign — the 3 typed-reply buttons
-                    // collapsed into a single Reply affordance. The reply's
-                    // intent (Question / Add Context / Different Take) is
-                    // now picked in the composer's intent picker, the same
-                    // way it is for top-level posts.
-                    HStack(spacing: 8) {
-                        if auth.isLoggedIn && muteState == nil
-                            && depth < SettingsService.shared.commentNumber("max_depth") {
-                            // Disable Reply when:
-                            //   - the thread is closed (no new replies)
-                            //   - the asker has hit the per-expert chain cap
-                            //     (chain row exists, repliesLeft == 0, no
-                            //     free pass)
-                            let replyState = askerReplyState(for: comment)
-                            let disabled = replyState.disabled || isThreadClosed
-                            Button {
-                                startReply(to: comment)
-                            } label: {
-                                Text("Reply")
-                                    .font(.system(.caption, design: .default, weight: .semibold))
-                                    .foregroundColor(disabled ? VP.muted : VP.accent)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(disabled)
-                            .accessibilityLabel("Reply")
-                            if let copy = replyState.copy {
-                                Text(copy)
-                                    .font(.system(size: VP.Size.xs))
-                                    .foregroundColor(replyState.disabled ? VP.warn : VP.dim)
-                            }
-                            if isThreadClosed {
-                                Text("Thread closed.")
-                                    .font(.system(size: VP.Size.xs))
-                                    .foregroundColor(VP.dim)
-                            }
+                    // Unified action row — Reply + I-agree + Helpful as
+                    // sharp-cornered pill toggles. Mirrors web's
+                    // CommentRow.tsx actionPillStyle. Tag pills hide for
+                    // the comment's author (server returns 403 on
+                    // self-tag) and for anon viewers (no auth = no
+                    // toggle action). The Reply pill still renders for
+                    // anon — its tap currently routes through the
+                    // existing in-app guard which prompts sign-in.
+                    commentActionRow(
+                        for: comment,
+                        depth: depth,
+                        isOwn: isOwnComment,
+                        isThreadClosed: isThreadClosed
+                    )
+                    .padding(.top, 6)
+
+                    // Edit — kept as a small secondary text button rather
+                    // than promoted into the pill row. Web puts Edit in
+                    // the overflow menu; iOS keeps the existing pattern
+                    // of a low-emphasis Edit affordance next to the row.
+                    // Same server-side window + lock-on-reply gates.
+                    if isOwnComment && canEditOwnComment && muteState == nil
+                        && (comment.replyCount ?? 0) == 0
+                        && (comment.createdAt.map { Date().timeIntervalSince($0) <= 15 * 60 } ?? false) {
+                        Button {
+                            beginEdit(comment)
+                        } label: {
+                            Text("Edit")
+                                .font(.system(.caption, design: .default, weight: .semibold))
+                                .foregroundColor(VP.accent)
                         }
-                        // Owner cleanup item 7 (2026-05-08) — gate the edit
-                        // affordance on the same window + lock-on-reply
-                        // rules the server enforces. Server is final
-                        // arbiter; this just spares a 403.
-                        if isOwnComment && canEditOwnComment && muteState == nil
-                            && (comment.replyCount ?? 0) == 0
-                            && (comment.createdAt.map { Date().timeIntervalSince($0) <= 15 * 60 } ?? false) {
-                            Button {
-                                beginEdit(comment)
-                            } label: {
-                                Text("Edit")
-                                    .font(.system(.caption, design: .default, weight: .semibold))
-                                    .foregroundColor(VP.accent)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        // Comment-system redesign — Agree/Disagree action
-                        // buttons removed. The signal lives on the "I agree"
-                        // reader-tag chip in commentTagChipsRow instead.
-                        Spacer()
+                        .buttonStyle(.plain)
+                        .padding(.top, 4)
                     }
-                    .padding(.top, 4)
                 }
             }
         }
@@ -2362,13 +2346,14 @@ struct StoryDetailView: View {
         .padding(.leading, 20 + indent)
         .overlay(alignment: .leading) {
             if depth > 0 {
-                // Unified-intent redesign — every comment (top-level OR reply)
-                // gets a left-edge accent matching its intent color. Rows
-                // with NULL intent fall back to the neutral 1pt rule.
-                let accent = intentAccent(comment.intent)
+                // 3pt intent-colored left rule on threaded replies, matching
+                // web's `borderLeft: '3px solid ${replyTintBorder}'` in
+                // CommentRow.tsx. NULL-intent replies fall back to a neutral
+                // grey at the same width so the visual rhythm stays even.
+                let neutral = Color(red: 0xdc/255.0, green: 0xdc/255.0, blue: 0xdc/255.0)
                 Rectangle()
-                    .fill(accent ?? VP.dim.opacity(0.35))
-                    .frame(width: accent == nil ? 1 : 2)
+                    .fill(intentAccent(comment.intent) ?? neutral)
+                    .frame(width: 3)
                     .padding(.leading, 20 + indent - 8)
                     .padding(.vertical, 6)
             }
@@ -2379,8 +2364,17 @@ struct StoryDetailView: View {
         // EXPERT_THREADS Wave 5 — author-attribute-driven accent border.
         // Whether or not the thread itself is in expert mode, an expert's
         // reply in their verified category gets the chip + accent border.
+        //
+        // Threaded replies (depth > 0) without expert chrome get a 5%
+        // intent-tinted background instead, matching web's `replyTintBg`
+        // in CommentRow.tsx. Expert chrome wins when both would apply
+        // because expert is a stronger visual signal.
         .padding(showsExpertChrome(comment) ? 10 : 0)
-        .background(showsExpertChrome(comment) ? VP.expertColor.opacity(0.06) : Color.clear)
+        .background(
+            showsExpertChrome(comment)
+                ? VP.expertColor.opacity(0.06)
+                : (depth > 0 ? intentTintBg(comment.intent) : Color.clear)
+        )
         .overlay(
             RoundedRectangle(cornerRadius: VP.radiusMD)
                 .stroke(showsExpertChrome(comment) ? VP.expertColor.opacity(0.22) : Color.clear, lineWidth: 1)
@@ -4039,23 +4033,88 @@ struct StoryDetailView: View {
     //   NULL            → no accent / no chip
 
     /// Maps an `intent` string to its accent color, or nil for NULL / unknown.
+    /// Exact hex values mirror web's INTENT_META palette in CommentRow.tsx so
+    /// the chips, borders, and tints render identically across platforms.
     private func intentAccent(_ kind: String?) -> Color? {
         switch kind {
-        case "question":       return VP.brand
-        case "add_context":    return VP.success
-        case "different_take": return VP.warn
+        case "question":       return Color(red: 0x4a/255.0, green: 0x6e/255.0, blue: 0x8a/255.0)
+        case "add_context":    return Color(red: 0x3d/255.0, green: 0x6b/255.0, blue: 0x4f/255.0)
+        case "different_take": return Color(red: 0xa1/255.0, green: 0x4b/255.0, blue: 0x1a/255.0)
         default:               return nil
         }
     }
 
-    /// Labels the 3 intent values into UI copy. Returns nil for unknown /
-    /// NULL values so the renderer can skip the chip.
-    private func intentLabel(_ raw: String?) -> String? {
-        switch raw {
-        case "question":       return "Question"
-        case "add_context":    return "Add Context"
-        case "different_take": return "Different Take"
-        default:               return nil
+    /// 5% intent-tint background for threaded reply containers. Mirrors
+    /// web's `replyTintBg` (rgba(r,g,b,0.05) per intent). Returns a
+    /// neutral fallback for replies that have no intent so threaded rows
+    /// still group visually.
+    private func intentTintBg(_ kind: String?) -> Color {
+        if let accent = intentAccent(kind) { return accent.opacity(0.05) }
+        return Color(red: 0xf3/255.0, green: 0xf3/255.0, blue: 0xf3/255.0)
+    }
+
+    /// The header bar that sits above the body on threaded replies
+    /// (depth > 0). Mono uppercase tag with a leading glyph; rows with
+    /// no intent fall back to the generic "↩ Reply" treatment so the
+    /// reply still has an explicit context header above the body, the
+    /// way web's CommentRow does for depth > 0.
+    private func threadedReplyHeader(_ kind: String?) -> (label: String, color: Color) {
+        let neutral = Color(red: 0x77/255.0, green: 0x77/255.0, blue: 0x77/255.0)
+        switch kind {
+        case "question":       return ("? Question", intentAccent("question") ?? neutral)
+        case "add_context":    return ("+ Adding to this", intentAccent("add_context") ?? neutral)
+        case "different_take": return ("\u{21bb} A different take", intentAccent("different_take") ?? neutral)
+        default:               return ("\u{21a9} Reply", neutral)
+        }
+    }
+
+    /// Mono tally line composer — "AGREED BY N · HELPFUL M · X REPLIES",
+    /// each segment present only when its count > 0. Returns a single
+    /// concatenated Text so the SwiftUI runtime can lay it out as one
+    /// run with mixed weights/colors per segment (matches web's mono
+    /// tally row in CommentRow.tsx).
+    private func commentTallyText(for comment: VPComment) -> Text? {
+        let iAgree = comment.iAgreeCount ?? 0
+        let helpful = comment.helpfulCount ?? 0
+        let replies = comment.replyCount ?? 0
+        guard iAgree > 0 || helpful > 0 || replies > 0 else { return nil }
+        let mono = Font.system(size: 9.5, weight: .medium, design: .monospaced)
+        let monoBold = Font.system(size: 9.5, weight: .bold, design: .monospaced)
+        let labelC = Color(red: 0x77/255.0, green: 0x77/255.0, blue: 0x77/255.0)
+        let numberC = Color(red: 0x11/255.0, green: 0x11/255.0, blue: 0x11/255.0)
+        let sepC = Color(red: 0xdc/255.0, green: 0xdc/255.0, blue: 0xdc/255.0)
+        var result = Text("")
+        var needsSep = false
+        if iAgree > 0 {
+            result = result
+                + Text("AGREED BY ").font(mono).foregroundColor(labelC)
+                + Text("\(iAgree)").font(monoBold).foregroundColor(numberC)
+            needsSep = true
+        }
+        if helpful > 0 {
+            if needsSep { result = result + Text(" · ").font(mono).foregroundColor(sepC) }
+            result = result
+                + Text("HELPFUL ").font(mono).foregroundColor(labelC)
+                + Text("\(helpful)").font(monoBold).foregroundColor(numberC)
+            needsSep = true
+        }
+        if replies > 0 {
+            if needsSep { result = result + Text(" · ").font(mono).foregroundColor(sepC) }
+            result = result
+                + Text("\(replies)").font(monoBold).foregroundColor(numberC)
+                + Text(replies == 1 ? " REPLY" : " REPLIES").font(mono).foregroundColor(labelC)
+        }
+        return result
+    }
+
+    @ViewBuilder
+    private func commentTallyLine(for comment: VPComment) -> some View {
+        if let text = commentTallyText(for: comment) {
+            text
+                .tracking(0.5)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 8)
+                .accessibilityLabel("Comment tally")
         }
     }
 
@@ -4112,38 +4171,149 @@ struct StoryDetailView: View {
         }
     }
 
+    /// Unified action row — Reply + (I agree, Helpful) sharp-cornered
+    /// pill toggles, matching web's actionPillStyle in CommentRow.tsx.
+    /// Mirrors web's gate semantics: tag pills hidden on own comments
+    /// (self-tag is server-side 403 anyway); Reply pill always shown
+    /// when the user could reply at this depth. Counts appear inside
+    /// each pill in a small mono span when > 0, identical to web.
     @ViewBuilder
-    private func commentTagChipsRow(for comment: VPComment) -> some View {
+    private func commentActionRow(
+        for comment: VPComment,
+        depth: Int,
+        isOwn: Bool,
+        isThreadClosed: Bool
+    ) -> some View {
         let userTags = commentTagsByUser[comment.id] ?? []
-        HStack(spacing: 12) {
-            ForEach(Self.readerTagOrder, id: \.kind) { entry in
-                tagChipButton(
-                    comment: comment,
-                    kind: entry.kind,
-                    label: entry.label,
-                    isCast: userTags.contains(entry.kind)
-                )
+        let belowDepthLimit = depth < SettingsService.shared.commentNumber("max_depth")
+        let canReplyAuthed = auth.isLoggedIn && muteState == nil && belowDepthLimit
+        let canReplyAnon = !auth.isLoggedIn && belowDepthLimit
+        let askerState = canReplyAuthed ? askerReplyState(for: comment) : (disabled: false, copy: nil as String?)
+        let replyDisabled = canReplyAuthed ? (askerState.disabled || isThreadClosed) : false
+        let smallPills = depth > 0
+        HStack(spacing: 8) {
+            if canReplyAuthed {
+                commentPillButton(
+                    label: "Reply",
+                    glyph: nil,
+                    count: nil,
+                    active: false,
+                    disabled: replyDisabled,
+                    smallPills: smallPills
+                ) { startReply(to: comment) }
+                if let copy = askerState.copy {
+                    Text(copy)
+                        .font(.system(size: VP.Size.xs))
+                        .foregroundColor(askerState.disabled ? VP.warn : VP.dim)
+                }
+                if isThreadClosed {
+                    Text("Thread closed.")
+                        .font(.system(size: VP.Size.xs))
+                        .foregroundColor(VP.dim)
+                }
+            } else if canReplyAnon {
+                // Anon tap routes through the existing registration sheet,
+                // mirroring Group A's FollowStoryButton anon pattern + web's
+                // openWall() behavior — the pill is visible as a conversion
+                // affordance rather than hidden entirely.
+                commentPillButton(
+                    label: "Reply",
+                    glyph: nil,
+                    count: nil,
+                    active: false,
+                    disabled: false,
+                    smallPills: smallPills
+                ) { showRegistrationSheet = true }
+            }
+            if !isOwn && auth.isLoggedIn {
+                ForEach(Self.readerTagOrder, id: \.kind) { entry in
+                    let glyph = entry.kind == "i_agree" ? "✓" : "★"
+                    let count = tagCount(for: comment, kind: entry.kind)
+                    let isCast = userTags.contains(entry.kind)
+                    let busy = commentTagBusyKey == "\(comment.id):\(entry.kind)"
+                    commentPillButton(
+                        label: entry.label,
+                        glyph: glyph,
+                        count: count > 0 ? count : nil,
+                        active: isCast,
+                        disabled: busy,
+                        smallPills: smallPills
+                    ) {
+                        Task { await toggleCommentTag(comment, kind: entry.kind) }
+                    }
+                    .opacity(busy ? 0.6 : 1)
+                    .accessibilityLabel("\(isCast ? "Remove" : "Add") \(entry.label) tag")
+                }
             }
             Spacer(minLength: 0)
         }
     }
 
+    /// Single sharp-cornered pill button used by the action row. Matches
+    /// web's actionPillStyle (CommentRow.tsx): 0px radius, 1px border,
+    /// transparent or ink fill, glyph + label + optional mono count.
+    /// `smallPills = true` mirrors the depth>0 sizing on web (12pt font,
+    /// 12/6 padding) vs the top-level sizing (13pt font, 16/9 padding).
     @ViewBuilder
-    private func tagChipButton(comment: VPComment, kind: String, label: String, isCast: Bool) -> some View {
-        let busy = commentTagBusyKey == "\(comment.id):\(kind)"
-        let count = tagCount(for: comment, kind: kind)
-        Button {
-            Task { await toggleCommentTag(comment, kind: kind) }
-        } label: {
-            Text(count > 0 ? "\(label) \(count)" : label)
-                .font(.system(size: 11, weight: isCast ? .semibold : .medium))
-                .foregroundColor(isCast ? VP.text : VP.dim)
-                .frame(minHeight: 24)
-                .opacity(busy ? 0.6 : 1)
+    private func commentPillButton(
+        label: String,
+        glyph: String?,
+        count: Int?,
+        active: Bool,
+        disabled: Bool,
+        smallPills: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        let inkBg = Color(red: 0x11/255.0, green: 0x11/255.0, blue: 0x11/255.0)
+        let inkText = Color(red: 0xfc/255.0, green: 0xfc/255.0, blue: 0xfc/255.0)
+        let inactiveText = Color(red: 0x33/255.0, green: 0x33/255.0, blue: 0x33/255.0)
+        let disabledText = Color(red: 0xa1/255.0, green: 0xa1/255.0, blue: 0xa1/255.0)
+        let borderC = Color(red: 0xdc/255.0, green: 0xdc/255.0, blue: 0xdc/255.0)
+        let fontSize: CGFloat = smallPills ? 12 : 13
+        let hPad: CGFloat = smallPills ? 12 : 16
+        let vPad: CGFloat = smallPills ? 6 : 9
+        let countFontSize: CGFloat = max(fontSize - 2, 9)
+        let textColor: Color = disabled ? disabledText : (active ? inkText : inactiveText)
+        Button(action: action) {
+            HStack(spacing: 6) {
+                if let g = glyph {
+                    Text(g).font(.system(size: fontSize, weight: .medium))
+                }
+                Text(label)
+                    .font(.system(size: fontSize, weight: .medium))
+                if let c = count, c > 0 {
+                    Text("\(c)")
+                        .font(.system(size: countFontSize, design: .monospaced))
+                        .opacity(active ? 0.85 : 0.6)
+                }
+            }
+            .foregroundColor(textColor)
+            .padding(.horizontal, hPad)
+            .padding(.vertical, vPad)
+            .background(active ? inkBg : Color.clear)
+            .overlay(
+                Rectangle()
+                    .stroke(active ? inkBg : borderC, lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
-        .disabled(busy)
-        .accessibilityLabel("\(isCast ? "Remove" : "Add") \(label) tag")
+        .disabled(disabled)
+    }
+
+    /// Threaded-reply header bar. Mono uppercase tag with a leading
+    /// glyph in the intent color (or neutral grey for replies with no
+    /// intent). Renders above the comment body on depth > 0 only;
+    /// top-level rows keep the inline intent chip in the meta row.
+    @ViewBuilder
+    private func threadedReplyHeaderView(_ intent: String?) -> some View {
+        let header = threadedReplyHeader(intent)
+        Text(header.label)
+            .font(.system(size: 9, weight: .bold, design: .monospaced))
+            .tracking(1.5)
+            .textCase(.uppercase)
+            .foregroundColor(header.color)
+            .padding(.bottom, 8)
+            .accessibilityHidden(true)
     }
 
     /// POSTs through /api/comments/[id]/tag. Server-side rate-limits +
