@@ -68,6 +68,11 @@ export async function POST(request: Request) {
 
   const results = {
     approved_count: 0,
+    // Emails that already had a user account when bulk-approval ran.
+    // We stamp the row consumed immediately and skip the invite email
+    // (no "you're in!" email to someone who's already in). Surfaced in
+    // the response so the admin UI can show a one-line summary.
+    already_signed_up_count: 0,
     failed_ids: [] as string[],
     email_failed_ids: [] as string[],
   };
@@ -88,6 +93,28 @@ export async function POST(request: Request) {
         continue;
       }
       if (req.status !== 'pending') { results.failed_ids.push(id); continue; }
+
+      // Look up an existing user for this email (case-insensitive). If we
+      // find one, the bulk-approve will silently mark the row consumed
+      // and skip the invite email — no point telling someone they've been
+      // approved to a product they already use.
+      const lcEmail = req.email.toLowerCase();
+      const { data: existingUser } = await service
+        .from('users')
+        .select('id, created_at')
+        .ilike('email', lcEmail)
+        .maybeSingle();
+      const existingUserSource: string | null = await (async () => {
+        if (!existingUser) return null;
+        try {
+          const { data: authUser } = await service.auth.admin.getUserById(existingUser.id);
+          const raw = (authUser?.user?.user_metadata as Record<string, unknown> | null)?.signup_source;
+          if (typeof raw === 'string' && (raw === 'ios' || raw === 'kids' || raw === 'web')) {
+            return raw;
+          }
+        } catch {}
+        return 'web';
+      })();
 
       // Mint owner-tier link.
       const { data: minted, error: mintErr } = await service.rpc('mint_owner_referral_link', {
@@ -112,59 +139,128 @@ export async function POST(request: Request) {
         }).eq('id', codeId);
       }
 
-      // Send approval email.
+      // Send approval email — but only if the user doesn't already have
+      // an account. Sending "you're in!" to a current user is confusing
+      // and erodes trust. The minted code is still bound to the row for
+      // audit/forensics; we just don't surface it to the user.
       let emailId: string | null = null;
-      try {
-        const tpl = renderTemplate(
-          APPROVAL_TEMPLATE,
-          buildApprovalVars({
-            name: req.name || '',
-            invite_url: inviteUrl,
-            expires_at: new Date(expiresAtIso).toLocaleDateString(undefined, {
-              year: 'numeric', month: 'long', day: 'numeric',
-            }),
-          })
-        );
-        const result = await sendEmail({
-          to: req.email,
-          subject: tpl.subject,
-          html: tpl.html,
-          text: tpl.text,
-          fromName: tpl.fromName,
-          fromEmail: tpl.fromEmail,
-          replyTo: undefined,
-          unsubscribeUrl: undefined,
-        });
-        emailId = (result as { id?: string })?.id || null;
-      } catch (e) {
-        console.error('[bulk-approve] sendEmail failed for', id, e);
-        results.email_failed_ids.push(id);
-        // Continue — still mark approved even if email failed.
+      if (!existingUser) {
+        try {
+          const tpl = renderTemplate(
+            APPROVAL_TEMPLATE,
+            buildApprovalVars({
+              name: req.name || '',
+              invite_url: inviteUrl,
+              expires_at: new Date(expiresAtIso).toLocaleDateString(undefined, {
+                year: 'numeric', month: 'long', day: 'numeric',
+              }),
+            })
+          );
+          const result = await sendEmail({
+            to: req.email,
+            subject: tpl.subject,
+            html: tpl.html,
+            text: tpl.text,
+            fromName: tpl.fromName,
+            fromEmail: tpl.fromEmail,
+            replyTo: undefined,
+            unsubscribeUrl: undefined,
+          });
+          emailId = (result as { id?: string })?.id || null;
+        } catch (e) {
+          console.error('[bulk-approve] sendEmail failed for', id, e);
+          results.email_failed_ids.push(id);
+          // Continue — still mark approved even if email failed.
+        }
       }
 
-      // Mark approved. BugList #4: stamp metadata.email_status so the
-      // admin UI can surface a per-row "Resend invite" button on
-      // rows where the initial email attempt failed.
-      const { error: updErr } = await service.from('access_requests').update({
+      // Mark approved. If the email already had a user, stamp consumed
+      // in the same UPDATE so the row jumps straight to the Consumed tab
+      // and out of the admin's outstanding-action list.
+      //
+      // The cast widens the inline literal to include the consumed_*
+      // columns added in migration 20260512180000. Drop the cast once
+      // `supabase gen types` has been rerun and database.ts knows about
+      // them.
+      const approvedAtIso = new Date().toISOString();
+      const updateRow: Record<string, unknown> = {
         status: 'approved',
         approved_by: actor.id,
-        approved_at: new Date().toISOString(),
+        approved_at: approvedAtIso,
         access_code_id: codeId,
         metadata: {
           approval_email_id: emailId,
           invite_url: inviteUrl,
-          email_status: emailId ? 'sent' : 'failed',
+          email_status: existingUser
+            ? 'skipped_already_user'
+            : (emailId ? 'sent' : 'failed'),
           email_last_attempt_at: new Date().toISOString(),
         },
         ...(cohortSource ? { referral_source: cohortSource } : {}),
         ...(cohortMedium ? { referral_medium: cohortMedium } : {}),
         ...(emailId ? { invite_sent_at: new Date().toISOString() } : {}),
-      }).eq('id', id);
+        ...(existingUser
+          ? {
+              consumed_at: existingUser.created_at || approvedAtIso,
+              consumed_by_user_id: existingUser.id,
+              consumption_source: existingUserSource || 'web',
+            }
+          : {}),
+      };
+      const { error: updErr } = await service
+        .from('access_requests')
+        .update(updateRow as never)
+        .eq('id', id);
 
       if (updErr) {
         console.error('[bulk-approve] update failed for', id, updErr.message);
         results.failed_ids.push(id);
         continue;
+      }
+
+      // Race-window mitigation: a signup may have landed between our
+      // initial existingUser check and this UPDATE. The signup's own
+      // consume_access_request would have seen status='pending' and
+      // no-op'd. Re-query now that status='approved' and stamp via the
+      // RPC. Idempotent: the inline-consumed case from existingUser
+      // already populated consumed_*, so the RPC returns NULL.
+      if (!existingUser) {
+        try {
+          const { data: lateUser } = await service
+            .from('users')
+            .select('id')
+            .ilike('email', lcEmail)
+            .maybeSingle();
+          if (lateUser?.id) {
+            let lateSource: 'web' | 'ios' | 'kids' = 'web';
+            try {
+              const { data: authUser } = await service.auth.admin.getUserById(lateUser.id);
+              const raw = (authUser?.user?.user_metadata as Record<string, unknown> | null)?.signup_source;
+              if (typeof raw === 'string' && (raw === 'ios' || raw === 'kids' || raw === 'web')) {
+                lateSource = raw;
+              }
+            } catch {}
+            // RPC name cast as never until database.ts is regenerated
+            // with the new function signature (migration 20260512180100).
+            const { error: rpcErr } = await service.rpc(
+              'consume_access_request' as never,
+              {
+                p_email: req.email,
+                p_user_id: lateUser.id,
+                p_source: lateSource,
+              } as never
+            );
+            if (rpcErr) {
+              console.error('[bulk-approve] late consume_access_request failed for', id, rpcErr);
+            } else {
+              // The race-window catch counts as silent-consume for the
+              // admin summary toast.
+              results.already_signed_up_count++;
+            }
+          }
+        } catch (e) {
+          console.error('[bulk-approve] race-mitigation lookup threw for', id, e);
+        }
       }
 
       try {
@@ -177,6 +273,8 @@ export async function POST(request: Request) {
             access_code_id: codeId,
             email: req.email,
             email_sent: !!emailId,
+            already_signed_up: !!existingUser,
+            consumed_by_user_id: existingUser?.id || null,
           },
         });
       } catch {
@@ -184,6 +282,7 @@ export async function POST(request: Request) {
       }
 
       results.approved_count++;
+      if (existingUser) results.already_signed_up_count++;
     } catch (err) {
       console.error('[bulk-approve] unexpected error for', id, err);
       results.failed_ids.push(id);
@@ -200,6 +299,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: !anyFailure,
     approved_count: results.approved_count,
+    already_signed_up_count: results.already_signed_up_count,
     failed_count: results.failed_ids.length,
     email_failed_count: results.email_failed_ids.length,
     failed_ids: results.failed_ids,

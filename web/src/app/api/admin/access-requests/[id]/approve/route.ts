@@ -67,6 +67,28 @@ export async function POST(request: Request, { params }: { params: { id: string 
     );
   }
 
+  // Look up an existing user for this email. If the user is already
+  // signed up (common after iOS launches open), we silently mark the
+  // row consumed and skip the invite email — sending "you're in!" to
+  // someone who's already in is confusing and erodes trust.
+  const lcEmail = req.email.toLowerCase();
+  const { data: existingUser } = await service
+    .from('users')
+    .select('id, created_at')
+    .ilike('email', lcEmail)
+    .maybeSingle();
+  const existingUserSource: string | null = await (async () => {
+    if (!existingUser) return null;
+    try {
+      const { data: authUser } = await service.auth.admin.getUserById(existingUser.id);
+      const raw = (authUser?.user?.user_metadata as Record<string, unknown> | null)?.signup_source;
+      if (typeof raw === 'string' && (raw === 'ios' || raw === 'kids' || raw === 'web')) {
+        return raw;
+      }
+    } catch {}
+    return 'web';
+  })();
+
   // Mint owner-tier link (one-time, 7-day default expiry).
   const expiresAtIso = new Date(
     Date.now() + DEFAULT_EXPIRY_DAYS * 24 * 60 * 60 * 1000
@@ -101,22 +123,24 @@ export async function POST(request: Request, { params }: { params: { id: string 
   );
 
   let emailId: string | null = null;
-  try {
-    const result = await sendEmail({
-      to: req.email,
-      subject: tpl.subject,
-      html: tpl.html,
-      text: tpl.text,
-      fromName: tpl.fromName,
-      fromEmail: tpl.fromEmail,
-      replyTo: undefined,
-      unsubscribeUrl: undefined,
-    });
-    emailId = (result as { id?: string })?.id || null;
-  } catch (e) {
-    // Email failure is recoverable — admin can re-trigger from the queue.
-    // Still mark approved + bind code so the request doesn't stay pending.
-    console.error('[admin.access_request.approve] sendEmail failed:', e);
+  if (!existingUser) {
+    try {
+      const result = await sendEmail({
+        to: req.email,
+        subject: tpl.subject,
+        html: tpl.html,
+        text: tpl.text,
+        fromName: tpl.fromName,
+        fromEmail: tpl.fromEmail,
+        replyTo: undefined,
+        unsubscribeUrl: undefined,
+      });
+      emailId = (result as { id?: string })?.id || null;
+    } catch (e) {
+      // Email failure is recoverable — admin can re-trigger from the queue.
+      // Still mark approved + bind code so the request doesn't stay pending.
+      console.error('[admin.access_request.approve] sendEmail failed:', e);
+    }
   }
 
   // Stamp cohort tags on the minted code if provided.
@@ -135,29 +159,91 @@ export async function POST(request: Request, { params }: { params: { id: string 
   // surface a "Resend invite" button on rows where the initial email
   // attempt failed (was previously only inferable via the absence of
   // invite_sent_at).
-  const updatePayload: TableUpdate<'access_requests'> = {
+  //
+  // ConsumeUpdate widens TableUpdate with the three columns added in
+  // migration 20260512180000. Drop the extension once
+  // `supabase gen types` is rerun and database.ts knows about them.
+  type ConsumeUpdate = TableUpdate<'access_requests'> & {
+    consumed_at?: string | null;
+    consumed_by_user_id?: string | null;
+    consumption_source?: 'web' | 'ios' | 'kids' | null;
+  };
+  const approvedAtIso = new Date().toISOString();
+  const updatePayload: ConsumeUpdate = {
     status: 'approved',
     approved_by: actor.id,
-    approved_at: new Date().toISOString(),
+    approved_at: approvedAtIso,
     access_code_id: codeId,
     metadata: {
       approval_email_id: emailId,
       invite_url: inviteUrl,
-      email_status: emailId ? 'sent' : 'failed',
+      email_status: existingUser
+        ? 'skipped_already_user'
+        : (emailId ? 'sent' : 'failed'),
       email_last_attempt_at: new Date().toISOString(),
     },
     ...(cohortSource ? { referral_source: cohortSource } : {}),
     ...(cohortMedium ? { referral_medium: cohortMedium } : {}),
-  } as TableUpdate<'access_requests'>;
+  };
   if (emailId) updatePayload.invite_sent_at = new Date().toISOString();
+  // Same UPDATE stamps the row consumed when the user already exists, so
+  // it moves straight to the Consumed bucket instead of sitting in
+  // Outstanding for an action that's already done.
+  if (existingUser) {
+    updatePayload.consumed_at = existingUser.created_at || approvedAtIso;
+    updatePayload.consumed_by_user_id = existingUser.id;
+    updatePayload.consumption_source = (existingUserSource as 'web' | 'ios' | 'kids' | null) || 'web';
+  }
 
   const { error: updErr } = await service
     .from('access_requests')
-    .update(updatePayload)
+    .update(updatePayload as never)
     .eq('id', id);
   if (updErr) {
     console.error('[admin.access_request.approve] update failed:', updErr.message);
     return NextResponse.json({ error: 'Approve marked but DB update failed' }, { status: 500 });
+  }
+
+  // Race-window mitigation. The initial existingUser query ran before
+  // the row hit status='approved'. If a signup landed between that
+  // query and this UPDATE, the signup's own consume_access_request RPC
+  // saw status='pending' and no-op'd, which would leave an approved
+  // unconsumed orphan. Re-query for a user now that the row is
+  // approved and stamp via the RPC — idempotent: if the inline UPDATE
+  // already stamped consumed_*, the RPC returns NULL.
+  if (!existingUser) {
+    try {
+      const { data: lateUser } = await service
+        .from('users')
+        .select('id')
+        .ilike('email', lcEmail)
+        .maybeSingle();
+      if (lateUser?.id) {
+        let lateSource: 'web' | 'ios' | 'kids' = 'web';
+        try {
+          const { data: authUser } = await service.auth.admin.getUserById(lateUser.id);
+          const raw = (authUser?.user?.user_metadata as Record<string, unknown> | null)?.signup_source;
+          if (typeof raw === 'string' && (raw === 'ios' || raw === 'kids' || raw === 'web')) {
+            lateSource = raw;
+          }
+        } catch {}
+        // RPC name cast as never until database.ts is regenerated with
+        // the new function signature (added in migration 20260512180100).
+        const { error: rpcErr } = await service.rpc(
+          'consume_access_request' as never,
+          {
+            p_email: req.email,
+            p_user_id: lateUser.id,
+            p_source: lateSource,
+          } as never
+        );
+        if (rpcErr) {
+          console.error('[admin.access_request.approve] late consume_access_request failed:', rpcErr);
+        }
+      }
+    } catch (e) {
+      console.error('[admin.access_request.approve] race-mitigation lookup threw:', e);
+    }
   }
 
   try {
@@ -171,6 +257,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         access_code_id: codeId,
         email: req.email,
         email_sent: !!emailId,
+        already_signed_up: !!existingUser,
+        consumed_by_user_id: existingUser?.id || null,
       },
     });
   } catch {

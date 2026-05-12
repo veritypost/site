@@ -30,8 +30,12 @@ export type GateResult =
  * `access_requests` row is the canonical source of truth for "this
  * email is allowed in." It must work even when the recipient never
  * clicked the invite link (auto-email failed, link lost in inbox,
- * cookies cleared, different device, etc.). Once approved, that email
- * is in — period.
+ * cookies cleared, different device, etc.).
+ *
+ * Filtered on `consumed_at IS NULL` — once the approval has been used
+ * (a user has signed up with that email), it stops being a gate
+ * bypass. Returning users authenticate normally as existing accounts;
+ * a leaked or guessed approved email can't be re-used indefinitely.
  */
 export async function isApprovedEmail(
   service: SupabaseClient,
@@ -45,6 +49,7 @@ export async function isApprovedEmail(
       .select('id')
       .eq('email', lc)
       .eq('status', 'approved')
+      .is('consumed_at', null)
       .maybeSingle();
     return !!data;
   } catch {
