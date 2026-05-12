@@ -186,7 +186,6 @@ struct StoryDetailView: View {
     // is the only reading-list primitive.
     @State private var isFollowing = false
     @State private var followBusy = false
-    @State private var showUpgradeAlert = false
     @State private var showSubscription = false
     // OwnersAudit Story Task 18 — anon Discussion tab → LoginView sheet
     @State private var showLogin = false
@@ -454,12 +453,6 @@ struct StoryDetailView: View {
                 }
                 .accessibilityLabel("More options")
             }
-        }
-        .alert("Follow limit reached", isPresented: $showUpgradeAlert) {
-            Button("See paid plans") { showSubscription = true }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("You\u{2019}ve hit the follow limit for free accounts. Upgrade to follow unlimited stories.")
         }
         .sheet(isPresented: $showSubscription) { SubscriptionView().environmentObject(auth) }
         .sheet(isPresented: $showRegistrationSheet) {
@@ -4399,7 +4392,7 @@ private struct RegistrationSheetView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             VStack(alignment: .leading, spacing: 12) {
-                Label("Follow stories to come back to them later", systemImage: "bookmark")
+                Label("Follow stories to come back to them later", systemImage: "clock")
                 Label("Join discussions after passing the quiz", systemImage: "bubble.left.and.bubble.right")
                 Label("Follow topics you care about", systemImage: "star")
             }
