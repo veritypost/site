@@ -59,27 +59,6 @@ Web shows 21 settings cards in a master/detail drawer (Identity, Security, Passw
 **Prompt for the agent team:**
 > Reconcile settings IA. Read every card in `web/src/app/profile/settings/_cards/` and every section in `VerityPost/VerityPost/SettingsView.swift`. Map each web card to its iOS equivalent. Identify which web cards don't have an iOS twin (and vice versa) — those are real feature gaps. Either consolidate web to 7 groups or expand iOS to 21 cards; lean iOS toward web's structure since web is the more granular and explicit one. Pressure-test save UX per setting (optimistic / debounced / explicit save), permission gates, and "owner-mode" visibility.
 
-## 9. Comments redesign — port to iOS
-
-Web shipped a unified intent column, tally line, and "I agree / Helpful" action row in commit `973ee088`. Three intent types (Question / Adding to this / Different take) with color tokens, mono font, threaded reply borders. iOS still shows intent as a single inline badge in the meta row — no tally line, no action row toggles, no threaded-reply intent border.
-
-**Prompt for the agent team:**
-> Port the web comments redesign to iOS adult. Read `web/src/components/CommentRow.tsx` end to end (especially lines 486–982) and reproduce the visual + interactive contract in `VerityPost/VerityPost/StoryDetailView.swift`'s discussion tab. Cover: intent rendering on top-level vs reply, tally line "Agreed by N · Helpful M · X replies", I-agree/Helpful toggles (write to `comment_context_tags`), quote-reply on text selection (does iOS have an equivalent gesture?), threaded-reply 3px intent-colored left border. Pressure-test anon viewing (can see counts, can't tap), expert-thread chrome (currently kill-switched, leave it off), moderation actions visibility, and permission gates. Cross-platform: web is the source of truth; kids comments are a separate funnel — confirm out of scope.
-
-## 10. FollowStoryButton anon UX divergence
-
-Web: button renders for anon users and tapping it opens the registration wall. iOS: button is auth-gated upstream and never renders for anon. Web converts anons; iOS just hides the affordance. They should match.
-
-**Prompt for the agent team:**
-> Pick a direction and align both platforms. Probable answer: match web — render the button for anon and open the registration wall on tap. iOS doesn't have an equivalent registration wall today, so the prerequisite is building one (or repurposing the "Sign up" sheet that the Profile tab already opens for anon). Investigate the full anon-tap flow: where does the wall open, what does it offer, how does the user return to the article after dismissing? Pressure-test: anon taps Follow → wall → dismisses → still on article → taps Follow again → wall opens again (not annoying)? Anon taps Follow → wall → signs up → returns to article with Follow now active?
-
-## 11. Reading-progress ribbon styling drift
-
-Web: 2px bar in ink color, visible on every scroll, only when progress > 0. iOS: 2px bar in accent color, only visible on the Story tab. Two different visual languages for the same affordance.
-
-**Prompt for the agent team:**
-> Decide on one treatment and apply it to both platforms. Probable answer: match web's ink color (more neutral, less attention-grabbing) and apply to all tabs on iOS, not just the Story tab. Verify: dark mode rendering (ink color flips), reduced-motion accessibility (no scaling animation), exact z-index relationship to the iOS top bar.
-
 ## 12. Typography model mismatch
 
 Web uses fixed-pixel typography (18px body / 1.7 line-height for article prose, 16px elsewhere). iOS uses Dynamic Type so font size scales with the user's accessibility settings. Same article on a user's iPhone with large accessibility text looks dramatically different from the same article on the web. Affects readability, layout overflow, and accessibility posture.
@@ -96,10 +75,10 @@ Web uses fixed-pixel typography (18px body / 1.7 line-height for article prose, 
 
 ## 15. Card radius alignment
 
-Web cards are 8px radius (`CommentRow.tsx:603`). iOS uses `VP.radiusMD = 12` and `VP.Radius.md = 10` (`Theme.swift:166, 157`). Intent chips on web went sharp (0px); iOS still rounds them. Small differences (2–4px) but visible on every card and comment thread.
+Web cards are 8px radius (`CommentRow.tsx:603`). iOS uses `VP.radiusMD = 12` and `VP.Radius.md = 10` (`Theme.swift:166, 157`). Small differences (2–4px) but visible on every card. Intent-chip variant of this drift was resolved in the comments-redesign port (chips became text-only mono, no radius); this entry is now narrowed to general card surfaces.
 
 **Prompt for the agent team:**
-> Pick one canonical scale and align. Investigate where each side's radius constants are consumed (Theme.swift on iOS, inline styles on web), and decide whether web should introduce CSS custom properties to match iOS's named scale (`--radius-sm`, `--radius-md`, `--radius-pill`). Sharp-cornered intent chips on web are a deliberate design choice — preserve them and decide if iOS should match.
+> Pick one canonical scale and align. Investigate where each side's radius constants are consumed (Theme.swift on iOS, inline styles on web), and decide whether web should introduce CSS custom properties to match iOS's named scale (`--radius-sm`, `--radius-md`, `--radius-pill`). Likely lands alongside the spacing-scale work in item 16 — they're the same design-system harmonization arc.
 
 ## 16. Spacing scale alignment
 
