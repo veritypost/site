@@ -1398,7 +1398,15 @@ final class AuthViewModel: ObservableObject {
             }
             struct SessionShape: Decodable {
                 let access_token: String
-                let refresh_token: String
+                // Optional defensive guard: the server contract today only
+                // returns refresh_token when client === 'ios', and the
+                // value is never null in practice. If a future contract
+                // change ever emits `"refresh_token": null` explicitly,
+                // JSONDecoder would throw on a non-optional String and the
+                // user would see "Invalid code" — which is misleading
+                // because the code itself is fine. Optional lets us
+                // surface a more accurate error below.
+                let refresh_token: String?
             }
             struct OTPResponse: Decodable {
                 let ok: Bool?
@@ -1414,13 +1422,21 @@ final class AuthViewModel: ObservableObject {
                 authError = "Invalid code. Please try again."
                 return false
             }
+            // Distinct error path for the server-side anomaly where a
+            // session arrives without a refresh token — retrying the
+            // same code won't help (the server's response shape is the
+            // problem, not user input).
+            guard let refreshToken = s.refresh_token else {
+                authError = "Sign-in is temporarily unavailable. Please try again later."
+                return false
+            }
             // Install the session into the Swift SDK so `client.auth.session`
             // returns it for the rest of the app lifecycle and the SDK
             // refreshes the token on its own.
             do {
                 let session = try await client.auth.setSession(
                     accessToken: s.access_token,
-                    refreshToken: s.refresh_token
+                    refreshToken: refreshToken
                 )
                 await loadUser(id: session.user.id.uuidString)
                 // Clear the "Check your inbox" card + 30s resend cooldown
