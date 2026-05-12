@@ -16,7 +16,7 @@ import crypto from 'node:crypto';
 //     third-party pings.
 //   - Otherwise deny.
 export function verifyCronAuth(request) {
-  const vercelCron = request.headers.get('x-vercel-cron') === '1';
+  const vercelCron = request.headers.get('x-vercel-cron') !== null;
 
   // Vercel platform scheduler path: trust the header on its own.
   if (vercelCron) return { ok: true, vercel_cron: true };
