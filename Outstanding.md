@@ -199,12 +199,23 @@ The waitlist removal + OTP session-body fix in commit `e4cad79d` is committed lo
 **Prompt for the agent team:**
 > Pressure-test the auth changes in commit `e4cad79d` end-to-end on a real iOS build. Verify: (a) anon user can launch the app and reach Home without ever seeing a signup prompt; (b) an iOS user typing the 8-digit code into the OTP field successfully signs in and `client.auth.session` returns the installed session afterward; (c) the tapped-from-email Universal Link path still works; (d) signing out, then signing back in via OTP, works without showing the stale "Check your inbox" card; (e) the audit_log row for an iOS signup tags `client: "ios"` and `signup_source: "ios"`; (f) the web waitlist UI still functions correctly with no regressions. Verify the Supabase Swift SDK 2.43.1 `setSession(accessToken:refreshToken:)` semantics — does it emit `.signedIn` synchronously, async, or both? If it races the auth listener's own `loadUser`, document the race and decide if a fix is needed. Use the methodology above (3 investigators + 1 adversary).
 
-## 4. Analytics distinction between per-login client and durable signup_source
+## 4. Analytics distinction between per-login client and durable signup_source — SHIPPED 2026-05-12
 
 A returning web user who installs iOS and signs in will produce audit_log rows tagged `client: "ios"` even though their canonical `signup_source` is `"web"`. Per-login client and durable origin are now two different things. Any dashboard that conflates them will misattribute iOS logins as iOS acquisitions.
 
 **Prompt for the agent team:**
 > Audit every consumer of `audit_log.metadata.client` and `users.raw_user_meta_data.signup_source` (via grep + Supabase MCP). For each, decide whether it wants the per-login client or the durable origin. Fix any that read the wrong field. Build a one-page reference under `/admin/` that explicitly documents the distinction so future analytics queries don't get it wrong. Include funnel reports, cohort retention queries, and any growth dashboard.
+
+**SHIPPED 2026-05-12.** Investigator audit: only one consumer reads either field today — `web/src/app/api/admin/access-requests/[id]/approve/route.ts:84,216` correctly reads `auth.users.user_metadata.signup_source` (durable origin) when stamping `access_requests.consumption_source`. **No mis-reads found.** No funnel, cohort, retention, growth, or admin dashboard queries currently consume either field, so there was nothing to fix. The risk the item was created to prevent (a future dashboard conflating the two) is now headed off by a canonical reference doc at `web/src/app/admin/_docs/ANALYTICS_FIELDS.md` — covers the distinction with a side-by-side table, ✅/❌ SQL examples, the `signup_complete` edge case (audit row's `metadata.client` equals origin by definition for a user's first login), and the schema-location footnote (`signup_source` lives only in `auth.users.raw_user_meta_data` JSONB; `metadata.client` lives in `public.audit_log.metadata`). Underscore-prefixed `_docs/` folder keeps it out of Next.js routing. Grep-discoverable for future devs/agents.
+
+**Schema canonical write sites (cataloged in the doc):**
+- `audit_log.metadata.client` written by `send-magic-link/route.js:122`, `verify-magic-code/route.ts:71,312,315`, with the documented `signup_complete` defensive-fallback at `verify-magic-code/route.ts:307-310` (reads `user_metadata.signup_source` if request `client` is missing).
+- `users.raw_user_meta_data.signup_source` written **once** at user creation by `send-magic-link/route.js:290` via `service.auth.admin.createUser({ user_metadata: { signup_source: client } })`.
+
+**Cross-platform footnote:**
+- Web: doc lives here, audit applies to web admin code. ✓
+- iOS: N/A — iOS doesn't run analytics queries; it writes telemetry via web API per memory `feedback_ios_writes_via_web_api.md`. The doc applies to anyone reading audit data, regardless of where the writes originated.
+- Kids iOS: N/A — same as iOS.
 
 ---
 
