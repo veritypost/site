@@ -12,7 +12,7 @@ import Supabase
 //   [ hero card: score + tier pill ]
 //   [ stat row: Quizzes passed / Comments ]
 //   [ social row: Followers / Following — gated by profile.followers.view.own ]
-//   [ quick action row: Bookmarks / Messages / Share / Kids ]
+//   [ quick action row: Messages / Share / Kids ]
 //   [ recent activity preview — 3 rows + "See all" ]
 //   [ achievement preview — 3 tiles + "See all" ]
 //   [ tab bar: Overview / Activity / Categories / Milestones ]

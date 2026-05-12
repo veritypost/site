@@ -236,9 +236,6 @@ struct MainTabView: View {
 
     // Nav restructure 2026-05-06: matches mobile web. Browse removed
     // from bottom nav; sections accessible via HomeSectionsSheet.
-    // 2026-05-07: Following added back as a 3rd tab (mirrors web
-    // NavWrapper update) — points at the article-bookmarks list.
-    // The story-level /following surface stays launch-hidden.
     // Notifications and Rankings still accessed from Profile.
     // Profile slot relabels to "Sign up" for anon users.
     // Owner cleanup item 12 (2026-05-08, refined) — Following lives in
@@ -301,9 +298,10 @@ struct MainTabView: View {
             TextTabBar(selected: $selectedTab, isLoggedIn: isLoggedIn)
         }
         .onChange(of: auth.pendingHomeJump) { _, requested in
-            // T66 — BookmarksView's empty-state CTA requests a tab swap
-            // by flipping this flag. Apply the swap + clear the flag so a
-            // future request is observable.
+            // T66 — cross-view request to flip the tab to Home. Set by
+            // anywhere a deep view wants to bounce the user back to the
+            // tab bar. Apply the swap + clear the flag so a future
+            // request is observable.
             if requested {
                 selectedTab = .today
                 auth.pendingHomeJump = false

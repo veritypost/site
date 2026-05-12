@@ -44,7 +44,6 @@ struct StoryDetailView: View {
     @State private var canRetakeQuiz: Bool = false
     @State private var hasUnlimitedQuizAttempts: Bool = false
     @State private var canMentionAutocomplete: Bool = false
-    @State private var hasUnlimitedBookmarks: Bool = false
     @State private var canViewBody: Bool = true
     @State private var canViewSources: Bool = true
     @State private var canViewTimeline: Bool = true
@@ -181,20 +180,17 @@ struct StoryDetailView: View {
     // Source expansion
     @State private var expandedSource: Int? = nil
 
-    // Bookmarks
-    @State private var isBookmarked = false
-    @State private var bookmarkId: String? = nil
-    // Owner cleanup item 12 — story-level follow state. The "Save" button
-    // is now "Follow" (story-level); old bookmark state above stays as
-    // orphan for the bookmark-cap alert path which the data layer still
-    // shares (table left dormant). UI flips entirely to follow.
+    // Story-level follow state — the "Save" button is now "Follow"
+    // (story-level via story_follows). The legacy article-level
+    // bookmark state was removed in the bookmark cleanup; story-follow
+    // is the only reading-list primitive.
     @State private var isFollowing = false
     @State private var followBusy = false
     @State private var showUpgradeAlert = false
     @State private var showSubscription = false
     // OwnersAudit Story Task 18 — anon Discussion tab → LoginView sheet
     @State private var showLogin = false
-    // Registration wall sheet — triggered by anon bookmark or quiz CTA taps
+    // Registration wall sheet — triggered by anon quiz CTA taps
     @State private var showRegistrationSheet = false
 
     // Expert filter
@@ -567,7 +563,6 @@ struct StoryDetailView: View {
             canRetakeQuiz = await PermissionService.shared.has("quiz.retake")
             hasUnlimitedQuizAttempts = await PermissionService.shared.has("quiz.retake.after_fail")
             canMentionAutocomplete = await PermissionService.shared.has("comments.mention.autocomplete")
-            hasUnlimitedBookmarks = await PermissionService.shared.has("bookmarks.unlimited")
             // Anon parity with web (web/src/app/[slug]/page.tsx:335). Anon
             // visitors read article bodies unconditionally; the
             // `article.view.body` permission is reserved for the
@@ -3183,34 +3178,11 @@ struct StoryDetailView: View {
 
         // D29: Articles have no reactions — reaction loading removed.
 
-        // Bookmark and quiz-history fetches are secondary — the article body is already
-        // loaded before these run. Failures degrade gracefully: isBookmarked defaults to
-        // false (safe; worst case the user re-bookmarks), quiz history defaults to empty
-        // (safe; user re-takes the quiz). Neither failure should block article reading.
+        // Quiz-history fetch is secondary — the article body is already loaded
+        // before this runs. Failure degrades gracefully (defaults to empty;
+        // user re-takes the quiz). Should not block article reading.
         if let session = try? await client.auth.session {
             let userId = session.user.id.uuidString
-            struct BM: Decodable { let id: String }
-            do {
-                let bm: BM = try await client.from("bookmarks")
-                    .select("id")
-                    .eq("user_id", value: userId)
-                    .eq("article_id", value: story.id)
-                    .single()
-                    .execute()
-                    .value
-                isBookmarked = true
-                bookmarkId = bm.id
-            } catch {
-                // PostgREST surfaces "no rows" via `single()` as a thrown
-                // error — that's the not-found case we swallow. Anything
-                // else is a real failure that gates persisted UI.
-                let msg = error.localizedDescription.lowercased()
-                let isNotFound = msg.contains("no rows") || msg.contains("pgrst116")
-                if !isNotFound {
-                    Log.d("[StoryDetail] bookmark check failed:", error)
-                }
-            }
-
             struct PassRow: Decodable { let attempt_number: Int?; let is_correct: Bool? }
             let rows: [PassRow]
             do {
@@ -3414,17 +3386,7 @@ struct StoryDetailView: View {
         }
     }
 
-    // MARK: - Bookmark
-    // D13: routes through /api/bookmarks (service client) so the D13 cap
-    // trigger runs server-side and RLS can stay ownership-only per
-    // migration 045. Direct supabase-client inserts hit the old RLS wall
-    // and bypass server-side validation.
-    //
-    // A118 — server-side cap is the source of truth. The trigger raises
-    // `P0001 bookmark_cap_exceeded`, which the API route surfaces as a
-    // 403 with `{"error":"bookmark_cap_exceeded"}`. We read the body,
-    // route a cap-exceeded response into the upgrade alert, and treat
-    // every other non-2xx as a transient failure.
+    // MARK: - Story follow
     // Owner cleanup item 12 — story-level follow toggle. POSTs the new
     // /api/story-follows endpoint, optimistically flips local state.
     // Hidden when the article has no story_id (handled at the call site).
@@ -3478,71 +3440,6 @@ struct StoryDetailView: View {
         } catch {
             // Silent — default to not-following.
         }
-    }
-
-    private func toggleBookmark() async {
-        guard let session = try? await client.auth.session else { return }
-        let site = SupabaseManager.shared.siteURL
-        if isBookmarked, let bid = bookmarkId {
-            guard let url = URL(string: "/api/bookmarks/\(bid)", relativeTo: site) else { return }
-            var req = URLRequest(url: url)
-            req.httpMethod = "DELETE"
-            req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
-            if let (_, response) = try? await URLSession.shared.data(for: req),
-               let http = response as? HTTPURLResponse, http.statusCode == 200 {
-                isBookmarked = false; bookmarkId = nil
-            }
-        } else {
-            guard let url = URL(string: "/api/bookmarks", relativeTo: site) else { return }
-            struct Body: Encodable { let article_id: String }
-            struct Resp: Decodable { let id: String }
-            struct ErrResp: Decodable { let error: String? }
-            var req = URLRequest(url: url)
-            req.httpMethod = "POST"
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
-            req.httpBody = try? JSONEncoder().encode(Body(article_id: story.id))
-            guard let (data, response) = try? await URLSession.shared.data(for: req),
-                  let http = response as? HTTPURLResponse else {
-                return
-            }
-            if http.statusCode == 200,
-               let decoded = try? JSONDecoder().decode(Resp.self, from: data) {
-                isBookmarked = true
-                bookmarkId = decoded.id
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                return
-            }
-            // Cap-exceeded — surface upgrade affordance instead of failing
-            // silently. The route returns 403 with `error: "bookmark_cap_exceeded"`
-            // when the trigger raises P0001. Anything else is a transient
-            // failure we just log.
-            if let err = try? JSONDecoder().decode(ErrResp.self, from: data),
-               err.error == "bookmark_cap_exceeded" {
-                await MainActor.run { showUpgradeAlert = true }
-                return
-            }
-            Log.d("[StoryDetail] bookmark POST non-2xx:", http.statusCode)
-        }
-    }
-
-    /// D13: users without `bookmarks.unlimited` may bookmark up
-    /// to 10 articles; users with it are uncapped. Removing an existing
-    /// bookmark never hits the cap.
-    ///
-    /// A118 — the iOS client used to pre-count bookmarks before posting,
-    /// which raced against the server's `bookmarks_cap` trigger: between
-    /// the SELECT and the POST another tab/web session could land row #11.
-    /// We now trust the server-side trigger and parse its P0001
-    /// "bookmark_cap_exceeded" reply (surfaced by /api/bookmarks as a 403)
-    /// into the upgrade affordance, mirroring what the web client does.
-    /// The pre-check is gone end-to-end.
-    private func attemptBookmark() async {
-        guard (try? await client.auth.session) != nil else {
-            await MainActor.run { showRegistrationSheet = true }
-            return
-        }
-        await toggleBookmark()
     }
 
     // D29: Articles have no reactions — toggleReaction removed.
@@ -4489,7 +4386,7 @@ struct ThreadChainState: Equatable {
 }
 
 // MARK: - Registration wall sheet (Slice 6)
-// Shown to anonymous users who tap Bookmark or the quiz/discussion CTA.
+// Shown to anonymous users who tap the quiz/discussion CTA.
 // Presents a half-sheet with a Sign up link; does not require auth context.
 private struct RegistrationSheetView: View {
     var body: some View {
@@ -4502,7 +4399,7 @@ private struct RegistrationSheetView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             VStack(alignment: .leading, spacing: 12) {
-                Label("Bookmark articles to read later", systemImage: "bookmark")
+                Label("Follow stories to come back to them later", systemImage: "bookmark")
                 Label("Join discussions after passing the quiz", systemImage: "bubble.left.and.bubble.right")
                 Label("Follow topics you care about", systemImage: "star")
             }

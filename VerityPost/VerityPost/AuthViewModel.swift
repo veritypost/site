@@ -92,9 +92,9 @@ final class AuthViewModel: ObservableObject {
     @Published var sessionExpired = false
 
     /// T66 — cross-view request to flip the bottom tab to Home. Used by
-    /// deep views (BookmarksView empty-state CTA) that don't otherwise
-    /// have access to the tab-bar selection. ContentView observes this
-    /// flag and clears it after applying the switch.
+    /// deep views that don't otherwise have access to the tab-bar
+    /// selection. ContentView observes this flag and clears it after
+    /// applying the switch.
     @Published var pendingHomeJump: Bool = false
 
     /// T88 — local-only onboarding bypass. Set when the server stamp

@@ -648,7 +648,7 @@ final class StoreManager: ObservableObject {
         // confirmation exists (empty set) this returns false for all paid
         // features, defaulting-closed rather than defaulting-open.
         switch feature {
-        case "bookmarks_unlimited", "collections", "dms", "mentions", "follows",
+        case "dms", "mentions", "follows",
              "tts", "advanced_search", "category_leaderboards", "recap",
              "profile_banner", "profile_card":
             return !serverConfirmedProductIDs.isEmpty
