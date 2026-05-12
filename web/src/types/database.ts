@@ -14407,6 +14407,7 @@ export type Database = {
           body: string
           id: string
           metadata: Json
+          priority: string
           title: string
           type: string
           user_id: string

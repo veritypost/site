@@ -19,6 +19,11 @@ const CRON_NAME = 'send-push';
 // digest bundler. Both gated on the master kill switch via expertConfig.
 const EXPERT_THREADS_ALERT_TYPES = new Set(['mention', 'category_arrival']);
 
+// Urgent-priority allowlist + (priority,type) → APNs opts mapping lives in
+// web/src/lib/pushPriority.js so it can be unit-tested in isolation and so
+// other dispatch paths (if any future ones are added) can share enforcement.
+import { resolvePushPriority } from '@/lib/pushPriority';
+
 // Auth: CRON_SECRET via verifyCronAuth. Fail-closed 403.
 // Push delivery worker. Mirrors /api/cron/send-emails in shape: picks
 // unsent notifications whose channel isn't 'in_app' (quiet hours force
@@ -450,12 +455,30 @@ async function drainOneBatch({ expertThreadsEnabled = false } = {}) {
 
           await Promise.all(
             wave.map(async ({ n, token: t }) => {
-              const r = await send(t.push_token, {
-                title: n.title,
-                body: n.body,
-                url: n.action_url,
-                metadata: n.metadata || undefined,
-              });
+              // Map the row's priority + type to APNs apns-priority +
+              // aps interruption-level. Urgent is allowlist-gated; rows that
+              // ask for urgent with a non-allowlisted type are downgraded
+              // here and a warning is logged so abuse is visible in cron logs.
+              const { priority, interruptionLevel, downgraded } = resolvePushPriority(
+                n.priority,
+                n.type
+              );
+              if (downgraded) {
+                console.warn(
+                  '[cron.send-push] downgraded urgent push: type not on URGENT_TYPE_ALLOWLIST',
+                  { notification_id: n.id, type: n.type }
+                );
+              }
+              const r = await send(
+                t.push_token,
+                {
+                  title: n.title,
+                  body: n.body,
+                  url: n.action_url,
+                  metadata: n.metadata || undefined,
+                },
+                { priority, interruptionLevel }
+              );
               await service.from('push_receipts').insert({
                 notification_id: n.id,
                 user_id: n.user_id,

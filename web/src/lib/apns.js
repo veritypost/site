@@ -81,7 +81,21 @@ const DEAD_TOKEN_REASONS = new Set([
   'TopicDisallowed',
 ]);
 
-function buildAlertPayload({ title, body, url, badge, category, threadId, metadata }) {
+// Allowed values for the aps `interruption-level` key (Apple docs).
+// 'critical' deliberately omitted: requires the Critical Alerts entitlement
+// (com.apple.developer.usernotifications.critical-alerts) which we don't have.
+const VALID_INTERRUPTION_LEVELS = new Set(['passive', 'active', 'time-sensitive']);
+
+function buildAlertPayload({
+  title,
+  body,
+  url,
+  badge,
+  category,
+  threadId,
+  metadata,
+  interruptionLevel,
+}) {
   const aps = {
     alert: { title: title || '' },
     sound: 'default',
@@ -90,6 +104,12 @@ function buildAlertPayload({ title, body, url, badge, category, threadId, metada
   if (typeof badge === 'number') aps.badge = badge;
   if (category) aps.category = category;
   if (threadId) aps['thread-id'] = threadId;
+  // Apple key name is literally "interruption-level" (hyphenated). Only set
+  // when the caller supplied a recognised value — silently omit otherwise so
+  // we never ship a malformed payload that APNs would 400.
+  if (interruptionLevel && VALID_INTERRUPTION_LEVELS.has(interruptionLevel)) {
+    aps['interruption-level'] = interruptionLevel;
+  }
 
   const payload = { aps };
   if (url) payload.action_url = url;
@@ -104,10 +124,25 @@ function buildAlertPayload({ title, body, url, badge, category, threadId, metada
 // Send one alert push on an existing HTTP/2 session. Resolves with a result
 // shape; never throws for APNs-level errors (those are reported on the
 // result object). It does throw for local crypto / config errors.
+// opts:
+//   priority           — APNs `apns-priority` header. 10 for immediate / urgent
+//                        delivery, 5 for power-conserving. Defaults to 10 for
+//                        back-compat; new callers should pass the value mapped
+//                        from notifications.priority.
+//   expiration         — `apns-expiration` header. 0 = drop if undeliverable.
+//   collapseId         — `apns-collapse-id` header.
+//   interruptionLevel  — aps `interruption-level` field. One of
+//                        'passive' | 'active' | 'time-sensitive'. ('critical'
+//                        is not supported — entitlement not held.) When set to
+//                        'time-sensitive', the OS may break through Focus /
+//                        Do Not Disturb on iOS 15+.
 function sendOnSession(session, deviceToken, notification, opts = {}) {
   const jwt = signAppleJwt();
   const topic = apnsTopic();
-  const body = Buffer.from(JSON.stringify(buildAlertPayload(notification)), 'utf8');
+  const body = Buffer.from(
+    JSON.stringify(buildAlertPayload({ ...notification, interruptionLevel: opts.interruptionLevel })),
+    'utf8'
+  );
 
   const headers = {
     ':method': 'POST',
