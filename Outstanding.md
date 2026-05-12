@@ -24,13 +24,6 @@ The waitlist removal + OTP session-body fix in commit `e4cad79d` is committed lo
 **Prompt for the agent team:**
 > Pressure-test the auth changes in commit `e4cad79d` end-to-end on a real iOS build. Verify: (a) anon user can launch the app and reach Home without ever seeing a signup prompt; (b) an iOS user typing the 8-digit code into the OTP field successfully signs in and `client.auth.session` returns the installed session afterward; (c) the tapped-from-email Universal Link path still works; (d) signing out, then signing back in via OTP, works without showing the stale "Check your inbox" card; (e) the audit_log row for an iOS signup tags `client: "ios"` and `signup_source: "ios"`; (f) the web waitlist UI still functions correctly with no regressions. Verify the Supabase Swift SDK 2.43.1 `setSession(accessToken:refreshToken:)` semantics — does it emit `.signedIn` synchronously, async, or both? If it races the auth listener's own `loadUser`, document the race and decide if a fix is needed. Use the methodology above (3 investigators + 1 adversary).
 
-## 3. Access-request rows orphaned by iOS signups
-
-When iOS launches open, a user who was previously approved on the web waitlist (row in `access_requests` with `status='approved'`) can install iOS and sign up. The iOS path bypasses the gate entirely and never marks the access_request consumed. The row stays in "approved, never used" state forever and the admin queue shows it as pending consumption.
-
-**Prompt for the agent team:**
-> Decide and implement: should iOS signups that match an existing approved `access_requests` row mark it consumed, or should the queue display logic learn to recognize "this email's user already signed up via another surface" and treat the row as fulfilled? Investigate the admin queue UI (`/admin/access-requests`) and any cron/dashboard that counts pending vs approved vs consumed. Pressure-test: user approved on web → installs iOS → signs up; user approved on web → never installs iOS → row stays pending forever (current correct state); user signs up on iOS first, then web tries to approve them later. Confirm no downstream analytics break (e.g., conversion rate calcs that divide approved-by-fulfilled).
-
 ## 4. Analytics distinction between per-login client and durable signup_source
 
 A returning web user who installs iOS and signs in will produce audit_log rows tagged `client: "ios"` even though their canonical `signup_source` is `"web"`. Per-login client and durable origin are now two different things. Any dashboard that conflates them will misattribute iOS logins as iOS acquisitions.
