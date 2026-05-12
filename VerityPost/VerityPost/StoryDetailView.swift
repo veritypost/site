@@ -815,6 +815,15 @@ struct StoryDetailView: View {
 
             Spacer().frame(height: 80)
         }
+        // Match web's article body measure (web ArticleSurface caps at
+        // 680px via maxWidth + margin: 0 auto). On iPhone the cap is a
+        // no-op (the frame settles to viewport width). On iPad and
+        // landscape the article column now centers at 680pt instead of
+        // stretching edge-to-edge, which was the most visible parity
+        // drift identified in the audit. The double-frame idiom is
+        // SwiftUI's unambiguous "cap then center in parent."
+        .frame(maxWidth: 680)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     @ViewBuilder private var passToCommentCTA: some View {
@@ -2778,12 +2787,19 @@ struct StoryDetailView: View {
     // preference values populated from the ScrollView background. Hidden when
     // the active tab is not the article (no progress to report there).
     @ViewBuilder private var readingProgressRibbon: some View {
+        // Mirror web's ReadingProgressRibbon (ink color, not accent).
+        // Story-tab guard stays — iOS has per-tab ScrollViews so the
+        // progress observer only fires on the Story tab; if we showed
+        // the bar on Timeline / Discussion it would freeze at the last
+        // Story value and read as a stale UI element. The guard keeps
+        // the semantic accurate; the color swap brings the visual into
+        // alignment with web.
         if activeTab == .story {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Rectangle().fill(VP.rule)
                     Rectangle()
-                        .fill(VP.accent)
+                        .fill(VP.ink)
                         .frame(width: geo.size.width * readingProgress)
                 }
             }
@@ -3384,7 +3400,15 @@ struct StoryDetailView: View {
     // /api/story-follows endpoint, optimistically flips local state.
     // Hidden when the article has no story_id (handled at the call site).
     private func toggleStoryFollow(storyId: String) async {
-        guard let session = try? await client.auth.session else { return }
+        // Anon tap → open the existing registration sheet instead of
+        // silently bailing. Matches web's FollowStoryButton anon path
+        // (button renders, tap fires openWall, RegistrationWall modal
+        // opens). The sheet is shared with the quiz CTA path; copy is
+        // generic ("Read more on Verity Post / Join free to unlock more").
+        guard let session = try? await client.auth.session else {
+            await MainActor.run { showRegistrationSheet = true }
+            return
+        }
         await MainActor.run { followBusy = true }
         defer { Task { @MainActor in followBusy = false } }
 
