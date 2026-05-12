@@ -159,17 +159,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   // surface a "Resend invite" button on rows where the initial email
   // attempt failed (was previously only inferable via the absence of
   // invite_sent_at).
-  //
-  // ConsumeUpdate widens TableUpdate with the three columns added in
-  // migration 20260512180000. Drop the extension once
-  // `supabase gen types` is rerun and database.ts knows about them.
-  type ConsumeUpdate = TableUpdate<'access_requests'> & {
-    consumed_at?: string | null;
-    consumed_by_user_id?: string | null;
-    consumption_source?: 'web' | 'ios' | 'kids' | null;
-  };
   const approvedAtIso = new Date().toISOString();
-  const updatePayload: ConsumeUpdate = {
+  const updatePayload: TableUpdate<'access_requests'> = {
     status: 'approved',
     approved_by: actor.id,
     approved_at: approvedAtIso,
@@ -197,7 +188,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const { error: updErr } = await service
     .from('access_requests')
-    .update(updatePayload as never)
+    .update(updatePayload)
     .eq('id', id);
   if (updErr) {
     console.error('[admin.access_request.approve] update failed:', updErr.message);
@@ -227,16 +218,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
             lateSource = raw;
           }
         } catch {}
-        // RPC name cast as never until database.ts is regenerated with
-        // the new function signature (added in migration 20260512180100).
-        const { error: rpcErr } = await service.rpc(
-          'consume_access_request' as never,
-          {
-            p_email: req.email,
-            p_user_id: lateUser.id,
-            p_source: lateSource,
-          } as never
-        );
+        const { error: rpcErr } = await service.rpc('consume_access_request', {
+          p_email: req.email,
+          p_user_id: lateUser.id,
+          p_source: lateSource,
+        });
         if (rpcErr) {
           console.error('[admin.access_request.approve] late consume_access_request failed:', rpcErr);
         }

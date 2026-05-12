@@ -15,6 +15,7 @@ import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 import { renderTemplate, sendEmail } from '@/lib/email';
 import { APPROVAL_TEMPLATE, buildApprovalVars } from '@/lib/betaApprovalEmail';
 import { getSiteUrl } from '@/lib/siteUrl';
+import type { TableUpdate } from '@/types/database-helpers';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -177,13 +178,8 @@ export async function POST(request: Request) {
       // Mark approved. If the email already had a user, stamp consumed
       // in the same UPDATE so the row jumps straight to the Consumed tab
       // and out of the admin's outstanding-action list.
-      //
-      // The cast widens the inline literal to include the consumed_*
-      // columns added in migration 20260512180000. Drop the cast once
-      // `supabase gen types` has been rerun and database.ts knows about
-      // them.
       const approvedAtIso = new Date().toISOString();
-      const updateRow: Record<string, unknown> = {
+      const updateRow: TableUpdate<'access_requests'> = {
         status: 'approved',
         approved_by: actor.id,
         approved_at: approvedAtIso,
@@ -209,7 +205,7 @@ export async function POST(request: Request) {
       };
       const { error: updErr } = await service
         .from('access_requests')
-        .update(updateRow as never)
+        .update(updateRow)
         .eq('id', id);
 
       if (updErr) {
@@ -240,16 +236,11 @@ export async function POST(request: Request) {
                 lateSource = raw;
               }
             } catch {}
-            // RPC name cast as never until database.ts is regenerated
-            // with the new function signature (migration 20260512180100).
-            const { error: rpcErr } = await service.rpc(
-              'consume_access_request' as never,
-              {
-                p_email: req.email,
-                p_user_id: lateUser.id,
-                p_source: lateSource,
-              } as never
-            );
+            const { error: rpcErr } = await service.rpc('consume_access_request', {
+              p_email: req.email,
+              p_user_id: lateUser.id,
+              p_source: lateSource,
+            });
             if (rpcErr) {
               console.error('[bulk-approve] late consume_access_request failed for', id, rpcErr);
             } else {

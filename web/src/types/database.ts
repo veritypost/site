@@ -258,6 +258,9 @@ export type Database = {
           access_code_id: string | null
           approved_at: string | null
           approved_by: string | null
+          consumed_at: string | null
+          consumed_by_user_id: string | null
+          consumption_source: string | null
           created_at: string
           email: string
           id: string
@@ -277,6 +280,9 @@ export type Database = {
           access_code_id?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          consumed_at?: string | null
+          consumed_by_user_id?: string | null
+          consumption_source?: string | null
           created_at?: string
           email: string
           id?: string
@@ -296,6 +302,9 @@ export type Database = {
           access_code_id?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          consumed_at?: string | null
+          consumed_by_user_id?: string | null
+          consumption_source?: string | null
           created_at?: string
           email?: string
           id?: string
@@ -336,6 +345,27 @@ export type Database = {
           {
             foreignKeyName: "fk_access_requests_approved_by"
             columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_access_requests_consumed_by_user_id"
+            columns: ["consumed_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_access_requests_consumed_by_user_id"
+            columns: ["consumed_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "public_user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_access_requests_consumed_by_user_id"
+            columns: ["consumed_by_user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -1652,7 +1682,6 @@ export type Database = {
           author_id: string | null
           body: string
           body_html: string | null
-          bookmark_count: number
           browse_only: boolean
           category_id: string
           cluster_id: string | null
@@ -1725,7 +1754,6 @@ export type Database = {
           author_id?: string | null
           body: string
           body_html?: string | null
-          bookmark_count?: number
           browse_only?: boolean
           category_id: string
           cluster_id?: string | null
@@ -1798,7 +1826,6 @@ export type Database = {
           author_id?: string | null
           body?: string
           body_html?: string | null
-          bookmark_count?: number
           browse_only?: boolean
           category_id?: string
           cluster_id?: string | null
@@ -2279,133 +2306,6 @@ export type Database = {
           {
             foreignKeyName: "fk_blocked_words_added_by"
             columns: ["added_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      bookmark_collections: {
-        Row: {
-          bookmark_count: number
-          created_at: string
-          description: string | null
-          id: string
-          is_default: boolean
-          name: string
-          sort_order: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          bookmark_count?: number
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_default?: boolean
-          name: string
-          sort_order?: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          bookmark_count?: number
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_default?: boolean
-          name?: string
-          sort_order?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_bookmark_collections_user_id"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "public_profiles_v"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_bookmark_collections_user_id"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "public_user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_bookmark_collections_user_id"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      bookmarks: {
-        Row: {
-          article_id: string
-          collection_id: string | null
-          collection_name: string | null
-          created_at: string
-          id: string
-          notes: string | null
-          sort_order: number
-          user_id: string
-        }
-        Insert: {
-          article_id: string
-          collection_id?: string | null
-          collection_name?: string | null
-          created_at?: string
-          id?: string
-          notes?: string | null
-          sort_order?: number
-          user_id: string
-        }
-        Update: {
-          article_id?: string
-          collection_id?: string | null
-          collection_name?: string | null
-          created_at?: string
-          id?: string
-          notes?: string | null
-          sort_order?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_bookmarks_article_id"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_bookmarks_collection_id"
-            columns: ["collection_id"]
-            isOneToOne: false
-            referencedRelation: "bookmark_collections"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_bookmarks_user_id"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "public_profiles_v"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_bookmarks_user_id"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "public_user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_bookmarks_user_id"
-            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -14274,15 +14174,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      admin_force_bookmark: {
-        Args: {
-          p_article_id: string
-          p_collection_id?: string
-          p_notes?: string
-          p_user_id: string
-        }
-        Returns: string
-      }
       admin_restore_article: {
         Args: { p_admin_id: string; p_article_id: string }
         Returns: undefined
@@ -14572,11 +14463,11 @@ export type Database = {
           surface: string
         }[]
       }
-      convert_kid_trial: { Args: { p_user_id: string }; Returns: number }
-      create_bookmark_collection: {
-        Args: { p_description?: string; p_name: string; p_user_id: string }
+      consume_access_request: {
+        Args: { p_email: string; p_source: string; p_user_id: string }
         Returns: string
       }
+      convert_kid_trial: { Args: { p_user_id: string }; Returns: number }
       create_comment_followup: {
         Args: { p_body: string; p_comment_id: string }
         Returns: Json
@@ -14606,10 +14497,6 @@ export type Database = {
       current_kid_profile_id: { Args: never; Returns: string }
       decline_queue_item: {
         Args: { p_queue_item_id: string; p_user_id: string }
-        Returns: undefined
-      }
-      delete_bookmark_collection: {
-        Args: { p_collection_id: string; p_user_id: string }
         Returns: undefined
       }
       dismiss_cluster: {
@@ -14775,10 +14662,6 @@ export type Database = {
       has_verified_email: { Args: never; Returns: boolean }
       hide_comment: {
         Args: { p_comment_id: string; p_mod_id: string; p_reason: string }
-        Returns: undefined
-      }
-      increment_bookmark_count: {
-        Args: { amount?: number; article_id: string }
         Returns: undefined
       }
       increment_comment_count: {
@@ -15120,15 +15003,6 @@ export type Database = {
       release_stale_expert_claims: {
         Args: { p_max_age_hours?: number }
         Returns: number
-      }
-      rename_bookmark_collection: {
-        Args: {
-          p_collection_id: string
-          p_description?: string
-          p_name: string
-          p_user_id: string
-        }
-        Returns: undefined
       }
       reopen_expert_thread: {
         Args: { p_root_id: string; p_user_id: string }
@@ -15636,3 +15510,4 @@ export const Constants = {
     },
   },
 } as const
+

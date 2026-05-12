@@ -24,16 +24,11 @@ import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
-// consumed_* columns landed in migration 20260512180000. The generated
-// database.ts types haven't been regenerated yet in this branch, so
-// extend the row shape inline. Drop these three lines after the next
-// `supabase gen types` run.
+// access_codes is a join shape (not a column on access_requests) — keep
+// the inline extension. Every other column the page reads is now in the
+// generated Row type.
 type Req = Tables<'access_requests'> & {
   access_codes: { code: string; expires_at: string | null; current_uses: number | null } | null;
-  referral_medium?: string | null;
-  consumed_at?: string | null;
-  consumed_by_user_id?: string | null;
-  consumption_source?: string | null;
 };
 
 type TabKey = 'pending' | 'outstanding' | 'consumed' | 'rejected' | 'all';
