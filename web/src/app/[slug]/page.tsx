@@ -244,14 +244,6 @@ export default async function ArticleSlugPage({
     slug: r.stories!.slug,
     title: r.title,
   }));
-  const nearbyArticles = nearbyRows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    slug: r.stories!.slug,
-    excerpt: r.excerpt,
-    category_name: category?.name ?? null,
-  }));
-
   if (article.status !== 'published' && !canEdit) redirect(`/${story.slug}`);
 
   // Suppress view-count writes for Owner Mode holders so owner reading
@@ -331,7 +323,6 @@ export default async function ArticleSlugPage({
               bodyHtml={bodyHtml}
               canEdit={canEdit}
               canViewBody={isAnon ? true : canViewBody}
-              nearbyArticles={nearbyArticles}
               isSignedIn={!!user}
             />
             {!isCoppa && (article.status === 'published' || canEdit || isOwnerModeViewer) && (

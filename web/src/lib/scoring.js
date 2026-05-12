@@ -119,36 +119,25 @@ export async function scoreDailyLogin(service, { userId }) {
   return { ...pointsData, streak: streakData };
 }
 
-// scoreReceiveContextTag — award the `receive_context_tag` rule to the
-// comment author when an actor marks the comment as adding context.
-// Bucketed to the article's category so per-category leaderboards
-// reflect comment quality, not just reading stats. Idempotent per
-// (actor, comment) so repeat toggles don't double-award; self-tags
-// are skipped at the route layer too but defended again here.
-//
-// (Replaces scoreReceiveHelpfulTag — the legacy `receive_helpful_tag`
-// rule was never seeded into score_rules, so the old call path was a
-// silent no-op. The "Helpful" tag is the heart / social signal in the
-// new comment voice model and intentionally does not score.)
-export async function scoreReceiveContextTag(service, { actorId, authorId, commentId, articleId, categoryId }) {
+export async function scoreReceiveHelpful(service, { actorId, authorId, commentId, articleId, categoryId }) {
   if (!actorId || !authorId || !commentId) {
     return { awarded: false, error: 'actorId, authorId, commentId required' };
   }
   if (actorId === authorId) return { awarded: false, reason: 'self_tag' };
 
-  const syntheticKey = `receive_context_tag:${actorId}:${commentId}`;
+  const syntheticKey = `receive_helpful:${actorId}:${commentId}`;
   const { data: existing } = await service
     .from('score_events')
     .select('id')
     .eq('user_id', authorId)
-    .eq('action', 'receive_context_tag')
+    .eq('action', 'receive_helpful')
     .filter('metadata->>key', 'eq', syntheticKey)
     .limit(1)
     .maybeSingle();
   if (existing) return { awarded: false, reason: 'already_awarded' };
 
   const { data, error } = await service.rpc('award_points', {
-    p_action: 'receive_context_tag',
+    p_action: 'receive_helpful',
     p_user_id: authorId,
     p_kid_profile_id: null,
     p_article_id: articleId || null,

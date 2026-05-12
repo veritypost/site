@@ -48,7 +48,7 @@ const SETTINGS: SettingGroup[] = [
     { k: 'ai_bridge_text', l: 'Bridge text between clusters', desc: 'Factual summaries between comment groups', on: false },
   ]},
   { group: 'Sorting & Display', items: [
-    { k: 'default_sort', l: 'Default sort: Top', desc: 'Sort by quality_score (upvotes weighted by reader score)', on: true },
+    { k: 'default_sort', l: 'Default sort: Top', desc: 'Sort by upvote_count then created_at (weighted by reader score)', on: true },
     { k: 'weighted_upvotes', l: 'Weighted upvotes', desc: 'Higher-score users\' upvotes count more toward quality score', on: true },
     { k: 'show_quiz_score', l: 'Show quiz score on comments', desc: 'Display poster quiz score next to their comment', on: true },
     { k: 'collapse_low_quiz', l: 'Collapse low-quiz comments', desc: 'Auto-collapse comments from users who scored below pass threshold', on: true },

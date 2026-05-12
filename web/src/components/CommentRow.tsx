@@ -39,25 +39,44 @@ type CommentUser = {
 
 type Mention = { user_id?: string; username: string };
 
-export type TagKind = 'context' | 'cite_needed' | 'off_topic';
+export type TagKind = 'i_agree' | 'helpful';
 
-// Three tags: one additive (context), two challenge (cite_needed, off_topic).
-// No counts shown in UI — quality_score is the only derived number surfaced.
-const TAG_META: Record<TagKind, { label: string; color: string; challenge: boolean }> = {
-  context:     { label: 'Context',     color: 'var(--p-ink)', challenge: false },
-  cite_needed: { label: 'Cite needed', color: '#ea580c', challenge: true },
-  off_topic:   { label: 'Off-topic',   color: '#6b7280', challenge: true },
+export type Intent = 'question' | 'add_context' | 'different_take';
+
+const TAG_META: Record<TagKind, { label: string }> = {
+  i_agree: { label: 'I agree' },
+  helpful: { label: 'Helpful' },
+};
+
+// Unified intent metadata — same labels + colors on top-level and replies.
+// Colors are pulled from the new editorial intent palette:
+//   add_context    → deep green   (#3d6b4f)  bg rgba(61,107,79,0.05)
+//   different_take → rust amber   (#a14b1a)  bg rgba(161,75,26,0.05)
+//   question       → slate blue   (#4a6e8a)  bg rgba(74,110,138,0.05)
+// `tagLabel` includes the glyph prefix used in the tag header for replies;
+// `label` is the plain word used in the meta-line intent chip. `bg` is the
+// tinted container background applied to threaded (depth > 0) reply blocks.
+const INTENT_META: Record<
+  Intent,
+  { label: string; tagLabel: string; color: string; bg: string }
+> = {
+  question:       { label: 'Question',       tagLabel: '? Question',         color: '#4a6e8a', bg: 'rgba(74,110,138,0.05)' },
+  add_context:    { label: 'Adding to this', tagLabel: '+ Adding to this',   color: '#3d6b4f', bg: 'rgba(61,107,79,0.05)' },
+  different_take: { label: 'Different take', tagLabel: '↻ A different take', color: '#a14b1a', bg: 'rgba(161,75,26,0.05)' },
+};
+
+// Tag glyph for each reader-applied tag kind (mockup uses ✓ and ★).
+const TAG_GLYPH: Record<TagKind, string> = {
+  i_agree: '✓',
+  helpful: '★',
 };
 
 export type EnrichedComment = CommentRowDb & {
   users?: CommentUser;
   _your_tags?: Set<TagKind>;
   helpful_count?: number | null;
-  cite_needed_count?: number | null;
-  off_topic_count?: number | null;
-  quality_score?: number | null;
-  // EXPERT_THREADS Wave 4b — newer columns the generated db.ts may not
-  // yet carry. Kept optional so loadAll's `select('*')` unwraps cleanly.
+  i_agree_count?: number | null;
+  intent?: Intent | null;
   is_expert_thread_root?: boolean | null;
   expert_thread_root_id?: string | null;
   expert_thread_closed_at?: string | null;
@@ -98,7 +117,7 @@ interface CommentRowProps {
   quizPassed?: boolean;
 }
 
-const DEFAULT_TAG_KINDS: TagKind[] = ['context', 'cite_needed', 'off_topic'];
+const DEFAULT_TAG_KINDS: TagKind[] = ['i_agree', 'helpful'];
 
 // EXPERT_THREADS Wave 4b — render expert tokens (`@expert` / `@expert_<u>`)
 // distinctly from bare mentions. Mentions array carries *resolved bare*
@@ -282,7 +301,7 @@ export default function CommentRow({
   }, [closeCooldown]);
   const canReply = hasPermission('comments.reply');
   const canReport = hasPermission('comments.report');
-  const canContextTag = hasPermission('comments.context_tag');
+  const canTag = hasPermission('comments.tag');
   const canEditOwn = hasPermission('comments.edit.own');
   // Owner cleanup item 7 (2026-05-08) — gate the self-edit menu item on
   // the same window + lock-on-reply rules the server enforces, so the
@@ -415,10 +434,28 @@ export default function CommentRow({
   const commentDepth = comment.thread_depth ?? depth;
   const yours = comment._your_tags ?? new Set<TagKind>();
   function tagCount(k: TagKind): number {
-    if (k === 'context') return (comment as CommentRowDb & { context_tag_count?: number | null }).context_tag_count ?? 0;
-    if (k === 'cite_needed') return comment.cite_needed_count ?? 0;
-    return comment.off_topic_count ?? 0;
+    if (k === 'i_agree') return comment.i_agree_count ?? 0;
+    return comment.helpful_count ?? 0;
   }
+
+  // Threaded reply container treatment — only depth > 0 gets the tinted
+  // background + intent-colored left border. Top-level comments stay
+  // visually neutral; their intent (if any) renders as a small chip near
+  // the meta line instead.
+  const intentMeta = comment.intent ? INTENT_META[comment.intent] : null;
+  const isThreadedReply = depth > 0 && !showExpertChrome;
+  const replyTintBg = isThreadedReply
+    ? (intentMeta ? intentMeta.bg : '#f3f3f3')
+    : undefined;
+  const replyTintBorder = isThreadedReply
+    ? (intentMeta ? intentMeta.color : '#dcdcdc')
+    : undefined;
+  // Tag header for threaded replies. Plain reply (no intent) uses the
+  // institutional "↩ Reply" label in the muted ink; intent replies use
+  // the intent's tag label + color. Top-level comments keep the small
+  // meta-line chip and don't render this header.
+  const replyTagText = intentMeta ? intentMeta.tagLabel : '↩ Reply';
+  const replyTagColor = intentMeta ? intentMeta.color : '#777777';
 
   return (
     <div
@@ -428,9 +465,13 @@ export default function CommentRow({
           paddingTop: 28,
           paddingBottom: 24,
           borderBottom: '1px solid var(--border, #e5e5e5)',
-        } : depth > 0 && !showExpertChrome ? {
-          paddingTop: 16,
-          paddingBottom: 4,
+        } : {}),
+        ...(isThreadedReply ? {
+          padding: '14px 16px',
+          background: replyTintBg,
+          borderLeft: `3px solid ${replyTintBorder}`,
+          marginTop: 4,
+          marginBottom: 4,
         } : {}),
         ...(showExpertChrome ? {
           background: '#f0faf4',
@@ -442,13 +483,19 @@ export default function CommentRow({
         } : {}),
       }}
     >
-      {comment.is_context_pinned && (
+      {isThreadedReply && (
         <div
-          style={{ borderLeft: '2px solid var(--p-ink)', paddingLeft: 8, marginBottom: 8 }}
+          style={{
+            fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            color: replyTagColor,
+            marginBottom: 8,
+          }}
         >
-          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--p-ink)' }}>
-            Pinned as Article Context
-          </span>
+          {replyTagText}
         </div>
       )}
       <div style={{ display: 'flex', gap: 12 }}>
@@ -463,10 +510,6 @@ export default function CommentRow({
           style={{
             flex: 1,
             minWidth: 0,
-            ...(depth > 0 && !showExpertChrome ? {
-              paddingLeft: 14,
-              borderLeft: '2px solid var(--border, #e5e5e5)',
-            } : {}),
           }}
         >
           {showExpertChrome && (
@@ -497,25 +540,30 @@ export default function CommentRow({
                   title="Copy link to comment"
                   style={{
                     background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                    fontSize: 11, lineHeight: 1, letterSpacing: '0.02em',
-                    color: copiedLink ? 'var(--success-text, #16a34a)' : 'var(--p-ink-muted)',
-                    fontFamily: 'inherit',
+                    fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+                    fontSize: 10, lineHeight: 1, letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: copiedLink ? 'var(--success-text, #16a34a)' : '#777777',
                     transition: 'color 100ms',
                   }}
                 >
                   {copiedLink ? 'Copied!' : `${timeAgo(comment.created_at)}${comment.is_edited ? ' · edited' : ''}`}
                 </button>
-                {(comment.quality_score ?? 0) !== 0 && (
+                {/* Top-level intent chip — replies render their intent as a
+                    tag header above the meta line instead, so this only
+                    fires on depth === 0 to avoid duplication. */}
+                {depth === 0 && intentMeta && (
                   <span
-                    title="Community quality signal"
                     style={{
-                      fontSize: 11,
+                      fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+                      fontSize: 9,
                       fontWeight: 700,
-                      color: (comment.quality_score ?? 0) > 0 ? 'var(--success-text)' : '#b94040',
-                      fontVariantNumeric: 'tabular-nums',
+                      letterSpacing: '0.22em',
+                      textTransform: 'uppercase',
+                      color: intentMeta.color,
                     }}
                   >
-                    {(comment.quality_score ?? 0) > 0 ? '+' : ''}{comment.quality_score}
+                    {intentMeta.tagLabel}
                   </span>
                 )}
               </div>
@@ -820,7 +868,64 @@ export default function CommentRow({
               !!onReopenThread;
             const replyDisabled =
               isExpertThreadClosed || askerCapHit || quizPassed === false;
-            const replyButton =
+            const replyTitle = isExpertThreadClosed
+              ? 'This thread is closed.'
+              : askerCapHit
+                ? `Conversation complete with @${user.username || 'expert'} — they can grant another reply if you have a follow-up.`
+                : undefined;
+            // Smaller action buttons on threaded replies to keep the
+            // nested block visually lighter (mockup spec — 6px 12px / 12px
+            // font on replies vs 9px 16px / 13px on top-level).
+            const actionPad = isThreadedReply ? '6px 12px' : '9px 16px';
+            const actionFontSize = isThreadedReply ? 12 : 13;
+            // Sharp-cornered institutional pill used by I agree / Helpful /
+            // Reply (and the legacy Quote reply / thread toggle entries). On
+            // state inverts to ink fill, white label, count at 0.85 opacity.
+            function actionPillStyle(opts: {
+              on: boolean;
+              disabled?: boolean;
+            }): React.CSSProperties {
+              const { on, disabled } = opts;
+              return {
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontFamily: 'inherit',
+                fontSize: actionFontSize,
+                fontWeight: 500,
+                lineHeight: 1.2,
+                padding: actionPad,
+                border: `1px solid ${on ? '#111111' : '#dcdcdc'}`,
+                borderRadius: 0,
+                background: on ? '#111111' : 'transparent',
+                color: disabled
+                  ? '#a1a1aa'
+                  : on
+                    ? '#fcfcfc'
+                    : '#333333',
+                cursor: disabled ? 'default' : 'pointer',
+                letterSpacing: '0',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                transition: 'color 120ms, background 120ms, border-color 120ms',
+              };
+            }
+            // Tally line — render above the action row. Mono small caps,
+            // ink-3 separators, ink-1 bold for the numbers. Skip any count
+            // that is 0; if all counts are 0 the whole line collapses.
+            const iAgreeCount = comment.i_agree_count ?? 0;
+            const helpfulCount = comment.helpful_count ?? 0;
+            const replyCount = comment.reply_count ?? 0;
+            type TallySeg = { label: string; n: number };
+            const tallySegments: TallySeg[] = [];
+            if (iAgreeCount > 0) tallySegments.push({ label: 'Agreed by', n: iAgreeCount });
+            if (helpfulCount > 0) tallySegments.push({ label: 'Helpful', n: helpfulCount });
+            if (replyCount > 0) tallySegments.push({ label: replyCount === 1 ? 'reply' : 'replies', n: replyCount });
+            const showTally = tallySegments.length > 0;
+            // Unified intent model: composer owns the intent picker. The
+            // action row just shows the Reply toggle.
+            const replyGlyph = '↩';
+            const replyButtons =
               canReply && commentDepth < commentMaxDepth ? (
                 <button
                   onClick={() => {
@@ -828,32 +933,55 @@ export default function CommentRow({
                     setReplyOpen((v) => !v);
                   }}
                   disabled={replyDisabled}
-                  title={
-                    isExpertThreadClosed
-                      ? 'This thread is closed.'
-                      : askerCapHit
-                        ? `Conversation complete with @${user.username || 'expert'} — they can grant another reply if you have a follow-up.`
-                        : undefined
-                  }
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    padding: '5px 12px',
-                    borderRadius: 20,
-                    minHeight: 32,
-                    border: '1px solid var(--border, #e5e5e5)',
-                    background: 'transparent',
-                    color: replyDisabled ? 'var(--p-ink-faint)' : 'var(--p-ink-muted)',
-                    cursor: replyDisabled ? 'default' : 'pointer',
-                    touchAction: 'manipulation',
-                    letterSpacing: '-0.01em',
-                  }}
+                  title={replyTitle}
+                  style={actionPillStyle({ on: replyOpen, disabled: replyDisabled })}
                 >
-                  Reply
+                  <span aria-hidden="true">{replyGlyph}</span>
+                  <span>Reply</span>
                 </button>
               ) : null;
             return (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
+              <>
+                {showTally && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      flexWrap: 'wrap',
+                      marginTop: 12,
+                      fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+                      fontSize: 9.5,
+                      fontWeight: 500,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      color: '#777777',
+                    }}
+                    aria-label="Comment tally"
+                  >
+                    {tallySegments.map((seg, i) => (
+                      <span key={seg.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        {i > 0 && (
+                          <span aria-hidden="true" style={{ color: '#dcdcdc' }}>·</span>
+                        )}
+                        {/* "Agreed by 24" / "Helpful 19" — label first. For
+                            replies we render "4 replies" with the count first. */}
+                        {seg.label === 'Agreed by' || seg.label === 'Helpful' ? (
+                          <>
+                            <span>{seg.label}</span>
+                            <span style={{ color: '#111111', fontWeight: 700 }}>{seg.n}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ color: '#111111', fontWeight: 700 }}>{seg.n}</span>
+                            <span>{seg.label}</span>
+                          </>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: showTally ? 8 : 14, flexWrap: 'wrap' }}>
                   {/* Quote reply — appears when reader has selected text in this comment's body */}
                   {selectedQuote && canReply && !replyOpen && (
                     <button
@@ -863,24 +991,42 @@ export default function CommentRow({
                         window.getSelection()?.removeAllRanges();
                         setReplyOpen(true);
                       }}
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        padding: '5px 12px',
-                        borderRadius: 20,
-                        minHeight: 32,
-                        border: '1px solid var(--border, #e5e5e5)',
-                        background: 'transparent',
-                        color: 'var(--p-ink-muted, #888)',
-                        cursor: 'pointer',
-                        letterSpacing: '-0.01em',
-                        touchAction: 'manipulation',
-                      }}
+                      style={actionPillStyle({ on: false })}
                     >
-                      Quote reply
+                      <span aria-hidden="true">“</span>
+                      <span>Quote reply</span>
                     </button>
                   )}
-                  {replyButton}
+                  {!isOwner && canTag && quizPassed !== false && tagKinds.map((k) => {
+                    const meta = TAG_META[k];
+                    const active = yours.has(k);
+                    const count = tagCount(k);
+                    return (
+                      <button
+                        key={k}
+                        onClick={() => doTag(k)}
+                        disabled={!!busy}
+                        aria-pressed={active}
+                        style={actionPillStyle({ on: active, disabled: !!busy })}
+                      >
+                        <span aria-hidden="true">{TAG_GLYPH[k]}</span>
+                        <span>{meta.label}</span>
+                        {count > 0 && (
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+                              fontSize: actionFontSize - 2,
+                              opacity: active ? 0.85 : 0.6,
+                              marginLeft: 2,
+                            }}
+                          >
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                  {replyButtons}
                   {askerRepliesLeft != null && askerRepliesLeft > 0 && (
                     <span
                       style={{
@@ -997,66 +1143,22 @@ export default function CommentRow({
                       Conversation complete with @{user.username || 'expert'} — they can grant another reply if you have a follow-up.
                     </span>
                   )}
-                  {/* Context / Cite needed / Off-topic tag buttons — inline, always visible to non-owners.
-                      Owner cleanup item 6 (2026-05-08): muted text-only chips, single ink color throughout
-                      per the no-color-per-tier rule. Active state = ink color + 600 weight; no filled
-                      backgrounds, no colored borders. Tag color in TAG_META is preserved for any future
-                      surface that needs it (e.g., audit logs) but not used here. */}
-                  {!isOwner && canContextTag && quizPassed !== false && tagKinds.map(k => {
-                    const meta = TAG_META[k];
-                    const active = yours.has(k);
-                    const count = tagCount(k);
-                    return (
-                      <button
-                        key={k}
-                        onClick={() => doTag(k)}
-                        disabled={!!busy}
-                        style={{
-                          fontSize: 11,
-                          fontWeight: active ? 600 : 500,
-                          padding: '4px 10px',
-                          borderRadius: 14,
-                          minHeight: 28,
-                          border: 'none',
-                          background: 'transparent',
-                          color: active ? 'var(--p-ink)' : 'var(--p-ink-muted, #888)',
-                          cursor: busy ? 'default' : 'pointer',
-                          letterSpacing: '0',
-                          touchAction: 'manipulation',
-                          WebkitTapHighlightColor: 'transparent',
-                          transition: 'color 120ms',
-                        }}
-                      >
-                        {meta.label}{count > 0 ? ` ${count}` : ''}
-                      </button>
-                    );
-                  })}
                   {/* Reply thread toggle — lives in the action row, same as all other toggles */}
                   {depth === 0 && replies.length > 0 && (
                     <button
-                      onClick={() => setRepliesOpen(v => !v)}
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 500,
-                        padding: '5px 12px',
-                        borderRadius: 20,
-                        minHeight: 32,
-                        border: '1px solid var(--border, #e5e5e5)',
-                        background: repliesOpen ? 'var(--card, #f5f5f5)' : 'transparent',
-                        color: 'var(--p-ink-muted, #888)',
-                        cursor: 'pointer',
-                        letterSpacing: '0',
-                        touchAction: 'manipulation',
-                        WebkitTapHighlightColor: 'transparent',
-                        transition: 'background 120ms',
-                      }}
+                      onClick={() => setRepliesOpen((v) => !v)}
+                      style={actionPillStyle({ on: repliesOpen })}
                     >
-                      {repliesOpen
-                        ? 'Hide replies'
-                        : `${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
+                      <span aria-hidden="true">{repliesOpen ? '−' : '+'}</span>
+                      <span>
+                        {repliesOpen
+                          ? 'Hide replies'
+                          : `${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
+                      </span>
                     </button>
                   )}
-              </div>
+                </div>
+              </>
             );
           })()}
 
@@ -1077,7 +1179,23 @@ export default function CommentRow({
             </div>
           )}
 
-          {repliesOpen && replies.map((r, i) => <React.Fragment key={i}>{r}</React.Fragment>)}
+          {repliesOpen && replies.length > 0 && (
+            <div
+              style={{
+                marginTop: 18,
+                marginLeft: 28,
+                paddingLeft: 18,
+                borderLeft: '2px solid #dcdcdc',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 24,
+              }}
+            >
+              {replies.map((r, i) => (
+                <React.Fragment key={i}>{r}</React.Fragment>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -537,8 +537,6 @@ async function ensureComment(
       downvote_count: 0,
       reply_count: 0,
       is_pinned: false,
-      is_context_pinned: false,
-      context_tag_count: 0,
       is_expert_question: false,
       is_author_reply: false,
       is_expert_reply: false,

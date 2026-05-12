@@ -77,8 +77,7 @@ const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 //   Resp:    200 { ok: true } | 400 { error: '...' } | 401/403 | 404
 //   Render:  clients render `[deleted]` tombstone when deleted_at IS NOT
 //            NULL. iOS VPComment model decodes deleted_at, status,
-//            is_edited, mentions, context_tag_count, is_context_pinned
-//            per A126 to reach parity with the web row.
+//            is_edited, mentions per A126 to reach parity with the web row.
 //
 // Contract: mention array (A126 / §H2)
 // -------------------------------------

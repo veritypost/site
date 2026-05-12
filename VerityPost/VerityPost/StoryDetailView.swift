@@ -113,6 +113,11 @@ struct StoryDetailView: View {
     @State private var commentFirsthand: Bool = false
     @State private var commentFirsthandContext: String = ""
 
+    // Unified composer intent — nil / "question" / "add_context" / "different_take".
+    // Same picker on top-level and reply composers; irrevocable once the row
+    // is created. Replaces the legacy `author_self_tag` + `reply_type` split.
+    @State private var commentIntent: String? = nil
+
     // Owner cleanup item 7 (2026-05-08) — TODO-48 author follow-ups
     // retired in favour of real comment edit (PATCH /api/comments/[id])
     // with lock-on-reply + 60s typo grace + append-only after the grace.
@@ -121,12 +126,9 @@ struct StoryDetailView: View {
     // Cancellable 350ms auto-advance after a quiz option tap. Cancelled on
     // option re-tap, on view disappear, and on stage transition.
     @State private var quizAdvanceTask: Task<Void, Never>? = nil
-    // Agree/disagree reactions — one per user per comment, separate axis from tags.
-    @State private var agreedComments: Set<String> = []
-    @State private var disagreedComments: Set<String> = []
-
-    // Section A — comment-tag chips (context, cite_needed, off_topic).
-    // Per-comment per-kind cast set for the *current* user. context_tag_count already lives on VPComment.
+    // Reader tags (i_agree, helpful) — per-comment per-kind cast set for
+    // the *current* user. Replaces the old agree/disagree axis + the
+    // context/cite_needed/off_topic kinds in the comment-system redesign.
     @State private var commentTagsByUser: [String: Set<String>] = [:]
     @State private var commentTagBusyKey: String = ""
 
@@ -1562,8 +1564,8 @@ struct StoryDetailView: View {
         // "Top" sorts non-pinned by upvoteCount descending; "Newest"
         // sorts by createdAt descending (mirrors web CommentThread sort).
         topLevel.sort { (a, b) in
-            let aPinned = a.isPinned == true || a.isContextPinned == true
-            let bPinned = b.isPinned == true || b.isContextPinned == true
+            let aPinned = a.isPinned == true
+            let bPinned = b.isPinned == true
             if aPinned != bPinned { return aPinned }
             if commentSortOrder == "newest" {
                 return (a.createdAt ?? .distantPast) > (b.createdAt ?? .distantPast)
@@ -1664,6 +1666,7 @@ struct StoryDetailView: View {
                     Spacer()
                     Button {
                         replyingTo = nil
+                        commentIntent = nil
                     } label: {
                         Text("Cancel")
                             .font(.system(.caption, design: .default, weight: .semibold))
@@ -1819,6 +1822,19 @@ struct StoryDetailView: View {
                         }
                         .padding(.top, 4)
                     }
+
+                    // Unified intent picker — same on top-level + reply composers.
+                    // Mutually exclusive across None / Question / Add Context /
+                    // Different Take. Optional, irrevocable server-side, so this
+                    // is the one and only setter.
+                    HStack(spacing: 6) {
+                        intentPickerChip(value: nil,              label: "None")
+                        intentPickerChip(value: "question",       label: "Question")
+                        intentPickerChip(value: "add_context",    label: "Add Context")
+                        intentPickerChip(value: "different_take", label: "Different Take")
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.top, 6)
 
                     HStack {
                         Spacer()
@@ -2167,6 +2183,19 @@ struct StoryDetailView: View {
                     if Self.SHOW_EXPERT_CHROME_ON_COMMENTS {
                         VerifiedBadgeView(isExpert: u?.isExpert, isVerifiedPublicFigure: u?.isVerifiedPublicFigure)
                     }
+                    // Unified author intent chip (Question / Add Context /
+                    // Different Take). Irrevocable, set at most once on insert.
+                    // Same visual treatment for top-level + reply rows; chip
+                    // color matches the left-edge accent.
+                    if let intentLabel = intentLabel(comment.intent),
+                       let intentColor = intentAccent(comment.intent) {
+                        Text(intentLabel)
+                            .font(.system(.caption2, design: .default, weight: .semibold))
+                            .foregroundColor(intentColor)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(RoundedRectangle(cornerRadius: VP.radiusXS).fill(intentColor.opacity(0.12)))
+                    }
                     if comment.isEdited == true && !comment.isDeleted {
                         Text("(edited)")
                             .font(.caption2)
@@ -2269,8 +2298,13 @@ struct StoryDetailView: View {
 
                     let isThreadClosed = (threadRoot(for: comment)?.expertThreadClosedAt) != nil
 
-                    // Action row: Reply · Edit · Agree · Disagree
-                    HStack(spacing: 4) {
+                    // Action row: Reply · Edit (own only)
+                    // Unified-intent redesign — the 3 typed-reply buttons
+                    // collapsed into a single Reply affordance. The reply's
+                    // intent (Question / Add Context / Different Take) is
+                    // now picked in the composer's intent picker, the same
+                    // way it is for top-level posts.
+                    HStack(spacing: 8) {
                         if auth.isLoggedIn && muteState == nil
                             && depth < SettingsService.shared.commentNumber("max_depth") {
                             // Disable Reply when:
@@ -2279,15 +2313,17 @@ struct StoryDetailView: View {
                             //     (chain row exists, repliesLeft == 0, no
                             //     free pass)
                             let replyState = askerReplyState(for: comment)
+                            let disabled = replyState.disabled || isThreadClosed
                             Button {
                                 startReply(to: comment)
                             } label: {
-                                Text(replyState.disabled ? "Reply" : "Reply")
+                                Text("Reply")
                                     .font(.system(.caption, design: .default, weight: .semibold))
-                                    .foregroundColor(replyState.disabled ? VP.muted : VP.accent)
+                                    .foregroundColor(disabled ? VP.muted : VP.accent)
                             }
                             .buttonStyle(.plain)
-                            .disabled(replyState.disabled || isThreadClosed)
+                            .disabled(disabled)
+                            .accessibilityLabel("Reply")
                             if let copy = replyState.copy {
                                 Text(copy)
                                     .font(.system(size: VP.Size.xs))
@@ -2315,29 +2351,9 @@ struct StoryDetailView: View {
                             }
                             .buttonStyle(.plain)
                         }
-                        if auth.isLoggedIn && comment.userId != auth.currentUser?.id {
-                            let agreed = agreedComments.contains(comment.id)
-                            let disagreed = disagreedComments.contains(comment.id)
-                            Text("·")
-                                .font(.caption)
-                                .foregroundColor(VP.dim.opacity(0.5))
-                            Button {
-                                Task { await reactOnComment(comment, reaction: "agree") }
-                            } label: {
-                                Text("Agree")
-                                    .font(.system(size: VP.Size.sm, weight: agreed ? .bold : .medium))
-                                    .foregroundColor(agreed ? Color(hex: "#1a7a4a") : VP.dim)
-                            }
-                            .buttonStyle(.plain)
-                            Button {
-                                Task { await reactOnComment(comment, reaction: "disagree") }
-                            } label: {
-                                Text("Disagree")
-                                    .font(.system(size: VP.Size.sm, weight: disagreed ? .bold : .medium))
-                                    .foregroundColor(disagreed ? Color(hex: "#b94040") : VP.dim)
-                            }
-                            .buttonStyle(.plain)
-                        }
+                        // Comment-system redesign — Agree/Disagree action
+                        // buttons removed. The signal lives on the "I agree"
+                        // reader-tag chip in commentTagChipsRow instead.
                         Spacer()
                     }
                     .padding(.top, 4)
@@ -2349,9 +2365,13 @@ struct StoryDetailView: View {
         .padding(.leading, 20 + indent)
         .overlay(alignment: .leading) {
             if depth > 0 {
+                // Unified-intent redesign — every comment (top-level OR reply)
+                // gets a left-edge accent matching its intent color. Rows
+                // with NULL intent fall back to the neutral 1pt rule.
+                let accent = intentAccent(comment.intent)
                 Rectangle()
-                    .fill(VP.dim.opacity(0.35))
-                    .frame(width: 1)
+                    .fill(accent ?? VP.dim.opacity(0.35))
+                    .frame(width: accent == nil ? 1 : 2)
                     .padding(.leading, 20 + indent - 8)
                     .padding(.vertical, 6)
             }
@@ -3036,11 +3056,11 @@ struct StoryDetailView: View {
                 // (is_expert_thread_root, expert_thread_root_id,
                 // expert_thread_closed_at, expert_thread_closed_by,
                 // last_reopen_at) so close/reopen + cap affordances render.
-                .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, is_expert_thread_root, expert_thread_root_id, expert_thread_closed_at, expert_thread_closed_by, last_reopen_at, upvote_count, downvote_count, reply_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions, real_world_experience")
+                .select("id, user_id, article_id, parent_id, body, is_pinned, is_expert_reply, is_expert_thread_root, expert_thread_root_id, expert_thread_closed_at, expert_thread_closed_by, last_reopen_at, upvote_count, downvote_count, reply_count, helpful_count, i_agree_count, intent, created_at, deleted_at, status, is_edited, mentions, real_world_experience")
                 .eq("article_id", value: story.id)
                 .eq("status", value: "visible")
                 .is("deleted_at", value: nil)
-                .order("is_context_pinned", ascending: false)
+                .order("upvote_count", ascending: false)
                 .order("created_at", ascending: false)
                 .limit(100)
                 .execute().value
@@ -3228,19 +3248,22 @@ struct StoryDetailView: View {
 
         await trackReading()
 
-        // Load the current user's agree/disagree reactions.
         if let session = try? await client.auth.session {
             let userId = session.user.id.uuidString
             let ids = comments.map { $0.id }
             if !ids.isEmpty {
-                struct R: Decodable { let comment_id: String; let reaction: String }
-                let mine: [R] = (try? await client.from("comment_agree_disagree")
-                    .select("comment_id, reaction")
+                struct TagRow: Decodable { let comment_id: String; let tag_kind: String }
+                let mine: [TagRow] = (try? await client.from("comment_context_tags")
+                    .select("comment_id, tag_kind")
                     .eq("user_id", value: userId)
                     .in("comment_id", values: ids)
+                    .in("tag_kind", values: ["i_agree", "helpful"])
                     .execute().value) ?? []
-                agreedComments = Set(mine.filter { $0.reaction == "agree" }.map { $0.comment_id })
-                disagreedComments = Set(mine.filter { $0.reaction == "disagree" }.map { $0.comment_id })
+                var by: [String: Set<String>] = [:]
+                for r in mine {
+                    by[r.comment_id, default: []].insert(r.tag_kind)
+                }
+                commentTagsByUser = by
             }
         }
 
@@ -3317,7 +3340,7 @@ struct StoryDetailView: View {
                               case let .string(newId) = idValue else { continue }
                         if comments.contains(where: { $0.id == newId }) { continue }
                         guard var fresh: VPComment = try? await client.from("comments")
-                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, reply_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions")
+                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_expert_reply, upvote_count, downvote_count, reply_count, helpful_count, i_agree_count, intent, created_at, deleted_at, status, is_edited, mentions")
                             .eq("id", value: newId)
                             .single()
                             .execute()
@@ -3333,12 +3356,15 @@ struct StoryDetailView: View {
                             fresh.users = author
                         }
                         if !comments.contains(where: { $0.id == fresh.id }) {
-                            // Append and re-sort: pinned first, then newest.
+                            // Append and re-sort: highest-voted first, then newest.
+                            // Mirrors the loadData() order (upvote_count desc,
+                            // created_at desc) now that the auto-pin column
+                            // is suspended.
                             comments.append(fresh)
                             comments.sort { a, b in
-                                let aPinned = a.isContextPinned == true
-                                let bPinned = b.isContextPinned == true
-                                if aPinned != bPinned { return aPinned && !bPinned }
+                                let au = a.upvoteCount ?? 0
+                                let bu = b.upvoteCount ?? 0
+                                if au != bu { return au > bu }
                                 return (a.createdAt ?? .distantPast) > (b.createdAt ?? .distantPast)
                             }
                         }
@@ -3352,7 +3378,7 @@ struct StoryDetailView: View {
                         // bare columns. Author data is preserved from the existing
                         // displayed comment (updates don't change authorship).
                         guard var refreshed: VPComment = try? await client.from("comments")
-                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_context_pinned, is_expert_reply, upvote_count, downvote_count, reply_count, helpful_count, cite_needed_count, off_topic_count, quality_score, agree_count, disagree_count, created_at, deleted_at, status, is_edited, context_tag_count, mentions")
+                            .select("id, user_id, article_id, parent_id, body, is_pinned, is_expert_reply, upvote_count, downvote_count, reply_count, helpful_count, i_agree_count, intent, created_at, deleted_at, status, is_edited, mentions")
                             .eq("id", value: updatedId)
                             .single()
                             .execute()
@@ -3957,16 +3983,17 @@ struct StoryDetailView: View {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
-        // POST /api/comments expects { article_id, body, parent_id?, mentions?,
-        // real_world_experience? }. mentions is empty; free-tier mentions are
-        // stripped server-side per D21. real_world_experience is the
-        // firsthand-context line captured at compose time (≤80 chars,
-        // server validates + DB CHECK enforces).
+        // POST /api/comments expects { article_id, body, parent_id?,
+        // real_world_experience?, intent? }. The unified-intent redesign
+        // collapsed the old `author_self_tag` (top-level only) and
+        // `reply_type` (reply only) into a single `intent` column, sent the
+        // same way for both top-level and reply rows.
         struct Payload: Encodable {
             let article_id: String
             let body: String
             let parent_id: String?
             let real_world_experience: String?
+            let intent: String?
         }
         let parentId = replyingTo?.id
         let rweCandidate = commentFirsthand
@@ -3977,7 +4004,8 @@ struct StoryDetailView: View {
                 article_id: story.id,
                 body: body,
                 parent_id: parentId,
-                real_world_experience: rweCandidate.isEmpty ? nil : rweCandidate
+                real_world_experience: rweCandidate.isEmpty ? nil : rweCandidate,
+                intent: commentIntent
             )
         )
 
@@ -3999,6 +4027,7 @@ struct StoryDetailView: View {
                         // the server-returned comment row directly.
                         commentFirsthand = false
                         commentFirsthandContext = ""
+                        commentIntent = nil
                         commentText = ""
                         replyingTo = nil
                         composerFocused = false
@@ -4085,131 +4114,129 @@ struct StoryDetailView: View {
         }
     }
 
-    /// D29 comment voting. Routes through /api/comments/[id]/vote which
-    /// calls the `toggle_vote` RPC — the single source of truth for
-    /// up/down/clear transitions (kept identical between web and iOS).
-    /// POST /api/comments/[id]/agree — toggles agree or disagree.
-    /// Server handles: same reaction again = remove; opposite = switch.
-    private func reactOnComment(_ comment: VPComment, reaction: String) async {
-        let wasAgreed = agreedComments.contains(comment.id)
-        let wasDisagreed = disagreedComments.contains(comment.id)
-        // Optimistic toggle.
-        await MainActor.run {
-            UISelectionFeedbackGenerator().selectionChanged()
-            if reaction == "agree" {
-                if wasAgreed { agreedComments.remove(comment.id) }
-                else { agreedComments.insert(comment.id); disagreedComments.remove(comment.id) }
-            } else {
-                if wasDisagreed { disagreedComments.remove(comment.id) }
-                else { disagreedComments.insert(comment.id); agreedComments.remove(comment.id) }
-            }
-        }
-        let site = SupabaseManager.shared.siteURL
-        guard let url = URL(string: "/api/comments/\(comment.id)/agree", relativeTo: site) else { return }
-        guard let session = try? await client.auth.session else {
-            await MainActor.run {
-                agreedComments = wasAgreed ? agreedComments.union([comment.id]) : agreedComments.subtracting([comment.id])
-                disagreedComments = wasDisagreed ? disagreedComments.union([comment.id]) : disagreedComments.subtracting([comment.id])
-                flashModerationToast("Please sign in again.")
-            }
-            return
-        }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["reaction": reaction])
-        do {
-            let (data, resp) = try await URLSession.shared.data(for: req)
-            guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                throw URLError(.badServerResponse)
-            }
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                await MainActor.run {
-                    let serverReaction = json["reaction"] as? String
-                    agreedComments = serverReaction == "agree" ? agreedComments.union([comment.id]) : agreedComments.subtracting([comment.id])
-                    disagreedComments = serverReaction == "disagree" ? disagreedComments.union([comment.id]) : disagreedComments.subtracting([comment.id])
-                }
-            }
-        } catch {
-            await MainActor.run {
-                agreedComments = wasAgreed ? agreedComments.union([comment.id]) : agreedComments.subtracting([comment.id])
-                disagreedComments = wasDisagreed ? disagreedComments.union([comment.id]) : disagreedComments.subtracting([comment.id])
-                flashModerationToast("Couldn\u{2019}t update reaction. Try again.")
-            }
+    // MARK: - Intent accent (unified-intent redesign)
+    //
+    // Every comment (top-level OR reply) carries a single optional `intent`
+    // value driving both the username-adjacent chip and the left-edge accent.
+    // Color choices picked from the existing VP palette:
+    //   question        → VP.brand    (blue)
+    //   add_context     → VP.success  (green)
+    //   different_take  → VP.warn     (amber)
+    //   NULL            → no accent / no chip
+
+    /// Maps an `intent` string to its accent color, or nil for NULL / unknown.
+    private func intentAccent(_ kind: String?) -> Color? {
+        switch kind {
+        case "question":       return VP.brand
+        case "add_context":    return VP.success
+        case "different_take": return VP.warn
+        default:               return nil
         }
     }
 
-    // MARK: - Section A: comment tag chips
+    /// Labels the 3 intent values into UI copy. Returns nil for unknown /
+    /// NULL values so the renderer can skip the chip.
+    private func intentLabel(_ raw: String?) -> String? {
+        switch raw {
+        case "question":       return "Question"
+        case "add_context":    return "Add Context"
+        case "different_take": return "Different Take"
+        default:               return nil
+        }
+    }
 
-    // Order matches web DEFAULT_TAG_KINDS. No insightful/sarcastic.
-    private static let commentTagOrder: [(kind: String, label: String, color: Color)] = [
-        ("context",     "Context",     VP.accent),
-        ("cite_needed", "Cite needed", VP.tagCiteNeeded),
-        ("off_topic",   "Off-topic",   VP.tagOffTopic),
+    /// One mutually-exclusive option in the composer's intent picker.
+    /// Tap = select; re-tap of the active option is a no-op (callers can
+    /// pick None to clear). Driven by `commentIntent`. Same picker on
+    /// top-level + reply composers.
+    @ViewBuilder
+    private func intentPickerChip(value: String?, label: String) -> some View {
+        let isActive = commentIntent == value
+        let accent = intentAccent(value)
+        Button {
+            commentIntent = value
+        } label: {
+            Text(label)
+                .font(.system(size: 11, weight: isActive ? .semibold : .medium))
+                .foregroundColor(isActive ? (accent ?? VP.text) : VP.dim)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: VP.radiusFull)
+                        .stroke(isActive ? (accent ?? VP.text) : VP.border, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Intent: \(label)")
+    }
+
+    // MARK: - Reader-tag chips (i_agree, helpful)
+    //
+    // Comment-system redesign — the 3 context-style tag kinds and the
+    // separate agree/disagree axis are collapsed into exactly 2 reader
+    // tags: "I agree" (signal-only) and "Helpful" (awards comment-author
+    // scoring via receive_helpful). Author cannot tag own. Toggle = remove.
+    //
+    // Text-only chip styling per the owner cleanup rule:
+    //   active   → VP.text + .semibold
+    //   inactive → VP.dim  + .medium
+
+    /// Order locks "I agree" before "Helpful" so the surface stays stable
+    /// across renders. No backing color — this is a label/weight contrast,
+    /// not a color-coded tier.
+    private static let readerTagOrder: [(kind: String, label: String)] = [
+        ("i_agree", "I agree"),
+        ("helpful", "Helpful"),
     ]
 
-    // Returns the community count for a tag kind on a given comment.
+    /// Returns the community count for a reader-tag kind on a given comment.
     private func tagCount(for comment: VPComment, kind: String) -> Int {
         switch kind {
-        case "context":    return comment.contextTagCount ?? 0
-        case "cite_needed": return comment.citeNeededCount ?? 0
-        case "off_topic":  return comment.offTopicCount ?? 0
-        default:           return 0
+        case "i_agree": return comment.iAgreeCount ?? 0
+        case "helpful": return comment.helpfulCount ?? 0
+        default:        return 0
         }
     }
 
     @ViewBuilder
     private func commentTagChipsRow(for comment: VPComment) -> some View {
-        // Web parity: context / cite_needed / off_topic are always-visible
-        // inline pill buttons. No "+ Tag" opener, no hidden picker.
         let userTags = commentTagsByUser[comment.id] ?? []
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(Self.commentTagOrder, id: \.kind) { entry in
-                    tagChipButton(
-                        comment: comment,
-                        entry: entry,
-                        isCast: userTags.contains(entry.kind)
-                    )
-                }
+        HStack(spacing: 12) {
+            ForEach(Self.readerTagOrder, id: \.kind) { entry in
+                tagChipButton(
+                    comment: comment,
+                    kind: entry.kind,
+                    label: entry.label,
+                    isCast: userTags.contains(entry.kind)
+                )
             }
+            Spacer(minLength: 0)
         }
     }
 
     @ViewBuilder
-    private func tagChipButton(comment: VPComment, entry: (kind: String, label: String, color: Color), isCast: Bool) -> some View {
-        // Pill-shape always-visible chip. Active chip: 600 weight + tinted
-        // bg + colored border; inactive: 500 weight + neutral. Matches the
-        // web action-chip family (12px / 500 inactive / 600 active / pill
-        // 20px radius / 32 min-height).
-        let busy = commentTagBusyKey == "\(comment.id):\(entry.kind)"
-        let count = tagCount(for: comment, kind: entry.kind)
-        // Owner cleanup item 6 (2026-05-08): muted text-only chips matching
-        // web. Single ink color throughout per the no-color-per-tier rule;
-        // active = VP.text + .semibold weight, inactive = VP.dim + .medium.
-        // No filled backgrounds, no colored borders. entry.color preserved
-        // in commentTagOrder for any future audit/log surface.
+    private func tagChipButton(comment: VPComment, kind: String, label: String, isCast: Bool) -> some View {
+        let busy = commentTagBusyKey == "\(comment.id):\(kind)"
+        let count = tagCount(for: comment, kind: kind)
         Button {
-            Task { await toggleCommentTag(comment, kind: entry.kind) }
+            Task { await toggleCommentTag(comment, kind: kind) }
         } label: {
-            Text(count > 0 ? "\(entry.label) \(count)" : entry.label)
+            Text(count > 0 ? "\(label) \(count)" : label)
                 .font(.system(size: 11, weight: isCast ? .semibold : .medium))
                 .foregroundColor(isCast ? VP.text : VP.dim)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .frame(minHeight: 28)
+                .frame(minHeight: 24)
                 .opacity(busy ? 0.6 : 1)
         }
         .buttonStyle(.plain)
         .disabled(busy)
-        .accessibilityLabel("\(isCast ? "Remove" : "Add") \(entry.label) tag")
+        .accessibilityLabel("\(isCast ? "Remove" : "Add") \(label) tag")
     }
 
-    /// POSTs through /api/comments/[id]/context-tag. Server-side rate-limits + self-tag
-    /// guards apply; we optimistically toggle local state and revert on
-    /// any non-2xx.
-    private func toggleCommentTag(_ comment: VPComment, kind: String) async {
+    /// POSTs through /api/comments/[id]/tag. Server-side rate-limits +
+    /// self-tag guards apply; we optimistically toggle local state and
+    /// revert on any non-2xx. Body: `{ "kind": "i_agree" | "helpful" }`.
+    /// Response: `{ tagged, count, kind }`.
+    private func postCommentTag(_ comment: VPComment, kind: String) async {
         let key = "\(comment.id):\(kind)"
         await MainActor.run { commentTagBusyKey = key }
         defer { Task { @MainActor in if commentTagBusyKey == key { commentTagBusyKey = "" } } }
@@ -4224,7 +4251,7 @@ struct StoryDetailView: View {
         }
 
         let site = SupabaseManager.shared.siteURL
-        guard let url = URL(string: "/api/comments/\(comment.id)/context-tag", relativeTo: site) else { return }
+        guard let url = URL(string: "/api/comments/\(comment.id)/tag", relativeTo: site) else { return }
         guard let session = try? await client.auth.session else {
             await MainActor.run {
                 revertCommentTagOptimistic(commentId: comment.id, kind: kind, wasCast: wasCast)
@@ -4236,14 +4263,13 @@ struct StoryDetailView: View {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["tag_kind": kind])
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["kind": kind])
         do {
             let (data, resp) = try await URLSession.shared.data(for: req)
             guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                 throw URLError(.badServerResponse)
             }
-            // Reconcile with server truth where it ships. RPC returns
-            // { tagged, count, tag_kind, is_pinned }.
+            // Reconcile with server truth. Response: { tagged, count, kind }.
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 await MainActor.run {
                     if let tagged = json["tagged"] as? Bool {
@@ -4252,13 +4278,12 @@ struct StoryDetailView: View {
                         if set.isEmpty { commentTagsByUser.removeValue(forKey: comment.id) }
                         else { commentTagsByUser[comment.id] = set }
                     }
-                    // context_tag_count + is_context_pinned only echo for kind='context'.
-                    if kind == "context",
-                       let count = json["count"] as? Int,
+                    if let count = json["count"] as? Int,
                        let idx = comments.firstIndex(where: { $0.id == comment.id }) {
-                        comments[idx].contextTagCount = count
-                        if let pinned = json["is_pinned"] as? Bool {
-                            comments[idx].isContextPinned = pinned
+                        switch kind {
+                        case "i_agree": comments[idx].iAgreeCount = count
+                        case "helpful": comments[idx].helpfulCount = count
+                        default:        break
                         }
                     }
                 }
@@ -4269,6 +4294,12 @@ struct StoryDetailView: View {
                 flashModerationToast("Couldn\u{2019}t update tag. Try again.")
             }
         }
+    }
+
+    /// Thin shim — call sites in the redesigned action row read
+    /// `toggleCommentTag`, the new POST runs through `postCommentTag`.
+    private func toggleCommentTag(_ comment: VPComment, kind: String) async {
+        await postCommentTag(comment, kind: kind)
     }
 
     private func revertCommentTagOptimistic(commentId: String, kind: String, wasCast: Bool) {

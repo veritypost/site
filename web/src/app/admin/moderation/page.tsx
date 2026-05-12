@@ -31,13 +31,13 @@ import type { Tables } from '@/types/database-helpers';
 //     id           bigserial primary key,
 //     comment_id   uuid not null references comments(id) on delete cascade,
 //     moderator_id uuid not null references users(id),
-//     action       text not null check (action in ('hide','unhide','context_tag','remove')),
+//     action       text not null check (action in ('hide','unhide','tag','remove')),
 //     reason       text,
 //     created_at   timestamptz not null default now()
 //   );
 //
 // with an index on (comment_id, created_at desc). Insert one row per
-// hide/unhide/context-tag from the moderation + comments admin pages,
+// hide/unhide/tag from the moderation + comments admin pages,
 // and surface the latest entry in the comment row's hover state. This
 // is T5 schema work — halted per the runbook until owner approval.
 

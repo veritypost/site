@@ -3,6 +3,7 @@ import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { searchUsers } from '@/lib/search/searchUsers';
+import { sanitizeIlikeTerm } from '@/lib/search/sanitize';
 
 const NO_STORE = { 'Cache-Control': 'private, no-store, max-age=0' };
 
@@ -28,7 +29,8 @@ export async function GET(request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const q = (searchParams.get('q') || '').trim().replace(/^@/, '');
+  const raw = (searchParams.get('q') || '').trim().replace(/^@/, '');
+  const q = sanitizeIlikeTerm(raw).trim();
   if (q.length === 0) {
     return NextResponse.json({ users: [] }, { headers: NO_STORE });
   }

@@ -6,12 +6,10 @@
  * the story-manager without leaving the current reader context.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import Ad from '@/components/Ad';
-import UpNextSheet from '@/components/article/UpNextSheet';
 import ReadingProgressRibbon from '@/components/ReadingProgressRibbon';
-import type { UpNextArticle, UpNextSheetHandle } from '@/components/article/UpNextSheet';
 
 export type ArticleSurfaceArticle = {
   id: string;
@@ -33,7 +31,6 @@ export type ArticleSurfaceProps = {
   canEdit: boolean;
   canViewBody?: boolean;
   isSignedIn?: boolean;
-  nearbyArticles?: UpNextArticle[];
 };
 
 const PAGE_STYLE: React.CSSProperties = {
@@ -88,19 +85,10 @@ const BODY_STYLE: React.CSSProperties = {
   color: 'var(--p-ink)',
 };
 
-export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true, isSignedIn = false, nearbyArticles = [] }: ArticleSurfaceProps) {
+export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true, isSignedIn = false }: ArticleSurfaceProps) {
   const editHref = article.is_kids_safe
     ? `/admin/kids-story-manager?article=${article.id}`
     : `/admin/story-manager?article=${article.id}`;
-
-  const upNextRef = useRef<UpNextSheetHandle>(null);
-
-  // Fire the Up Next sheet when a comment is successfully posted.
-  useEffect(() => {
-    const handler = () => upNextRef.current?.fire();
-    window.addEventListener('vp:comment-sent', handler);
-    return () => window.removeEventListener('vp:comment-sent', handler);
-  }, []);
 
   // Scroll-depth tracking: fires 25/50/75/100% milestones for the article body.
   // Fire-and-forget; errors are swallowed so reader UX is never affected.
@@ -216,7 +204,6 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
         </div>
       )}
     </article>
-    <UpNextSheet ref={upNextRef} articles={nearbyArticles} />
     </>
   );
 }

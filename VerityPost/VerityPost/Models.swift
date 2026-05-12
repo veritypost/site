@@ -415,7 +415,6 @@ struct VPComment: Codable, Identifiable {
     var parentId: String?
     var body: String?
     var isPinned: Bool?
-    var isContextPinned: Bool?
     var isExpertReply: Bool?
     /// EXPERT_THREADS Wave 5 — comments thread-mode columns. The root
     /// comment of an expert thread (depth 0 with `@expert` token) carries
@@ -444,19 +443,21 @@ struct VPComment: Codable, Identifiable {
     var deletedAt: Date?
     var status: String?
     var isEdited: Bool?
-    /// Cached count of @-mentions in this comment's body. Server-side
-    /// trigger maintains it; iOS only reads.
-    var contextTagCount: Int?
-    var citeNeededCount: Int?
-    var offTopicCount: Int?
-    var qualityScore: Int?
-    var agreeCount: Int?
-    var disagreeCount: Int?
-    /// Section A — client-side cache of the kinds the current user has
-    /// cast on this comment ('context', 'cite_needed', 'off_topic').
-    /// Not part of the row's
-    /// JSON shape; populated by StoryDetailView from a separate fetch
-    /// against `comment_context_tags` so each chip renders cast/uncast.
+    /// Reader-tag counts (helpful + i_agree). Replaced the older context /
+    /// cite_needed / off_topic kinds and the comment_agree_disagree axis in
+    /// the comment-system redesign. `helpfulCount` awards comment-author
+    /// scoring via the `receive_helpful` action; `iAgreeCount` is signal-only.
+    var helpfulCount: Int?
+    var iAgreeCount: Int?
+    /// Author's optional compose-time intent — `question`, `add_context`, or
+    /// `different_take`. NULL when the author left it unset. Unified across
+    /// top-level and reply comments (replaces the legacy `author_self_tag` /
+    /// `reply_type` split). Drives the colored chip + left-edge accent.
+    var intent: String?
+    /// Section A — client-side cache of the reader-tag kinds the current
+    /// user has cast on this comment ('i_agree', 'helpful'). Not part of
+    /// the row's JSON shape; populated by StoryDetailView from a separate
+    /// fetch so each chip renders cast/uncast.
     /// Defaulted to nil so it stays out of the synthesized Codable path
     /// (CodingKeys below intentionally omits it).
     var commentTagKinds: Set<String>? = nil
@@ -530,7 +531,6 @@ struct VPComment: Codable, Identifiable {
         case articleId = "article_id"
         case parentId = "parent_id"
         case isPinned = "is_pinned"
-        case isContextPinned = "is_context_pinned"
         case isExpertReply = "is_expert_reply"
         case isExpertThreadRoot = "is_expert_thread_root"
         case expertThreadRootId = "expert_thread_root_id"
@@ -543,12 +543,9 @@ struct VPComment: Codable, Identifiable {
         case createdAt = "created_at"
         case deletedAt = "deleted_at"
         case isEdited = "is_edited"
-        case contextTagCount = "context_tag_count"
-        case citeNeededCount = "cite_needed_count"
-        case offTopicCount = "off_topic_count"
-        case qualityScore = "quality_score"
-        case agreeCount = "agree_count"
-        case disagreeCount = "disagree_count"
+        case helpfulCount = "helpful_count"
+        case iAgreeCount = "i_agree_count"
+        case intent
         case realWorldExperience = "real_world_experience"
     }
 }

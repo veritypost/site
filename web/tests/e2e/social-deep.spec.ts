@@ -89,10 +89,10 @@ test.describe('social-deep — comments', () => {
     expect(res.status()).toBeLessThan(500);
   });
 
-  test('context-tag non-existent comment does not 5xx', async ({ page }) => {
+  test('tag non-existent comment does not 5xx', async ({ page }) => {
     await signInAsSeededUser(page, seed!.users.free, seed!.password);
-    const res = await page.request.post(`/api/comments/${FAKE_COMMENT_ID}/context-tag`, {
-      data: { context_tag: 'misleading' },
+    const res = await page.request.post(`/api/comments/${FAKE_COMMENT_ID}/tag`, {
+      data: { kind: 'helpful' },
     });
     expect(res.status()).toBeLessThan(500);
   });

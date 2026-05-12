@@ -37,15 +37,14 @@ const C = {
 };
 
 type Period = 'today' | 'this_week' | 'this_month' | 'all_time';
-type TagKind = 'context' | 'cite_needed' | 'off_topic';
+type TagKind = 'i_agree' | 'helpful';
 
 const TAG_META: Record<TagKind, { label: string; color: string }> = {
-  context: { label: 'Context', color: '#1d4ed8' },
-  cite_needed: { label: 'Cite needed', color: '#b45309' },
-  off_topic: { label: 'Off topic', color: '#b91c1c' },
+  i_agree: { label: 'I agree', color: '#1d4ed8' },
+  helpful: { label: 'Helpful', color: '#15803d' },
 };
 
-const TAG_ORDER: TagKind[] = ['context', 'cite_needed', 'off_topic'];
+const TAG_ORDER: TagKind[] = ['i_agree', 'helpful'];
 
 interface Sub {
   id: string;

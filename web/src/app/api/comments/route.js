@@ -97,12 +97,34 @@ export async function POST(request) {
   } catch {
     /* malformed JSON falls through to the empty-object validation below */
   }
-  const { article_id, body, parent_id, mentions, real_world_experience } = parsed;
+  const {
+    article_id,
+    body,
+    parent_id,
+    mentions,
+    real_world_experience,
+    intent,
+  } = parsed;
   if (!article_id || !body) {
     return NextResponse.json(
       { error: 'article_id and body required' },
       { status: 400, headers: NO_STORE }
     );
+  }
+
+  // Unified intent column: same enum is valid on both top-level + replies.
+  // DB CHECK is `intent IN ('question','add_context','different_take') OR
+  // intent IS NULL`; intent is independent of parent_id.
+  const ALLOWED_INTENTS = new Set(['question', 'add_context', 'different_take']);
+  let intentClean = null;
+  if (intent != null) {
+    if (typeof intent !== 'string' || !ALLOWED_INTENTS.has(intent)) {
+      return NextResponse.json(
+        { error: 'invalid_intent' },
+        { status: 400, headers: NO_STORE }
+      );
+    }
+    intentClean = intent;
   }
 
   // Defense-in-depth — DB CHECK enforces 80 chars, but reject early so
@@ -301,6 +323,7 @@ export async function POST(request) {
     p_parent_id: parent_id || null,
     p_mentions: Array.isArray(mentions) ? mentions : [],
     p_real_world_experience: rweClean,
+    p_intent: intentClean,
   });
   if (error) {
     console.error('[comments.POST]', error);

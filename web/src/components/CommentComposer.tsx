@@ -10,6 +10,8 @@ import type { Database } from '@/types/database';
 type Mention = { user_id: string; username: string };
 type CommentRow = Database['public']['Tables']['comments']['Row'];
 
+export type Intent = 'question' | 'add_context' | 'different_take';
+
 interface CommentComposerProps {
   articleId: string;
   parentId?: string | null;
@@ -61,6 +63,7 @@ export default function CommentComposer({
   hasQuiz = true,
   prefillQuote,
 }: CommentComposerProps) {
+  const [intent, setIntent] = useState<Intent | null>(null);
   const [bodyText, setBodyText] = useState<string>('');
   const [isEmpty, setIsEmpty] = useState(true);
   const [busy, setBusy] = useState<boolean>(false);
@@ -439,6 +442,7 @@ export default function CommentComposer({
           parent_id: parentId,
           mentions,
           real_world_experience: rweCandidate || null,
+          intent,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -457,6 +461,7 @@ export default function CommentComposer({
       const posted = data.comment || null;
       setFirsthand(false);
       setFirsthandContext('');
+      setIntent(null);
       onPosted?.(posted);
       onCancel?.();
     } catch (err) {
@@ -484,9 +489,35 @@ export default function CommentComposer({
 
   const isReply = !!parentId;
 
+  // Unified intent picker — same options + visual treatment on both
+  // top-level comments and replies. Intent is optional; null = no intent
+  // (the "Just replying" / no-tag pill on reply panels).
+  // Colors are the editorial intent palette:
+  //   add_context    → deep green   (#3d6b4f) bg rgba(61,107,79,0.05)
+  //   different_take → rust amber   (#a14b1a) bg rgba(161,75,26,0.05)
+  //   question       → slate blue   (#4a6e8a) bg rgba(74,110,138,0.05)
+  // The glyph prefix is shown in the pill on the panel (and the meta-line
+  // chip / tag header in CommentRow re-uses the same glyph + label).
+  const INTENT_OPTIONS: Array<{
+    value: Intent | null;
+    label: string;
+    replyLabel: string;
+    glyph: string;
+    color: string;
+    bg: string;
+  }> = [
+    { value: null,             label: 'No intent',      replyLabel: 'Just replying',   glyph: '↩', color: '#111111', bg: 'transparent' },
+    { value: 'add_context',    label: 'Add Context',    replyLabel: 'Adding to this',  glyph: '+', color: '#3d6b4f', bg: 'rgba(61,107,79,0.05)' },
+    { value: 'different_take', label: 'Different Take', replyLabel: 'A different take', glyph: '↻', color: '#a14b1a', bg: 'rgba(161,75,26,0.05)' },
+    { value: 'question',       label: 'Question',       replyLabel: 'Question',        glyph: '?', color: '#4a6e8a', bg: 'rgba(74,110,138,0.05)' },
+  ];
+
+  const COMMENT_BODY_MAX = 4000;
+
   return (
     <div style={isReply ? replyContainerStyle : containerStyle}>
-      <div style={{ position: 'relative' }}>
+
+      <div style={{ position: 'relative', ...(isReply ? { borderTop: '1px solid #dcdcdc', paddingTop: 12, marginTop: 12 } : {}) }}>
         <div
           ref={editorRef}
           contentEditable
@@ -498,17 +529,20 @@ export default function CommentComposer({
           role="textbox"
           aria-multiline="true"
           aria-label={isReply ? 'Reply text' : 'Comment text'}
-          style={editorStyle}
+          style={{
+            ...editorStyle,
+            ...(isReply ? { minHeight: 60, fontSize: 14.5, lineHeight: 1.55 } : {}),
+          }}
         />
         {isEmpty && (
           <div
             aria-hidden
             style={{
               position: 'absolute',
-              top: 4,
+              top: isReply ? 16 : 4,
               left: 0,
               pointerEvents: 'none',
-              fontSize: 14,
+              fontSize: isReply ? 14.5 : 14,
               lineHeight: 1.6,
               color: 'var(--p-ink-faint, #bbb)',
               userSelect: 'none',
@@ -587,68 +621,64 @@ export default function CommentComposer({
           </div>
         );
       })()}
-      {firsthand && (
+      <div style={{ marginTop: isReply ? 12 : 8 }}>
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            marginTop: 6,
-            paddingTop: 8,
-            borderTop: '1px solid var(--border, #e5e5e5)',
-            animation: 'vpFadeIn 200ms ease-out',
+            gap: 6,
+            flexWrap: 'wrap',
           }}
+          role="radiogroup"
+          aria-label="Comment intent"
         >
-          <span
-            aria-hidden="true"
-            style={{
-              fontFamily: 'var(--font-serif), Georgia, serif',
-              fontStyle: 'italic',
-              fontSize: 12.5,
-              color: 'var(--p-ink-muted, #52525b)',
-              flexShrink: 0,
-              letterSpacing: '0.01em',
-            }}
-          >
-            How do you know?
-          </span>
-          <input
-            type="text"
-            value={firsthandContext}
-            onChange={(e) => setFirsthandContext(e.target.value.slice(0, FIRSTHAND_CONTEXT_LIMIT))}
-            placeholder="e.g. dad of three in Detroit  ·  civil engineer, 30 yrs"
-            maxLength={FIRSTHAND_CONTEXT_LIMIT}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              fontFamily: 'var(--font-serif), Georgia, serif',
-              fontStyle: 'italic',
-              fontSize: 13,
-              color: 'var(--p-ink, #0a0a0a)',
-              border: 'none',
-              outline: 'none',
-              background: 'transparent',
-              padding: '2px 0',
-              letterSpacing: '0.01em',
-            }}
-          />
-          <span
-            style={{
-              fontFamily: 'var(--font-serif), Georgia, serif',
-              fontStyle: 'italic',
-              fontSize: 11.5,
-              color:
-                firsthandContext.length > FIRSTHAND_CONTEXT_LIMIT - 12
-                  ? 'var(--p-warn, #b45309)'
-                  : 'var(--p-ink-faint, #a1a1aa)',
-              fontVariantNumeric: 'tabular-nums',
-              flexShrink: 0,
-            }}
-          >
-            {FIRSTHAND_CONTEXT_LIMIT - firsthandContext.length}
-          </span>
+          {INTENT_OPTIONS.map((opt) => {
+            const active = intent === opt.value;
+            const isNeutral = opt.value === null;
+            // Neutral idle: muted ink on neutral border. Intent idle: intent
+            // color text + border, transparent fill. On state inverts to a
+            // solid fill (ink for neutral, intent color for intents).
+            const idleColor = isNeutral ? '#333333' : opt.color;
+            const idleBorder = isNeutral ? '#dcdcdc' : opt.color;
+            const activeFill = isNeutral ? '#111111' : opt.color;
+            return (
+              <button
+                key={String(opt.value)}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                aria-label={isReply ? opt.replyLabel : opt.label}
+                onClick={() => setIntent(opt.value)}
+                onMouseEnter={(e) => {
+                  if (!active && !isNeutral) e.currentTarget.style.background = opt.bg;
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) e.currentTarget.style.background = 'transparent';
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  padding: '8px 14px',
+                  border: `1px solid ${active ? activeFill : idleBorder}`,
+                  borderRadius: 0,
+                  background: active ? activeFill : 'transparent',
+                  color: active ? '#fcfcfc' : idleColor,
+                  cursor: 'pointer',
+                  letterSpacing: '0',
+                  lineHeight: 1.2,
+                  transition: 'background 120ms, color 120ms, border-color 120ms',
+                }}
+              >
+                <span aria-hidden="true">{opt.glyph}</span>
+                <span>{isReply ? opt.replyLabel : opt.label}</span>
+              </button>
+            );
+          })}
         </div>
-      )}
+      </div>
       <div style={footerStyle}>
         {(
           [
@@ -675,10 +705,10 @@ export default function CommentComposer({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid var(--border, #e5e5e5)',
-              borderRadius: 5,
+              border: '1px solid #dcdcdc',
+              borderRadius: 0,
               background: 'transparent',
-              color: 'var(--p-ink-muted, #888)',
+              color: '#777777',
               cursor: 'pointer',
               padding: 0,
               flexShrink: 0,
@@ -688,76 +718,153 @@ export default function CommentComposer({
           </button>
         ))}
         <span style={{ flex: 1 }} />
-        <button
-          type="button"
-          onClick={() => {
-            setFirsthand((v) => {
-              const next = !v;
-              // Pre-fill from profile background only when toggling on AND
-              // the context input is currently empty. The user can edit or
-              // clear freely from there.
-              if (next && !firsthandContext.trim() && profileBackgroundOneline.trim()) {
-                setFirsthandContext(profileBackgroundOneline.trim().slice(0, FIRSTHAND_CONTEXT_LIMIT));
-              }
-              return next;
-            });
-          }}
-          aria-pressed={firsthand}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 7,
-            background: 'transparent',
-            border: 'none',
-            padding: '4px 6px',
-            cursor: 'pointer',
-            fontFamily: 'var(--font-serif), Georgia, serif',
-            fontStyle: 'italic',
-            fontSize: 12.5,
-            letterSpacing: '0.01em',
-            color: firsthand ? 'var(--p-ink, #0a0a0a)' : 'var(--p-ink-muted, #52525b)',
-            opacity: firsthand ? 1 : 0.78,
-            transition: 'color 140ms ease, opacity 140ms ease',
-          }}
-          onMouseEnter={(e) => { if (!firsthand) e.currentTarget.style.opacity = '1'; }}
-          onMouseLeave={(e) => { if (!firsthand) e.currentTarget.style.opacity = '0.78'; }}
-        >
+        {firsthand ? (
           <span
-            aria-hidden="true"
             style={{
-              width: 12,
-              height: 12,
-              borderRadius: 3,
-              border: '1.5px solid currentColor',
               display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              background: firsthand ? 'currentColor' : 'transparent',
-              transition: 'background 140ms ease',
+              gap: 8,
+              flex: '1 1 240px',
+              minWidth: 0,
+              padding: '4px 6px',
             }}
           >
-            {firsthand && (
+            <button
+              type="button"
+              onClick={() => setFirsthand(false)}
+              aria-pressed={true}
+              aria-label="Turn off firsthand"
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 3,
+                border: '1.5px solid var(--p-ink, #0a0a0a)',
+                background: 'var(--p-ink, #0a0a0a)',
+                padding: 0,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
               <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
                 <path d="M1.5 4l1.7 1.7L6.5 2.5" stroke="var(--p-bg, #fff)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-            )}
+            </button>
+            <input
+              type="text"
+              value={firsthandContext}
+              onChange={(e) => setFirsthandContext(e.target.value.slice(0, FIRSTHAND_CONTEXT_LIMIT))}
+              placeholder="dad of three in Detroit  ·  civil engineer, 30 yrs"
+              maxLength={FIRSTHAND_CONTEXT_LIMIT}
+              autoFocus
+              style={{
+                flex: 1,
+                minWidth: 0,
+                fontFamily: 'var(--font-serif), Georgia, serif',
+                fontStyle: 'italic',
+                fontSize: 13,
+                color: 'var(--p-ink, #0a0a0a)',
+                border: 'none',
+                outline: 'none',
+                background: 'transparent',
+                padding: '2px 0',
+                letterSpacing: '0.01em',
+              }}
+            />
+            <span
+              style={{
+                fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+                fontSize: 10,
+                color:
+                  firsthandContext.length > FIRSTHAND_CONTEXT_LIMIT - 12
+                    ? '#a14b1a'
+                    : '#777777',
+                fontVariantNumeric: 'tabular-nums',
+                flexShrink: 0,
+              }}
+            >
+              {FIRSTHAND_CONTEXT_LIMIT - firsthandContext.length}
+            </span>
           </span>
-          I know this firsthand
-        </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setFirsthand(true);
+              if (!firsthandContext.trim() && profileBackgroundOneline.trim()) {
+                setFirsthandContext(profileBackgroundOneline.trim().slice(0, FIRSTHAND_CONTEXT_LIMIT));
+              }
+            }}
+            aria-pressed={false}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 7,
+              background: 'transparent',
+              border: 'none',
+              padding: '4px 6px',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-serif), Georgia, serif',
+              fontStyle: 'italic',
+              fontSize: 12.5,
+              letterSpacing: '0.01em',
+              color: 'var(--p-ink-muted, #52525b)',
+              opacity: 0.78,
+              transition: 'color 140ms ease, opacity 140ms ease',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.78'; }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 3,
+                border: '1.5px solid currentColor',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                background: 'transparent',
+              }}
+            />
+            I know this firsthand
+          </button>
+        )}
+        <span
+          aria-live="polite"
+          style={{
+            fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+            fontSize: 10.5,
+            letterSpacing: '0.08em',
+            color: bodyText.length > COMMENT_BODY_MAX - 200 ? '#a14b1a' : '#777777',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {bodyText.length} / {COMMENT_BODY_MAX}
+        </span>
         {onCancel && <button onClick={onCancel} style={cancelBtnStyle}>Cancel</button>}
         <button
           onClick={submit}
           disabled={isEmpty || busy}
+          onMouseEnter={(e) => {
+            if (!isEmpty && !busy) e.currentTarget.style.background = '#e33010';
+          }}
+          onMouseLeave={(e) => {
+            if (!isEmpty && !busy) e.currentTarget.style.background = '#111111';
+          }}
           style={{
             ...postBtnStyle,
-            background: !isEmpty && !busy ? 'var(--accent, #111)' : 'transparent',
-            color: !isEmpty && !busy ? '#fff' : 'var(--dim, #999)',
-            border: !isEmpty && !busy ? 'none' : '1px solid var(--border, #e5e5e5)',
+            background: !isEmpty && !busy ? '#111111' : 'transparent',
+            color: !isEmpty && !busy ? '#fcfcfc' : '#a1a1aa',
+            border: !isEmpty && !busy ? '1px solid #111111' : '1px solid #dcdcdc',
             cursor: !isEmpty && !busy ? 'pointer' : 'default',
           }}
         >
-          {busy ? 'Posting…' : 'Post'}
+          {busy ? 'Sending…' : isReply ? 'Send reply' : 'Post'}
         </button>
       </div>
       {error && <div style={{ fontSize: 12, color: '#dc2626', marginTop: 6 }}>{error}</div>}
@@ -766,23 +873,26 @@ export default function CommentComposer({
 }
 
 const containerStyle: CSSProperties = {
-  // Drop the 0 1px 6px box-shadow — the shadow made the composer
-  // look like a floating dialog instead of inline editorial chrome.
-  // Border alone is enough definition. Padding bumped from 14/16 to
-  // 16/20 for breathing room between the cursor and the border.
-  border: '1px solid var(--border, #e5e5e5)',
-  borderRadius: 10,
-  padding: '16px 20px',
-  background: 'var(--bg, #fff)',
+  // Top-level composer keeps a soft hairline border but inherits the
+  // sharp-corner institutional treatment of the reply panel — no
+  // box-shadow, no rounded corners.
+  border: '1px solid #dcdcdc',
+  borderRadius: 0,
+  padding: '16px 18px',
+  background: '#fcfcfc',
   marginBottom: 16,
 };
 const replyContainerStyle: CSSProperties = {
-  border: '1px solid var(--border, #e5e5e5)',
-  borderRadius: 10,
-  padding: '16px 20px',
-  background: 'var(--card, #f7f7f7)',
+  // Reply panel — heavier 1.5px ink border, white fill, sharp corners.
+  // Reads as a deliberate institutional surface inside the tinted reply
+  // block, not a floating dialog. Matches the mockup's "what kind of
+  // reply?" picker container.
+  border: '1.5px solid #111111',
+  borderRadius: 0,
+  padding: '16px 18px',
+  background: '#ffffff',
   marginBottom: 12,
-  marginTop: 8,
+  marginTop: 18,
 };
 const editorStyle: CSSProperties = {
   // 14/1.6 -> 15/1.7. Closer to the comment body's 16/1.7 — what you
@@ -807,30 +917,34 @@ const editorStyle: CSSProperties = {
 const footerStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 6,
+  gap: 12,
   rowGap: 8,
   flexWrap: 'wrap',
-  marginTop: 8,
+  marginTop: 10,
   paddingTop: 10,
-  borderTop: '1px solid var(--border, #e5e5e5)',
+  borderTop: '1px solid #dcdcdc',
 };
 const cancelBtnStyle: CSSProperties = {
   background: 'none',
   border: 'none',
-  fontSize: 13,
-  color: 'var(--dim, #666)',
+  padding: '4px 6px',
+  fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+  fontSize: 10,
+  fontWeight: 600,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: '#777777',
   cursor: 'pointer',
 };
 const postBtnStyle: CSSProperties = {
-  // Weight 700 -> 600 — same restraint pass applied across the page.
-  // 700 reads as marketing CTA; 600 reads as editorial action.
-  padding: '8px 18px',
-  borderRadius: 8,
-  border: 'none',
-  color: '#fff',
-  fontSize: 13,
-  fontWeight: 600,
-  letterSpacing: '0.005em',
+  fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+  padding: '9px 16px',
+  borderRadius: 0,
+  fontSize: 10.5,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.14em',
+  transition: 'background 120ms',
 };
 const mentionDropdownStyle: CSSProperties = {
   background: '#fff',

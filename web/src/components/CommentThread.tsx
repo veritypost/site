@@ -87,9 +87,9 @@ type DialogState = {
   targetUserId?: string;
 } | null;
 
-export type TagKind = 'context' | 'cite_needed' | 'off_topic';
+export type TagKind = 'i_agree' | 'helpful';
 
-const TAG_KINDS: TagKind[] = ['context', 'cite_needed', 'off_topic'];
+const TAG_KINDS: TagKind[] = ['i_agree', 'helpful'];
 
 export default function CommentThread({
   articleId,
@@ -215,7 +215,6 @@ export default function CommentThread({
       .eq('article_id', articleId)
       .eq('status', 'visible')
       .is('deleted_at', null)
-      .order('is_context_pinned', { ascending: false })
       .order('upvote_count', { ascending: false })
       .order('created_at', { ascending: true })
       .range(0, 49);
@@ -384,7 +383,7 @@ export default function CommentThread({
   useEffect(() => {
     if (!articleId || !canSubscribe) return;
     let cancelled = false;
-    const channelName = `article-comments:${articleId}:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const channelName = `article-comments:${articleId}`;
     const channel = supabase
       .channel(channelName)
       .on(
@@ -431,12 +430,20 @@ export default function CommentThread({
         },
         async (payload: { new: CommentDb }) => {
           if (cancelled) return;
-          if (payload.new.status && payload.new.status !== 'visible') {
+          const redacted =
+            (payload.new.status && payload.new.status !== 'visible') ||
+            !!payload.new.deleted_at;
+          if (redacted) {
             setComments((prev) =>
               prev.map((c) =>
                 c.id !== payload.new.id
                   ? c
-                  : { ...c, body: '[deleted]', status: 'deleted' as string, deleted_at: new Date().toISOString() }
+                  : {
+                      ...c,
+                      body: '[deleted]',
+                      status: payload.new.status ?? 'deleted',
+                      deleted_at: payload.new.deleted_at ?? new Date().toISOString(),
+                    }
               )
             );
             return;
@@ -476,39 +483,26 @@ export default function CommentThread({
   }, [articleId, canSubscribe, supabase]);
 
   async function handleToggleTag(commentId: string, tagKind: TagKind) {
-    const res = await fetch(`/api/comments/${commentId}/context-tag`, {
+    const res = await fetch(`/api/comments/${commentId}/tag`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tag_kind: tagKind }),
+      body: JSON.stringify({ kind: tagKind }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setError(friendlyError(data?.error, 'Tag failed'));
       return;
     }
-    // The RPC always returns the canonical { tagged, count, tag_kind,
-    // helpful_count, is_pinned } shape. `count` is context-only and
-    // unchanged for non-context kinds; `helpful_count` is reflected on
-    // every response so a helpful toggle and a context toggle both
-    // converge to truth on the row.
     setComments((prev) =>
       prev.map((c) =>
         c.id === commentId
           ? {
               ...c,
-              ...(tagKind === 'context'
-                ? {
-                    context_tag_count: data.count,
-                    is_context_pinned: data.is_pinned,
-                    context_pinned_at: data.is_pinned
-                      ? c.context_pinned_at || new Date().toISOString()
-                      : c.context_pinned_at,
-                  }
+              ...(tagKind === 'i_agree' && typeof data.count === 'number'
+                ? ({ i_agree_count: data.count } as unknown as Partial<CommentDb>)
                 : {}),
-              // helpful_count column lands with the Section A migration;
-              // cast to `unknown` then merge so older type defs accept it.
-              ...(typeof data.helpful_count === 'number'
-                ? ({ helpful_count: data.helpful_count } as unknown as Partial<CommentDb>)
+              ...(tagKind === 'helpful' && typeof data.count === 'number'
+                ? ({ helpful_count: data.count } as unknown as Partial<CommentDb>)
                 : {}),
             }
           : c
@@ -909,10 +903,10 @@ export default function CommentThread({
     if (sort === 'newest') {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     }
-    // 'top': sort by quality_score (helpful + context - cite_needed - off_topic) descending
-    const qA = (a as unknown as { quality_score?: number | null }).quality_score ?? 0;
-    const qB = (b as unknown as { quality_score?: number | null }).quality_score ?? 0;
-    return qB - qA;
+    const uA = a.upvote_count ?? 0;
+    const uB = b.upvote_count ?? 0;
+    if (uA !== uB) return uB - uA;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
   const childrenByParent: Record<string, CommentWithAuthor[]> = {};
   visible
