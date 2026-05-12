@@ -24,10 +24,19 @@ import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
+// consumed_* columns landed in migration 20260512180000. The generated
+// database.ts types haven't been regenerated yet in this branch, so
+// extend the row shape inline. Drop these three lines after the next
+// `supabase gen types` run.
 type Req = Tables<'access_requests'> & {
   access_codes: { code: string; expires_at: string | null; current_uses: number | null } | null;
   referral_medium?: string | null;
+  consumed_at?: string | null;
+  consumed_by_user_id?: string | null;
+  consumption_source?: string | null;
 };
+
+type TabKey = 'pending' | 'outstanding' | 'consumed' | 'rejected' | 'all';
 
 function RequestsInner() {
   const router = useRouter();
@@ -38,7 +47,10 @@ function RequestsInner() {
   const [authorized, setAuthorized] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rows, setRows] = useState<Req[]>([]);
-  const [tab, setTab] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
+  // Default to Outstanding (approved-but-not-consumed) — the actionable
+  // bucket. Pending stays one click away for triage; Consumed is the
+  // historical audit trail.
+  const [tab, setTab] = useState<TabKey>('outstanding');
   const [active, setActive] = useState<Req | null>(null);
   const [busy, setBusy] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -83,11 +95,14 @@ function RequestsInner() {
 
   const filtered = rows.filter((r) => {
     if (tab === 'all') return true;
+    if (tab === 'outstanding') return r.status === 'approved' && !r.consumed_at;
+    if (tab === 'consumed') return r.status === 'approved' && !!r.consumed_at;
     return r.status === tab;
   });
   const counts = {
     pending: rows.filter((r) => r.status === 'pending').length,
-    approved: rows.filter((r) => r.status === 'approved').length,
+    outstanding: rows.filter((r) => r.status === 'approved' && !r.consumed_at).length,
+    consumed: rows.filter((r) => r.status === 'approved' && !!r.consumed_at).length,
     rejected: rows.filter((r) => r.status === 'rejected').length,
     total: rows.length,
   };
@@ -190,19 +205,33 @@ function RequestsInner() {
         push({ message: json.error || 'Bulk approve failed', variant: 'danger' });
         return;
       }
-      const { approved_count = 0, failed_ids = [], email_failed_ids = [] } = json;
+      const {
+        approved_count = 0,
+        already_signed_up_count = 0,
+        failed_ids = [],
+        email_failed_ids = [],
+      } = json;
+      // "X already had accounts — marked consumed" suffix on the toast
+      // so the admin sees the silent-consume split without an extra modal.
+      const consumedSuffix =
+        already_signed_up_count > 0
+          ? ` ${already_signed_up_count} already had accounts — marked consumed.`
+          : '';
       if (failed_ids.length > 0) {
         push({
-          message: `Approved ${approved_count}. Failed: ${failed_ids.length}. Check logs.`,
+          message: `Approved ${approved_count}. Failed: ${failed_ids.length}. Check logs.${consumedSuffix}`,
           variant: 'warn',
         });
       } else if (email_failed_ids.length > 0) {
         push({
-          message: `Approved ${approved_count}. Email failed for ${email_failed_ids.length} — copy links manually.`,
+          message: `Approved ${approved_count}. Email failed for ${email_failed_ids.length} — copy links manually.${consumedSuffix}`,
           variant: 'warn',
         });
       } else {
-        push({ message: `Approved ${approved_count} request(s).`, variant: 'success' });
+        push({
+          message: `Approved ${approved_count} request(s).${consumedSuffix}`,
+          variant: 'success',
+        });
       }
       setSelected(new Set());
       await loadAll();
@@ -332,9 +361,9 @@ function RequestsInner() {
         gap: S[3], marginBottom: S[6],
       }}>
         <StatCard label="Pending" value={counts.pending} trend={counts.pending > 0 ? 'up' : 'flat'} />
-        <StatCard label="Approved" value={counts.approved} />
+        <StatCard label="Outstanding" value={counts.outstanding} trend={counts.outstanding > 0 ? 'up' : 'flat'} />
+        <StatCard label="Consumed" value={counts.consumed} />
         <StatCard label="Rejected" value={counts.rejected} />
-        <StatCard label="All-time" value={counts.total} />
       </div>
 
       {loadError && (
@@ -350,12 +379,20 @@ function RequestsInner() {
       <Toolbar
         left={
           <div style={{ display: 'flex', gap: S[1] }}>
-            {(['pending', 'approved', 'rejected', 'all'] as const).map((t) => {
+            {(['pending', 'outstanding', 'consumed', 'rejected', 'all'] as const).map((t) => {
               const isActive = tab === t;
+              const tooltips: Record<typeof t, string> = {
+                pending: 'Awaiting admin review',
+                outstanding: 'Approved, not yet signed up',
+                consumed: 'Approved and signed up',
+                rejected: 'Rejected requests',
+                all: 'Every request',
+              };
               return (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
+                  title={tooltips[t]}
                   style={{
                     padding: `${S[1]}px ${S[3]}px`, borderRadius: 6,
                     border: `1px solid ${isActive ? C.accent : C.divider}`,
@@ -482,12 +519,41 @@ function RequestsInner() {
                 />
               </DetailRow>
             )}
-            {/* BugList #4 — surface Resend button for approved rows whose
-                initial email send failed. Backend gates on
-                metadata.email_status === 'failed' OR (status='approved'
-                AND invite_sent_at IS NULL). */}
+            {/* "Joined" badge — shown when the row has been consumed by
+                a signup. Surfaces the consumption timestamp and links
+                to the user profile so an admin can verify the account. */}
+            {active.status === 'approved' && active.consumed_at && (
+              <DetailRow label="User status">
+                <div style={{ display: 'flex', alignItems: 'center', gap: S[2], flexWrap: 'wrap' }}>
+                  <Badge size="xs" variant="success">✓ Joined</Badge>
+                  {active.consumed_by_user_id && (
+                    <a
+                      href={`/admin/users/${active.consumed_by_user_id}`}
+                      style={{ color: C.accent, textDecoration: 'none', fontSize: F.sm }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      View profile →
+                    </a>
+                  )}
+                  {active.consumption_source && (
+                    <span style={{ fontSize: F.xs, color: C.dim }}>
+                      via {active.consumption_source}
+                    </span>
+                  )}
+                </div>
+              </DetailRow>
+            )}
+            {active.status === 'approved' && active.consumed_at && (
+              <DetailRow label="Signed up">
+                {new Date(active.consumed_at).toLocaleString()}
+              </DetailRow>
+            )}
+            {/* Resend invite — surface for approved rows whose initial
+                email send failed AND that haven't been consumed. If the
+                user already has an account there is no value in resending. */}
             {active.status === 'approved' &&
              !active.invite_sent_at &&
+             !active.consumed_at &&
              active.access_code_id && (
               <DetailRow label="Email status">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>

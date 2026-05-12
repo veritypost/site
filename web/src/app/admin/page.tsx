@@ -122,13 +122,16 @@ export default function AdminHubPage() {
       }
       setAuthorized(true);
 
-      // Pending access-request count — Phase 1 intake removed the
-      // email-confirm gate, so all pending rows count.
-      const { count: pending } = await supabase
+      // Actionable access-request count — combines pending (waiting for
+      // an approve/reject decision) and outstanding (approved but the
+      // user hasn't signed up yet). Both need follow-up; the hub badge
+      // is the one place we surface "you have work to do here."
+      // PostgREST `or` lets us union the two filters in one round trip.
+      const { count: actionable } = await supabase
         .from('access_requests')
         .select('id', { count: 'exact', head: true })
-        .eq('status', 'pending');
-      setPendingRequestCount(pending || 0);
+        .or('status.eq.pending,and(status.eq.approved,consumed_at.is.null)');
+      setPendingRequestCount(actionable || 0);
 
       setLoading(false);
     }
@@ -179,8 +182,8 @@ export default function AdminHubPage() {
             </Badge>
             <span style={{ fontSize: F.base, fontWeight: 500 }}>
               {pendingRequestCount === 1
-                ? 'access request awaiting review'
-                : 'access requests awaiting review'}
+                ? 'access request awaiting action'
+                : 'access requests awaiting action'}
             </span>
           </div>
           <span style={{ fontSize: F.sm, color: C.dim }}>Review &rarr;</span>
