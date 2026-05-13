@@ -86,3 +86,12 @@ FROM public.plans pl, public.permission_sets ps
 WHERE pl.name IN ('verity_monthly', 'verity_annual')
   AND ps.key IN ('free', 'verity')
 ON CONFLICT DO NOTHING;
+
+-- Zombie verity_perks + verity_pro_perks cleanup considered (2026-05-13 panel)
+-- but dropped before apply: guard_system_permissions trigger refuses DELETE on
+-- system rows and refuses key renames; the trigger's prescribed retirement is
+-- is_active=false, which both zombies already satisfy. They also carry zero
+-- permission_set_perms attachments (MCP-verified), so reactivating one would
+-- grant nothing — the reactivation footgun is fangless. If a future cleanup
+-- truly wants the rows gone, it must SET LOCAL app.allow_system_perm_edits =
+-- 'true' inside its own transaction and be deliberate about it.

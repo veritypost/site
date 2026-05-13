@@ -193,11 +193,7 @@ export async function POST(request: Request) {
   // Auto-expire any currently-valid pick in this (category, subcategory, slot)
   // bucket. Best-effort; if it fails we still try the INSERT and surface any
   // UNIQUE-window conflict the constraint catches.
-  // The table is fresh post-migration so it's not in the generated Database
-  // type yet; cast to bypass the missing relation in the typed surface.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const svc = service as any;
-  let expireQuery = svc
+  let expireQuery = service
     .from('editors_edge_picks')
     .update({ valid_to: nowIso })
     .is('removed_at', null)
@@ -225,7 +221,7 @@ export async function POST(request: Request) {
     curator_note,
     created_by: actor.id,
   };
-  const { data: inserted, error: insertErr } = await svc
+  const { data: inserted, error: insertErr } = await service
     .from('editors_edge_picks')
     .insert(insertPayload)
     .select('id')

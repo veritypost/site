@@ -49,13 +49,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'id must be a uuid' }, { status: 400 });
   }
 
-  // editors_edge_picks isn't in the generated Database type yet (migration
-  // applied at runtime). Cast through the service client to read/write the
-  // row without breaking the build.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const svc = service as any;
-
-  const { data: existing, error: readErr } = await svc
+  const { data: existing, error: readErr } = await service
     .from('editors_edge_picks')
     .select('id, article_id, category_id, subcategory_id, slot, valid_from, valid_to, removed_at')
     .eq('id', id)
@@ -72,7 +66,7 @@ export async function DELETE(
   }
 
   const nowIso = new Date().toISOString();
-  const { error: updErr } = await svc
+  const { error: updErr } = await service
     .from('editors_edge_picks')
     .update({ removed_at: nowIso })
     .eq('id', id)

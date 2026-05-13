@@ -115,12 +115,8 @@ export async function runDirectoryArticles(
           .in('story_id', storyIds)
           .eq('users.is_expert', true);
 
-  // 3. editors_edge_picks currently valid for these articles. Cast through
-  //    unknown because the table is added in migration 20260513000100 and
-  //    isn't in database.ts yet — Stream A regenerates types after the
-  //    migration applies.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const edgePromise = (supabase as any)
+  // 3. editors_edge_picks currently valid for these articles.
+  const edgePromise = supabase
     .from('editors_edge_picks')
     .select('article_id, valid_from, valid_to, removed_at')
     .in('article_id', articleIds)

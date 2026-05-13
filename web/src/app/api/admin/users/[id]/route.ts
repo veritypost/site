@@ -252,11 +252,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json({ ok: true });
 }
 
-// TODO(T238): RLS verification — confirm public reads of `users` filter
-// `deleted_at IS NULL`. If not, add a migration that updates the SELECT
-// policies on `users` (and any view that fans out from it: comments,
-// articles authored, follower lists) to exclude soft-deleted rows for
-// non-admin viewers. Admin queries should still see tombstones.
+// T238a resolved 2026-05-13 via MCP RLS audit: users table SELECT
+// policies are `users_admin_read` (admin sees all incl. tombstones),
+// `users_self_read` (id = auth.uid() only), `users_select_block_kid_jwt`,
+// and no anon policy. Non-admin authenticated users can read only
+// themselves — they never see another user's row regardless of
+// deleted_at. The "public reads exposing tombstones" gap the original
+// TODO worried about does not exist. Removed.
 //
 // TODO(T238): GDPR hard-purge — add a separate "purge" admin endpoint
 // (or a nightly cron) that hard-deletes any row with

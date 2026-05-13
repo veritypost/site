@@ -12,8 +12,13 @@
 -- last 7 days at query time, not in the index predicate, because the
 -- 7-day window slides and a partial-on-date would invalidate weekly.
 --
--- Also: ensure categories.slug is UNIQUE among live rows. /directory/
--- routes on the slug, so a collision would silently fork URL state.
+-- Note: an earlier draft of this file added a partial UNIQUE index on
+-- categories.slug WHERE deleted_at IS NULL. Dropped before apply
+-- (2026-05-13 pre-apply panel): categories_slug_key is already a
+-- GLOBAL UNIQUE on slug, which is strictly stronger; the partial
+-- couldn't deliver the soft-delete slug-reuse it claimed. If the
+-- product ever wants slug reuse after soft-delete, that's a separate
+-- migration that drops the global + idx_categories_slug.
 
 -- Latest sort by category.
 CREATE INDEX IF NOT EXISTS articles_directory_category_idx
@@ -29,9 +34,3 @@ CREATE INDEX IF NOT EXISTS articles_directory_subcategory_idx
 CREATE INDEX IF NOT EXISTS articles_directory_trending_idx
   ON public.articles (category_id, view_count DESC, published_at DESC)
   WHERE status = 'published' AND deleted_at IS NULL;
-
--- Slug uniqueness for live categories. Partial so soft-deleted rows
--- can keep their (now-historical) slug without blocking a re-use.
-CREATE UNIQUE INDEX IF NOT EXISTS categories_slug_unique
-  ON public.categories (slug)
-  WHERE deleted_at IS NULL;
