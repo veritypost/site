@@ -59,22 +59,17 @@ const TAG_META: Record<TagKind, { label: string }> = {
 //   add_context    → deep green   (#3d6b4f)  bg rgba(61,107,79,0.05)
 //   different_take → rust amber   (#a14b1a)  bg rgba(161,75,26,0.05)
 //   question       → slate blue   (#4a6e8a)  bg rgba(74,110,138,0.05)
-// `tagLabel` includes the glyph prefix used in the tag header for replies;
-// `label` is the plain word used in the meta-line intent chip. `bg` is the
-// tinted container background applied to threaded (depth > 0) reply blocks.
+// `tagLabel` is the threaded-reply tag header; `label` is the meta-line
+// intent chip. Text labels only (owner rule: no glyphs in chrome). `bg` is
+// the tinted container background applied to threaded (depth > 0) reply
+// blocks.
 const INTENT_META: Record<
   Intent,
   { label: string; tagLabel: string; color: string; bg: string }
 > = {
-  question:       { label: 'Question',       tagLabel: '? Question',         color: '#4a6e8a', bg: 'rgba(74,110,138,0.05)' },
-  add_context:    { label: 'Adding to this', tagLabel: '+ Adding to this',   color: '#3d6b4f', bg: 'rgba(61,107,79,0.05)' },
-  different_take: { label: 'Different take', tagLabel: '↻ A different take', color: '#a14b1a', bg: 'rgba(161,75,26,0.05)' },
-};
-
-// Tag glyph for each reader-applied tag kind (mockup uses ✓ and ★).
-const TAG_GLYPH: Record<TagKind, string> = {
-  i_agree: '✓',
-  helpful: '★',
+  question:       { label: 'Question',       tagLabel: 'Question',         color: '#4a6e8a', bg: 'rgba(74,110,138,0.05)' },
+  add_context:    { label: 'Adding to this', tagLabel: 'Adding to this',   color: '#3d6b4f', bg: 'rgba(61,107,79,0.05)' },
+  different_take: { label: 'Different take', tagLabel: 'A different take', color: '#a14b1a', bg: 'rgba(161,75,26,0.05)' },
 };
 
 export type EnrichedComment = CommentRowDb & {
@@ -1006,7 +1001,6 @@ export default function CommentRow({
                       }}
                       style={actionPillStyle({ on: false })}
                     >
-                      <span aria-hidden="true">“</span>
                       <span>Quote reply</span>
                     </button>
                   )}
@@ -1022,7 +1016,6 @@ export default function CommentRow({
                         aria-pressed={active}
                         style={actionPillStyle({ on: active, disabled: !!busy })}
                       >
-                        <span aria-hidden="true">{TAG_GLYPH[k]}</span>
                         <span>{meta.label}</span>
                         {count > 0 && (
                           <span
@@ -1165,7 +1158,6 @@ export default function CommentRow({
                       onClick={() => setRepliesOpen((v) => !v)}
                       style={actionPillStyle({ on: repliesOpen })}
                     >
-                      <span aria-hidden="true">{repliesOpen ? '−' : '+'}</span>
                       <span>
                         {repliesOpen
                           ? 'Hide replies'
