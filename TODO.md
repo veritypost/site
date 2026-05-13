@@ -45,8 +45,8 @@ Before making ANY decision, recommendation, or question, you must:
 **Last write: 2026-05-13.**
 
 **Mid-flight (web side, awaiting owner decision before next agent action):**
-- **A4 parked 2026-05-13** — owner not ready to decide nav placement. Whole `/directory` ship blocks until nav home decided (or owner says ship as deep-link-only).
-- iOS mid-flight item (Ad-Placement Landmine) lives in `TODO-IOS.md` Section B — owner picks revive vs remap vs hybrid.
+- **A4 parked 2026-05-13** — owner not ready to decide nav placement. `/directory` ship blocks until nav home decided (or owner says ship as deep-link-only). All code on origin/main; only the nav link insertion remains.
+- iOS mid-flight: see `TODO-IOS.md`.
 
 **Locked decisions (verify with `git log` if unsure):**
 - Canonical wordmark = "verity post" (lowercase, space) for visual chrome; "Verity Post LLC" only in legal/copyright contexts.
@@ -107,15 +107,7 @@ iOS-side verification for the `/directory` ship. Owner runs Xcode build for iPho
 
 Note: spec said `BrowseRouter.swift`; actual code uses `BrowseState.swift` for the same role. Not a bug — just naming drift.
 
-### A7 — Push commits `[Owner approval → Code]`
-
-After A5 + A6 pass:
-
-```sh
-git push origin main
-```
-
-This pushes the accumulated commits including the `/directory` build commits + unrelated theme/chrome fixes that have piled up locally. Spot-check before pushing.
+(A7 — push commits — completed 2026-05-13 as part of the session push batch; no separate step remains.)
 
 ---
 
@@ -190,7 +182,7 @@ Working-as-intended (zero-value to touch):
 
 ## Critical path (web + cross-platform)
 
-- **Ship `/directory`:** parked at A4 (owner not ready). When you re-open it: A4 → A5 → A6 → A7.
+- **Ship `/directory`:** parked at A4 (owner not ready). When you re-open it: A4 → A5 → A6. (Push step retired — session work landed on origin/main 2026-05-13.)
 - iOS critical path lives in `TODO-IOS.md`. Independent track.
 
 No active web-side blocker waiting on you while A4 is parked.
@@ -225,12 +217,6 @@ Client-side DOMPurify sanitization shipped on `Ad.jsx` — XSS gap closed on all
 - `web/src/app/category/[id]/page.js` (2 callsites)
 
 **Blocker for full migration:** SsrAdCell only renders `house` ad_network creatives — it returns null for `google_adsense` and third-party `srcDoc` iframe units. Migrating naively would silently drop AdSense + third-party support on those placements. Either extend SsrAdCell to handle all 4 ad_network paths (AdSense via SsrAdSenseCell, third-party via sandboxed iframe SSR), OR defer until AdSense launch decision lands.
-
-#### G2.8b — Email wordmark consolidation (~10 LOC, deliverability-gated)
-
-Email helpers in `web/src/lib/{betaApprovalEmail,accessRequestEmail,magicLinkEmail,waitlistEmail}.ts` still hardcode `'verity post'` in HTML strings AND in `from_name` fields. Same visual wordmark as the JSX surfaces; logically part of G2.8 consolidation.
-
-**Owner check required before shipping:** `from_name` lands in inbox sender headers and can affect deliverability with some providers. If you have a deliverability-driven reason for the exact string (capitalization, spelling, character set), say so. Otherwise this is a straight `import { BRAND_NAME }` + interpolate change.
 
 ### G3 — Loose ends `[Code, low priority]`
 
