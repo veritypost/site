@@ -447,17 +447,17 @@ export default function CommentRow({
   const intentMeta = comment.intent ? INTENT_META[comment.intent] : null;
   const isThreadedReply = depth > 0 && !showExpertChrome;
   const replyTintBg = isThreadedReply
-    ? (intentMeta ? intentMeta.bg : '#f3f3f3')
+    ? (intentMeta ? intentMeta.bg : 'var(--accent-bg)')
     : undefined;
   const replyTintBorder = isThreadedReply
-    ? (intentMeta ? intentMeta.color : '#dcdcdc')
+    ? (intentMeta ? intentMeta.color : 'var(--border)')
     : undefined;
   // Tag header for threaded replies. Plain reply (no intent) uses the
   // institutional "Reply" label in the muted ink; intent replies use
   // the intent's tag label + color. Top-level comments keep the small
   // meta-line chip and don't render this header.
   const replyTagText = intentMeta ? intentMeta.tagLabel : 'Reply';
-  const replyTagColor = intentMeta ? intentMeta.color : '#777777';
+  const replyTagColor = intentMeta ? intentMeta.color : 'var(--muted-foreground)';
 
   return (
     <div
@@ -548,7 +548,7 @@ export default function CommentRow({
                     fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
                     fontSize: 10, lineHeight: 1, letterSpacing: '0.12em',
                     textTransform: 'uppercase',
-                    color: copiedLink ? 'var(--success-text, #16a34a)' : '#777777',
+                    color: copiedLink ? 'var(--success-text)' : 'var(--muted-foreground)',
                     transition: 'color 100ms',
                   }}
                 >
@@ -604,7 +604,7 @@ export default function CommentRow({
                       right: 0,
                       top: '100%',
                       zIndex: 10,
-                      background: '#fff',
+                      background: 'var(--bg)',
                       border: '1px solid var(--p-border)',
                       borderRadius: 8,
                       boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
@@ -704,8 +704,8 @@ export default function CommentRow({
                     padding: '7px 16px',
                     borderRadius: 9,
                     border: 'none',
-                    background: editBody.trim() && busy !== 'edit' ? 'var(--p-ink)' : '#ccc',
-                    color: '#fff',
+                    background: editBody.trim() && busy !== 'edit' ? 'var(--p-ink)' : 'var(--muted)',
+                    color: 'var(--p-bg)',
                     fontWeight: 700,
                     cursor: busy === 'edit' || !editBody.trim() ? 'default' : 'pointer',
                   }}
@@ -905,14 +905,14 @@ export default function CommentRow({
                 fontWeight: 500,
                 lineHeight: 1.2,
                 padding: actionPad,
-                border: `1px solid ${on ? '#111111' : '#dcdcdc'}`,
+                border: `1px solid ${on ? 'var(--text)' : 'var(--border)'}`,
                 borderRadius: 0,
-                background: on ? '#111111' : 'transparent',
+                background: on ? 'var(--text)' : 'transparent',
                 color: disabled
-                  ? '#a1a1aa'
+                  ? 'var(--muted)'
                   : on
-                    ? '#fcfcfc'
-                    : '#333333',
+                    ? 'var(--bg)'
+                    : 'var(--text-secondary)',
                 cursor: disabled ? 'default' : 'pointer',
                 letterSpacing: '0',
                 touchAction: 'manipulation',
@@ -963,25 +963,25 @@ export default function CommentRow({
                       fontWeight: 500,
                       letterSpacing: '0.08em',
                       textTransform: 'uppercase',
-                      color: '#777777',
+                      color: 'var(--muted-foreground)',
                     }}
                     aria-label="Comment tally"
                   >
                     {tallySegments.map((seg, i) => (
                       <span key={seg.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                         {i > 0 && (
-                          <span aria-hidden="true" style={{ color: '#dcdcdc' }}>·</span>
+                          <span aria-hidden="true" style={{ color: 'var(--border)' }}>·</span>
                         )}
                         {/* "Agreed by 24" / "Helpful 19" — label first. For
                             replies we render "4 replies" with the count first. */}
                         {seg.label === 'Agreed by' || seg.label === 'Helpful' ? (
                           <>
                             <span>{seg.label}</span>
-                            <span style={{ color: '#111111', fontWeight: 700 }}>{seg.n}</span>
+                            <span style={{ color: 'var(--text)', fontWeight: 700 }}>{seg.n}</span>
                           </>
                         ) : (
                           <>
-                            <span style={{ color: '#111111', fontWeight: 700 }}>{seg.n}</span>
+                            <span style={{ color: 'var(--text)', fontWeight: 700 }}>{seg.n}</span>
                             <span>{seg.label}</span>
                           </>
                         )}
@@ -1193,7 +1193,7 @@ export default function CommentRow({
                 marginTop: 18,
                 marginLeft: 28,
                 paddingLeft: 18,
-                borderLeft: '2px solid #dcdcdc',
+                borderLeft: '2px solid var(--border)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 24,

@@ -510,7 +510,7 @@ export default function CommentComposer({
     color: string;
     bg: string;
   }> = [
-    { value: null,             label: 'No intent',      replyLabel: 'Just replying',    color: '#111111', bg: 'transparent' },
+    { value: null,             label: 'No intent',      replyLabel: 'Just replying',    color: 'var(--text)', bg: 'transparent' },
     { value: 'add_context',    label: 'Add Context',    replyLabel: 'Adding to this',   color: '#3d6b4f', bg: 'rgba(61,107,79,0.05)' },
     { value: 'different_take', label: 'Different Take', replyLabel: 'A different take', color: '#a14b1a', bg: 'rgba(161,75,26,0.05)' },
     { value: 'question',       label: 'Question',       replyLabel: 'Question',         color: '#4a6e8a', bg: 'rgba(74,110,138,0.05)' },
@@ -521,7 +521,7 @@ export default function CommentComposer({
   return (
     <div style={isReply ? replyContainerStyle : containerStyle}>
 
-      <div style={{ position: 'relative', ...(isReply ? { borderTop: '1px solid #dcdcdc', paddingTop: 12, marginTop: 12 } : {}) }}>
+      <div style={{ position: 'relative', ...(isReply ? { borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 } : {}) }}>
         <div
           ref={editorRef}
           contentEditable
@@ -577,7 +577,7 @@ export default function CommentComposer({
                 // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6/10 row inset for the mention dropdown
                 padding: '6px 10px',
                 border: 'none',
-                background: i === mentionSuggest.activeIndex ? 'rgba(17,17,17,0.06)' : 'transparent',
+                background: i === mentionSuggest.activeIndex ? 'var(--accent-bg)' : 'transparent',
                 cursor: 'pointer',
                 borderRadius: 'var(--r-sm)',
                 textAlign: 'left',
@@ -650,7 +650,7 @@ export default function CommentComposer({
                     // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6/10 row inset for the mention dropdown
                     padding: '6px 10px',
                     border: 'none',
-                    background: idx === sugg.activeIndex ? 'rgba(17,17,17,0.06)' : 'transparent',
+                    background: idx === sugg.activeIndex ? 'var(--accent-bg)' : 'transparent',
                     cursor: 'pointer',
                     borderRadius: 'var(--r-sm)',
                     textAlign: 'left',
@@ -685,9 +685,9 @@ export default function CommentComposer({
             // Neutral idle: muted ink on neutral border. Intent idle: intent
             // color text + border, transparent fill. On state inverts to a
             // solid fill (ink for neutral, intent color for intents).
-            const idleColor = isNeutral ? '#333333' : opt.color;
-            const idleBorder = isNeutral ? '#dcdcdc' : opt.color;
-            const activeFill = isNeutral ? '#111111' : opt.color;
+            const idleColor = isNeutral ? 'var(--text-secondary)' : opt.color;
+            const idleBorder = isNeutral ? 'var(--border)' : opt.color;
+            const activeFill = isNeutral ? 'var(--text)' : opt.color;
             return (
               <button
                 key={String(opt.value)}
@@ -713,7 +713,10 @@ export default function CommentComposer({
                   border: `1px solid ${active ? activeFill : idleBorder}`,
                   borderRadius: 0,
                   background: active ? activeFill : 'transparent',
-                  color: active ? '#fcfcfc' : idleColor,
+                  // Active text contrasts on the fill. Neutral pill flips with
+                  // theme (white-on-ink-light, dark-on-white-ink-dark). Intent
+                  // pills always render white-on-brand-color regardless of theme.
+                  color: active ? (isNeutral ? 'var(--bg)' : '#fcfcfc') : idleColor,
                   cursor: 'pointer',
                   letterSpacing: '0',
                   lineHeight: 1.2,
@@ -752,10 +755,10 @@ export default function CommentComposer({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid #dcdcdc',
+              border: '1px solid var(--border)',
               borderRadius: 0,
               background: 'transparent',
-              color: '#777777',
+              color: 'var(--muted-foreground)',
               cursor: 'pointer',
               padding: 'var(--s0)',
               flexShrink: 0,
@@ -829,7 +832,7 @@ export default function CommentComposer({
                 color:
                   firsthandContext.length > FIRSTHAND_CONTEXT_LIMIT - 12
                     ? '#a14b1a'
-                    : '#777777',
+                    : 'var(--muted-foreground)',
                 fontVariantNumeric: 'tabular-nums',
                 flexShrink: 0,
               }}
@@ -890,7 +893,7 @@ export default function CommentComposer({
             fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
             fontSize: 10.5,
             letterSpacing: '0.08em',
-            color: bodyText.length > COMMENT_BODY_MAX - 200 ? '#a14b1a' : '#777777',
+            color: bodyText.length > COMMENT_BODY_MAX - 200 ? '#a14b1a' : 'var(--muted-foreground)',
             fontVariantNumeric: 'tabular-nums',
           }}
         >
@@ -904,13 +907,13 @@ export default function CommentComposer({
             if (!isEmpty && !busy) e.currentTarget.style.background = '#e33010';
           }}
           onMouseLeave={(e) => {
-            if (!isEmpty && !busy) e.currentTarget.style.background = '#111111';
+            if (!isEmpty && !busy) e.currentTarget.style.background = 'var(--text)';
           }}
           style={{
             ...postBtnStyle,
-            background: !isEmpty && !busy ? '#111111' : 'transparent',
-            color: !isEmpty && !busy ? '#fcfcfc' : '#a1a1aa',
-            border: !isEmpty && !busy ? '1px solid #111111' : '1px solid #dcdcdc',
+            background: !isEmpty && !busy ? 'var(--text)' : 'transparent',
+            color: !isEmpty && !busy ? 'var(--bg)' : 'var(--muted)',
+            border: !isEmpty && !busy ? '1px solid var(--text)' : '1px solid var(--border)',
             cursor: !isEmpty && !busy ? 'pointer' : 'default',
           }}
         >
@@ -926,23 +929,23 @@ const containerStyle: CSSProperties = {
   // Top-level composer keeps a soft hairline border but inherits the
   // sharp-corner institutional treatment of the reply panel — no
   // box-shadow, no rounded corners.
-  border: '1px solid #dcdcdc',
+  border: '1px solid var(--border)',
   borderRadius: 0,
   // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 16/18 container inset (18 off-grid keeps the editor breathing room)
   padding: '16px 18px',
-  background: '#fcfcfc',
+  background: 'var(--bg)',
   marginBottom: 'var(--s4)',
 };
 const replyContainerStyle: CSSProperties = {
-  // Reply panel — heavier 1.5px ink border, white fill, sharp corners.
+  // Reply panel — heavier 1.5px ink border, page-bg fill, sharp corners.
   // Reads as a deliberate institutional surface inside the tinted reply
   // block, not a floating dialog. Matches the mockup's "what kind of
   // reply?" picker container.
-  border: '1.5px solid #111111',
+  border: '1.5px solid var(--text)',
   borderRadius: 0,
   // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 16/18 container inset matches the top-level composer
   padding: '16px 18px',
-  background: '#ffffff',
+  background: 'var(--bg)',
   marginBottom: 'var(--s3)',
   marginTop: 18, // magic — intentional (between --s4 16 and --s5 20 — slight bump above the reply panel)
 };
@@ -953,7 +956,7 @@ const editorStyle: CSSProperties = {
   width: '100%',
   minHeight: 72,
   background: 'transparent',
-  color: 'var(--text-primary, #111)',
+  color: 'var(--text)',
   fontSize: 15,
   lineHeight: 1.7,
   padding: 'var(--s1) var(--s0)',
@@ -974,7 +977,7 @@ const footerStyle: CSSProperties = {
   flexWrap: 'wrap',
   marginTop: 10, // magic — intentional (between --s2 8 and --s3 12 — footer rhythm above the divider)
   paddingTop: 10, // magic — intentional (between --s2 8 and --s3 12 — footer rhythm above the divider)
-  borderTop: '1px solid #dcdcdc',
+  borderTop: '1px solid var(--border)',
 };
 const cancelBtnStyle: CSSProperties = {
   background: 'none',
@@ -986,7 +989,7 @@ const cancelBtnStyle: CSSProperties = {
   fontWeight: 600,
   letterSpacing: '0.14em',
   textTransform: 'uppercase',
-  color: '#777777',
+  color: 'var(--muted-foreground)',
   cursor: 'pointer',
 };
 const postBtnStyle: CSSProperties = {
@@ -1001,8 +1004,8 @@ const postBtnStyle: CSSProperties = {
   transition: 'background 120ms',
 };
 const mentionDropdownStyle: CSSProperties = {
-  background: '#fff',
-  border: '1px solid var(--border, #e5e5e5)',
+  background: 'var(--bg)',
+  border: '1px solid var(--border)',
   borderRadius: 'var(--r-md)',
   boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
   padding: 'var(--s1)',

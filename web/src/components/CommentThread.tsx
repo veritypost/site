@@ -974,7 +974,7 @@ export default function CommentThread({
           justifyContent: 'space-between',
           marginBottom: 'var(--s5)',
           paddingBottom: 'var(--s3)',
-          borderBottom: '1px solid #e5e5e5',
+          borderBottom: '1px solid var(--border)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text, #1a1a1a)' }}>
@@ -1407,8 +1407,11 @@ export default function CommentThread({
                   background:
                     dialog.action === 'delete' || dialog.action === 'block'
                       ? '#dc2626'
-                      : 'var(--accent, #111)',
-                  color: '#fff',
+                      : 'var(--accent)',
+                  color:
+                    dialog.action === 'delete' || dialog.action === 'block'
+                      ? '#fff'
+                      : 'var(--bg)',
                   fontSize: 13,
                   fontWeight: 700,
                   cursor: dialog.submitting ? 'default' : 'pointer',
