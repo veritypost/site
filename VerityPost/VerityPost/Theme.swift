@@ -280,6 +280,34 @@ extension Color {
         let b = Double(rgb & 0xFF) / 255
         self.init(red: r, green: g, blue: b)
     }
+
+    /// Dark-mode-aware peer of `Color(hex:)`. In dark trait, lifts the
+    /// input's HSB brightness by +0.22 (clamped to 1.0) so deliberately
+    /// dark band fills — `#1a1a2e` style navies, `#1b2a1b` style forest
+    /// greens — gain edge against `systemBackground` (~B 0.06–0.11 on
+    /// OLED dark). In light trait returns the input unchanged. Hue and
+    /// saturation are preserved so the per-category color identity stays
+    /// recognisable across modes; relative relationships (politics-cooler-
+    /// than-markets, etc.) are intact.
+    ///
+    /// Picked over manual 16-hex-pick 2026-05-13 panel (2-1 majority).
+    /// Owner-judgment trade-off: if a specific category lands muddy in
+    /// dark mode (space / ai / near-pure-black hexes are the likeliest
+    /// candidates), the fix is to inject a per-slug override in
+    /// HomeView.categoryPalette, not to abandon the algorithmic lift.
+    init(hex raw: String, adaptive: Bool) {
+        guard adaptive else { self.init(hex: raw); return }
+        let base = UIColor(Color(hex: raw))
+        self = Color(uiColor: UIColor { tc in
+            guard tc.userInterfaceStyle == .dark else { return base }
+            var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            guard base.getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return base }
+            return UIColor(hue: h,
+                           saturation: s,
+                           brightness: min(1, b + 0.22),
+                           alpha: a)
+        })
+    }
 }
 
 // MARK: - Avatar (plain circle fill + up to 3 chars)

@@ -373,7 +373,11 @@ struct StoryDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                if let slug = story.slug, let url = URL(string: "https://veritypost.com/story/\(slug)") {
+                if let slug = story.slug {
+                    // Canonical URL Stage 2 (2026-05-13) — bare /{slug}.
+                    // Stage 1 web shipped the metadata + 308 redirect from
+                    // /story/{slug}, so legacy share links keep resolving.
+                    let url = SupabaseManager.shared.siteURL.appendingPathComponent(slug)
                     ShareLink(item: url) {
                         Image(systemName: "square.and.arrow.up").foregroundColor(VP.dim)
                     }

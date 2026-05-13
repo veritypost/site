@@ -217,7 +217,7 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Main Tab View — 2-tab layout: Home, Profile (Browse + Following dropped; BrowseLanding + FollowingView retained for re-expose)
+// MARK: - Main Tab View — 3-tab layout: Home, Browse, Profile
 
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthViewModel
@@ -237,13 +237,13 @@ struct MainTabView: View {
     @State private var profilePath = NavigationPath()
     private let deepLinkClient = SupabaseManager.shared.client
 
-    // Nav restructure 2026-05-06: matches mobile web. Browse removed
-    // from bottom nav; sections accessible via HomeSectionsSheet.
+    // Nav restructure: 3 tabs — Today, Browse, Profile.
     // Notifications and Rankings still accessed from Profile.
     // Profile slot relabels to "Sign up" for anon users.
-    // Owner cleanup item 12 (2026-05-08, refined) — Following lives in
-    // HomeSectionsSheet (top-bar grid icon on Home), not as a tab. Two
-    // tabs only: Today + Profile. Mirrors web's Home + Profile bottom nav.
+    // Owner cleanup item 12 (2026-05-08) — Following lives in
+    // HomeSectionsSheet (top-bar grid icon on Home), not as a tab.
+    // Browse re-added 2026-05-12 (Stream D) — 3-pane hierarchical
+    // directory mirroring web /directory.
     enum Tab: Hashable { case today, browse, profile }
 
     private var isLoggedIn: Bool { auth.currentUser != nil }
@@ -270,10 +270,10 @@ struct MainTabView: View {
 
     // MARK: - Adult tab bar
     //
-    // 2 tabs: Home, Profile — matches mobile web nav.
-    // Browse removed; sections accessible via HomeSectionsSheet on the home toolbar.
+    // 3 tabs: Home, Browse, Profile.
+    // Browse is the 3-pane hierarchical directory (Stream D, 2026-05-12).
     // Text-only (no icons), bottom-fixed, translucent white with a blur.
-    // Active tab renders in accent color, bold. Anon users see the same 2
+    // Active tab renders in accent color, bold. Anon users see the same 3
     // slots; the Profile slot flips to "Sign up" via the SignInGate
     // destination. Alerts and Rankings are accessed from Profile.
 
@@ -483,9 +483,10 @@ struct TextTabBar: View {
     }
 
     private var items: [Item] {
-        // Owner cleanup item 12 (2026-05-08, refined) — Following lives in
-        // HomeSectionsSheet (top-bar grid icon on Home), not as a tab. Two
-        // slots only: Home + Profile (or Sign up for anon). Mirrors web.
+        // Three slots: Home + Browse + Profile (Profile flips to "Sign up"
+        // for anon). Following lives in HomeSectionsSheet (top-bar grid
+        // icon on Home), not as a tab — owner cleanup item 12 (2026-05-08).
+        // Browse re-added 2026-05-12 (Stream D — hierarchical directory).
         if isLoggedIn {
             return [
                 Item(id: .today,   label: "Home"),

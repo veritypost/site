@@ -2,104 +2,29 @@ import SwiftUI
 import UIKit
 
 // @migrated-to-permissions 2026-04-18
-// @feature-verified home_feed 2026-04-18
-
-/// Home-feed recap card. Rendered when `recap.list.view` is granted and a
-/// recap exists this week. Users without the permission see an upsell
-/// card; anyone else gets `EmptyView`.
-struct HomeRecapCard: View {
-    @EnvironmentObject var auth: AuthViewModel
-    @ObservedObject private var perms = PermissionStore.shared
-    @State private var recapTitle: String?
-    @State private var recapId: String?
-    @State private var canViewRecaps: Bool?
-    @State private var showSubscription = false
-
-    var body: some View {
-        Group {
-            if let title = recapTitle, let id = recapId {
-                NavigationLink {
-                    RecapQuizView(recapId: id, title: title)
-                        .environmentObject(auth)
-                } label: {
-                    recapCardBody(title: title, sub: "Take the recap quiz")
-                }
-                .buttonStyle(.plain)
-            } else if canViewRecaps == false {
-                Button { showSubscription = true } label: {
-                    recapCardBody(title: "See what you missed this week", sub: "Available on paid plans.")
-                }
-                .buttonStyle(.plain)
-                .sheet(isPresented: $showSubscription) {
-                    SubscriptionView().environmentObject(auth)
-                }
-            } else {
-                EmptyView()
-            }
-        }
-        .task { await load() }
-        .task(id: perms.changeToken) {
-            canViewRecaps = await PermissionService.shared.has("recap.list.view")
-        }
-    }
-
-    private func recapCardBody(title: String, sub: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("This week in review")
-                .font(.system(.caption2, design: .default, weight: .bold))
-                .tracking(1)
-                .foregroundColor(VP.accent)
-            Text(title)
-                .font(.system(.headline, design: .default, weight: .semibold))
-                .foregroundColor(VP.text)
-                .multilineTextAlignment(.leading)
-            Text(sub)
-                .font(.caption)
-                .foregroundColor(VP.dim)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(VP.accent.opacity(0.05))
-        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.accent.opacity(0.25)))
-        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-    }
-
-    private func load() async {
-        let site = SupabaseManager.shared.siteURL
-        guard let url = URL(string: "/api/recap", relativeTo: site) else { return }
-        let client = SupabaseManager.shared.client
-        guard let session = try? await client.auth.session else { return }
-        var req = URLRequest(url: url)
-        req.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
-        do {
-            let (data, _) = try await URLSession.shared.data(for: req)
-            struct MyAttempt: Decodable { let completed_at: String? }
-            struct Row: Decodable {
-                let id: String
-                let title: String
-                let my_attempt: MyAttempt?
-            }
-            struct ListResponse: Decodable { let recaps: [Row]; let paid: Bool? }
-            let wrapped = (try? JSONDecoder().decode(ListResponse.self, from: data))
-            let rows = wrapped?.recaps ?? []
-            await MainActor.run {
-                if let next = rows.first(where: { $0.my_attempt?.completed_at == nil }) ?? rows.first {
-                    recapId = next.id
-                    recapTitle = next.title
-                }
-            }
-        } catch {
-            // Swallow — self-hiding slot.
-        }
-    }
-}
+// @feature-verified ads 2026-05-13
 
 /// Per-launch session id for ad serve / impression / cap accounting.
 /// One UUID per app launch, mirrors the EventsClient pattern.
 private enum AdSession {
     static let id: String = UUID().uuidString
+}
+
+/// iOS home placement names follow the `ios_home_<slot>_<tier>` shape.
+/// Anonymous users see the `_anon` variant; authenticated users (free
+/// tier) see the `_free` variant. Paid tiers don't see either — the
+/// placement-level `hidden_for_tiers` array enforces that server-side.
+/// Migration `ios_home_placements_tier_split` (2026-05-13) owns these
+/// names; do not retire without verifying the iOS binary in production.
+enum HomeAdSlotSlot: String {
+    case top
+    case inFeed1 = "in_feed_1"
+    case inFeed2 = "in_feed_2"
+    case belowFold = "below_fold"
+}
+
+func iosHomePlacement(_ slot: HomeAdSlotSlot, authed: Bool) -> String {
+    "ios_home_\(slot.rawValue)_\(authed ? "free" : "anon")"
 }
 
 /// Generic ad slot. Calls /api/ads/serve with the supplied placement,
@@ -121,6 +46,13 @@ struct HomeAdSlot: View {
     @State private var ad: AdPayload?
     @State private var impressionId: String?
     @State private var recordedImpression = false
+    // Section E.2 — viewability gate. Mirrors web _AdBeacon.tsx: ≥50%
+    // on-screen for ≥1000ms continuous = MRC viewable impression.
+    // Without this, every HomeAdSlot fires recordImpression on mount
+    // regardless of whether the cell is in the viewport — inflates
+    // impressions vs web's IntersectionObserver.
+    @State private var visibleSince: Date? = nil
+    @State private var viewabilityTask: Task<Void, Never>? = nil
 
     var body: some View {
         Group {
@@ -159,17 +91,59 @@ struct HomeAdSlot: View {
                     .padding(.vertical, 6)
                 }
                 .buttonStyle(.plain)
-                .task(id: ad.id) {
-                    if !recordedImpression {
-                        recordedImpression = true
-                        await recordImpression()
+                .background(
+                    // Non-layout-affecting frame probe. Fires
+                    // onPreferenceChange on every scroll tick.
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: AdCellFrameKey.self,
+                            value: proxy.frame(in: .global)
+                        )
                     }
+                )
+                .onPreferenceChange(AdCellFrameKey.self) { frame in
+                    handleVisibility(frame: frame)
+                }
+                .onDisappear {
+                    viewabilityTask?.cancel()
+                    viewabilityTask = nil
+                    visibleSince = nil
                 }
             } else {
                 EmptyView()
             }
         }
         .task(id: placement + (articleId ?? "")) { await load() }
+    }
+
+    /// Decide whether the cell is ≥50% on-screen. If yes and we haven't
+    /// already started the 1s timer, start it; if no, cancel any pending
+    /// timer and reset the dwell clock. Once `recordedImpression` flips
+    /// true, this function short-circuits — never re-fires on rescroll.
+    private func handleVisibility(frame: CGRect) {
+        if recordedImpression { return }
+        guard frame.height > 0, frame.width > 0 else { return }
+        let screen = UIScreen.main.bounds
+        let visible = frame.intersection(screen)
+        let ratio = (visible.height * visible.width) /
+                    (frame.height * frame.width)
+        if ratio >= 0.5 {
+            if visibleSince == nil { visibleSince = Date() }
+            if viewabilityTask == nil {
+                viewabilityTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    if Task.isCancelled { return }
+                    if !recordedImpression {
+                        recordedImpression = true
+                        await recordImpression()
+                    }
+                }
+            }
+        } else {
+            viewabilityTask?.cancel()
+            viewabilityTask = nil
+            visibleSince = nil
+        }
     }
 
     private func load() async {
@@ -262,6 +236,16 @@ struct ImpressionResponse: Decodable {
 }
 
 private struct EmptyAck: Decodable {}
+
+/// PreferenceKey carrying the ad cell's global frame for the viewability
+/// math in HomeAdSlot.handleVisibility(frame:). Last value wins — there's
+/// only one publisher per HomeAdSlot instance.
+private struct AdCellFrameKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
 
 // MARK: - QuizSponsorEyebrow (Wave 4)
 //
