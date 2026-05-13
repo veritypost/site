@@ -65,8 +65,8 @@ export default function SubcategoryPane({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: 'var(--bg, #fcfcfc)',
-        borderRight: '1px solid var(--border, #dcdcdc)',
+        background: 'var(--bg)',
+        borderRight: '1px solid var(--border)',
         overflowY: 'auto',
       }}
     >
@@ -78,11 +78,11 @@ export default function SubcategoryPane({
           fontFamily: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
           fontSize: 10,
           fontWeight: 600,
-          color: 'var(--ink-3, #777)',
+          color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.15em',
-          borderBottom: '1px solid var(--border, #dcdcdc)',
-          background: 'var(--bg, #fcfcfc)',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--bg)',
           zIndex: 2,
           display: 'flex',
           justifyContent: 'space-between',
@@ -113,7 +113,7 @@ export default function SubcategoryPane({
                 margin: '8px 0 0',
                 fontSize: 14,
                 lineHeight: 1.5,
-                color: 'var(--ink-2, #333)',
+                color: 'var(--text-secondary)',
               }}
             >
               {parent.description}
@@ -124,7 +124,7 @@ export default function SubcategoryPane({
               margin: '14px 0 0',
               fontFamily: '"IBM Plex Mono", monospace',
               fontSize: 11,
-              color: 'var(--ink-3, #777)',
+              color: 'var(--muted-foreground)',
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
             }}
@@ -146,15 +146,15 @@ export default function SubcategoryPane({
                 border: 'none',
                 cursor: 'pointer',
                 padding: '18px 24px',
-                borderBottom: '1px solid var(--border, #dcdcdc)',
+                borderBottom: '1px solid var(--border)',
                 borderLeft:
                   activeSubSlug === null
-                    ? '2px solid var(--accent, #e33010)'
+                    ? '2px solid #e33010'
                     : '2px solid transparent',
                 fontFamily: '"Source Serif 4", Georgia, serif',
                 fontSize: 18,
                 fontWeight: activeSubSlug === null ? 600 : 500,
-                color: 'var(--ink, #111)',
+                color: 'var(--text)',
               }}
             >
               All
@@ -177,13 +177,13 @@ export default function SubcategoryPane({
                     padding: '18px 24px',
                     borderTop: 'none',
                     borderRight: 'none',
-                    borderBottom: '1px solid var(--border, #dcdcdc)',
+                    borderBottom: '1px solid var(--border)',
                     borderLeft: active
-                      ? '2px solid var(--accent, #e33010)'
+                      ? '2px solid #e33010'
                       : '2px solid transparent',
                     textAlign: 'left',
                     textDecoration: 'none',
-                    color: 'var(--ink, #111)',
+                    color: 'var(--text)',
                     background: 'transparent',
                     cursor: 'pointer',
                     fontFamily: '"Source Serif 4", Georgia, serif',
@@ -199,7 +199,7 @@ export default function SubcategoryPane({
                         fontFamily:
                           '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
                         fontSize: 11,
-                        color: 'var(--ink-3, #777)',
+                        color: 'var(--muted-foreground)',
                         fontWeight: 400,
                       }}
                     >

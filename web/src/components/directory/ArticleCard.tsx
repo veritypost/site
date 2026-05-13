@@ -39,7 +39,7 @@ export default function ArticleCard({ article, edgeStyle = false }: ArticleCardP
     <article
       style={{
         position: 'relative',
-        borderBottom: '1px solid var(--border, #dcdcdc)',
+        borderBottom: '1px solid var(--border)',
         background: 'transparent',
       }}
     >
@@ -51,7 +51,7 @@ export default function ArticleCard({ article, edgeStyle = false }: ArticleCardP
           padding: '20px 24px',
           textDecoration: 'none',
           color: 'inherit',
-          borderLeft: edgeStyle ? '2px solid var(--accent, #e33010)' : '2px solid transparent',
+          borderLeft: edgeStyle ? '2px solid #e33010' : '2px solid transparent',
           transition: 'background 100ms ease',
         }}
       >
@@ -59,7 +59,7 @@ export default function ArticleCard({ article, edgeStyle = false }: ArticleCardP
           style={{
             fontFamily: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
             fontSize: 11,
-            color: 'var(--ink-3, #777)',
+            color: 'var(--muted-foreground)',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
             marginBottom: 8,
@@ -84,7 +84,7 @@ export default function ArticleCard({ article, edgeStyle = false }: ArticleCardP
             fontWeight: 500,
             lineHeight: 1.25,
             letterSpacing: '-0.005em',
-            color: 'var(--ink, #111)',
+            color: 'var(--text)',
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
@@ -99,7 +99,7 @@ export default function ArticleCard({ article, edgeStyle = false }: ArticleCardP
               margin: '6px 0 0',
               fontSize: 15,
               lineHeight: 1.4,
-              color: 'var(--ink-2, #333)',
+              color: 'var(--text-secondary)',
               display: '-webkit-box',
               WebkitLineClamp: 1,
               WebkitBoxOrient: 'vertical',
@@ -118,7 +118,7 @@ export default function ArticleCard({ article, edgeStyle = false }: ArticleCardP
             bottom: 16,
             fontFamily: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
             fontSize: 11,
-            color: 'var(--accent, #e33010)',
+            color: '#e33010',
             letterSpacing: '0.05em',
           }}
         >

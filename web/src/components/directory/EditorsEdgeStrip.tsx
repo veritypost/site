@@ -23,8 +23,8 @@ export default function EditorsEdgeStrip({ pick }: EditorsEdgeStripProps) {
     <section
       aria-label="Editor's Edge"
       style={{
-        borderBottom: '1px solid var(--border, #dcdcdc)',
-        background: 'var(--bg, #fcfcfc)',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--bg)',
       }}
     >
       <div
@@ -35,7 +35,7 @@ export default function EditorsEdgeStrip({ pick }: EditorsEdgeStripProps) {
           fontWeight: 600,
           letterSpacing: '0.15em',
           textTransform: 'uppercase',
-          color: 'var(--accent, #e33010)',
+          color: '#e33010',
         }}
       >
         Editor’s Edge

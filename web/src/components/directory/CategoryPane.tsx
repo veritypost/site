@@ -39,8 +39,8 @@ export default function CategoryPane({ categories, activeSlug, onSelect }: Categ
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: 'var(--bg, #fcfcfc)',
-        borderRight: '1px solid var(--border, #dcdcdc)',
+        background: 'var(--bg)',
+        borderRight: '1px solid var(--border)',
         overflowY: 'auto',
       }}
     >
@@ -52,11 +52,11 @@ export default function CategoryPane({ categories, activeSlug, onSelect }: Categ
           fontFamily: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
           fontSize: 10,
           fontWeight: 600,
-          color: 'var(--ink-3, #777)',
+          color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.15em',
-          borderBottom: '1px solid var(--border, #dcdcdc)',
-          background: 'var(--bg, #fcfcfc)',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--bg)',
           zIndex: 2,
         }}
       >
@@ -83,11 +83,11 @@ export default function CategoryPane({ categories, activeSlug, onSelect }: Categ
                   padding: '18px 24px',
                   borderTop: 'none',
                   borderRight: 'none',
-                  borderBottom: '1px solid var(--border, #dcdcdc)',
-                  borderLeft: active ? '2px solid var(--accent, #e33010)' : '2px solid transparent',
+                  borderBottom: '1px solid var(--border)',
+                  borderLeft: active ? '2px solid #e33010' : '2px solid transparent',
                   textAlign: 'left',
                   textDecoration: 'none',
-                  color: 'var(--ink, #111)',
+                  color: 'var(--text)',
                   background: 'transparent',
                   cursor: 'pointer',
                   fontFamily: '"Source Serif 4", Georgia, serif',
@@ -105,7 +105,7 @@ export default function CategoryPane({ categories, activeSlug, onSelect }: Categ
                       fontFamily:
                         '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
                       fontSize: 11,
-                      color: 'var(--ink-3, #777)',
+                      color: 'var(--muted-foreground)',
                       fontWeight: 400,
                     }}
                   >
@@ -122,7 +122,7 @@ export default function CategoryPane({ categories, activeSlug, onSelect }: Categ
               padding: 24,
               fontFamily: '"Source Serif 4", Georgia, serif',
               fontStyle: 'italic',
-              color: 'var(--ink-3, #777)',
+              color: 'var(--muted-foreground)',
             }}
           >
             No sections match.

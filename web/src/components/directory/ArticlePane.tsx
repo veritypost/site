@@ -50,7 +50,7 @@ export default function ArticlePane({
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          background: 'var(--bg-alt, #f3f3f3)',
+          background: 'var(--accent-bg)',
         }}
       >
         <header
@@ -59,11 +59,11 @@ export default function ArticlePane({
             fontFamily: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
             fontSize: 10,
             fontWeight: 600,
-            color: 'var(--ink-3, #777)',
+            color: 'var(--muted-foreground)',
             textTransform: 'uppercase',
             letterSpacing: '0.15em',
-            borderBottom: '1px solid var(--border, #dcdcdc)',
-            background: 'var(--bg-alt, #f3f3f3)',
+            borderBottom: '1px solid var(--border)',
+            background: 'var(--accent-bg)',
           }}
         >
           Briefing records
@@ -73,7 +73,7 @@ export default function ArticlePane({
             padding: 32,
             fontFamily: '"Source Serif 4", Georgia, serif',
             fontStyle: 'italic',
-            color: 'var(--ink-3, #777)',
+            color: 'var(--muted-foreground)',
           }}
         >
           Select a section to view records.
@@ -93,7 +93,7 @@ export default function ArticlePane({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: 'var(--bg-alt, #f3f3f3)',
+        background: 'var(--accent-bg)',
         overflowY: 'auto',
         position: 'relative',
       }}
@@ -106,11 +106,11 @@ export default function ArticlePane({
           fontFamily: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
           fontSize: 10,
           fontWeight: 600,
-          color: 'var(--ink-3, #777)',
+          color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.15em',
-          borderBottom: '1px solid var(--border, #dcdcdc)',
-          background: 'var(--bg-alt, #f3f3f3)',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--accent-bg)',
           zIndex: 2,
           display: 'flex',
           justifyContent: 'space-between',
@@ -148,7 +148,7 @@ export default function ArticlePane({
             .vp-dir-pane-stripe {
               width: 40%;
               height: 100%;
-              background: var(--accent, #e33010);
+              background: #e33010;
               animation: vp-dir-pane-stripe 1.1s ease-in-out infinite;
             }
             @media (prefers-reduced-motion: reduce) {
@@ -167,7 +167,7 @@ export default function ArticlePane({
             padding: 32,
             fontFamily: '"Source Serif 4", Georgia, serif',
             fontStyle: 'italic',
-            color: 'var(--ink-3, #777)',
+            color: 'var(--muted-foreground)',
           }}
         >
           {loading ? 'Loading records…' : 'No articles yet.'}

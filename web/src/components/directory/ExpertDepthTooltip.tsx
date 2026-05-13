@@ -123,20 +123,20 @@ export default function ExpertDepthTooltip({ storyId, count }: ExpertDepthToolti
             minWidth: 220,
             maxWidth: 280,
             padding: '10px 12px',
-            background: 'var(--bg, #fff)',
-            border: '1px solid var(--border, #dcdcdc)',
+            background: 'var(--bg)',
+            border: '1px solid var(--border)',
             borderRadius: 8,
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
             fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
             fontSize: 12,
-            color: 'var(--ink, #111)',
+            color: 'var(--text)',
           }}
         >
           {state.kind === 'loading' && (
-            <div style={{ color: 'var(--ink-3, #777)', fontStyle: 'italic' }}>Loading…</div>
+            <div style={{ color: 'var(--muted-foreground)', fontStyle: 'italic' }}>Loading…</div>
           )}
           {state.kind === 'error' && (
-            <div style={{ color: 'var(--ink-3, #777)' }}>Couldn’t load experts.</div>
+            <div style={{ color: 'var(--muted-foreground)' }}>Couldn’t load experts.</div>
           )}
           {state.kind === 'locked' && (
             <div>
@@ -147,7 +147,7 @@ export default function ExpertDepthTooltip({ storyId, count }: ExpertDepthToolti
                   fontWeight: 600,
                   letterSpacing: '0.1em',
                   textTransform: 'uppercase',
-                  color: 'var(--accent, #e33010)',
+                  color: '#e33010',
                   marginBottom: 6,
                 }}
               >
@@ -162,8 +162,8 @@ export default function ExpertDepthTooltip({ storyId, count }: ExpertDepthToolti
                   display: 'inline-block',
                   padding: '6px 12px',
                   borderRadius: 6,
-                  background: 'var(--ink, #111)',
-                  color: 'var(--bg, #fff)',
+                  background: 'var(--text)',
+                  color: 'var(--bg)',
                   textDecoration: 'none',
                   fontSize: 11,
                   fontWeight: 600,
@@ -182,7 +182,7 @@ export default function ExpertDepthTooltip({ storyId, count }: ExpertDepthToolti
                   fontWeight: 600,
                   letterSpacing: '0.1em',
                   textTransform: 'uppercase',
-                  color: 'var(--ink-3, #777)',
+                  color: 'var(--muted-foreground)',
                   marginBottom: 6,
                 }}
               >
@@ -207,7 +207,7 @@ export default function ExpertDepthTooltip({ storyId, count }: ExpertDepthToolti
                           width: 20,
                           height: 20,
                           borderRadius: '50%',
-                          background: 'var(--bg-alt, #f3f3f3)',
+                          background: 'var(--accent-bg)',
                           flexShrink: 0,
                         }}
                       />
@@ -215,7 +215,7 @@ export default function ExpertDepthTooltip({ storyId, count }: ExpertDepthToolti
                     <span style={{ minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <span style={{ fontWeight: 600 }}>{e.display_name || 'Expert'}</span>
                       {e.expert_title && (
-                        <span style={{ color: 'var(--ink-3, #777)' }}> · {e.expert_title}</span>
+                        <span style={{ color: 'var(--muted-foreground)' }}> · {e.expert_title}</span>
                       )}
                     </span>
                   </li>

@@ -352,8 +352,8 @@ export default function DirectoryShell({
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        background: 'var(--bg, #fcfcfc)',
-        color: 'var(--ink, #111)',
+        background: 'var(--bg)',
+        color: 'var(--text)',
       }}
     >
       <style>{`
@@ -364,14 +364,14 @@ export default function DirectoryShell({
             align-items: center;
             gap: 8px;
             padding: 12px 24px;
-            background: var(--bg-alt, #f3f3f3);
-            border-bottom: 1px solid var(--border, #dcdcdc);
+            background: var(--accent-bg);
+            border-bottom: 1px solid var(--border);
             font-family: "IBM Plex Mono", monospace;
             font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            color: var(--ink, #111);
+            color: var(--text);
             cursor: pointer;
           }
         }
@@ -480,8 +480,8 @@ function EmptyPane({ label, hint }: { label: string; hint: string }) {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: 'var(--bg, #fcfcfc)',
-        borderRight: '1px solid var(--border, #dcdcdc)',
+        background: 'var(--bg)',
+        borderRight: '1px solid var(--border)',
       }}
     >
       <header
@@ -490,10 +490,10 @@ function EmptyPane({ label, hint }: { label: string; hint: string }) {
           fontFamily: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
           fontSize: 10,
           fontWeight: 600,
-          color: 'var(--ink-3, #777)',
+          color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.15em',
-          borderBottom: '1px solid var(--border, #dcdcdc)',
+          borderBottom: '1px solid var(--border)',
         }}
       >
         {label}
@@ -503,7 +503,7 @@ function EmptyPane({ label, hint }: { label: string; hint: string }) {
           padding: 32,
           fontFamily: '"Source Serif 4", Georgia, serif',
           fontStyle: 'italic',
-          color: 'var(--ink-3, #777)',
+          color: 'var(--muted-foreground)',
         }}
       >
         {hint}
