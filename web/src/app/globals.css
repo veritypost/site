@@ -842,6 +842,21 @@ body {
     overflow-y: auto;
   }
   [data-reader-panel="timeline"] > section:first-child { margin-top: 0; }
+  /* Align Quiz + Discussion to the article body column on desktop.
+     Mirror the body's grid shape so engagement content sits in the
+     same left 1fr column (rail width reserved but empty) — left edge
+     therefore matches the article body exactly. Without this, the
+     engagement wrapper centered to 760px which placed its left edge
+     well to the right of the article body's left edge. */
+  [data-reader-engagement] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    column-gap: 32px;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 40px;
+  }
+  [data-reader-engagement] > * { grid-column: 1; }
 }
 
 @media (max-width: 1179px) {
