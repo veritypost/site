@@ -255,4 +255,28 @@ iPad: same hierarchy in `NavigationSplitView`.
 
 Build started: 2026-05-12 (overnight).
 Planning panel: 5 design agents + 5 deep-code agents complete.
-Phase: implementing.
+Phase: **BUILT** — all 4 streams shipped + post-impl reviewer PASSED.
+
+### Commits (local only; not pushed)
+- `6762a9a4` Stream A — DB migrations + BUILD.md spec
+- `2f1d6246` Stream B — /directory route, components, public API
+- `c3c4609b` Stream C — admin Editor's Edge curation
+- `15407d63` Stream D — iOS Browse tab
+- `033228c5` fix(ios-browse) — align EditorsEdgePick decoder to is_verified
+
+### What to do in the morning
+1. **Apply migrations** in order from the Supabase dashboard (or via CLI):
+   - `20260513000000_pg_trgm_categories.sql`
+   - `20260513000100_editors_edge_picks.sql`
+   - `20260513000200_directory_permissions.sql`
+   - `20260513000300_directory_indexes.sql`
+2. **Regen TS types**: `npx supabase gen types typescript ...` — clears the `as any` casts in the admin + public editors-edge routes.
+3. **Verify locally**: `cd web && npm run dev`, hit `/directory`, `/directory/politics`, `/directory/culture` (flat cat), `/admin/editors-edge`. Sign in as admin → create an Edge pick → confirm it renders on `/directory/<that-cat>`.
+4. **iOS**: open in Xcode, build, sanity-check Browse tab renders + tap-through works. (SourceKit will re-index and clear the transient UIKit warnings — they are not real build errors; many existing files import UIKit.)
+5. **Push when satisfied**: `git push origin main` — I deliberately did not push per the no-push-without-approval rule.
+
+### Open follow-ups (non-blocking)
+- iOS expert-coverage tooltip is not wired (count only); web has it. Defer.
+- Owner-decision questions parked at sensible defaults in Locked Decisions — revisit if you want different Edge windows or multi-slot rotation.
+- Admin POST auto-expire is best-effort + UNIQUE backstop; if collisions show up under load, lift into a SECURITY DEFINER RPC.
+- `database.ts` regen needed for type-cleanup (item 2 above).
