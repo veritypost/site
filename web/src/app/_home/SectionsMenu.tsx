@@ -434,6 +434,9 @@ export default function SectionsMenu() {
 
                   <AllRow active={isHomeActive} onNavigate={close} />
 
+                  {/* Stream B (directory build) — "Browse all" entry point to /directory. */}
+                  <BrowseAllRow onNavigate={close} />
+
                   {parents.map((p) => {
                     const subs = subsByParent.get(p.id) ?? [];
                     const parentActive = activeCatSlug === p.slug;
@@ -799,6 +802,38 @@ function FollowingRow({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Stream B (directory build) — link to the new 3-pane directory.
+// Non-destructive: lives alongside AllRow + the existing per-category rows
+// so legacy link targets stay intact; this just adds an additional entry
+// point. The directory route handles its own auth/perm logic.
+function BrowseAllRow({ onNavigate }: { onNavigate: () => void }) {
+  return (
+    <div style={{ borderBottom: `1px solid ${C.rule}` }}>
+      <Link
+        href="/directory"
+        onClick={onNavigate}
+        style={{
+          display: 'block',
+          padding: '16px 0',
+          textDecoration: 'none',
+        }}
+      >
+        <span
+          style={{
+            fontFamily: serifStack,
+            fontSize: 22,
+            fontWeight: 500,
+            letterSpacing: '-0.015em',
+            color: C.text,
+          }}
+        >
+          Browse all
+        </span>
+      </Link>
     </div>
   );
 }
