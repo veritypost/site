@@ -10,7 +10,6 @@ import Foundation
 
 struct EditorsEdgePick: Decodable, Identifiable {
     let id: String
-    let slug: String?
     let storySlug: String?
     let title: String?
     let excerpt: String?
@@ -23,13 +22,16 @@ struct EditorsEdgePick: Decodable, Identifiable {
     let validTo: Date?
 
     enum CodingKeys: String, CodingKey {
-        case id, slug, title, excerpt
+        case id, title, excerpt
         case storySlug = "story_slug"
         case publishedAt = "published_at"
         case sourceName = "source_name"
         case readingTimeMinutes = "reading_time_minutes"
         case expertCount = "expert_count"
-        case isExpertVerified = "is_expert_verified"
+        // Server emits `is_verified` (not `is_expert_verified`) — see
+        // runDirectoryArticles.ts + editors-edge/route.ts. BUILD.md spec
+        // line 175 mis-named the field; server + this DTO follow code.
+        case isExpertVerified = "is_verified"
         case edgeLabel = "_edge_label"
         case validTo = "_valid_to"
     }
@@ -89,6 +91,8 @@ struct BrowseArticleDecor: Decodable {
         case sourceName = "source_name"
         case readingTimeMinutes = "reading_time_minutes"
         case expertCount = "expert_count"
-        case isExpertVerified = "is_expert_verified"
+        // Server emits `is_verified`, not `is_expert_verified` (see
+        // runDirectoryArticles.ts). Spec line 175 was wrong; code wins.
+        case isExpertVerified = "is_verified"
     }
 }
