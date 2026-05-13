@@ -113,6 +113,9 @@ playwright-report/
 test-results/
 .nyc_output/
 web/tests/e2e/.auth/
+# NOTE: VerityPost/VerityPostSnapshotTests/__Snapshots__/ is intentionally
+# tracked — snapshot baseline PNGs are source of truth for the iOS layout
+# diff suite. Don't add a rule that excludes it.
 
 # --- Misc ------------------------------------------------------------------
 *.pem

@@ -19,6 +19,10 @@ packages:
   Supabase:
     url: https://github.com/supabase-community/supabase-swift
     from: 2.0.0
+  SnapshotTesting:
+    url: https://github.com/pointfreeco/swift-snapshot-testing
+    minVersion: 1.18.9
+    maxVersion: 1.19.0
 
 targets:
   VerityPost:
@@ -103,3 +107,19 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.veritypost.app.uitests
         TEST_TARGET_NAME: VerityPost
+
+  VerityPostSnapshotTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: VerityPostSnapshotTests
+    dependencies:
+      - target: VerityPost
+      - package: SnapshotTesting
+        product: SnapshotTesting
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.veritypost.app.snapshottests
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/VerityPost.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/VerityPost"

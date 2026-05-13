@@ -232,6 +232,17 @@ struct StoryDetailView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var contentHeight: CGFloat = 1
     @State private var viewportHeight: CGFloat = 1
+    // Session 3 part 2 (2026-05-12) — iPad article-reader rail. Mirrors
+    // HomeView's `isGridMode` pattern: read horizontalSizeClass + measured
+    // viewport width and flip the body to a two-column shape at
+    // `VP.LayoutBreak.rail` (1180pt). Width is populated via a passive
+    // GeometryReader background on the outer container so rotation /
+    // Split View / Stage Manager width changes reflow through correctly.
+    @Environment(\.horizontalSizeClass) private var hSize
+    @State private var viewportWidth: CGFloat = 0
+    private var isRailMode: Bool {
+        hSize == .regular && viewportWidth >= VP.LayoutBreak.rail
+    }
     @State private var showPassBurst = false
     @State private var pointsDelta: Int? = nil
     @State private var pointsDeltaVisible = false
@@ -320,90 +331,29 @@ struct StoryDetailView: View {
     }
 
     // MARK: - Body
+    // Session 3 part 2 (2026-05-12) — body splits into two structural shapes
+    // driven by `isRailMode`. The OUTER VStack identity is stable across the
+    // flip (tabBar / readingProgressRibbon / mainContent) so rotation
+    // landscape↔portrait keeps its animation smooth. The structural change
+    // is contained inside `mainContent`, which switches between the
+    // single-ScrollView tab shape and the rail HStack-of-two-ScrollViews
+    // shape. All `.sheet` / `.fullScreenCover` / `.confirmationDialog`
+    // modifiers stay attached to the outer VStack so they fire in both
+    // modes regardless of which branch is rendered.
     var body: some View {
         VStack(spacing: 0) {
             tabBar
             readingProgressRibbon
-            ScrollViewReader { proxy in
-                ScrollView {
-                    if let loadError = loadError {
-                        VStack(spacing: 10) {
-                            Text("We couldn't load this article — check your connection.")
-                                .font(.system(.callout, design: .default, weight: .semibold))
-                                .foregroundColor(VP.text)
-                            Text(loadError)
-                                .font(.footnote)
-                                .foregroundColor(VP.dim)
-                                .multilineTextAlignment(.center)
-                            Button {
-                                Task { await loadData() }
-                            } label: {
-                                Text("Try again")
-                                    .font(.system(.subheadline, design: .default, weight: .semibold))
-                                    .foregroundColor(VP.accent)
-                            }
-                            .padding(.top, 4)
-                        }
-                        .padding(.horizontal, 40)
-                        .padding(.top, 60)
-                    } else {
-                        switch activeTab {
-                        case .story:
-                            storyContent
-                                .background(
-                                    GeometryReader { inner in
-                                        Color.clear
-                                            .preference(
-                                                key: ArticleContentHeightKey.self,
-                                                value: inner.size.height
-                                            )
-                                    }
-                                )
-                        case .timeline:
-                            if canViewTimeline { timelineContent } else { timelineLockedPrompt }
-                        case .discussion:
-                            // OwnersAudit Story Task 18: Discussion tab is now
-                            // visible to anonymous users so the product mechanic
-                            // (earn the discussion) is discoverable. Tap → auth
-                            // gate prompt; logged-in → real discussion content.
-                            // C2 — comments.section.view denial (web parity).
-                            if !canViewComments {
-                                Text("Comments aren't available for your account.")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                            } else if auth.isLoggedIn {
-                                discussionContent
-                            } else {
-                                anonDiscussionPrompt
-                            }
-                        }
-                    }
-                }
-                .background(
-                    GeometryReader { outer in
-                        Color.clear
-                            .preference(
-                                key: ArticleScrollOffsetKey.self,
-                                value: -outer.frame(in: .named("storyScroll")).minY
-                            )
-                            .onAppear { viewportHeight = outer.size.height }
-                            .onChange(of: outer.size.height) { _, h in viewportHeight = h }
-                    }
-                )
-                .coordinateSpace(name: "storyScroll")
-                .onPreferenceChange(ArticleScrollOffsetKey.self) { handleScrollOffset($0) }
-                .onPreferenceChange(ArticleContentHeightKey.self) { contentHeight = max($0, 1) }
-                .onChange(of: userPassedQuiz) { wasPassed, isPassed in
-                    if !wasPassed && isPassed {
-                        triggerQuizPassMoment(scrollProxy: proxy)
-                    }
-                }
-                .background(VP.bg)
-            }
+            mainContent
         }
         .background(VP.bg)
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .preference(key: StoryViewportWidthKey.self, value: proxy.size.width)
+            }
+        )
+        .onPreferenceChange(StoryViewportWidthKey.self) { viewportWidth = $0 }
         .sheet(isPresented: $showUpNext) { upNextSheet }
         // Q-NEW2 (2026-05-12) — linked-article opens a whole reader; iPad
         // formSheet (540×620) would override the 680pt reading-column cap.
@@ -602,8 +552,169 @@ struct StoryDetailView: View {
     // OwnersAudit Story Task 18: Discussion tab is now always visible
     // (anon, paid, free — same 3 tabs everywhere). Tab presence
     // surfaces the product mechanic; per-pane gating handles auth state.
+    //
+    // Session 3 part 2 (2026-05-12) — when the iPad rail is rendering, the
+    // Timeline tab is redundant (the rail already shows timeline content),
+    // so the tab bar collapses to Story / Discussion. `activeTab` state is
+    // preserved across the flip; if the user was on Timeline before
+    // rotating into rail mode, they'll see Story in the left column and
+    // the timeline in the rail. On rotation back to portrait, the Timeline
+    // tab reappears with `activeTab` unchanged from before the flip.
     private var visibleTabs: [StoryTab] {
-        StoryTab.allCases
+        if isRailMode {
+            return [.story, .discussion]
+        }
+        return StoryTab.allCases
+    }
+
+    // Session 3 part 2 — defensive read of the active tab for the article
+    // ScrollView's content switch. In rail mode the Timeline tab is hidden;
+    // if `activeTab == .timeline` (carried over from a portrait session
+    // before the rotation), treat it as `.story` for the switch so the
+    // user sees the article rather than an empty pane. The underlying
+    // `activeTab` state is NOT mutated — it stays at `.timeline` so the
+    // tab survives a rotation back to portrait per the locked decision.
+    private var effectiveActiveTab: StoryTab {
+        if isRailMode && activeTab == .timeline { return .story }
+        return activeTab
+    }
+
+    // MARK: - Main content (rail vs tab structural flip)
+    // Session 3 part 2 (2026-05-12) — chooses the content shape. Rail mode
+    // (iPad landscape ≥ 1180pt, `.regular` size class) renders two
+    // independent ScrollViews side-by-side. Non-rail mode renders the
+    // original single-ScrollView tab shape. Both shapes are wrapped in a
+    // `Group` so the outer body's modifier chain (sheets, dialogs,
+    // toolbars, toasts) attaches at the same level regardless of branch.
+    @ViewBuilder private var mainContent: some View {
+        if isRailMode {
+            HStack(alignment: .top, spacing: 32) {
+                // Left column — article (or active tab content). Owns the
+                // `"storyScroll"` coordinate space, so reading-progress
+                // ribbon + Up Next trigger continue to measure article
+                // scroll only. Capped at the reading-column width per the
+                // existing storyContent `.frame(maxWidth:)` rule.
+                articleScrollView
+                    .frame(maxWidth: .infinity)
+                // Right column — timeline rail. Independent ScrollView with
+                // its own scroll geometry; nothing here writes
+                // `ArticleScrollOffsetKey` or `ArticleContentHeightKey`,
+                // so the reading-progress ribbon is unaffected.
+                timelineRailScrollView
+                    .frame(width: 300)
+            }
+            .padding(.trailing, 16)
+            .background(VP.bg)
+        } else {
+            articleScrollView
+        }
+    }
+
+    // MARK: - Article ScrollView (shared by both rail and tab modes)
+    // Session 3 part 2 (2026-05-12) — the original body's ScrollView,
+    // lifted into a builder so rail mode can place it next to the
+    // timeline rail. Behavior is identical to pre-refactor in non-rail
+    // mode. In rail mode this is the left column; the active-tab switch
+    // is driven by `effectiveActiveTab` so a stale `.timeline` selection
+    // defensively renders Story until the user picks a visible tab.
+    @ViewBuilder private var articleScrollView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                if let loadError = loadError {
+                    VStack(spacing: 10) {
+                        Text("We couldn't load this article — check your connection.")
+                            .font(.system(.callout, design: .default, weight: .semibold))
+                            .foregroundColor(VP.text)
+                        Text(loadError)
+                            .font(.footnote)
+                            .foregroundColor(VP.dim)
+                            .multilineTextAlignment(.center)
+                        Button {
+                            Task { await loadData() }
+                        } label: {
+                            Text("Try again")
+                                .font(.system(.subheadline, design: .default, weight: .semibold))
+                                .foregroundColor(VP.accent)
+                        }
+                        .padding(.top, 4)
+                    }
+                    .padding(.horizontal, 40)
+                    .padding(.top, 60)
+                } else {
+                    switch effectiveActiveTab {
+                    case .story:
+                        storyContent
+                            .background(
+                                GeometryReader { inner in
+                                    Color.clear
+                                        .preference(
+                                            key: ArticleContentHeightKey.self,
+                                            value: inner.size.height
+                                        )
+                                }
+                            )
+                    case .timeline:
+                        if canViewTimeline { timelineContent } else { timelineLockedPrompt }
+                    case .discussion:
+                        // OwnersAudit Story Task 18: Discussion tab is now
+                        // visible to anonymous users so the product mechanic
+                        // (earn the discussion) is discoverable. Tap → auth
+                        // gate prompt; logged-in → real discussion content.
+                        // C2 — comments.section.view denial (web parity).
+                        if !canViewComments {
+                            Text("Comments aren't available for your account.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                        } else if auth.isLoggedIn {
+                            discussionContent
+                        } else {
+                            anonDiscussionPrompt
+                        }
+                    }
+                }
+            }
+            .background(
+                GeometryReader { outer in
+                    Color.clear
+                        .preference(
+                            key: ArticleScrollOffsetKey.self,
+                            value: -outer.frame(in: .named("storyScroll")).minY
+                        )
+                        .onAppear { viewportHeight = outer.size.height }
+                        .onChange(of: outer.size.height) { _, h in viewportHeight = h }
+                }
+            )
+            .coordinateSpace(name: "storyScroll")
+            .onPreferenceChange(ArticleScrollOffsetKey.self) { handleScrollOffset($0) }
+            .onPreferenceChange(ArticleContentHeightKey.self) { contentHeight = max($0, 1) }
+            .onChange(of: userPassedQuiz) { wasPassed, isPassed in
+                if !wasPassed && isPassed {
+                    triggerQuizPassMoment(scrollProxy: proxy)
+                }
+            }
+            .background(VP.bg)
+        }
+    }
+
+    // MARK: - Timeline rail ScrollView (rail mode only)
+    // Session 3 part 2 (2026-05-12) — right column in rail mode. Owns its
+    // own scroll geometry and does not participate in any of the article
+    // scroll preferences (no `ArticleScrollOffsetKey` / no
+    // `ArticleContentHeightKey`), so the reading-progress ribbon and Up
+    // Next trigger continue to measure article scroll exclusively. When
+    // the user is gated out of timeline (`canViewTimeline == false`), the
+    // rail shows the same upgrade prompt the timeline tab does.
+    @ViewBuilder private var timelineRailScrollView: some View {
+        ScrollView {
+            if canViewTimeline {
+                timelineContent
+            } else {
+                timelineLockedPrompt
+            }
+        }
+        .background(VP.bg)
     }
 
     // MARK: - Anon Discussion tab gate (Story Task 18)
@@ -838,7 +949,10 @@ struct StoryDetailView: View {
         // stretching edge-to-edge, which was the most visible parity
         // drift identified in the audit. The double-frame idiom is
         // SwiftUI's unambiguous "cap then center in parent."
-        .frame(maxWidth: 680)
+        // Session 3 part 2 (2026-05-12) — pull the magic 680 through
+        // `VP.LayoutBreak.readingColumn` so HomeView, StoryDetailView,
+        // and the rail-mode width math all resolve to one source.
+        .frame(maxWidth: VP.LayoutBreak.readingColumn)
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
@@ -4678,5 +4792,20 @@ private struct AvatarScoreCard: View {
                 .monospacedDigit()
                 .foregroundColor(VP.text)
         }
+    }
+}
+
+// Session 3 part 2 (2026-05-12) — viewport-width measurement for the
+// iPad article-reader rail breakpoint (`VP.LayoutBreak.rail` = 1180pt).
+// Mirrors HomeView's `HomeViewportWidthKey` pattern: a passive
+// GeometryReader background on StoryDetailView's outer container writes
+// this preference each layout pass, and `viewportWidth` is updated via
+// `.onPreferenceChange`. Reduce semantics: take the max — multiple
+// readers (e.g. inside nested scrolls) should not pin the value to
+// something narrower than the actual containing viewport.
+private struct StoryViewportWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

@@ -310,11 +310,48 @@ Both files stamp `access_requests.consumption_source` from `auth.users.user_meta
 - `ProfileView.swift:40-50, 184-191, 366-380, 1962-1970` — hero avatar bumps from 68pt → 96pt and name from `VP.Size.xl` → `VP.Size.xxl` when `shouldBumpHero` (`.regular` && viewport >= 700pt). Owner revised the locked >768pt threshold to >=700pt on 2026-05-12 to capture iPad mini portrait (744pt full-screen, `.regular` class). Stats/tabs/quick-actions stay at iPhone sizes per Q-NEW5.
 - `StoryDetailView.swift:408-425, 463-471, 654-661` — linked-article swapped from `.sheet` to `.fullScreenCover` (kills the iPad 540×620 formSheet that would override the 680pt cap; swipe-down-to-bail goes away, back button dismisses); `SubscriptionView` + `LoginView` sheets get `.presentationDetents([.large])` (no-op on iPhone; iPad gets full-height sheet instead of formSheet).
 
-**Deferred to Session 4 (owner-approved 2026-05-12, follows Q-iPad5 spike-first precedent):**
+**SHIPPED Session 3 part 2 (2026-05-12) — iPad rail rendering + snapshot test infrastructure.**
 
-- Rail-landscape rendering (Q-iPad2/Q-NEW1). `StoryDetailView`'s 3-tab switch (`activeTab` enum, `:80-81`) needs structural refactor to render `storyContent | timelineContent` side-by-side at iPad landscape ≥1180pt. Session 4 lands `NavigationSplitView` for Profile master/detail anyway — the same primitive naturally handles the article+timeline split. The `VP.LayoutBreak.rail = 1180` constant ships now as scaffolding.
-- Scroll-restore spike (Q-iPad5). Coupled to the rail rendering — the only structural layout flip is the rail flip; AppStorage changes alone don't invalidate view identity, so SwiftUI preserves state automatically.
-- Snapshot tests at 320/375/414/768/1024/1180/1366pt. No `SnapshotTesting` library wired yet; explicit defer to Session 4 alongside the rail.
+**Rail rendering (`StoryDetailView.swift`, +290 lines):**
+- New `isRailMode` computed property gated on `hSize == .regular && viewportWidth >= VP.LayoutBreak.rail` (1180pt). Viewport-width measurement mirrors `HomeView.swift:61-65` via a new `StoryViewportWidthKey` PreferenceKey.
+- `body` collapsed to outer `VStack { tabBar; readingProgressRibbon; mainContent }`. Outer-VStack identity stays stable across the rail/tab flip so rotation animation doesn't stutter.
+- `mainContent` flips on `isRailMode`. Rail branch: `HStack(alignment: .top, spacing: 32) { articleScrollView | timelineRailScrollView width 300 }` — **2 independent ScrollViews**. Left wraps original ScrollView, keeps `"storyScroll"` coordinate space + `ArticleScrollOffsetKey`, so reading-progress ribbon and Up Next 95%-trigger continue measuring article scroll only. Right has its own ScrollView with no preference keys (rail scrolls independently like web's sticky rail).
+- Tab bar collapses to 2 tabs (Story / Discussion) in rail mode. `activeTab` state is never mutated by the flip — `effectiveActiveTab` defensive mapper coerces `.timeline` → `.story` in the article column without writing state, so rotation back to portrait restores the user's prior tab selection. Discussion remains its own tab destination.
+- All 9 sheets/dialogs verified attached to the outer VStack and intact across the flip. Q-NEW2 fixes (`.fullScreenCover` linked-article, `.presentationDetents([.large])` on Subscription + Login) preserved.
+- `StoryDetailView.swift:952` — hardcoded `680` swapped to `VP.LayoutBreak.readingColumn` constant. Single source of truth for the rail math (`1180 − 680 − 32 = 468`).
+
+**Snapshot test infrastructure (`VerityPostSnapshotTests/`):**
+- **Source of truth: `VerityPost/project.yml`.** New target `VerityPostSnapshotTests` declared with `type: bundle.unit-test`, dependency on the main `VerityPost` target + new `SnapshotTesting` SPM package (`swift-snapshot-testing` minVersion 1.18.9 / maxVersion 1.19.0). `TEST_HOST` / `BUNDLE_LOADER` wired so `@testable import VerityPost` works.
+- **`.xcodeproj` is gitignored** (`.gitignore:77`) — regenerated from `project.yml` via XcodeGen.
+- New `VerityPost/VerityPostSnapshotTests/` directory with four files:
+  - `SnapshotTestCase.swift` — base class pinning UTC, `en_US_POSIX`, light color scheme, `.large` Dynamic Type. `SnapshotViewport` enum holds the 7 locked widths (320 / 375 / 414 / 768 / 1024 / 1180 / 1366). Helper `assertViewSnapshot(_:viewports:)` loops viewports.
+  - `MockFixtures.swift` — deterministic `Story` / `VPUser` / `[TimelineEvent]` fixtures via `@testable import VerityPost` (internal inits, no model changes needed). Frozen reference date `2025-01-01 UTC`.
+  - `StoryDetailViewSnapshotTests.swift` — 2 test methods covering the full viewport matrix. Renders a `StoryReaderProxy` structural stand-in because the shipping `StoryDetailView` requires `@EnvironmentObject AuthViewModel` + network loads in `.onAppear`; the rail refactor didn't add a DI-friendly initializer. **Swap proxy → real view in a follow-up session** that adds a `StoryDetailView(story:timeline:sources:permissions:)` initializer skipping `.onAppear` network calls.
+  - `README.md` — record / verify / regen workflow + xcodegen hand-off.
+- `.gitignore` annotated with a "do not exclude `__Snapshots__/`" guard.
+
+**Owner action — 2-step hand-off:**
+
+1. Regenerate `.xcodeproj` from `project.yml`:
+```sh
+cd VerityPost && xcodegen generate
+```
+
+2. Generate baselines (one-time):
+```sh
+SNAPSHOT_RECORD=YES xcodebuild test \
+  -project VerityPost/VerityPost.xcodeproj \
+  -scheme VerityPost \
+  -only-testing:VerityPostSnapshotTests \
+  -destination 'platform=iOS Simulator,name=iPad Pro (12.9-inch)'
+```
+
+Every assertion records and "fails" with `recorded snapshot` on this first run — expected. 14 PNGs land in `VerityPost/VerityPostSnapshotTests/__Snapshots__/`. Commit `__Snapshots__/` alongside. Drop the env var and re-run to verify everything replays green.
+
+**Out-of-arc deferrals:**
+
+- Scroll-restore spike (Q-iPad5). Rail refactor preserves view identity via the outer VStack so SwiftUI keeps scroll position naturally. Owner verifies on iPad simulator.
+- `StoryDetailView` DI-friendly initializer (for swapping the snapshot proxy → real view). Out of scope.
 
 **Cross-platform footnote:**
 
