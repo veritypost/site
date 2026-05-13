@@ -22,6 +22,7 @@ const CONTENT_PIPELINE: HubPage[] = [
   { href: '/admin/sources', title: 'Sources', desc: 'No-delete provenance log — every URL we have ever cited; outlet + date filters; CSV export' },
   { href: '/admin/pipeline-config', title: 'Pipeline Config', desc: 'Kill switches, thresholds, prompt presets, categories — all in one place' },
   { href: '/admin/top-stories', title: 'Top Stories', desc: 'Pin up to 5 articles to the front page in fixed positions.' },
+  { href: '/admin/editors-edge', title: "Editor's Edge", desc: "Schedule curated picks per category for the /directory surface and the iOS Browse tab." },
   { href: '/admin/home', title: 'Homepage', desc: 'Templated front page with editorial slots — fill them, then flip the live toggle.' },
   { href: '/admin/ads', title: 'Ads', desc: 'Sitewide ad inventory: campaigns, placements, units, analytics.' },
 ];
