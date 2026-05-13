@@ -24,10 +24,18 @@ import { checkRateLimit } from '@/lib/rateLimit';
 //   3. Ephemeral Supabase client (no cookie persist, no token refresh)
 //      runs the signInWithPassword probe. The caller's session cookie is
 //      never touched.
-//   4. On wrong password, calls record_failed_login_by_email so failed
-//      verifies count toward the same 5-strike account lockout that the
-//      login flow uses. One counter for "is this email being attacked,"
-//      shared across login + settings.
+//   4. Wrong-password attempts are throttled by the per-user rate limit
+//      ONLY (see step 2). We intentionally do NOT call
+//      record_failed_login_by_email here. That RPC bumps
+//      users.failed_login_count and at 5 strikes writes users.locked_until
+//      = now()+15min, which AccountStateBanner reads to lock the entire
+//      account. A user mis-typing their current password 5x in the
+//      PasswordCard / kid PIN-reset flow would then be locked out of the
+//      whole app from a legitimate settings action. The verify-password
+//      endpoint is auth-gated (requireAuth) so brute force already costs
+//      a stolen session; the 5/hour per-user rate limit is the right
+//      throttle here. Login lockouts stay enforced via the other RPC
+//      callsites (parent PIN/elevate, admin auth-recovery).
 //   5. Constant 401 response on wrong password — no enumeration of
 //      reasons (taken / locked / banned / wrong).
 //
@@ -78,17 +86,11 @@ export async function POST(request) {
   });
 
   if (probeError || !probe?.user) {
-    // Wrong password. Count it toward the 5-strike account lockout shared
-    // with the regular login flow. Same RPC, same counter, same lockout
-    // window — login-failed and verify-password both feed the same gate.
-    try {
-      await service.rpc('record_failed_login_by_email', { p_email: user.email });
-    } catch (err) {
-      console.error(
-        '[auth.verify-password] record_failed_login_by_email failed:',
-        err?.message || err
-      );
-    }
+    // Wrong password. Throttling is handled exclusively by the per-user
+    // rate limit above (5/hour). We deliberately do NOT feed the
+    // record_failed_login_by_email counter from this route — see the
+    // header comment (step 4) for why a settings flow must not cascade
+    // into a 15-minute account-wide lockout.
     return NextResponse.json({ error: 'Incorrect password' }, { status: 401 });
   }
 

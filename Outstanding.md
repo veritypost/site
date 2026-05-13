@@ -186,9 +186,11 @@ Web:
 Audit-log cross-cutting (`/api/account/sessions/[id]` DELETE / `/api/account/sessions` DELETE / `/api/users/[id]/block` DELETE):
 - All 3 endpoints now write `audit_log` rows with locked action names: `session.revoke_one`, `session.revoke_all` (with `metadata.count`), `block.remove`. Best-effort try/catch (mirrors existing `billing/cancel/route.js` pattern). Service-role client used for the insert to bypass RLS.
 
-Flagged for follow-up (not in this PR):
-- **MFA unenroll has no `audit_log` row** — both iOS and web call Supabase SDK's `mfa.unenroll()` directly, bypassing our log table. Adding a `/api/account/mfa/unenroll` wrapper requires migrating both callers; out of scope for Session 5.
-- **`/api/auth/verify-password` rate-limit shares the 5-strike login lockout** (Imp 4 + adversary). Mis-typing current password 5x can cascade into login lockout. Pre-existing endpoint design issue; not in this PR.
+Flagged at Session 5 ship — both **SHIPPED in follow-up commit 2026-05-12**:
+- ~~MFA unenroll has no `audit_log` row~~ — **CLOSED.** New route `web/src/app/api/account/mfa/unenroll/route.js` wraps the SDK call with bearer-aware auth (uses exported `resolveAuthedClient` from `lib/auth.js`), rate-limited at 5/hour per user via `policyKey='account_mfa_unenroll'`, writes `audit_log` row with action `mfa.unenroll` (target_type=`factor`, target_id=`<factor id>`). Web `MFACard.tsx:119-149` and iOS `SettingsView.swift:2265-2329` both migrated off the direct SDK call to fetch/URLSession POST. Kid tokens rejected via `requireAuth`'s default `kindAllowed='user'`.
+- ~~`/api/auth/verify-password` rate-limit shares the 5-strike login lockout~~ — **CLOSED.** Investigation found this codebase has no password-login route (login is magic-link), so the original "cascading login lockout" framing was technically wrong — but the `users.failed_login_count` counter is wired into `AccountStateBanner` which locks the entire account UI on 5 strikes. Dropped the `record_failed_login_by_email` call from the verify-password 401 branch entirely. Rate limit (5/hour per user) remains the sole throttle on wrong-password attempts. The lockout RPC stays live for legitimate consumers: kid-PIN-reset (`/api/kids/reset-pin`) and admin auth-recovery paths.
+
+Still deferred:
 - **Audit-log silent-fail without Sentry capture** — deferred per memory `feedback_sentry_deferred` (Sentry deferred until monetization).
 
 **Cross-platform footnote:**

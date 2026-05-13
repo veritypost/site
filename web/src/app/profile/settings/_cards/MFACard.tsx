@@ -120,9 +120,28 @@ export function MFACard({ preview }: Props) {
     if (!factorId) return;
     setConfirmRemove(false);
     setBusy(true);
-    const { error } = await supabase.auth.mfa.unenroll({ factorId });
+    // Session 5 follow-up: route through /api/account/mfa/unenroll so the
+    // destructive action lands in audit_log. Direct supabase.auth.mfa.unenroll
+    // bypassed our log table.
+    let res: Response;
+    try {
+      res = await fetch('/api/account/mfa/unenroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ factorId }),
+      });
+    } catch {
+      setBusy(false);
+      toast.error('Could not remove 2FA. Try again.');
+      return;
+    }
     setBusy(false);
-    if (error) {
+    if (res.status === 429) {
+      toast.error('Too many attempts. Try again in a few minutes.');
+      return;
+    }
+    if (!res.ok) {
       toast.error('Could not remove 2FA. Try again.');
       return;
     }

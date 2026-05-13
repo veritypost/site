@@ -114,7 +114,12 @@ export async function verifyBearerToken(token) {
   return decoded;
 }
 
-async function resolveAuthedClient(client) {
+// Exported so route handlers that need a bearer-or-cookie-scoped Supabase
+// client without going through `requireAuth(...)` can call this directly
+// (e.g., the MFA-unenroll route that needs the user-scoped client BEFORE
+// requireAuth runs, so the SDK call inherits the right session). Other
+// callers use requireAuth, which calls this internally.
+export async function resolveAuthedClient(client) {
   if (client) return client;
   try {
     const { headers } = await import('next/headers');

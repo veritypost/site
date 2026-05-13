@@ -2265,17 +2265,66 @@ struct MFASettingsView: View {
     private func disable(factorId: String) async {
         busy = true
         defer { busy = false }
+        status = nil
+        isError = false
+
+        // Session 5 follow-up: route through the web API
+        // (/api/account/mfa/unenroll) so the destructive action lands in
+        // audit_log. The direct SDK call bypassed our log table. Mirrors
+        // PasswordSettingsView.submit() at line 1697 for the bearer +
+        // URLSession pattern.
+        let site = SupabaseManager.shared.siteURL
+        let url = site.appendingPathComponent("api/account/mfa/unenroll")
+
+        let accessToken: String
         do {
-            _ = try await client.auth.mfa.unenroll(
-                params: MFAUnenrollParams(factorId: factorId)
-            )
-            verifiedFactorId = nil
-            status = "Two-factor disabled."
-            isError = false
+            accessToken = try await client.auth.session.accessToken
         } catch {
-            status = "Couldn't disable 2FA. Try again."
+            status = "Couldn\u{2019}t disable two-factor. Try signing in again."
             isError = true
+            return
         }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        struct UnenrollBody: Encodable { let factorId: String }
+        req.httpBody = try? JSONEncoder().encode(UnenrollBody(factorId: factorId))
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                status = "Couldn\u{2019}t disable two-factor. Try again."
+                isError = true
+                return
+            }
+            if http.statusCode == 401 {
+                status = "Couldn\u{2019}t disable two-factor. Try signing in again."
+                isError = true
+                return
+            }
+            if http.statusCode == 429 {
+                status = "Too many attempts. Try again in a few minutes."
+                isError = true
+                return
+            }
+            if !(200...299).contains(http.statusCode) {
+                status = "Couldn\u{2019}t disable two-factor. Try again."
+                isError = true
+                return
+            }
+        } catch {
+            Log.d("mfa.unenroll request failed:", error)
+            status = "Couldn\u{2019}t disable two-factor. Try again."
+            isError = true
+            return
+        }
+
+        verifiedFactorId = nil
+        status = "Two-factor disabled."
+        isError = false
+        await load()
     }
 }
 
