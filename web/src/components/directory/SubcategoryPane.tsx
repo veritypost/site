@@ -99,7 +99,7 @@ export default function SubcategoryPane({
           <h2
             style={{
               margin: 0,
-              fontFamily: '"Source Serif 4", Georgia, serif',
+              fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
               fontSize: 22,
               fontWeight: 700,
               letterSpacing: '-0.01em',
@@ -151,7 +151,7 @@ export default function SubcategoryPane({
                   activeSubSlug === null
                     ? '2px solid #e33010'
                     : '2px solid transparent',
-                fontFamily: '"Source Serif 4", Georgia, serif',
+                fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
                 fontSize: 18,
                 fontWeight: activeSubSlug === null ? 600 : 500,
                 color: 'var(--text)',
@@ -186,7 +186,7 @@ export default function SubcategoryPane({
                     color: 'var(--text)',
                     background: 'transparent',
                     cursor: 'pointer',
-                    fontFamily: '"Source Serif 4", Georgia, serif',
+                    fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
                     fontSize: 18,
                     fontWeight: active ? 600 : 500,
                     letterSpacing: '-0.005em',

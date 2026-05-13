@@ -9,6 +9,7 @@
  *   - adult       → JsonLd NewsArticle + indexable
  *   - kids/tweens → robots noindex,nofollow (COPPA; kids iOS app is canonical)
  */
+import { cache } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
@@ -63,18 +64,26 @@ type ArticleRow = {
   published_at: string | null;
   updated_at: string | null;
   deleted_at: string | null;
+  cover_image_url: string | null;
+  cover_image_alt: string | null;
 };
 
 const ARTICLE_SELECT =
-  'id, story_id, category_id, title, subtitle, body, body_html, excerpt, status, age_band, is_kids_safe, is_ai_generated, ai_model, ai_provider, published_at, updated_at, deleted_at';
+  'id, story_id, category_id, title, subtitle, body, body_html, excerpt, status, age_band, is_kids_safe, is_ai_generated, ai_model, ai_provider, published_at, updated_at, deleted_at, cover_image_url, cover_image_alt';
 
 function isCoppaBand(row: { age_band: string | null; is_kids_safe: boolean | null }): boolean {
   return row.age_band === 'kids' || row.age_band === 'tweens' || row.is_kids_safe === true;
 }
 
-async function fetchBySlug(
+// React.cache memoizes per-request — generateMetadata and the page
+// handler both call fetchBySlug with the same slug, so the second call
+// reuses the first's result. Without this, the per-render Supabase
+// roundtrip count doubles (stories + articles, twice). Cover image
+// fields live in ARTICLE_SELECT so OG/Twitter metadata doesn't need a
+// dedicated lookup.
+const fetchBySlug = cache(async (
   slug: string,
-): Promise<{ story: StoryRow; articles: ArticleRow[]; article: ArticleRow } | null> {
+): Promise<{ story: StoryRow; articles: ArticleRow[]; article: ArticleRow } | null> => {
   const service = createServiceClient();
   const { data: story } = await service
     .from('stories')
@@ -97,7 +106,7 @@ async function fetchBySlug(
     articles: articles as ArticleRow[],
     article: articles[0] as ArticleRow,
   };
-}
+});
 
 export async function generateMetadata({
   params,
@@ -110,14 +119,52 @@ export async function generateMetadata({
   const publishedArticle = found.articles.find((a) => a.status === 'published' && a.published_at !== null);
   if (!publishedArticle) return { title: 'Article not found · Verity Post' };
   const article = publishedArticle;
-  const meta: Metadata = {
-    title: article.title,
-    description: article.excerpt ?? undefined,
-  };
+
+  // COPPA-band articles stay noindex + skip social cards entirely; the
+  // kids iOS app is the canonical surface and we don't want kid content
+  // showing in Google or Twitter previews.
   if (isCoppaBand(article)) {
-    meta.robots = { index: false, follow: false };
+    return {
+      title: article.title,
+      description: article.excerpt ?? undefined,
+      robots: { index: false, follow: false },
+    };
   }
-  return meta;
+
+  const base = getSiteUrlOrNull();
+  const path = `/${found.story.slug}`;
+  const title = `${article.title} — Verity Post`;
+  const description = article.excerpt?.slice(0, 160) || 'News you can trust.';
+  // Cover image when set; else the article-aware opengraph-image route
+  // renders title + excerpt on a brand plate. Absolute URL when base is
+  // available — required for Twitter card consumption.
+  const ogImage = article.cover_image_url
+    ? { url: article.cover_image_url, alt: article.cover_image_alt || article.title }
+    : {
+        url: base ? `${base}${path}/opengraph-image` : `${path}/opengraph-image`,
+        alt: article.title,
+      };
+
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      title,
+      description,
+      url: path,
+      type: 'article',
+      publishedTime: article.published_at || undefined,
+      siteName: 'Verity Post',
+      images: [ogImage],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [ogImage.url],
+    },
+  };
 }
 
 export default async function ArticleSlugPage({

@@ -17,7 +17,7 @@ export default function Promo({ slot }: { slot: SlotRow }) {
       <section
         style={{
           border: '1px dashed var(--p-border)',
-          background: 'var(--p-paper-2)',
+          background: 'var(--p-surface)',
           padding: 28,
           textAlign: 'center',
           font: '600 11px/1 var(--p-sans, system-ui)',

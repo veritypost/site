@@ -26,7 +26,6 @@ export default function SecondLead({
       <StoryLink
         story={story}
         className="vp-feature-take__link"
-        style={{ display: 'grid' }}
       >
         {imageUrl && (
           <div className="vp-feature-take__art">

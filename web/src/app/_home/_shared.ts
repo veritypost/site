@@ -1,11 +1,7 @@
-// Legacy shared helpers + types carried over from the retired
-// hand-curated home. Still imported by `Sidebar.tsx`, `SectionsMenu.tsx`,
-// and several slot renderers (`_home/types.ts`, `_home/slots/_shared.tsx`,
-// `SecondaryPair`, `ListRail`, `WideStrip`). Kept here under the `-legacy`
-// suffix to signal that the contents should eventually be merged into
-// proper homes (`_home/slots/_shared.tsx` already exists separately);
-// this file is here for compatibility, not as the canonical place for
-// these utilities.
+// Shared home tokens + helpers (HomeStory projection, HOME_COLORS,
+// HOME_SERIF_STACK, HOME_EDITORIAL_TZ, timeShort). Imported by Sidebar,
+// SectionsMenu, types, and the slot _shared module. `slots/_shared.tsx`
+// wraps these for slot-side consumption (CardCtx, StoryLink, MetaLine).
 
 import type { Tables } from '@/types/database-helpers';
 
@@ -23,10 +19,9 @@ export const HOME_COLORS = {
   dim: 'var(--p-ink-dim)',
   muted: 'var(--p-ink-muted)',
   rule: 'var(--p-border)',
-  accent: 'var(--p-ink)',
 };
 
-export const HOME_SERIF_STACK = "Georgia, 'Times New Roman', 'Source Serif 4', serif";
+export const HOME_SERIF_STACK = "var(--font-source-serif), Georgia, 'Times New Roman', serif";
 
 export const HOME_EDITORIAL_TZ = 'America/New_York';
 

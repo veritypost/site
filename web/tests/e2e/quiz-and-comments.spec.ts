@@ -15,7 +15,7 @@ test.describe('quiz + comments', () => {
     await page.goto('/');
     if (page.url().endsWith('/welcome')) test.skip(true, 'coming-soon mode');
 
-    const articleLink = page.locator('a[href^="/story/"]').first();
+    const articleLink = page.locator('[data-testid="home-article-link"]').first();
     const count = await articleLink.count();
     if (count === 0) test.skip(true, 'no published articles');
 

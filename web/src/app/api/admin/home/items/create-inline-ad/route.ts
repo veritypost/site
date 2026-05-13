@@ -18,6 +18,7 @@
 // back so we never leave a dangling unit with no slot item.
 
 import { NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
@@ -208,6 +209,9 @@ export async function POST(request: Request) {
       placement: placementRow.name,
     },
   });
+
+  revalidatePath('/');
+  revalidateTag('home-layout');
 
   return NextResponse.json({
     ok: true,

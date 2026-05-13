@@ -28,7 +28,7 @@ export default async function DataTicker({
   const sponsorCell = await SsrAdCell({
     placement: 'home_ticker_sponsor',
     page: 'home',
-    position: 'ticker_sponsor',
+    position: 'data_ticker:home_ticker_sponsor',
     wrapperClassName: 'item sponsor',
     selector: '.vp-rh-ticker .sponsor',
   });

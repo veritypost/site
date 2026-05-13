@@ -13,7 +13,7 @@
 // Calls revalidatePath('/') so visitors see the new layout immediately.
 
 import { NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
@@ -94,6 +94,7 @@ export async function POST(request: Request) {
 
   // Bust the home page cache so the next visit serves the new layout.
   revalidatePath('/');
+  revalidateTag('home-layout');
 
   return NextResponse.json({ ok: true, live: target });
 }

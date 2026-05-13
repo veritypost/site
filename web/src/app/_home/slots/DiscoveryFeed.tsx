@@ -24,7 +24,7 @@ export default async function DiscoveryFeed({}: {
       SsrAdCell({
         placement: p,
         page: 'home',
-        position: p,
+        position: `discovery_feed:${p}`,
         wrapperClassName: 'discovery-cell',
         selector: `.discovery-cell[data-placement="${p}"]`,
         dataAttrs: { 'data-placement': p },

@@ -8,7 +8,7 @@ import {
   HOME_COLORS as C,
   HOME_SERIF_STACK as serifStack,
   timeShort,
-} from '../_shared-legacy';
+} from '../_shared';
 import type { Tables } from '@/types/database-helpers';
 // The canonical HomeStory (with cover_image fields) lives in types.ts
 // — re-export here so slot files can import everything they need from
@@ -35,7 +35,11 @@ export function categoryFor(
 }
 
 export function storyHref(story: HomeStory): string | null {
-  return story.stories?.slug ? `/story/${story.stories.slug}` : null;
+  // Canonical article URL is `/{slug}`. The legacy `/story/{slug}` shape
+  // is kept alive as a 301 in next.config.js for old bookmarks + iOS
+  // share URLs (iOS app still emits the legacy shape until the next
+  // release — see Stage 2 follow-up).
+  return story.stories?.slug ? `/${story.stories.slug}` : null;
 }
 
 export function Eyebrow({
@@ -96,6 +100,7 @@ export function StoryLink({
     <Link
       href={href}
       className={className}
+      data-testid="home-article-link"
       style={{
         color: 'inherit',
         textDecoration: 'none',

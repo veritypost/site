@@ -2,11 +2,11 @@
 // stays intentionally short and curated instead of stretching into a
 // long tail of near-duplicate cards.
 
-import type { ReactElement } from 'react';
-import Ad from '@/components/Ad';
+import { Fragment, type ReactElement } from 'react';
+import SsrAdCell from '../_SsrAdCell';
 import { createServiceClient } from '@/lib/supabase/server';
 import { C, StoryLink, type CardCtx, type HomeStory } from './_shared';
-import { timeShort } from '../_shared-legacy';
+import { timeShort } from '../_shared';
 import type { SlotRow } from '../types';
 
 const TARGET_COUNT = 4;
@@ -53,7 +53,6 @@ function renderRiverCard(
       <StoryLink
         story={story}
         className="vp-river-card__link"
-        style={{ display: 'grid' }}
       >
         {imageUrl && (
           <div className="vp-river-card__art" style={{ background: C.rule }}>
@@ -134,12 +133,16 @@ export default async function WideStrip({
       const position =
         typeof item.payload?.position === 'string' && item.payload.position
           ? (item.payload.position as string)
-          : 'wide_strip';
-      rendered.push(
-        <div key={item.id} className="vp-rh-card vp-rh-card-ad">
-          <Ad placement={placement} page={page} position={position} />
-        </div>,
-      );
+          : `wide_strip:${placement}`;
+      const cell = await SsrAdCell({
+        placement,
+        page,
+        position,
+        wrapperClassName: 'vp-rh-card vp-rh-card-ad',
+        selector: `.vp-rh-card-ad[data-river-ad-id="${item.id}"]`,
+        dataAttrs: { 'data-river-ad-id': String(item.id) },
+      });
+      if (cell) rendered.push(<Fragment key={item.id}>{cell}</Fragment>);
     }
   }
 
@@ -156,7 +159,7 @@ export default async function WideStrip({
     typeof slot.config.label === 'string' ? slot.config.label : 'More to Know';
 
   return (
-    <section className="vp-river-section vp-river-section--wide">
+    <section className="vp-river-section">
       <header className="vp-section-head">
         <p className="vp-section-head__label">{label}</p>
       </header>

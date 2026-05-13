@@ -1,6 +1,7 @@
 // DELETE — clear a single slot item by id.
 
 import { NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
@@ -58,6 +59,9 @@ export async function DELETE(
     targetId: id,
     oldValue: cleared[0] as Record<string, unknown>,
   });
+
+  revalidatePath('/');
+  revalidateTag('home-layout');
 
   return NextResponse.json({ ok: true });
 }

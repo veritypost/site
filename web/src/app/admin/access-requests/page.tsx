@@ -24,11 +24,11 @@ import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { Tables } from '@/types/database-helpers';
 
-// access_codes is a join shape (not a column on access_requests) — keep
-// the inline extension. Every other column the page reads is now in the
-// generated Row type.
-type Req = Tables<'access_requests'> & {
-  access_codes: { code: string; expires_at: string | null; current_uses: number | null } | null;
+// `access_codes` is a PostgREST join (see select string in loadAll) — not
+// a column on access_requests, so it isn't on the generated Row. Derive
+// the joined shape from Tables<'access_codes'> to stay in sync with schema.
+type AccessRequestRow = Tables<'access_requests'> & {
+  access_codes: Pick<Tables<'access_codes'>, 'code' | 'expires_at' | 'current_uses'> | null;
 };
 
 type TabKey = 'pending' | 'outstanding' | 'consumed' | 'rejected' | 'all';
@@ -41,12 +41,12 @@ function RequestsInner() {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [rows, setRows] = useState<Req[]>([]);
+  const [rows, setRows] = useState<AccessRequestRow[]>([]);
   // Default to Outstanding (approved-but-not-consumed) — the actionable
   // bucket. Pending stays one click away for triage; Consumed is the
   // historical audit trail.
   const [tab, setTab] = useState<TabKey>('outstanding');
-  const [active, setActive] = useState<Req | null>(null);
+  const [active, setActive] = useState<AccessRequestRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showReject, setShowReject] = useState(false);
@@ -84,7 +84,7 @@ function RequestsInner() {
       setLoadError('Failed to load access requests. Refresh to try again.');
     } else {
       setLoadError(null);
-      setRows((data || []) as Req[]);
+      setRows((data || []) as AccessRequestRow[]);
     }
   }
 
@@ -110,7 +110,7 @@ function RequestsInner() {
     }
   }, [active]);
 
-  const approve = async (r: Req) => {
+  const approve = async (r: AccessRequestRow) => {
     setBusy(true);
     try {
       const res = await fetch(`/api/admin/access-requests/${r.id}/approve`, {
@@ -168,7 +168,7 @@ function RequestsInner() {
   // BugList #4 — Resend the approval email for a row whose original
   // send failed. Reuses the existing minted access_codes row; does not
   // re-mint. Backend gates on metadata.email_status === 'failed'.
-  const resendInvite = async (r: Req) => {
+  const resendInvite = async (r: AccessRequestRow) => {
     setBusy(true);
     try {
       const res = await fetch(`/api/admin/access-requests/${r.id}/resend-invite`, {
@@ -281,7 +281,7 @@ function RequestsInner() {
         />
       ),
       sortable: false,
-      render: (r: Req) => r.status === 'pending' ? (
+      render: (r: AccessRequestRow) => r.status === 'pending' ? (
         <input
           type="checkbox"
           checked={selected.has(r.id)}
@@ -301,17 +301,17 @@ function RequestsInner() {
     },
     {
       key: 'email', header: 'Email', sortable: false,
-      render: (r: Req) => (
+      render: (r: AccessRequestRow) => (
         <div style={{ fontWeight: 600, color: C.ink, fontFamily: 'ui-monospace, monospace' }}>{r.email}</div>
       ),
     },
     {
       key: 'created_at', header: 'Submitted',
-      render: (r: Req) => r.created_at ? new Date(r.created_at).toLocaleString() : '—',
+      render: (r: AccessRequestRow) => r.created_at ? new Date(r.created_at).toLocaleString() : '—',
     },
     {
       key: 'source', header: 'Source',
-      render: (r: Req) => {
+      render: (r: AccessRequestRow) => {
         const meta = (r.metadata as { utm?: { source?: string | null }; referer?: string | null } | null) || null;
         const utm = meta?.utm?.source;
         if (utm) return <code style={{ fontSize: F.xs }}>{utm}</code>;
@@ -327,7 +327,7 @@ function RequestsInner() {
     },
     {
       key: 'status', header: 'Status',
-      render: (r: Req) => {
+      render: (r: AccessRequestRow) => {
         const v = r.status === 'approved' ? 'success'
           : r.status === 'rejected' ? 'danger'
           : 'warn';
@@ -336,7 +336,7 @@ function RequestsInner() {
     },
     {
       key: 'actions', header: '', sortable: false, align: 'right' as const,
-      render: (r: Req) => (
+      render: (r: AccessRequestRow) => (
         <Button size="sm" variant="ghost" onClick={(e: React.MouseEvent) => { e.stopPropagation(); setActive(r); }}>
           Review
         </Button>
@@ -418,7 +418,7 @@ function RequestsInner() {
         columns={cols}
         rows={filtered}
         rowKey={(r) => r.id}
-        onRowClick={(r: Req) => setActive(r)}
+        onRowClick={(r: AccessRequestRow) => setActive(r)}
         empty={
           <EmptyState
             title="No requests"

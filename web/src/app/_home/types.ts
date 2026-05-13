@@ -2,7 +2,7 @@
 // are what's been dropped into a slot by editorial. Article projection
 // matches the legacy `HomeStory` shape so cards can be styled identically.
 
-import type { HomeStory as HomeStoryLegacy } from './_shared-legacy';
+import type { HomeStory as HomeStoryLegacy } from './_shared';
 
 // Home slots need cover_image_url/alt; the legacy `HomeStory` Pick doesn't
 // include them. Extend here so SlotItem.article carries them through to
@@ -33,7 +33,6 @@ export type SlotKind =
   | 'secondary_pair'
   | 'wide_strip'
   | 'editors_picks'
-  | 'reader_notes'
   | 'data_ticker'
   | 'insight_row'
   | 'discovery_feed';

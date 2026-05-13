@@ -15,8 +15,6 @@ type CategoryRow = Pick<
   'id' | 'name' | 'slug' | 'color_hex' | 'parent_id' | 'sort_order'
 >;
 
-export const dynamic = 'force-dynamic';
-
 export default async function HomeRoot({
   previewSlug,
 }: {
@@ -27,7 +25,7 @@ export default async function HomeRoot({
   const [layout, catsRes] = await Promise.all([
     previewSlug
       ? fetchLayoutBySlug(service, previewSlug)
-      : fetchLiveLayout(service),
+      : fetchLiveLayout(),
     service
       .from('categories')
       .select('id, name, slug, color_hex, parent_id, sort_order')

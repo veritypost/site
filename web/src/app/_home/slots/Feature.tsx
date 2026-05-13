@@ -6,6 +6,7 @@
 //   - narrow (span <= 6): dark navy rail card — single figure in white.
 // Left-aligned by editorial rule.
 
+import { unstable_cache } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
 import { C, serifStack } from './_shared';
 import type { SlotRow } from '../types';
@@ -22,7 +23,7 @@ type FeatureRow = {
   items: unknown;
 };
 
-async function fetchTodayFeature(): Promise<FeatureRow | null> {
+async function fetchTodayFeatureInner(): Promise<FeatureRow | null> {
   const service = createServiceClient();
   const { data, error } = await service
     .from('daily_features')
@@ -37,6 +38,20 @@ async function fetchTodayFeature(): Promise<FeatureRow | null> {
     return null;
   }
   return data;
+}
+
+// Cached by UTC date — the key rolls over at UTC midnight so a fresh
+// day's feature can land in cache. 5-min TTL inside the day gives
+// editorial a freshness path. Tag `daily-features` is reserved for
+// admin invalidation when a daily_features write surface is added (none
+// exist today; admin inserts go through Supabase directly).
+function fetchTodayFeature(): Promise<FeatureRow | null> {
+  const todayKey = new Date().toISOString().slice(0, 10);
+  return unstable_cache(
+    fetchTodayFeatureInner,
+    ['daily-feature', todayKey],
+    { tags: ['daily-features'], revalidate: 300 },
+  )();
 }
 
 export default async function Feature({ slot }: { slot?: SlotRow }) {

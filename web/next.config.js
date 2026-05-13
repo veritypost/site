@@ -83,6 +83,18 @@ const nextConfig = {
         destination: '/',
         permanent: true,
       },
+      // Canonical article URL is `/{slug}` (sitemap already broadcasts
+      // this shape; Google indexes it). The legacy `/story/{slug}` route
+      // is folded into a 308 (permanent) so old bookmarks, social-share
+      // archives, and iOS app shares (until the next iOS release) keep
+      // resolving. Fires at the edge — never hits the page handler, so
+      // the `/story/[slug]/*.js` files become unreachable defense-in-
+      // depth, not load-bearing. Safe to delete in a later session.
+      {
+        source: '/story/:slug',
+        destination: '/:slug',
+        permanent: true,
+      },
     ];
   },
   async headers() {

@@ -501,7 +501,7 @@ function EmptyPane({ label, hint }: { label: string; hint: string }) {
       <div
         style={{
           padding: 32,
-          fontFamily: '"Source Serif 4", Georgia, serif',
+          fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
           fontStyle: 'italic',
           color: 'var(--muted-foreground)',
         }}

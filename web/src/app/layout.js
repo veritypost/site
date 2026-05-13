@@ -3,7 +3,7 @@
 import './globals.css';
 import { Suspense } from 'react';
 import { headers } from 'next/headers';
-import { Inter, Source_Serif_4 } from 'next/font/google';
+import { Inter, Source_Serif_4, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import NavWrapper from './NavWrapper';
 import { ToastProvider } from '../components/Toast';
 import ObservabilityInit from '../components/ObservabilityInit';
@@ -41,9 +41,26 @@ const inter = Inter({
 
 const sourceSerif = Source_Serif_4({
   subsets: ['latin'],
-  weight: ['400', '600', '700'],
+  weight: ['400', '500', '600', '700', '800'],
   display: 'swap',
   variable: '--font-source-serif',
+});
+
+// IBM Plex Sans + Mono — used by the home grid (Bundle 7 centralization).
+// Previously instantiated inside HomeLayout/Lead/Cluster; now sourced
+// here so the entire route tree shares one config hash and one CSS bundle.
+const ibmSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-ibm-sans',
+});
+
+const ibmMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  display: 'swap',
+  variable: '--font-ibm-mono',
 });
 
 export const metadata = {
@@ -117,7 +134,7 @@ export default async function RootLayout({ children }) {
   const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
-    <html lang="en" className={`${inter.variable} ${sourceSerif.variable}`}>
+    <html lang="en" className={`${inter.variable} ${sourceSerif.variable} ${ibmSans.variable} ${ibmMono.variable}`}>
       <head>
         {/* No-flash theme hydration: runs synchronously before first paint so
             the user's stored preference (vp_theme) is applied before React

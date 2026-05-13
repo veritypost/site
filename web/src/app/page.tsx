@@ -7,7 +7,8 @@
 
 import HomeRoot from './_home/HomeRoot';
 
-export const dynamic = 'force-dynamic';
+// Note: route is implicitly dynamic via root layout's `headers()` call
+// (CSP nonce). No explicit `force-dynamic` needed here.
 
 export default async function HomePage() {
   return <HomeRoot />;

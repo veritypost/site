@@ -3,7 +3,9 @@
 // to anon users). The admin preview path reads any layout by slug via
 // the service client.
 
+import { unstable_cache } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase/server';
 import { BLOCKING_SENSITIVITY_TAG_IDS } from '@/lib/sensitivityTags';
 import type {
   HomeStory,
@@ -66,7 +68,6 @@ const SLOT_KINDS: ReadonlySet<SlotKind> = new Set([
   'secondary_pair',
   'wide_strip',
   'editors_picks',
-  'reader_notes',
   'data_ticker',
   'insight_row',
   'discovery_feed',
@@ -145,9 +146,9 @@ const LAYOUT_SELECT = `
   )
 `;
 
-// Public read — relies on RLS to gate non-live rows. Returns null when
-// no layout is currently live.
-export async function fetchLiveLayout(
+// Inner uncached implementation. Kept around in case any caller already
+// holds a service client and wants to bypass the cache (none do today).
+async function fetchLiveLayoutInner(
   client: SupabaseClient,
 ): Promise<LayoutRow | null> {
   const { data, error } = await client
@@ -164,6 +165,22 @@ export async function fetchLiveLayout(
   if (!data) return null;
   return shapeLayout(data);
 }
+
+// Public read — cached with tag 'home-layout' + 60s TTL safety net. The
+// admin write routes call revalidateTag('home-layout') after every
+// mutation so editors see their edits immediately; the TTL is the
+// defense if any admin route forgets to invalidate. Cache key has no
+// args (the only knob is 'status=live', which can't vary per caller).
+// Service client is built inside the cached function so the cache key
+// stays serializable — SupabaseClient is non-serializable and identity-
+// unstable, would defeat the cache if passed in.
+export const fetchLiveLayout = unstable_cache(
+  async (): Promise<LayoutRow | null> => {
+    return fetchLiveLayoutInner(createServiceClient());
+  },
+  ['home-layout-live'],
+  { tags: ['home-layout'], revalidate: 60 },
+);
 
 // Admin / preview read — fetches any layout by slug, including drafts.
 // Caller must use the service client.

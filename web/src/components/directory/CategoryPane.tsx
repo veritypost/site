@@ -90,7 +90,7 @@ export default function CategoryPane({ categories, activeSlug, onSelect }: Categ
                   color: 'var(--text)',
                   background: 'transparent',
                   cursor: 'pointer',
-                  fontFamily: '"Source Serif 4", Georgia, serif',
+                  fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
                   fontSize: 20,
                   fontWeight: active ? 600 : 500,
                   letterSpacing: '-0.005em',
@@ -120,7 +120,7 @@ export default function CategoryPane({ categories, activeSlug, onSelect }: Categ
           <li
             style={{
               padding: 24,
-              fontFamily: '"Source Serif 4", Georgia, serif',
+              fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
               fontStyle: 'italic',
               color: 'var(--muted-foreground)',
             }}

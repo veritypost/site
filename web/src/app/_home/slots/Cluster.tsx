@@ -10,21 +10,9 @@
 
 import { Fragment, type ReactElement } from 'react';
 import Link from 'next/link';
-import { Source_Serif_4, IBM_Plex_Mono } from 'next/font/google';
 import type { SlotRow } from '../types';
 import type { CardCtx, HomeStory } from './_shared';
 import SsrAdCell from '../_SsrAdCell';
-
-const serif = Source_Serif_4({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  display: 'swap',
-});
-const mono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  display: 'swap',
-});
 
 function articleHref(s: HomeStory): string {
   const slug = s.stories?.slug;
@@ -71,11 +59,11 @@ export default async function Cluster({
         const s = item.article;
         if (!s || !s.stories?.slug) return null;
         return (
-          <Link key={item.id} href={articleHref(s)} className="vp-rh-card">
-            <span className={`vp-rh-tag ${mono.className}`}>
+          <Link key={item.id} href={articleHref(s)} className="vp-rh-card" data-testid="home-article-link">
+            <span className="vp-rh-tag">
               {categoryName(s, ctx.categoryById)}
             </span>
-            <h2 className={`vp-rh-title ${serif.className}`}>{s.title}</h2>
+            <h2 className="vp-rh-title">{s.title}</h2>
             {s.excerpt && <p className="vp-rh-summary">{s.excerpt}</p>}
             <span className="vp-rh-arrow" aria-hidden="true">
               →

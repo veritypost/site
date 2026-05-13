@@ -1,8 +1,8 @@
 import type { ReactElement } from 'react';
-import Ad from '@/components/Ad';
+import SsrAdCell from '../_SsrAdCell';
 import { StoryLink, categoryFor, type CardCtx, type HomeStory } from './_shared';
 import type { SlotRow } from '../types';
-import { HOME_EDITORIAL_TZ, timeShort } from '../_shared-legacy';
+import { HOME_EDITORIAL_TZ, timeShort } from '../_shared';
 
 function relativeDate(iso: string | null): string {
   if (!iso) return '';
@@ -31,7 +31,7 @@ function relativeDate(iso: string | null): string {
     .toUpperCase();
 }
 
-export default function ListRail({ slot, ctx }: { slot: SlotRow; ctx: CardCtx }) {
+export default async function ListRail({ slot, ctx }: { slot: SlotRow; ctx: CardCtx }) {
   // Per-item dispatch (mirrors Cluster.tsx). The rail is a single
   // narrow column of list rows — ads render as bare <li> containing the
   // Ad component, NOT wrapped in vp-rh-card-ad (which is a bordered
@@ -66,18 +66,14 @@ export default function ListRail({ slot, ctx }: { slot: SlotRow; ctx: CardCtx })
   const railSoft = 'rgba(255,255,255,0.72)';
   const railDim = 'rgba(255,255,255,0.54)';
 
-  const railStyle: React.CSSProperties = numbered
-    ? {}
-    : ({ ['--rail-dot']: '#f2e7d6' } as React.CSSProperties);
-
   // Track article index separately so numbered-list rendering keeps
   // sequential 1/2/3 even when ads sit between articles.
   let articleIdx = 0;
 
-  const renderItem = (
+  const renderItem = async (
     item: (typeof items)[number],
     rowIdx: number,
-  ): ReactElement | null => {
+  ): Promise<ReactElement | null> => {
     if (item.content_type === 'ad') {
       const placement = item.payload?.placement;
       if (typeof placement !== 'string' || placement.length === 0) return null;
@@ -88,10 +84,19 @@ export default function ListRail({ slot, ctx }: { slot: SlotRow; ctx: CardCtx })
       const position =
         typeof item.payload?.position === 'string' && item.payload.position
           ? (item.payload.position as string)
-          : 'list_rail';
+          : `list_rail:${placement}`;
+      const cell = await SsrAdCell({
+        placement,
+        page,
+        position,
+        wrapperClassName: 'vp-rail-ad-cell',
+        selector: `.vp-rail-ad-cell[data-rail-ad-id="${item.id}"]`,
+        dataAttrs: { 'data-rail-ad-id': String(item.id) },
+      });
+      if (!cell) return null;
       return (
         <li key={item.id} style={{ listStyle: 'none' }}>
-          <Ad placement={placement} page={page} position={position} />
+          {cell}
         </li>
       );
     }
@@ -216,14 +221,14 @@ export default function ListRail({ slot, ctx }: { slot: SlotRow; ctx: CardCtx })
     );
   }
 
-  const rows = items
-    .map((item, i) => renderItem(item, i))
-    .filter((node): node is ReactElement => node !== null);
+  const rows = (
+    await Promise.all(items.map((item, i) => renderItem(item, i)))
+  ).filter((node): node is ReactElement => node !== null);
 
   if (rows.length === 0) return null;
 
   return (
-    <aside className="vp-rail-block" style={railStyle}>
+    <aside className="vp-rail-block">
       <h3 className="vp-rail__title">{label}</h3>
       <ol
         style={{

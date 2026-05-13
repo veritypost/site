@@ -42,7 +42,6 @@ const REGISTRY: Record<SlotKind, SlotComponent> = {
   data_ticker: DataTicker,
   insight_row: InsightRow,
   discovery_feed: DiscoveryFeed,
-  reader_notes: () => null,
 };
 
 // Slots that source their own content (e.g. Feature reads daily_features

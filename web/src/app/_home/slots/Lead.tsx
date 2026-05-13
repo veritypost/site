@@ -9,21 +9,10 @@
 // no <style> tags.
 
 import Link from 'next/link';
-import { Source_Serif_4, IBM_Plex_Mono } from 'next/font/google';
+import { unstable_cache } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
 import type { SlotRow } from '../types';
 import type { CardCtx, HomeStory } from './_shared';
-
-const serif = Source_Serif_4({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  display: 'swap',
-});
-const mono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  display: 'swap',
-});
 
 type TimelineRow = {
   id: string;
@@ -36,6 +25,31 @@ type TimelineRow = {
 function articleHref(s: HomeStory): string {
   const slug = s.stories?.slug;
   return slug ? `/${slug}` : '#';
+}
+
+// Cached per story_id. First visit pays the roundtrip; repeat visits
+// within 5 minutes (or until a `story-timeline:{storyId}` invalidation)
+// come from cache. Threshold check (rows.length >= 3) happens inside
+// the cached function so under-threshold stories cache the empty array
+// instead of re-fetching.
+async function fetchLeadTimeline(storyId: string): Promise<TimelineRow[]> {
+  const service = createServiceClient();
+  const { data } = await service
+    .from('timelines')
+    .select('id, event_date, event_label, sort_order, metadata')
+    .eq('story_id', storyId)
+    .order('event_date', { ascending: false })
+    .limit(4);
+  const rows = ((data as TimelineRow[] | null) || []).slice().reverse();
+  return rows.length >= 3 ? rows : [];
+}
+
+function getCachedLeadTimeline(storyId: string): Promise<TimelineRow[]> {
+  return unstable_cache(
+    () => fetchLeadTimeline(storyId),
+    ['lead-timeline', storyId],
+    { tags: ['story-timeline', `story-timeline:${storyId}`], revalidate: 300 },
+  )();
 }
 
 function categoryName(
@@ -74,15 +88,7 @@ export default async function Lead({
 
   let leadTimeline: TimelineRow[] = [];
   if (leadStoryId) {
-    const service = createServiceClient();
-    const { data } = await service
-      .from('timelines')
-      .select('id, event_date, event_label, sort_order, metadata')
-      .eq('story_id', leadStoryId)
-      .order('event_date', { ascending: false })
-      .limit(4);
-    const rows = ((data as TimelineRow[] | null) || []).slice().reverse();
-    if (rows.length >= 3) leadTimeline = rows;
+    leadTimeline = await getCachedLeadTimeline(leadStoryId);
   }
 
   const leadCat = categoryName(lead, ctx.categoryById);
@@ -92,12 +98,12 @@ export default async function Lead({
     <article
       className={`vp-rh-card vp-rh-lead ${hasTimeline ? 'vp-rh-lead-with-timeline' : ''}`}
     >
-      <Link href={articleHref(lead)} className="vp-rh-lead-link">
+      <Link href={articleHref(lead)} className="vp-rh-lead-link" data-testid="home-article-link">
         <div className="vp-rh-lead-content">
-          <span className={`vp-rh-tag vp-rh-tag-accent ${mono.className}`}>
+          <span className="vp-rh-tag vp-rh-tag-accent">
             {leadCat}
           </span>
-          <h2 className={`vp-rh-lead-title ${serif.className}`}>
+          <h2 className="vp-rh-lead-title">
             {lead.title}
           </h2>
           {lead.excerpt && (
@@ -107,14 +113,14 @@ export default async function Lead({
       </Link>
       {hasTimeline && (
         <aside className="vp-rh-timeline">
-          <span className={`vp-rh-tl-label ${mono.className}`}>Timeline</span>
+          <span className="vp-rh-tl-label">Timeline</span>
           <ul>
             {leadTimeline.map((t, i) => {
               const isNow =
                 !!t.metadata?.current || i === leadTimeline.length - 1;
               return (
                 <li key={t.id} className={isNow ? 'now' : undefined}>
-                  <strong className={mono.className}>
+                  <strong>
                     {isNow ? 'Today: ' : `${shortDate(t.event_date)}: `}
                   </strong>
                   <span>{t.event_label}</span>
@@ -122,9 +128,15 @@ export default async function Lead({
               );
             })}
           </ul>
+          {/* Inner CTA is a visual cue for sighted users — same destination
+              as the outer Link wrapping the article body. Hidden from
+              assistive tech to avoid the "two landing targets to the same
+              story" duplication. */}
           <Link
             href={articleHref(lead)}
-            className={`vp-rh-readmore ${mono.className}`}
+            className="vp-rh-readmore"
+            aria-hidden="true"
+            tabIndex={-1}
           >
             Read full report →
           </Link>

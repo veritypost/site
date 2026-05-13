@@ -2,8 +2,50 @@
 // @feature-verified article_reading 2026-04-18
 'use client';
 import { useEffect, useState, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import { getSessionId } from '../lib/session';
 import AdSenseSlot from './AdSenseSlot';
+
+// Client-side sanitization for ad creative HTML. Mirrors the allowlist
+// in /app/_home/_SsrAdCell.tsx's AD_SANITIZE_OPTIONS (which uses
+// sanitize-html, a different config shape). Keep tag/attribute lists in
+// sync when either side changes. The server side (SsrAdCell) covers
+// home slots; this covers article-page + sticky-footer surfaces.
+const AD_DOMPURIFY_CONFIG = {
+  ALLOWED_TAGS: [
+    'a', 'div', 'span', 'p', 'h3', 'h4', 'strong', 'em', 'b', 'i', 'br',
+    'img', 'picture', 'source', 'button',
+  ],
+  ALLOWED_ATTR: [
+    'href', 'target', 'rel', 'style', 'src', 'srcset', 'alt', 'width',
+    'height', 'media', 'type',
+  ],
+  ALLOWED_URI_REGEXP: /^(?:https?:|\/(?!\/))/i,
+};
+
+// Force-merge rel="noopener noreferrer" on <a target="_blank"> after
+// sanitization. Matches the transformTags rule in SsrAdCell's
+// AD_SANITIZE_OPTIONS. Module-load registration is idempotent.
+if (typeof window !== 'undefined') {
+  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (node.tagName === 'A' && node.getAttribute('target') === '_blank') {
+      const existing = (node.getAttribute('rel') || '').toLowerCase();
+      const needed = ['noopener', 'noreferrer'].filter(
+        (r) => !existing.includes(r)
+      );
+      const merged = [
+        ...existing.split(/\s+/).filter(Boolean),
+        ...needed,
+      ].join(' ');
+      node.setAttribute('rel', merged);
+    }
+  });
+}
+
+function sanitizeAdHtml(html) {
+  if (typeof window === 'undefined') return html;
+  return DOMPurify.sanitize(html, AD_DOMPURIFY_CONFIG);
+}
 
 // Mirrors web/src/lib/track.ts getDeviceType so impression telemetry
 // records the same device buckets as page-view telemetry. Kept inline
@@ -36,9 +78,14 @@ const ADSENSE_PUBLISHER_ID = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID || '';
  *   page?: string,
  *   position?: string,
  *   articleId?: string | null,
+ *   skipSanitize?: boolean,
  * }} props
+ *
+ * skipSanitize: bypass the client-side DOMPurify pass on creative_html.
+ * Reserved for admin authoring previews where seeing the raw markup is
+ * the point. Production renders MUST leave this false (default).
  */
-export default function Ad({ placement, page = 'unknown', position = 'inline', articleId = null }) {
+export default function Ad({ placement, page = 'unknown', position = 'inline', articleId = null, skipSanitize = false }) {
   const [ad, setAd] = useState(null);
   const [impressionId, setImpressionId] = useState(null);
   const loggedRef = useRef(false);
@@ -232,11 +279,14 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
     // self-styled to fit its slot (ticker sponsor cell, insight row,
     // discovery cell, cluster inline card). Adding a gray bordered
     // 728px card around it would break every one of those layouts.
+    const houseHtml = skipSanitize
+      ? ad.creative_html
+      : sanitizeAdHtml(ad.creative_html);
     return (
       <div
         ref={containerRef}
         onClick={handleClick}
-        dangerouslySetInnerHTML={{ __html: ad.creative_html }}
+        dangerouslySetInnerHTML={{ __html: houseHtml }}
       />
     );
   }
@@ -245,13 +295,18 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
   // iframe so external markup cannot access document.cookie,
   // localStorage, or the parent DOM. `srcdoc` lets admins paste raw ad
   // tags while keeping the iframe same-origin-isolated from the page.
+  // Sanitize defense-in-depth — sandbox handles isolation, sanitizer
+  // strips event handlers + javascript:/data: URIs as a second layer.
   if (ad.creative_html) {
+    const iframeHtml = skipSanitize
+      ? ad.creative_html
+      : sanitizeAdHtml(ad.creative_html);
     return (
       <div ref={containerRef} style={wrapStyle} onClick={handleClick}>
         {sponsoredLabel}
         <iframe
           title="Sponsored"
-          srcDoc={ad.creative_html}
+          srcDoc={iframeHtml}
           sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
           style={{ width: '100%', minHeight: 120, border: 'none', display: 'block' }}
         />

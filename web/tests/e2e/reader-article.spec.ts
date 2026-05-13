@@ -13,7 +13,7 @@ test.describe('article reader', () => {
     await page.goto('/');
     if (page.url().endsWith('/welcome')) test.skip(true, 'coming-soon mode');
 
-    const articleLink = page.locator('a[href^="/story/"]').first();
+    const articleLink = page.locator('[data-testid="home-article-link"]').first();
     const count = await articleLink.count();
     if (count === 0) test.skip(true, 'no published articles in this environment');
 
@@ -24,10 +24,17 @@ test.describe('article reader', () => {
   });
 
   test('article URL renders headline + body or 404', async ({ page, request }) => {
-    // Hit /story/__nope__ and expect a graceful 404, not a 500.
-    const res = await request.get('/story/__definitely_not_a_real_slug__', {
+    // Hit /__nope__ and expect a graceful 404, not a 500. Also probe
+    // the legacy `/story/__nope__` shape — should 308 to /__nope__
+    // which itself returns 404 cleanly.
+    const res = await request.get('/__definitely_not_a_real_slug__', {
       maxRedirects: 0,
     });
     expect(res.status()).toBeLessThan(500);
+    const legacy = await request.get('/story/__definitely_not_a_real_slug__', {
+      maxRedirects: 0,
+    });
+    // Expect 308 (permanent redirect) from next.config.js — not a 5xx.
+    expect([308, 301]).toContain(legacy.status());
   });
 });

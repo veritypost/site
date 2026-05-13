@@ -90,6 +90,7 @@
 
   --font-serif: var(--font-source-serif), Georgia, serif;
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --bg-rgb: 255, 255, 255;
   --rank-gold: #B8860B;

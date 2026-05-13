@@ -4,6 +4,7 @@
 // at runtime. Add a separate flow if/when needed.
 
 import { NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
@@ -108,6 +109,9 @@ export async function PATCH(
     targetId: id,
     newValue: update,
   });
+
+  revalidatePath('/');
+  revalidateTag('home-layout');
 
   return NextResponse.json({ ok: true });
 }

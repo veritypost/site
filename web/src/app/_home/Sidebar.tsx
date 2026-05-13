@@ -12,7 +12,7 @@ import Link from 'next/link';
 import {
   HOME_COLORS as C,
   HOME_SERIF_STACK as serifStack,
-} from './_shared-legacy';
+} from './_shared';
 
 export type SidebarCategory = {
   id: string;

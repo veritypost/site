@@ -14,7 +14,7 @@ export default async function InsightRow({}: {
     <SsrAdCell
       placement="home_insight_row"
       page="home"
-      position="insight_row"
+      position="insight_row:home_insight_row"
       wrapperClassName="vp-rh-insight"
     />
   );

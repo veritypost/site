@@ -132,7 +132,6 @@ const KIND_DEFAULT_CAPACITY: Record<SlotKind, number> = {
   secondary_pair: 6,
   wide_strip: 1,
   editors_picks: 5,
-  reader_notes: 1,
   data_ticker: 1,
   insight_row: 1,
   discovery_feed: 1,
@@ -162,7 +161,6 @@ const KIND_LABEL: Record<SlotKind, string> = {
   secondary_pair: 'Secondary pair',
   wide_strip: 'Wide strip',
   editors_picks: "Editor's picks",
-  reader_notes: 'Reader Notes',
   data_ticker: 'Data Ticker',
   insight_row: 'Insight Row (Sponsored)',
   discovery_feed: 'Discovery Feed (Promoted)',
@@ -1602,7 +1600,7 @@ function LayoutCanvas({
       );
     }
 
-    // Payload-only kinds: feature, engagement, promo, reader_notes. No
+    // Payload-only kinds: feature, engagement, promo. No
     // vp-rh-* equivalent — render a single labeled block that opens the
     // block editor on click. Spans full row so it doesn't break the grid.
     const anchor = `payload:${slot.id}`;
@@ -2367,7 +2365,7 @@ function SlotInlineEditor({
     );
   };
 
-  // ----- Variant: payload (feature / engagement / promo / reader_notes) -----
+  // ----- Variant: payload (feature / engagement / promo) -----
   const payloadVariant = () => {
     if (activeEdit.kind !== 'payload') return null;
     return (

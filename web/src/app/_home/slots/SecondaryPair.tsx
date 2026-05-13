@@ -2,11 +2,11 @@
 // Launch assumes a lighter daily story count, so this tops out at four
 // strong cards instead of trying to impersonate an endless feed.
 
-import type { ReactElement } from 'react';
-import Ad from '@/components/Ad';
+import { Fragment, type ReactElement } from 'react';
+import SsrAdCell from '../_SsrAdCell';
 import { createServiceClient } from '@/lib/supabase/server';
 import { StoryLink, type CardCtx, type HomeStory } from './_shared';
-import { timeShort } from '../_shared-legacy';
+import { timeShort } from '../_shared';
 import type { SlotRow } from '../types';
 import { categoryDotStyle } from './_categoryColor';
 
@@ -18,7 +18,7 @@ async function fetchRecent(excludeIds: Set<string>, limit: number): Promise<Home
   const { data, error } = await service
     .from('articles')
     .select(
-      'id, title, excerpt, category_id, is_breaking, is_developing, published_at, cover_image_url, cover_image_alt, stories(slug, lifecycle_status)'
+      'id, title, excerpt, category_id, is_breaking, is_developing, published_at, stories(slug, lifecycle_status)'
     )
     .eq('status', 'published')
     .is('deleted_at', null)
@@ -111,12 +111,16 @@ export default async function SecondaryPair({
       const position =
         typeof item.payload?.position === 'string' && item.payload.position
           ? (item.payload.position as string)
-          : 'secondary_pair';
-      rendered.push(
-        <div key={item.id} className="vp-rh-card vp-rh-card-ad">
-          <Ad placement={placement} page={page} position={position} />
-        </div>,
-      );
+          : `secondary_pair:${placement}`;
+      const cell = await SsrAdCell({
+        placement,
+        page,
+        position,
+        wrapperClassName: 'vp-rh-card vp-rh-card-ad',
+        selector: `.vp-rh-card-ad[data-pair-ad-id="${item.id}"]`,
+        dataAttrs: { 'data-pair-ad-id': String(item.id) },
+      });
+      if (cell) rendered.push(<Fragment key={item.id}>{cell}</Fragment>);
     }
   }
 

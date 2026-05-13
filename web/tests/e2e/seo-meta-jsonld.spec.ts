@@ -33,7 +33,7 @@ test.describe('JSON-LD', () => {
   test('story page emits NewsArticle schema when article loads', async ({ page }) => {
     await page.goto('/');
     if (page.url().endsWith('/welcome')) test.skip(true, 'coming-soon mode');
-    const articleLink = page.locator('a[href^="/story/"]').first();
+    const articleLink = page.locator('[data-testid="home-article-link"]').first();
     if ((await articleLink.count()) === 0) test.skip(true, 'no published articles');
     await articleLink.click();
     await page.waitForLoadState('domcontentloaded');
