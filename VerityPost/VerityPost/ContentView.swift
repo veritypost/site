@@ -244,7 +244,7 @@ struct MainTabView: View {
     // Owner cleanup item 12 (2026-05-08, refined) — Following lives in
     // HomeSectionsSheet (top-bar grid icon on Home), not as a tab. Two
     // tabs only: Today + Profile. Mirrors web's Home + Profile bottom nav.
-    enum Tab: Hashable { case today, profile }
+    enum Tab: Hashable { case today, browse, profile }
 
     private var isLoggedIn: Bool { auth.currentUser != nil }
 
@@ -281,6 +281,7 @@ struct MainTabView: View {
         ZStack {
             switch selectedTab {
             case .today: NavigationStack { HomeView() }
+            case .browse: NavigationStack { BrowseCategoriesView() }.environmentObject(auth)
             case .profile:
                 NavigationStack(path: $profilePath) {
                     if isLoggedIn {
@@ -488,11 +489,13 @@ struct TextTabBar: View {
         if isLoggedIn {
             return [
                 Item(id: .today,   label: "Home"),
+                Item(id: .browse,  label: "Browse"),
                 Item(id: .profile, label: "Profile"),
             ]
         }
         return [
             Item(id: .today,   label: "Home"),
+            Item(id: .browse,  label: "Browse"),
             Item(id: .profile, label: "Sign up"),
         ]
     }
