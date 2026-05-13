@@ -5,13 +5,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { BRAND_NAME } from '@/lib/brand';
 import { formatDate } from '@/lib/dates';
+import { useFocusTrap } from '@/lib/useFocusTrap';
 import { Z } from '@/lib/zIndex';
 
 import {
   HOME_COLORS as C,
   HOME_SERIF_STACK as serifStack,
-} from './_shared-legacy';
+} from './_shared';
 import { HOME_SIDEBAR_BREAKPOINT_PX, type SidebarCategory } from './Sidebar';
 
 const OVERLAY_ID = 'vp-home-sections-overlay';
@@ -52,33 +54,53 @@ export default function SectionsMenu() {
   const [isFetching, setIsFetching] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const close = useCallback(() => setOpen(false), []);
+
+  // Trap keyboard focus inside the dialog + close on Escape. Replaces
+  // the prior document-level Escape listener (consolidated into the
+  // hook's onEscape callback). Activated only when both open and
+  // portal-mounted so the dialogRef points at real DOM.
+  useFocusTrap(open && mounted, dialogRef, { onEscape: close });
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Eager fetch — data ready before the first open. React 18 strict mode
-  // runs this twice in dev; the cancelled flag ensures only the surviving
-  // mount's response lands in state.
+  // Lazy fetch — runs once on first open. Most sessions never open the
+  // overlay, so the eager prefetch was wasted bandwidth + a DB roundtrip.
+  // `categoriesLoadedRef` is set only on success — if the user closes
+  // mid-fetch (AbortError) or the fetch fails, the next open retries.
+  // `inFlightRef` dedupes concurrent fetches within a single open cycle
+  // so React strict-mode's double-effect doesn't double-fire.
+  const categoriesLoadedRef = useRef(false);
+  const categoriesInFlightRef = useRef(false);
   useEffect(() => {
-    let cancelled = false;
-    void fetch('/api/categories', { cache: 'no-store' })
+    if (!open || categoriesLoadedRef.current || categoriesInFlightRef.current) return;
+    categoriesInFlightRef.current = true;
+    const controller = new AbortController();
+    void fetch('/api/categories', { cache: 'no-store', signal: controller.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((body: { categories?: SidebarCategory[] }) => {
-        if (cancelled) return;
         setCategories(Array.isArray(body.categories) ? body.categories : []);
+        categoriesLoadedRef.current = true;
       })
-      .catch(() => {
-        if (cancelled) return;
+      .catch((err: unknown) => {
+        // AbortError: user closed mid-fetch. Leave categoriesLoadedRef
+        // false so the next open retries. Other errors: treat as a real
+        // failure and surface the empty-state UI; user can re-open to
+        // retry as well.
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         setCategories([]);
+        categoriesLoadedRef.current = true;
+      })
+      .finally(() => {
+        categoriesInFlightRef.current = false;
       });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    return () => controller.abort();
+  }, [open]);
 
   const visible = useMemo(
     () =>
@@ -121,19 +143,17 @@ export default function SectionsMenu() {
       if (match) setExpanded(new Set([match.id]));
     }
     // Auto-focus the search input on overlay open. RAF gives the portal a
-    // tick to mount before we try to grab focus.
+    // tick to mount before we try to grab focus. This deliberately runs
+    // *after* useFocusTrap's initial-focus pass so the search input wins
+    // (the trap would otherwise focus the close button as the first
+    // focusable in DOM order).
     const focusFrame = requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    document.addEventListener('keydown', onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       cancelAnimationFrame(focusFrame);
-      document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
     };
     // Defaults computed once at open; URL changes mid-session shouldn't
@@ -243,8 +263,8 @@ export default function SectionsMenu() {
       }
       return;
     }
-    // Escape intentionally falls through to the document-level listener that
-    // closes the overlay.
+    // Escape bubbles to the dialog-scoped listener installed by useFocusTrap,
+    // which fires `close()` via the onEscape callback.
   };
 
   return (
@@ -298,6 +318,7 @@ export default function SectionsMenu() {
       {open && mounted && createPortal(
         <div className="vp-home-sections-overlay-root">
           <div
+            ref={dialogRef}
             id={OVERLAY_ID}
             role="dialog"
             aria-modal="true"
@@ -306,7 +327,7 @@ export default function SectionsMenu() {
             style={{
               position: 'fixed',
               inset: 0,
-              zIndex: Z.CRITICAL,
+              zIndex: Z.CRITICAL_MODAL,
               background: 'var(--bg)',
               display: 'flex',
               flexDirection: 'column',
@@ -332,7 +353,7 @@ export default function SectionsMenu() {
                   color: C.text,
                 }}
               >
-                veritypost
+                {BRAND_NAME.toLowerCase()}
               </span>
               <button
                 type="button"
@@ -536,7 +557,7 @@ function SearchResults({
               display: 'block',
               textDecoration: 'none',
               color: 'inherit',
-              background: isHighlighted ? 'var(--stone-100, #f5f5f4)' : 'transparent',
+              background: isHighlighted ? 'var(--p-surface-sunken)' : 'transparent',
               padding: '12px 10px',
               margin: '0 -10px',
               borderRadius: 4,
@@ -579,7 +600,7 @@ function SearchResults({
                 style={{
                   fontFamily: MONO_STACK,
                   fontSize: 10,
-                  color: 'var(--stone-500, #78716c)',
+                  color: 'var(--p-ink-dim)',
                   marginTop: 8,
                   letterSpacing: '0.01em',
                   lineHeight: 1.5,
@@ -675,12 +696,14 @@ function FollowingRow({
       });
   }
 
+  const followingSubsId = 'home-sections-following-subs';
   return (
     <div style={{ borderBottom: `1px solid ${C.rule}` }}>
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
+        {...(expanded ? { 'aria-controls': followingSubsId } : {})}
         style={{
           width: '100%',
           background: 'none',
@@ -707,6 +730,7 @@ function FollowingRow({
       </button>
       {expanded && (
         <div
+          id={followingSubsId}
           style={{
             paddingLeft: 14,
             marginLeft: 2,
@@ -900,6 +924,7 @@ function CategoryRow({
       {name}
     </span>
   );
+  const catSubsId = `home-sections-cat-${slug}-subs`;
   return (
     <div style={{ borderBottom: `1px solid ${C.rule}` }}>
       {hasSubs ? (
@@ -907,6 +932,7 @@ function CategoryRow({
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
+          {...(expanded ? { 'aria-controls': catSubsId } : {})}
           style={{
             width: '100%',
             background: 'none',
@@ -939,6 +965,7 @@ function CategoryRow({
       )}
       {hasSubs && expanded && (
         <div
+          id={catSubsId}
           style={{
             paddingLeft: 14,
             marginLeft: 2,

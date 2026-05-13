@@ -93,10 +93,13 @@ export async function POST(request, { params }) {
   // author by reporting their comments scattered across the site.
   // Lookup the comment's author first so we can key on target user.
   // T278 — also pull body / created_at / ip_address so an urgent report
-  // can be handed to NCMEC with the fields § 2258A requires.
+  // can be handed to NCMEC with the fields § 2258A requires. Joining
+  // articles.stories.slug so the NCMEC payload's contentUrl can be the
+  // canonical /{slug} (not the legacy /story/{article_uuid} that never
+  // resolved).
   const { data: targetComment, error: lookupErr } = await service
     .from('comments')
-    .select('user_id, body, created_at, ip_address, article_id')
+    .select('user_id, body, created_at, ip_address, article_id, articles!fk_comments_article_id(stories(slug))')
     .eq('id', params.id)
     .maybeSingle();
   if (lookupErr || !targetComment) {
@@ -166,11 +169,25 @@ export async function POST(request, { params }) {
     // off the is_escalated flag is the live path until then.
     if (ncmecConfigured()) {
       try {
+        // NCMEC requires an absolute public URL for the offending
+        // content. Comment permalink shape is /{slug}#c-{id}; resolve
+        // the slug via the comments→articles→stories join above. If
+        // the join returns null (story unpublished / orphaned article),
+        // fall back to the site root + comment marker so NCMEC still
+        // gets a reachable URL plus the suspect IDs and content excerpt
+        // for human review.
+        const storySlug = targetComment.articles?.stories?.slug ?? null;
+        const siteOrigin =
+          process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ||
+          'https://veritypost.com';
+        const contentUrl = storySlug
+          ? `${siteOrigin}/${storySlug}#c-${params.id}`
+          : `${siteOrigin}/#comment-${params.id}`;
         const result = await reportToNCMEC({
           reportId: data.id,
           targetType: 'comment',
           targetId: params.id,
-          contentUrl: `/story/${targetComment.article_id}#c-${params.id}`,
+          contentUrl,
           suspectUserId: targetComment.user_id || null,
           suspectIp: targetComment.ip_address || null,
           contentExcerpt: targetComment.body || null,

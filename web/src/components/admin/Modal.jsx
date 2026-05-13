@@ -76,7 +76,7 @@ export default function Modal({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: Z.CRITICAL,
+        zIndex: Z.CRITICAL_MODAL,
         background: 'rgba(17,17,17,0.52)',
         display: 'flex',
         alignItems: 'flex-start',

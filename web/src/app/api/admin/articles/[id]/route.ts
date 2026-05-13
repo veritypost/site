@@ -32,6 +32,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { z } from 'zod';
 import { requirePermission, requireAuth } from '@/lib/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
@@ -743,6 +744,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             return NextResponse.json({ error: 'Could not save timeline' }, { status: 500 });
           }
         }
+        revalidateTag(`story-timeline:${prior.story_id}`);
       } catch (err) {
         await captureMessage('admin article PATCH inconsistent state', 'error', {
           article_id: id,

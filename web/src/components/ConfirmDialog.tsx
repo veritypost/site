@@ -91,7 +91,7 @@ export default function ConfirmDialog({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: Z.CRITICAL,
+        zIndex: Z.CRITICAL_MODAL,
         background: 'rgba(0,0,0,0.45)',
         display: 'flex',
         alignItems: 'center',

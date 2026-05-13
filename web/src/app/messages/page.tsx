@@ -926,7 +926,7 @@ function MessagesPageInner() {
             position: 'fixed',
             inset: 0,
             background: 'rgba(17,17,17,0.92)',
-            zIndex: Z.CRITICAL,
+            zIndex: Z.CRITICAL_MODAL,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1379,7 +1379,7 @@ function MessagesPageInner() {
               style={{
                 position: 'fixed',
                 inset: 0,
-                zIndex: Z.CRITICAL,
+                zIndex: Z.CRITICAL_MODAL,
                 background: 'rgba(0,0,0,0.4)',
                 display: 'flex',
                 alignItems: 'center',
@@ -1667,7 +1667,7 @@ function MessagesPageInner() {
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: Z.CRITICAL,
+            zIndex: Z.CRITICAL_MODAL,
             background: 'rgba(0,0,0,0.4)',
             display: 'flex',
             alignItems: 'center',

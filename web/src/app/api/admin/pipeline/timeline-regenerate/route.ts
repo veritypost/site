@@ -17,6 +17,7 @@
 
 import 'server-only';
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { requirePermission } from '@/lib/auth';
@@ -232,6 +233,8 @@ export async function POST(req: Request) {
       console.error('[timeline-regenerate] delete-old failed (degraded state — admin must clean up)', deleteErr);
     }
   }
+
+  revalidateTag(`story-timeline:${storyId}`);
 
   await recordAdminAction({
     action: 'timeline.regenerate',

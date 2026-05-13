@@ -100,7 +100,7 @@ export default function DestructiveActionConfirm({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: Z.CRITICAL,
+        zIndex: Z.CRITICAL_MODAL,
         background: 'rgba(17, 17, 17, 0.85)',
         display: 'flex',
         alignItems: 'center',

@@ -12,6 +12,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePageViewTrack } from '@/lib/useTrack';
+import { BRAND_NAME } from '@/lib/brand';
 import SingleDoorForm from './_SingleDoorForm';
 
 const C = {
@@ -110,7 +111,7 @@ function LoginPageInner() {
               marginBottom: '24px',
             }}
           >
-            verity post
+            {BRAND_NAME.toLowerCase()}
           </div>
         </a>
 

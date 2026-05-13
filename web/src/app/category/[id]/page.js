@@ -389,7 +389,7 @@ function CategoryPageInner() {
             fontWeight: 600,
             padding: '10px 16px',
             borderRadius: 10,
-            zIndex: Z.CRITICAL,
+            zIndex: Z.TOAST,
             boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
           }}
         >

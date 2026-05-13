@@ -70,7 +70,7 @@ export default function Drawer({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: Z.CRITICAL,
+        zIndex: Z.CRITICAL_MODAL,
         background: 'rgba(17,17,17,0.45)',
         animation: 'vp-admin-fade 140ms ease-out',
       }}

@@ -4,6 +4,7 @@
 'use client';
 
 import { usePageViewTrack } from '@/lib/useTrack';
+import { BRAND_NAME } from '@/lib/brand';
 import RequestAccessForm from './_RequestAccessForm';
 
 const C = {
@@ -50,7 +51,7 @@ export default function RequestAccessPage() {
               marginBottom: '24px',
             }}
           >
-            verity post
+            {BRAND_NAME.toLowerCase()}
           </div>
         </a>
 

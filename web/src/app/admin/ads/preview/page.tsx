@@ -13,15 +13,19 @@ import Spinner from '@/components/admin/Spinner';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import Ad from '@/components/Ad';
 
-// Surface → placement key mapping (mirrors actual ad slot definitions).
-const SURFACE_PLACEMENTS: Record<string, string[]> = {
-  home: ['home_in_feed_1', 'home_in_feed_2'],
-  category: ['category_top', 'category_in_feed_1'],
-  article: ['article_header', 'article_in_body', 'article_end', 'article_rail', 'article_quiz_sponsor'],
-  mobile: ['mobile_sticky_footer'],
-};
+// Surface → placement list is now derived from live `ad_placements` rows
+// at mount. Hardcoded list dropped 2026-05-13 after the iOS landmine
+// rename (home_in_feed_1 → ios_home_in_feed_1_{anon,free}) silently
+// broke the home preview. DB is canonical; admin tools key off it.
+type Placement = { name: string; page: string; platform: string };
 
-const SURFACES = Object.keys(SURFACE_PLACEMENTS);
+// Surface name shown in the dropdown. Most map to `ad_placements.page`
+// directly; the one alias is `global → mobile` because the only
+// page='global' placement today is the mobile sticky banner.
+function surfaceFromPage(page: string): string {
+  return page === 'global' ? 'mobile' : page;
+}
+
 const TIERS = ['anon', 'free', 'verity_plus'];
 
 function AdPreviewInner() {
@@ -30,6 +34,7 @@ function AdPreviewInner() {
 
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
+  const [placementRows, setPlacementRows] = useState<Placement[]>([]);
 
   // Form state
   const [surface, setSurface] = useState<string>('home');
@@ -52,11 +57,29 @@ function AdPreviewInner() {
         (x) => !!x.roles?.name && ADMIN_ROLES.has(x.roles.name)
       );
       if (!ok) { router.push('/'); return; }
+      // Load the live active placement set. Surface dropdown + per-card
+      // render derive from this — never hardcoded.
+      const { data: rows } = await supabase
+        .from('ad_placements')
+        .select('name, page, platform')
+        .eq('is_active', true)
+        .order('platform', { ascending: true })
+        .order('page', { ascending: true })
+        .order('name', { ascending: true });
+      setPlacementRows((rows ?? []) as Placement[]);
       setAuthorized(true);
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Group live placements by visible surface name.
+  const surfaceMap = useMemo(() => {
+    const m: Record<string, Placement[]> = {};
+    for (const p of placementRows) (m[surfaceFromPage(p.page)] ??= []).push(p);
+    return m;
+  }, [placementRows]);
+  const SURFACES = useMemo(() => Object.keys(surfaceMap).sort(), [surfaceMap]);
 
   function handlePreview() {
     setActiveSurface(surface);
@@ -74,7 +97,7 @@ function AdPreviewInner() {
   }
   if (!authorized) return null;
 
-  const placements = activeSurface ? (SURFACE_PLACEMENTS[activeSurface] ?? []) : [];
+  const placements = activeSurface ? (surfaceMap[activeSurface] ?? []) : [];
 
   return (
     <Page>
@@ -140,6 +163,20 @@ function AdPreviewInner() {
           the <code>preview_tier={tier}</code> param is passed to the route but
           the RPC uses your session&apos;s actual tier.
         </div>
+
+        <div role="note" style={{
+          marginTop: S[2], padding: `${S[2]}px ${S[3]}px`, borderRadius: 6,
+          background: 'rgba(245, 158, 11, 0.08)',
+          border: '1px solid rgba(245, 158, 11, 0.45)',
+          fontSize: F.xs, color: C.ink, lineHeight: 1.55,
+        }}>
+          <strong style={{ fontWeight: 700 }}>Preview renders unsanitized creative.</strong>{' '}
+          This page shows raw <code>creative_html</code> so you can verify what
+          you authored. Production strips tags, attributes, and CSS properties
+          outside the ad allowlist (see <code>_SsrAdCell.AD_SANITIZE_OPTIONS</code> /{' '}
+          <code>Ad.jsx AD_DOMPURIFY_CONFIG</code>). If a creative looks fine here
+          but breaks in production, an allowlist rule stripped it.
+        </div>
       </PageSection>
 
       {activeSurface && (
@@ -152,10 +189,11 @@ function AdPreviewInner() {
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: S[4],
           }}>
-            {placements.map((key) => (
+            {placements.map((p) => (
               <PlacementCard
-                key={`${previewKey}-${key}`}
-                placementKey={key}
+                key={`${previewKey}-${p.name}`}
+                placementKey={p.name}
+                platform={p.platform}
                 tier={tier}
                 articleSlug={surface === 'article' ? articleSlug : ''}
               />
@@ -172,10 +210,12 @@ function AdPreviewInner() {
 
 function PlacementCard({
   placementKey,
+  platform,
   tier,
   articleSlug,
 }: {
   placementKey: string;
+  platform: string;
   tier: string;
   articleSlug: string;
 }) {
@@ -195,7 +235,7 @@ function PlacementCard({
           {placementKey}
         </span>
         <span style={{ fontSize: F.xs, color: C.muted }}>
-          tier: {tier}
+          {platform} · tier: {tier}
         </span>
       </div>
 
@@ -257,8 +297,12 @@ function AdSlotWithFallback({
     );
   }
 
-  // Ad will render its own UI when served.
-  return <Ad placement={placementKey} />;
+  // Admin authoring preview — renders raw creative_html (skipSanitize)
+  // so admins see exactly what they wrote, including any syntax errors
+  // or stripped-by-sanitizer markup. Production renders sanitize via
+  // _SsrAdCell's AD_SANITIZE_OPTIONS (server) or Ad.jsx's
+  // AD_DOMPURIFY_CONFIG (client). Self-XSS surface only — admin-gated.
+  return <Ad placement={placementKey} skipSanitize />;
 }
 
 function Lbl({ label, children }: { label: string; children: React.ReactNode }) {

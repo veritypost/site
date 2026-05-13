@@ -381,7 +381,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     bottom: 0,
     left: 0,
     right: 0,
-    zIndex: Z.CRITICAL,
+    zIndex: Z.CRITICAL_NAV,
     // Theme-aware glass — mirrors topBarStyle. --bg-rgb flips
     // 255,255,255 (light) → 18,18,18 (dark) so the bar reads dark in
     // dark mode instead of staying hardcoded white. Letter colors
@@ -415,7 +415,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     top: 0,
     left: 0,
     right: 0,
-    zIndex: Z.CRITICAL,
+    zIndex: Z.CRITICAL_NAV,
     // Theme-aware glass: --bg-rgb flips light → dark with the theme so
     // the wordmark stays legible in both modes (text is C.text =
     // var(--text), which already inverts).
@@ -685,7 +685,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
             bottom: showNav ? 56 : 0,
             left: 0,
             right: 0,
-            zIndex: Z.CRITICAL,
+            zIndex: Z.CRITICAL_BANNER,
             background: '#111',
             padding: '8px 16px',
             display: 'flex',

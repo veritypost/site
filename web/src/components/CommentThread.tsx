@@ -1511,7 +1511,7 @@ const overlayStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
   background: 'rgba(17,17,17,0.85)',
-  zIndex: Z.CRITICAL,
+  zIndex: Z.CRITICAL_MODAL,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',

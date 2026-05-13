@@ -1,6 +1,7 @@
 'use client';
 
 import { CSSProperties, FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { BRAND_NAME } from '@/lib/brand';
 
 const C = {
   bg: 'var(--bg)',
@@ -169,7 +170,7 @@ export default function WelcomeModal({ nextPath }: Props) {
       <div style={overlayStyle} role="dialog" aria-modal="true" aria-label="Invite a friend">
         <div style={cardStyle}>
           <div style={{ fontSize: '20px', fontWeight: 800, color: C.accent, letterSpacing: '-0.5px', marginBottom: 'var(--s6)' }}>
-            verity post
+            {BRAND_NAME.toLowerCase()}
           </div>
           <h1 style={{ fontSize: '24px', fontWeight: 700, color: C.text, margin: '0 0 var(--s2) 0' }}>
             invite someone.

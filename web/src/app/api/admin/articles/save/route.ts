@@ -10,6 +10,7 @@
 // created first; for updates, stories.slug is updated when the slug changes.
 // Timeline entries use story_id instead of article_id.
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { requirePermission } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/rateLimit';
@@ -260,6 +261,9 @@ export async function POST(request: Request) {
         .update(eventPayload)
         .eq('id', entry.id);
     }
+  }
+  if (storyId && (body.timeline_entries?.length ?? 0) > 0) {
+    revalidateTag(`story-timeline:${storyId}`);
   }
 
   // Sources — replace all (still article-level).
