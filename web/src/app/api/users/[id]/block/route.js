@@ -132,5 +132,22 @@ export async function DELETE(_request, { params }) {
     console.error('[users-block:DELETE]', error);
     return NextResponse.json({ error: 'Could not unblock user' }, { status: 500 });
   }
+
+  // Audit-log self-action. Mirrors the billing.cancel pattern (best-effort
+  // insert via service client; never fail the request on audit error).
+  // Session 5 — destructive action audit trail. target_id is the unblocked
+  // user. Idempotent: we log even if no row was deleted (a no-op unblock is
+  // still an intent worth recording for forensic purposes).
+  try {
+    await service.from('audit_log').insert({
+      actor_id: user.id,
+      action: 'block.remove',
+      target_type: 'user',
+      target_id: params.id,
+    });
+  } catch (auditErr) {
+    console.error('[users-block:DELETE] audit_log insert failed:', auditErr);
+  }
+
   return NextResponse.json({ blocked: false });
 }

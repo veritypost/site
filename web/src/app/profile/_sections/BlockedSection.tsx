@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { friendlyHttpError } from '@/lib/friendlyError';
 
 import { Card } from '../_components/Card';
+import { ConfirmDialog } from '../_components/ConfirmDialog';
 import { buttonSecondaryStyle } from '../_components/Field';
 import { useToast } from '../_components/Toast';
 import { EmptyState } from '../_components/EmptyState';
@@ -38,6 +39,7 @@ export function BlockedSection({ preview }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [unblockPending, setUnblockPending] = useState<{ id: string; username?: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -160,7 +162,12 @@ export function BlockedSection({ preview }: Props) {
             </div>
             <button
               type="button"
-              onClick={() => unblock(r.blocked_id)}
+              onClick={() =>
+                setUnblockPending({
+                  id: r.blocked_id,
+                  username: r.user?.username ?? undefined,
+                })
+              }
               disabled={busy === r.blocked_id || preview}
               style={buttonSecondaryStyle}
             >
@@ -169,6 +176,25 @@ export function BlockedSection({ preview }: Props) {
           </li>
         ))}
       </ul>
+      <ConfirmDialog
+        open={unblockPending !== null}
+        title="Unblock this person?"
+        body={
+          unblockPending?.username
+            ? `Unblock @${unblockPending.username}? They'll be able to message and follow you again.`
+            : "They'll be able to message and follow you again."
+        }
+        confirmLabel="Unblock"
+        busyLabel="Unblocking…"
+        busy={unblockPending !== null && busy === unblockPending.id}
+        onConfirm={() => {
+          if (unblockPending) {
+            unblock(unblockPending.id);
+            setUnblockPending(null);
+          }
+        }}
+        onCancel={() => setUnblockPending(null)}
+      />
     </Card>
   );
 }

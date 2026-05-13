@@ -35,6 +35,7 @@ export function SessionsSection({ preview }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmRevokeAll, setConfirmRevokeAll] = useState(false);
+  const [revokePending, setRevokePending] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -189,7 +190,7 @@ export function SessionsSection({ preview }: Props) {
               {!s.is_current ? (
                 <button
                   type="button"
-                  onClick={() => revoke(s.id)}
+                  onClick={() => setRevokePending(s.id)}
                   disabled={busy === s.id}
                   style={buttonSecondaryStyle}
                 >
@@ -209,6 +210,21 @@ export function SessionsSection({ preview }: Props) {
         busy={busy === 'all'}
         onConfirm={revokeOthers}
         onCancel={() => setConfirmRevokeAll(false)}
+      />
+      <ConfirmDialog
+        open={revokePending !== null}
+        title="Sign out this device?"
+        body="This device will be signed out immediately. The signed-in user there will need to sign in again."
+        confirmLabel="Sign out"
+        busyLabel="Signing out…"
+        busy={revokePending !== null && busy === revokePending}
+        onConfirm={() => {
+          if (revokePending) {
+            revoke(revokePending);
+            setRevokePending(null);
+          }
+        }}
+        onCancel={() => setRevokePending(null)}
       />
       <LoginAuditLog preview={preview} />
     </>

@@ -68,7 +68,7 @@ export async function DELETE() {
     );
   }
 
-  const { error } = await service
+  const { data: revoked, error } = await service
     .from('sessions')
     .update({
       is_active: false,
@@ -77,11 +77,28 @@ export async function DELETE() {
     })
     .eq('user_id', user.id)
     .eq('is_active', true)
-    .eq('is_current', false);
+    .eq('is_current', false)
+    .select('id');
 
   if (error) {
     console.error('[account.sessions.revoke_all]', error.message);
     return NextResponse.json({ error: 'Could not revoke sessions.' }, { status: 500, headers: NO_STORE });
+  }
+
+  // Audit-log self-action. Mirrors the billing.cancel pattern (best-effort
+  // insert via service client; never fail the request on audit error).
+  // Session 5 — destructive action audit trail. Target is the actor (user)
+  // because we revoked N of their sessions; the count goes in metadata.
+  try {
+    await service.from('audit_log').insert({
+      actor_id: user.id,
+      action: 'session.revoke_all',
+      target_type: 'user',
+      target_id: user.id,
+      metadata: { count: revoked?.length ?? 0 },
+    });
+  } catch (auditErr) {
+    console.error('[account.sessions.revoke_all] audit_log insert failed:', auditErr);
   }
 
   return NextResponse.json({ ok: true }, { headers: NO_STORE });

@@ -663,11 +663,6 @@ struct SettingsView: View {
     // pull-to-refresh. Zero preview-only writes — these mirror server state.
     @State private var hasActiveSubscription: Bool = false
     @State private var mfaEnabled: Bool = false
-    @State private var dmReceiptsEnabled: Bool = true
-    @State private var dmReceiptsLoading: Bool = true
-    @State private var dmReceiptsSaving: Bool = false
-    // RID-031 — shown when saveDmReceiptsPref fails and reverts the toggle.
-    @State private var dmReceiptsErrorAlert: Bool = false
     @AppStorage("vp_theme") private var vpTheme: String = "system"
 
     private var themeLabel: String {
@@ -711,11 +706,6 @@ struct SettingsView: View {
         }
         .sensoryFeedback(.selection, trigger: tapTick)
         .sheet(isPresented: $showFeedback) { FeedbackSheet().environmentObject(auth) }
-        .alert("Couldn\u{2019}t save", isPresented: $dmReceiptsErrorAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("DM read receipts preference couldn\u{2019}t be saved. Your setting has been reverted. Try again.")
-        }
         .task(id: perms.changeToken) { await loadPerms() }
         .task { await loadPreviews() }
         .onChange(of: searchText) { _, new in
@@ -1041,26 +1031,9 @@ struct SettingsView: View {
     private var privacyRows: [HubRowSpec] {
         var out: [HubRowSpec] = []
 
-        // DM read receipts — genuine inline toggle. Writes to the
-        // dm_read_receipts_enabled column via update_own_profile RPC,
-        // round-tripped through the same path DataPrivacyView uses so
-        // both surfaces stay coherent.
-        out.append(HubRowSpec(id: "dm-receipts",
-                              keywords: ["read receipts", "dm", "messages", "privacy", "receipts"]) { isLast, onTap in
-            let binding = Binding<Bool>(
-                get: { self.dmReceiptsEnabled },
-                set: { newValue in
-                    self.dmReceiptsEnabled = newValue
-                    onTap()
-                    Task { await self.saveDmReceiptsPref(newValue) }
-                }
-            )
-            return AnyView(HubRow(icon: "checkmark.message.fill",
-                                  title: "DM read receipts",
-                                  subtitle: "Let senders see when you\u{2019}ve read",
-                                  showDivider: !isLast,
-                                  kind: .toggle(binding, isDisabled: self.dmReceiptsLoading || self.dmReceiptsSaving)))
-        })
+        // DM read receipts toggle lives in DataPrivacyView (canonical copy)
+        // — the prior hub-level duplicate was removed Session 5 to avoid
+        // two surfaces writing the same column with different feedback UX.
 
         out.append(HubRowSpec(id: "blocked",
                               keywords: ["blocked", "block", "mute", "privacy", "safety"]) { isLast, onTap in
@@ -1235,7 +1208,6 @@ struct SettingsView: View {
     private func loadPreviews() async {
         await push.refresh()
         await loadMFAState()
-        await loadDmReceiptsPref()
         await blocks.refreshIfStale(currentUserId: auth.currentUser?.id)
     }
 
@@ -1244,42 +1216,6 @@ struct SettingsView: View {
             let factors = try await SupabaseManager.shared.client.auth.mfa.listFactors()
             mfaEnabled = factors.totp.contains(where: { $0.status == .verified })
         } catch { Log.d("Hub MFA preview load error:", error) }
-    }
-
-    private func loadDmReceiptsPref() async {
-        guard let userId = auth.currentUser?.id else {
-            dmReceiptsLoading = false
-            return
-        }
-        struct Row: Decodable { let dm_read_receipts_enabled: Bool? }
-        let r: [Row] = (try? await SupabaseManager.shared.client.from("users")
-            .select("dm_read_receipts_enabled")
-            .eq("id", value: userId)
-            .execute().value) ?? []
-        dmReceiptsEnabled = r.first?.dm_read_receipts_enabled ?? true
-        dmReceiptsLoading = false
-    }
-
-    private func saveDmReceiptsPref(_ newValue: Bool) async {
-        guard auth.currentUser?.id != nil else { return }
-        struct Args: Encodable { let p_fields: Patch }
-        struct Patch: Encodable { let dm_read_receipts_enabled: Bool }
-        await MainActor.run { dmReceiptsSaving = true }
-        defer { Task { @MainActor in dmReceiptsSaving = false } }
-        do {
-            try await SupabaseManager.shared.client.rpc(
-                "update_own_profile",
-                params: Args(p_fields: Patch(dm_read_receipts_enabled: newValue))
-            ).execute()
-        } catch {
-            Log.d("Hub saveDmReceiptsPref error:", error)
-            // Revert on failure so UI stays coherent with server,
-            // and show an alert so the user knows why it reverted.
-            await MainActor.run {
-                self.dmReceiptsEnabled = !newValue
-                self.dmReceiptsErrorAlert = true
-            }
-        }
     }
 
     /// Pull-to-refresh entry point. Re-fetches permissions, user data,
@@ -1639,17 +1575,75 @@ struct EmailSettingsView: View {
 struct PasswordSettingsView: View {
     private let client = SupabaseManager.shared.client
 
+    // Session 5 / Password parity (e): mirror web's PasswordCard.tsx contract.
+    // Before issuing supabase.auth.update(password:), verify the caller's
+    // CURRENT password by POSTing it to /api/auth/verify-password. Without
+    // this gate a stolen iOS session could rotate the password without ever
+    // knowing the old one — the same attack the web fix at PasswordCard:64
+    // closed.
+    @State private var currentPassword = ""
     @State private var newPassword = ""
     @State private var confirmPassword = ""
     @State private var submitting = false
     @State private var status: String? = nil
     @State private var isError = false
+    // nil = still resolving; true = email/password identity present;
+    // false = OAuth-only or magic-link account (no password on file).
+    // Default-to-true on unknown so we never lock a real password user
+    // out of the change-password flow — the verify-password endpoint
+    // is the authoritative gate either way.
+    @State private var hasPassword: Bool? = nil
 
     var body: some View {
         SettingsPageShell(title: "Password") {
-            SettingsSectionHeader(title: "New password", tone: .normal)
+            if hasPassword == false {
+                passwordlessBody
+            } else {
+                changePasswordBody
+            }
+        }
+        .task { resolveHasPassword() }
+    }
+
+    // Branch shown when the account has no password identity (OAuth / magic
+    // link). iOS doesn't currently host a "set password" flow; we redirect
+    // to web where /profile?section=security renders PasswordCard with the
+    // full set-password UI. Q-NEW7 / owner-locked.
+    private var passwordlessBody: some View {
+        Group {
+            SettingsSectionHeader(title: "Password not set", tone: .normal)
+            SettingsCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Your account uses sign-in by email link or another provider. To add a password, manage it on the web.")
+                        .font(.system(size: VP.Size.base))
+                        .foregroundColor(VP.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(16)
+            }
+            if let url = URL(string: "https://veritypost.com/profile?section=security") {
+                SettingsCard {
+                    SettingsRowExternal(title: "Open security settings on web",
+                                        url: url,
+                                        tone: .accent,
+                                        showDivider: false)
+                }
+            }
+        }
+    }
+
+    // Branch shown when the account has an email/password identity. Matches
+    // web PasswordCard's three-field shape (current / new / confirm) and
+    // verify-password-then-update sequencing.
+    private var changePasswordBody: some View {
+        Group {
+            SettingsSectionHeader(title: "Change password", tone: .normal)
             SettingsCard {
                 VStack(spacing: 14) {
+                    SettingsTextField(label: nil,
+                                      placeholder: "Current password",
+                                      text: $currentPassword,
+                                      isSecure: true)
                     SettingsTextField(label: nil,
                                       placeholder: "New password (min 8 chars)",
                                       text: $newPassword,
@@ -1660,7 +1654,8 @@ struct PasswordSettingsView: View {
                                       isSecure: true)
                     SettingsPrimaryButton(title: submitting ? "Updating..." : "Update password",
                                           isLoading: submitting,
-                                          isDisabled: newPassword.count < 8
+                                          isDisabled: currentPassword.isEmpty
+                                                      || newPassword.count < 8
                                                       || newPassword != confirmPassword) {
                         Task { await submit() }
                     }
@@ -1680,17 +1675,107 @@ struct PasswordSettingsView: View {
         }
     }
 
+    // Reads the cached Supabase user's `identities` array and looks for an
+    // "email" provider — the marker that the account has a password set.
+    // No network call: client.auth.currentUser is the locally-cached value
+    // from the active session. If identities are nil or missing entirely
+    // (older sessions / SDK quirks), assume hasPassword=true so the user
+    // can still attempt the change; the verify-password endpoint will
+    // surface a real error if the assumption was wrong.
+    private func resolveHasPassword() {
+        guard let user = client.auth.currentUser else {
+            hasPassword = true
+            return
+        }
+        guard let identities = user.identities, !identities.isEmpty else {
+            hasPassword = true
+            return
+        }
+        hasPassword = identities.contains { $0.provider == "email" }
+    }
+
     private func submit() async {
         submitting = true
         defer { submitting = false }
+        status = nil
+        isError = false
+
+        // Step 1: verify the current password via the web API gate. Same
+        // contract as PasswordCard.tsx:64 — POST {password: current} to
+        // /api/auth/verify-password with a bearer token. requireAuth on
+        // the route is bearer-aware (lib/auth.js:125), so the iOS session
+        // access token is accepted there.
+        let site = SupabaseManager.shared.siteURL
+        let url = site.appendingPathComponent("api/auth/verify-password")
+
+        let accessToken: String
+        do {
+            accessToken = try await client.auth.session.accessToken
+        } catch {
+            status = "You\u{2019}re not signed in. Try signing in again."
+            isError = true
+            return
+        }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        struct VerifyBody: Encodable { let password: String }
+        req.httpBody = try? JSONEncoder().encode(VerifyBody(password: currentPassword))
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                status = "Network error. Try again."
+                isError = true
+                return
+            }
+            if http.statusCode == 429 {
+                status = "Too many attempts. Try again in a few minutes."
+                isError = true
+                return
+            }
+            if http.statusCode == 401 {
+                // Disambiguate "no password set" from "wrong password" —
+                // both return 401 from verify-password. If the user's
+                // identities cache shows no email provider, this account
+                // signs in via OAuth / magic-link only and password change
+                // belongs on the web flow (mirrors the passwordless branch
+                // above). Post-impl adversary 2026-05-12.
+                let identities = client.auth.currentUser?.identities ?? []
+                let hasEmailProvider = identities.contains { $0.provider == "email" }
+                if !identities.isEmpty && !hasEmailProvider {
+                    status = "This account signs in by email link or another provider — manage your password on the web."
+                } else {
+                    status = "Current password is incorrect."
+                }
+                isError = true
+                return
+            }
+            if !(200...299).contains(http.statusCode) {
+                status = "Couldn\u{2019}t verify your current password. Try again."
+                isError = true
+                return
+            }
+        } catch {
+            Log.d("verify-password request failed:", error)
+            status = "Network error. Try again."
+            isError = true
+            return
+        }
+
+        // Step 2: verify-password succeeded — rotate the password via the
+        // Supabase SDK. Matches PasswordCard.tsx:79 (supabase.auth.updateUser).
         do {
             try await client.auth.update(user: UserAttributes(password: newPassword))
             status = "Password updated."
             isError = false
+            currentPassword = ""
             newPassword = ""
             confirmPassword = ""
         } catch {
-            status = "Couldn't update your password. Try again."
+            status = "Couldn\u{2019}t update your password. Try again."
             isError = true
         }
     }
@@ -1733,6 +1818,9 @@ struct LoginActivityView: View {
     @State private var revokingId: String? = nil
     @State private var revokingAll = false
     @State private var revokeError: String? = nil
+    // Confirmation state — session ID for per-row revoke; bool for revoke-all.
+    @State private var sessionPendingRevoke: String? = nil
+    @State private var showRevokeAllConfirm: Bool = false
 
     var body: some View {
         SettingsPageShell(title: "Sign-in activity") {
@@ -1767,7 +1855,7 @@ struct LoginActivityView: View {
                             Spacer(minLength: 8)
                             if !isCurrent && canRevoke {
                                 Button {
-                                    Task { await revokeSession(s.id) }
+                                    sessionPendingRevoke = s.id
                                 } label: {
                                     if revokingId == s.id {
                                         ProgressView().scaleEffect(0.7)
@@ -1797,7 +1885,7 @@ struct LoginActivityView: View {
                         isLoading: revokingAll,
                         isDisabled: revokingId != nil || revokingAll
                     ) {
-                        Task { await revokeAll() }
+                        showRevokeAllConfirm = true
                     }
                 }
             }
@@ -1855,6 +1943,29 @@ struct LoginActivityView: View {
         .task {
             await loadSessions()
             await load()
+        }
+        .alert("Sign out this device?",
+               isPresented: Binding<Bool>(
+                   get: { sessionPendingRevoke != nil },
+                   set: { newValue in if !newValue { sessionPendingRevoke = nil } }
+               )) {
+            Button("Sign out", role: .destructive) {
+                if let sid = sessionPendingRevoke {
+                    sessionPendingRevoke = nil
+                    Task { await revokeSession(sid) }
+                }
+            }
+            Button("Cancel", role: .cancel) { sessionPendingRevoke = nil }
+        } message: {
+            Text("This device will be signed out immediately.")
+        }
+        .alert("Sign out all other devices?", isPresented: $showRevokeAllConfirm) {
+            Button("Sign out others", role: .destructive) {
+                Task { await revokeAll() }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Every other device signed in to your account will be signed out immediately. This device stays signed in.")
         }
     }
 
@@ -1979,6 +2090,7 @@ struct MFASettingsView: View {
     @State private var busy = false
     @State private var status: String? = nil
     @State private var isError = false
+    @State private var showDisableConfirm: Bool = false
 
     var body: some View {
         SettingsPageShell(title: "Two-factor") {
@@ -1997,7 +2109,16 @@ struct MFASettingsView: View {
                                               isLoading: busy,
                                               isDisabled: false) {
                             UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                            Task { await disable(factorId: fid) }
+                            showDisableConfirm = true
+                        }
+                        .alert("Permanently remove your authenticator setup?",
+                               isPresented: $showDisableConfirm) {
+                            Button("Remove", role: .destructive) {
+                                Task { await disable(factorId: fid) }
+                            }
+                            Button("Cancel", role: .cancel) { }
+                        } message: {
+                            Text("You\u{2019}ll need to re-scan the QR code to re-enable two-factor authentication.")
                         }
                     }
                     .padding(16)
@@ -2028,7 +2149,7 @@ struct MFASettingsView: View {
                                 }
                             }
                         } else {
-                            SettingsPrimaryButton(title: busy ? "Generating..." : "Generate setup code",
+                            SettingsPrimaryButton(title: busy ? "Generating..." : "Set up 2FA",
                                                   isLoading: busy,
                                                   isDisabled: false) {
                                 Task { await startEnroll() }
@@ -2056,7 +2177,7 @@ struct MFASettingsView: View {
                                     if digits != new { code = String(digits.prefix(6)) }
                                     else if digits.count > 6 { code = String(digits.prefix(6)) }
                                 }
-                            SettingsPrimaryButton(title: busy ? "Verifying..." : "Verify & enable",
+                            SettingsPrimaryButton(title: busy ? "Verifying..." : "Verify and turn on",
                                                   isLoading: busy,
                                                   isDisabled: code.count != 6) {
                                 Task { await verify() }
@@ -2335,10 +2456,26 @@ struct FeedPreferencesSettingsView: View {
     @State private var showRecommended = true
     @State private var hideLowCred = false
     @State private var compactDisplay = false
+    // Dirty-state baselines: seeded in load() and reset on successful save
+    // so the Save button only enables when there's a real diff to persist.
+    // Pattern mirrors AccountSettingsView baselines.
+    @State private var originalShowBreaking = true
+    @State private var originalShowTrending = true
+    @State private var originalShowRecommended = true
+    @State private var originalHideLowCred = false
+    @State private var originalCompactDisplay = false
     @State private var loaded = false
     @State private var saving = false
     @State private var loadError: String? = nil
     @State private var saveError: String? = nil
+
+    private var dirty: Bool {
+        showBreaking != originalShowBreaking
+            || showTrending != originalShowTrending
+            || showRecommended != originalShowRecommended
+            || hideLowCred != originalHideLowCred
+            || compactDisplay != originalCompactDisplay
+    }
 
     var body: some View {
         SettingsPageShell(title: "Feed") {
@@ -2387,7 +2524,7 @@ struct FeedPreferencesSettingsView: View {
             VStack {
                 SettingsPrimaryButton(title: saving ? "Saving..." : "Save",
                                       isLoading: saving,
-                                      isDisabled: !loaded) {
+                                      isDisabled: !loaded || !dirty) {
                     Task { await save() }
                 }
             }
@@ -2413,6 +2550,13 @@ struct FeedPreferencesSettingsView: View {
                 hideLowCred = feed["hideLowCred"]?.boolValue ?? false
                 compactDisplay = (feed["display"]?.stringValue ?? "comfortable") == "compact"
             }
+            // Seed baselines from whatever ended up in state (loaded values
+            // or defaults). dirty stays false until the user actually edits.
+            originalShowBreaking = showBreaking
+            originalShowTrending = showTrending
+            originalShowRecommended = showRecommended
+            originalHideLowCred = hideLowCred
+            originalCompactDisplay = compactDisplay
             loadError = nil
         } catch {
             loadError = "Couldn\u{2019}t load latest preferences. Defaults shown."
@@ -2445,6 +2589,12 @@ struct FeedPreferencesSettingsView: View {
                 "update_own_profile",
                 params: Args(p_fields: Patch(metadata: metadataValue))
             ).execute()
+            // Reset baselines so dirty flips back to false until the next edit.
+            originalShowBreaking = showBreaking
+            originalShowTrending = showTrending
+            originalShowRecommended = showRecommended
+            originalHideLowCred = hideLowCred
+            originalCompactDisplay = compactDisplay
             saveError = nil
         } catch {
             saveError = "Couldn\u{2019}t save preferences. Try again."
@@ -2910,6 +3060,9 @@ private struct ExpertProfileView: View {
     @State private var pauseSaving: Bool = false
     @State private var pauseError: String? = nil
     @State private var datePickerSelection: Date = Date().addingTimeInterval(86400)
+    // Baseline for inline-Save gating — populated on load() and after
+    // savePause succeeds so the Save button only enables on real edits.
+    @State private var originalVacationDate: Date? = nil
 
     @State private var qhEnabled: Bool = false
     @State private var qhStart: String = ExpertProfileView.defaultQHStart
@@ -2917,6 +3070,9 @@ private struct ExpertProfileView: View {
     @State private var qhDays: [Int] = ExpertProfileView.defaultQHDays
     @State private var qhSaving: Bool = false
     @State private var qhError: String? = nil
+    // Baselines for inline-Save on quiet-hours pickers (start + end times).
+    @State private var originalQhStart: String = ExpertProfileView.defaultQHStart
+    @State private var originalQhEnd: String = ExpertProfileView.defaultQHEnd
 
     @State private var perPost: Int = 3
     @State private var perDay: Int = 25
@@ -3015,14 +3171,31 @@ private struct ExpertProfileView: View {
                         displayedComponents: .date
                     )
                     .labelsHidden()
-                    .onChange(of: datePickerSelection) { _, newVal in
-                        Task { await savePause(indefinite: false, until: endOfDay(newVal)) }
-                    }
+                    // Owner picked inline-Save over per-drag autosave: avoids
+                    // one RPC per spin of the wheel and gives users a clear
+                    // commit point. Drag is local-only until tapped.
                     HStack(spacing: 8) {
                         quickPickChip(label: "1 day", days: 1)
                         quickPickChip(label: "3 days", days: 3)
                         quickPickChip(label: "1 week", days: 7)
                     }
+                    let vacationDirty: Bool = {
+                        guard let original = originalVacationDate else { return true }
+                        return abs(endOfDay(datePickerSelection).timeIntervalSince(original)) > 1
+                    }()
+                    Button {
+                        Task { await savePause(indefinite: false, until: endOfDay(datePickerSelection)) }
+                    } label: {
+                        Text(pauseSaving ? "Saving\u{2026}" : "Save end date")
+                            .font(.system(size: VP.Size.sm, weight: .semibold))
+                            .foregroundColor(vacationDirty && !pauseSaving ? VP.accent : VP.dim)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .overlay(RoundedRectangle(cornerRadius: VP.radiusFull)
+                                .stroke(vacationDirty && !pauseSaving ? VP.accent : VP.border, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!vacationDirty || pauseSaving)
                     if let until = vacationUntil {
                         Text("Returns \(formatted(until)).")
                             .font(.caption)
@@ -3103,6 +3276,22 @@ private struct ExpertProfileView: View {
                         Text("→").foregroundColor(VP.dim)
                         timePickerField(label: "End", binding: $qhEnd)
                     }
+                    // Owner picked inline-Save over per-drag autosave for the
+                    // time pickers — drag stays local until tapped.
+                    let qhTimesDirty = (qhStart != originalQhStart) || (qhEnd != originalQhEnd)
+                    Button {
+                        Task { await saveQuietHours(enabled: true) }
+                    } label: {
+                        Text(qhSaving ? "Saving\u{2026}" : "Save times")
+                            .font(.system(size: VP.Size.sm, weight: .semibold))
+                            .foregroundColor(qhTimesDirty && !qhSaving ? VP.accent : VP.dim)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .overlay(RoundedRectangle(cornerRadius: VP.radiusFull)
+                                .stroke(qhTimesDirty && !qhSaving ? VP.accent : VP.border, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!qhTimesDirty || qhSaving)
                     VStack(alignment: .leading, spacing: 6) {
                         Text("DAYS")
                             .font(.system(size: VP.Size.xs, weight: .heavy))
@@ -3141,9 +3330,10 @@ private struct ExpertProfileView: View {
                 "",
                 selection: Binding<Date>(
                     get: { dateFromHHMM(binding.wrappedValue) ?? Date() },
+                    // Inline-Save pattern: drag is local-only until the user
+                    // taps the "Save times" chip beneath the picker row.
                     set: { newDate in
                         binding.wrappedValue = hhmmFromDate(newDate)
-                        Task { await saveQuietHours(enabled: qhEnabled) }
                     }
                 ),
                 displayedComponents: .hourAndMinute
@@ -3465,6 +3655,9 @@ private struct ExpertProfileView: View {
                     datePickerSelection = vacDate
                 }
             }
+            // Seed inline-Save baseline to the loaded date so the chip
+            // disables until the user actually drags the picker.
+            originalVacationDate = vacationUntil
             pauseUntilIndefinite = app.pauseUntilIndefinite ?? false
 
             // Hydrate quiet hours — master toggle goes ON only when all
@@ -3478,6 +3671,9 @@ private struct ExpertProfileView: View {
             qhDays = (app.mentionQuietHoursDays?.isEmpty == false)
                 ? app.mentionQuietHoursDays!
                 : ExpertProfileView.defaultQHDays
+            // Seed inline-Save baselines for the time pickers.
+            originalQhStart = qhStart
+            originalQhEnd = qhEnd
 
             perPost = app.mentionQuotaPerPost ?? 3
             perDay = app.mentionQuotaPerDay ?? 25
@@ -3600,6 +3796,9 @@ private struct ExpertProfileView: View {
             await MainActor.run {
                 pauseUntilIndefinite = indefinite
                 vacationUntil = until
+                // Reset baseline so the inline Save chip disables again
+                // until the next date drag.
+                originalVacationDate = until
             }
         } catch {
             await MainActor.run { pauseError = "Could not save." }
@@ -3635,6 +3834,13 @@ private struct ExpertProfileView: View {
             if !(200...299).contains(http.statusCode) {
                 let msg = decodeError(data) ?? "Could not save."
                 await MainActor.run { qhError = msg }
+            } else {
+                // Reset baselines so the inline Save chip disables again
+                // until the next time drag.
+                await MainActor.run {
+                    originalQhStart = qhStart
+                    originalQhEnd = qhEnd
+                }
             }
         } catch {
             await MainActor.run { qhError = "Could not save." }
@@ -3850,6 +4056,25 @@ struct DataPrivacyView: View {
     @State private var dmReceiptsLoading = true
     @State private var dmReceiptsSaving = false
     @State private var dmReceiptsErrorAlert = false
+    // Q-E4 tier-1 canonical race fix (Session 5).
+    // ─────────────────────────────────────────────────────────────────────
+    // `dmReceiptsSaveTask` holds the in-flight write so a rapid second toggle
+    // can cancel the prior task before its response lands. Without this,
+    // overlapping Tasks could return out of order — a stale "save failed"
+    // response could trigger the optimistic-revert against the LATEST user
+    // intent, leaving the UI in a lie state (toggle says X, server has Y).
+    //
+    // Pattern (mirror this at any tier-1 site that writes on toggle):
+    //   1. .onChange: dmReceiptsSaveTask?.cancel(); dmReceiptsSaveTask =
+    //      Task { await saveDmReceiptsPref(newValue) }
+    //   2. saveDmReceiptsPref() guards on Task.isCancelled BEFORE applying
+    //      the optimistic-revert on error. A cancelled task isn't a real
+    //      failure — the next save is already in flight and owns the UI.
+    //   3. Skip the initial-mount fire by gating on dmReceiptsLoading at the
+    //      top of save(). loadDmReceiptsPref() sets the toggle to its
+    //      server value then flips loading=false, so the .onChange that
+    //      fires during load is filtered out and never spawns a write.
+    @State private var dmReceiptsSaveTask: Task<Void, Never>? = nil
     @ObservedObject private var perms = PermissionStore.shared
     @State private var canExport = false
 
@@ -3863,7 +4088,11 @@ struct DataPrivacyView: View {
                                   isDisabled: dmReceiptsLoading || dmReceiptsSaving,
                                   showDivider: false)
                     .onChange(of: dmReceiptsEnabled) { _, newValue in
-                        Task { await saveDmReceiptsPref(newValue) }
+                        // Q-E4 race fix: cancel any in-flight save so a
+                        // rapid second toggle can't lose to a stale
+                        // response. See state-block doc above.
+                        dmReceiptsSaveTask?.cancel()
+                        dmReceiptsSaveTask = Task { await saveDmReceiptsPref(newValue) }
                     }
             }
             .alert("Couldn\u{2019}t save", isPresented: $dmReceiptsErrorAlert) {
@@ -3935,6 +4164,12 @@ struct DataPrivacyView: View {
 
     private func saveDmReceiptsPref(_ newValue: Bool) async {
         guard auth.currentUser?.id != nil else { return }
+        // Q-E4 race fix: drop the .onChange that fires during the initial
+        // load — loadDmReceiptsPref() seeds the toggle from the server row
+        // and only THEN flips loading=false. Writing back the just-loaded
+        // value is wasted bandwidth at best, and at worst races the load
+        // itself if the user toggles before the read returns.
+        if dmReceiptsLoading { return }
         struct Args: Encodable { let p_fields: Patch }
         struct Patch: Encodable { let dm_read_receipts_enabled: Bool }
         await MainActor.run { dmReceiptsSaving = true }
@@ -3945,6 +4180,13 @@ struct DataPrivacyView: View {
                 params: Args(p_fields: Patch(dm_read_receipts_enabled: newValue))
             ).execute()
         } catch {
+            // Q-E4 race fix: a cancelled Task is NOT a real save failure —
+            // the user just toggled again and the next save is already in
+            // flight (owns the UI). Reverting here would clobber that
+            // newer intent. Checking AFTER the throw is correct: PostgREST
+            // surfaces cancellation as a thrown URLError/CancellationError
+            // on the await above.
+            if Task.isCancelled { return }
             Log.d("DataPrivacy saveDmReceiptsPref error:", error)
             // Mirror Hub semantics: revert UI on failure + surface alert
             // so the user knows the toggle didn't save (was silent
@@ -4234,6 +4476,8 @@ struct BlockedAccountsView: View {
     @State private var loading = true
     @State private var loadError: String? = nil
     @State private var busyId: String? = nil
+    // Confirmation state — set on tap, consumed by the .alert below.
+    @State private var unblockPending: (rowId: String, targetId: String, username: String)? = nil
 
     var body: some View {
         SettingsPageShell(title: "Blocked accounts") {
@@ -4284,7 +4528,11 @@ struct BlockedAccountsView: View {
                             Spacer()
                             Button {
                                 if let target = row.blocked_id {
-                                    Task { await unblock(rowId: row.id, targetId: target) }
+                                    unblockPending = (
+                                        rowId: row.id,
+                                        targetId: target,
+                                        username: row.username ?? ""
+                                    )
                                 }
                             } label: {
                                 Text(busyId == row.id ? "\u{2026}" : "Unblock")
@@ -4311,6 +4559,25 @@ struct BlockedAccountsView: View {
             }
         }
         .task { await load() }
+        .alert("Unblock this person?",
+               isPresented: Binding<Bool>(
+                   get: { unblockPending != nil },
+                   set: { newValue in if !newValue { unblockPending = nil } }
+               )) {
+            Button("Unblock") {
+                if let pending = unblockPending {
+                    unblockPending = nil
+                    Task { await unblock(rowId: pending.rowId, targetId: pending.targetId) }
+                }
+            }
+            Button("Cancel", role: .cancel) { unblockPending = nil }
+        } message: {
+            if let uname = unblockPending?.username, !uname.isEmpty {
+                Text("@\(uname) will be able to message and follow you again.")
+            } else {
+                Text("They\u{2019}ll be able to message and follow you again.")
+            }
+        }
     }
 
     private func load() async {

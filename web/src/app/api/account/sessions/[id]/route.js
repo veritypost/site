@@ -64,5 +64,19 @@ export async function DELETE(_request, { params }) {
     return NextResponse.json({ error: 'Session not found or cannot be revoked.' }, { status: 404, headers: NO_STORE });
   }
 
+  // Audit-log self-action. Mirrors the billing.cancel pattern (best-effort
+  // insert via service client; never fail the request on audit error).
+  // Session 5 — destructive action audit trail.
+  try {
+    await service.from('audit_log').insert({
+      actor_id: user.id,
+      action: 'session.revoke_one',
+      target_type: 'session',
+      target_id: sessionId,
+    });
+  } catch (auditErr) {
+    console.error('[account.sessions.revoke] audit_log insert failed:', auditErr);
+  }
+
   return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }

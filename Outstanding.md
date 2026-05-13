@@ -163,6 +163,48 @@ Web:
 - Email-verify gate: shows inline in YouSection but Identity row stays tappable; tapping it reaches `AccountSettingsView`.
 - Anon user: existing anon hero preserved; section list not rendered.
 
+**SHIPPED Session 5 (2026-05-12).**
+
+Per 4-implementer batch-mode pattern + reviewer + adversary. 6 files, +540 / -90 net.
+
+iOS (`SettingsView.swift`):
+- **Bug (a) — duplicate DM toggle.** Deleted hub-level `HubRowSpec` block + hub-level `.alert("Couldn't save", isPresented: $dmReceiptsErrorAlert)`. Canonical copy stays at the post-port DataPrivacyView location.
+- **Hub-level dead-code cleanup (post-impl adversary).** Imp 1 left the hub-level `@State` vars (`dmReceiptsEnabled` / `Loading` / `Saving` / `ErrorAlert`) + `loadDmReceiptsPref()` + `saveDmReceiptsPref()` per the original brief. Post-impl review confirmed they're truly orphan after (a) — deleted all 4 vars, both functions, and the `loadPreviews()` call site.
+- **Bug (b) — 4 destructive confirms.** Mirror the existing `.alert("Delete account?")` destructive pattern. MFA disable, per-session revoke (keyed by `sessionPendingRevoke: String?`), revoke-all-other (`showRevokeAllConfirm: Bool`), per-row Unblock (keyed by `unblockPending: (rowId, targetId, username)?`). Each .alert renders title + body + destructive button + cancel.
+- **Bug (c) — FeedPreferences dirty gate.** Added `original*` baselines for all 5 toggles; `dirty: Bool` computed; Save button gated on `!loaded || !dirty`. Baselines reset on successful save.
+- **Bug (d) — DatePicker save-on-commit (inline-Save chips).** Removed per-drag `.onChange { savePause/saveQuietHours }`. Added "Save end date" chip below Vacation pause picker + "Save times" chip below Quiet hours start/end picker. Both gated on dirty baseline comparison.
+- **Bug (e) — password parity with passwordless-user gate.** `PasswordSettingsView` rewritten with `resolveHasPassword()` reading `client.auth.currentUser?.identities` (looks for `provider == "email"`). Passwordless branch (OAuth / magic-link signups) renders "Open security settings on web" link to `https://veritypost.com/profile?section=security` instead of the form. Form branch adds `currentPassword` SecureField above new/confirm; submit two-step: POST `{password: current}` to `/api/auth/verify-password` with bearer token, then on 2xx call `client.auth.update(user: UserAttributes(password: newPassword))`. 401 response branched: if identities are non-empty AND no email provider, surface "manage on web" copy instead of "Current password is incorrect" (post-impl adversary 2026-05-12).
+- **Race-condition fix at canonical Q-E4 tier-1 site.** DataPrivacyView's DM-toggle save replaced with explicit `Task` cancellation: `dmReceiptsSaveTask?.cancel(); dmReceiptsSaveTask = Task { await saveDmReceiptsPref(newValue) }`. `saveDmReceiptsPref` early-returns on `dmReceiptsLoading` (filters initial-mount fire). Error handler guards on `Task.isCancelled` BEFORE applying optimistic revert — cancelled tasks no longer clobber newer user intent. Multi-line doc comment makes this the documented canonical pattern for future Q-E4 tier-1 sites.
+- **Q-NEW7 labels.** MFA: "Generate setup code" → "Set up 2FA"; "Verify & enable" → "Verify and turn on." Password: "Update password" unchanged.
+- **MFA disable copy fix (post-impl adversary).** Confirm alert body dropped the "Your recovery codes will also be invalidated" claim — Supabase TOTP doesn't issue recovery codes, so the statement was wrong.
+
+Web:
+- **Bug (f) — `BlockedSection.tsx` per-row Unblock.** Wrapped in `ConfirmDialog` keyed by `unblockPending: { id, username? } | null`. Username path is `r.user?.username` (Imp 3 verified against `Row` interface at the file's existing rendering).
+- **Bug (g) — `SessionsSection.tsx` per-row Revoke.** Wrapped in `ConfirmDialog` keyed by `revokePending: string | null`. Sits alongside the existing revoke-all-others ConfirmDialog at lines 203-212.
+- **Adversary investigator misread closed:** the BlockedSection "optimistic mutation" claim was incorrect — `setRows` runs inside the success branch of the unblock RPC, not pre-fetch. No change needed.
+
+Audit-log cross-cutting (`/api/account/sessions/[id]` DELETE / `/api/account/sessions` DELETE / `/api/users/[id]/block` DELETE):
+- All 3 endpoints now write `audit_log` rows with locked action names: `session.revoke_one`, `session.revoke_all` (with `metadata.count`), `block.remove`. Best-effort try/catch (mirrors existing `billing/cancel/route.js` pattern). Service-role client used for the insert to bypass RLS.
+
+Flagged for follow-up (not in this PR):
+- **MFA unenroll has no `audit_log` row** — both iOS and web call Supabase SDK's `mfa.unenroll()` directly, bypassing our log table. Adding a `/api/account/mfa/unenroll` wrapper requires migrating both callers; out of scope for Session 5.
+- **`/api/auth/verify-password` rate-limit shares the 5-strike login lockout** (Imp 4 + adversary). Mis-typing current password 5x can cascade into login lockout. Pre-existing endpoint design issue; not in this PR.
+- **Audit-log silent-fail without Sentry capture** — deferred per memory `feedback_sentry_deferred` (Sentry deferred until monetization).
+
+**Cross-platform footnote:**
+- iOS: covered above.
+- Web: bugs (f), (g) + audit-log inserts cover web surfaces equally.
+- Kids iOS: N/A — no parent-facing Settings rail in the kids product (`VerityPostKids/`).
+
+**Build verification status:** Same sandbox SourceKit gap. **Owner runs iPhone simulator + web local dev before merge.** Verify:
+- DM toggle rapid-tap doesn't desync UI from server (drag toggle 5x fast; final state matches server).
+- All 4 iOS confirm dialogs appear with destructive button + correct copy + cancel role.
+- FeedPreferences Save disabled when no toggles changed; enables on first edit; disables again after successful save.
+- Vacation pause + Quiet hours fire one RPC per Save tap, not per drag tick.
+- Password flow: real-password user sees 3-field form + works; OAuth / magic-link user sees "manage on web" link; 401 on wrong current password shows the correct error.
+- Web BlockedSection + SessionsSection per-row destructive actions show confirm; existing revoke-all path unchanged.
+- After each destructive action: a row appears in `audit_log` with the locked action name.
+
 ### Q-E1 — Profile shell: master/detail wins on both platforms
 - **Question:** Does iOS port web's 21-section master/detail shell (with the "You" dashboard preserved as one section), or does web port iOS's 4-tab dashboard?
 - **Why it matters:** Web's `ProfileApp.tsx:249-525` declares 21 sections (you, public, background, activity, messages, categories, milestones, family, expert-queue, expert-profile, identity, security, sessions, notifications, appearance, privacy, plan, refer, help, data, signout); iOS's `ProfileView.swift` is a 4-tab dashboard — owner's stated parity goal means one model has to move.
