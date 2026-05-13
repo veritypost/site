@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "dev:3333": "next dev -p 3333",
+    "prebuild": "node scripts/check-sensitivity-tags.mjs && node scripts/check-canonical-url-denylist.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -19,6 +20,8 @@
     "test:e2e:debug": "PWDEBUG=1 playwright test",
     "test:e2e:report": "playwright show-report",
     "check-crons": "node scripts/check-crons.mjs",
+    "check:sensitivity-tags": "node scripts/check-sensitivity-tags.mjs",
+    "check:canonical-url-denylist": "node scripts/check-canonical-url-denylist.mjs",
     "audit:ads": "node scripts/audit-ad-placements.mjs"
   },
   "lint-staged": {
