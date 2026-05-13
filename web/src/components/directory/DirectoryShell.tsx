@@ -405,7 +405,7 @@ export default function DirectoryShell({
         role="button"
         aria-label={backText}
       >
-        ← {backText.toUpperCase()}
+        {backText.toUpperCase()}
       </div>
 
       <div

@@ -109,7 +109,7 @@ export default function ExpertDepthTooltip({ storyId, count }: ExpertDepthToolti
           textUnderlineOffset: 2,
         }}
       >
-        ✓ {count} expert{count === 1 ? '' : 's'}
+        {count} expert{count === 1 ? '' : 's'}
       </button>
       {open && (
         <div
@@ -169,7 +169,7 @@ export default function ExpertDepthTooltip({ storyId, count }: ExpertDepthToolti
                   fontWeight: 600,
                 }}
               >
-                Upgrade →
+                Upgrade
               </Link>
             </div>
           )}

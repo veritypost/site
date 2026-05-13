@@ -502,20 +502,18 @@ export default function CommentComposer({
   //   add_context    → deep green   (#3d6b4f) bg rgba(61,107,79,0.05)
   //   different_take → rust amber   (#a14b1a) bg rgba(161,75,26,0.05)
   //   question       → slate blue   (#4a6e8a) bg rgba(74,110,138,0.05)
-  // The glyph prefix is shown in the pill on the panel (and the meta-line
-  // chip / tag header in CommentRow re-uses the same glyph + label).
+  // Text labels only — no glyphs in chrome (owner rule).
   const INTENT_OPTIONS: Array<{
     value: Intent | null;
     label: string;
     replyLabel: string;
-    glyph: string;
     color: string;
     bg: string;
   }> = [
-    { value: null,             label: 'No intent',      replyLabel: 'Just replying',   glyph: '↩', color: '#111111', bg: 'transparent' },
-    { value: 'add_context',    label: 'Add Context',    replyLabel: 'Adding to this',  glyph: '+', color: '#3d6b4f', bg: 'rgba(61,107,79,0.05)' },
-    { value: 'different_take', label: 'Different Take', replyLabel: 'A different take', glyph: '↻', color: '#a14b1a', bg: 'rgba(161,75,26,0.05)' },
-    { value: 'question',       label: 'Question',       replyLabel: 'Question',        glyph: '?', color: '#4a6e8a', bg: 'rgba(74,110,138,0.05)' },
+    { value: null,             label: 'No intent',      replyLabel: 'Just replying',    color: '#111111', bg: 'transparent' },
+    { value: 'add_context',    label: 'Add Context',    replyLabel: 'Adding to this',   color: '#3d6b4f', bg: 'rgba(61,107,79,0.05)' },
+    { value: 'different_take', label: 'Different Take', replyLabel: 'A different take', color: '#a14b1a', bg: 'rgba(161,75,26,0.05)' },
+    { value: 'question',       label: 'Question',       replyLabel: 'Question',         color: '#4a6e8a', bg: 'rgba(74,110,138,0.05)' },
   ];
 
   const COMMENT_BODY_MAX = 4000;
@@ -722,7 +720,6 @@ export default function CommentComposer({
                   transition: 'background 120ms, color 120ms, border-color 120ms',
                 }}
               >
-                <span aria-hidden="true">{opt.glyph}</span>
                 <span>{isReply ? opt.replyLabel : opt.label}</span>
               </button>
             );

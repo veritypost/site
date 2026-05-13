@@ -16,17 +16,13 @@ struct BrowseBackBar: View {
             Button {
                 state.goBack()
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 12, weight: .bold))
-                    Text("Back")
-                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                        .tracking(1.1)
-                }
-                .foregroundColor(VP.accent)
-                .padding(.vertical, 10)
-                .padding(.horizontal, 12)
-                .contentShape(Rectangle())
+                Text("Back")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .tracking(1.1)
+                    .foregroundColor(VP.accent)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Back to \(backTargetLabel)")

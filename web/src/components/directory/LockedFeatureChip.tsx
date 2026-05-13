@@ -32,7 +32,6 @@ export default function LockedFeatureChip({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 4,
         padding: '2px 8px',
         borderRadius: 999,
         border: '1px solid var(--border)',
@@ -48,22 +47,6 @@ export default function LockedFeatureChip({
         ...style,
       }}
     >
-      <svg
-        width="9"
-        height="9"
-        viewBox="0 0 14 14"
-        fill="none"
-        aria-hidden="true"
-        style={{ flexShrink: 0 }}
-      >
-        <rect x="3" y="7" width="8" height="5" rx="1" fill="currentColor" opacity="0.55" />
-        <path
-          d="M4.5 7V5a2.5 2.5 0 0 1 5 0V7"
-          stroke="currentColor"
-          strokeWidth="1.25"
-          strokeLinecap="round"
-        />
-      </svg>
       {label}
     </Link>
   );

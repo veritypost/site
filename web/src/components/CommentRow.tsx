@@ -458,10 +458,10 @@ export default function CommentRow({
     ? (intentMeta ? intentMeta.color : '#dcdcdc')
     : undefined;
   // Tag header for threaded replies. Plain reply (no intent) uses the
-  // institutional "↩ Reply" label in the muted ink; intent replies use
+  // institutional "Reply" label in the muted ink; intent replies use
   // the intent's tag label + color. Top-level comments keep the small
   // meta-line chip and don't render this header.
-  const replyTagText = intentMeta ? intentMeta.tagLabel : '↩ Reply';
+  const replyTagText = intentMeta ? intentMeta.tagLabel : 'Reply';
   const replyTagColor = intentMeta ? intentMeta.color : '#777777';
 
   return (
@@ -939,7 +939,6 @@ export default function CommentRow({
             const showTally = tallySegments.length > 0;
             // Unified intent model: composer owns the intent picker. The
             // action row just shows the Reply toggle.
-            const replyGlyph = '↩';
             const replyButtons =
               canReply && commentDepth < commentMaxDepth ? (
                 <button
@@ -951,7 +950,6 @@ export default function CommentRow({
                   title={replyTitle}
                   style={actionPillStyle({ on: replyOpen, disabled: replyDisabled })}
                 >
-                  <span aria-hidden="true">{replyGlyph}</span>
                   <span>Reply</span>
                 </button>
               ) : null;

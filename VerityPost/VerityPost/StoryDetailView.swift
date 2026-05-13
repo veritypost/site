@@ -2320,7 +2320,7 @@ struct StoryDetailView: View {
                         VerifiedBadgeView(isExpert: u?.isExpert, isVerifiedPublicFigure: u?.isVerifiedPublicFigure)
                     }
                     // Top-level intent chip — mono uppercase tagLabel
-                    // ("? Question" / "+ Adding to this" / "↻ A different
+                    // ("Question" / "Adding to this" / "A different
                     // take"), matches web CommentRow.tsx inline chip on
                     // depth=0. Threaded replies (depth > 0) get the chip
                     // as a separate header above the body instead, so
@@ -4186,17 +4186,17 @@ struct StoryDetailView: View {
     }
 
     /// The header bar that sits above the body on threaded replies
-    /// (depth > 0). Mono uppercase tag with a leading glyph; rows with
-    /// no intent fall back to the generic "↩ Reply" treatment so the
-    /// reply still has an explicit context header above the body, the
-    /// way web's CommentRow does for depth > 0.
+    /// (depth > 0). Mono uppercase tag; rows with no intent fall back
+    /// to the generic "Reply" treatment so the reply still has an
+    /// explicit context header above the body, the way web's CommentRow
+    /// does for depth > 0.
     private func threadedReplyHeader(_ kind: String?) -> (label: String, color: Color) {
         let neutral = Color(red: 0x77/255.0, green: 0x77/255.0, blue: 0x77/255.0)
         switch kind {
-        case "question":       return ("? Question", intentAccent("question") ?? neutral)
-        case "add_context":    return ("+ Adding to this", intentAccent("add_context") ?? neutral)
-        case "different_take": return ("\u{21bb} A different take", intentAccent("different_take") ?? neutral)
-        default:               return ("\u{21a9} Reply", neutral)
+        case "question":       return ("Question", intentAccent("question") ?? neutral)
+        case "add_context":    return ("Adding to this", intentAccent("add_context") ?? neutral)
+        case "different_take": return ("A different take", intentAccent("different_take") ?? neutral)
+        default:               return ("Reply", neutral)
         }
     }
 

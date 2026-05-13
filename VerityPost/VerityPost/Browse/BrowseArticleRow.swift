@@ -51,7 +51,6 @@ struct BrowseArticleRow: View {
         let publisher = decor?.sourceName
         let readMin = decor?.readingTimeMinutes
         let expertCount = decor?.expertCount ?? 0
-        let verified = decor?.isExpertVerified ?? false
 
         HStack(spacing: 6) {
             if let dateText {
@@ -70,7 +69,7 @@ struct BrowseArticleRow: View {
             }
             if expertCount > 0 {
                 metaSep
-                expertChip(count: expertCount, verified: verified)
+                expertChip(count: expertCount)
             }
             Spacer(minLength: 0)
         }
@@ -90,10 +89,10 @@ struct BrowseArticleRow: View {
             .foregroundColor(VP.muted)
     }
 
-    private func expertChip(count: Int, verified: Bool) -> some View {
-        // Tappable when `onTapExperts` is provided. Verified flag prepends
-        // a checkmark; the count text reads "N EXPERTS" or "1 EXPERT".
-        let label = "\(verified ? "\u{2713} " : "")\(count) \(count == 1 ? "EXPERT" : "EXPERTS")"
+    private func expertChip(count: Int) -> some View {
+        // Tappable when `onTapExperts` is provided. The count text reads
+        // "N EXPERTS" or "1 EXPERT".
+        let label = "\(count) \(count == 1 ? "EXPERT" : "EXPERTS")"
         return Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             onTapExperts?()
