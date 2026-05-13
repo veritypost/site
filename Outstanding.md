@@ -24,8 +24,8 @@ Every item below is a research-and-fix task, not a code instruction. Run it thro
 1. **Session 1 — Tokens.** Group D: radius alias + spacing scale + semantic color swap (with text/background classification) + Bright variants. All token files in one diff.
 2. **Session 2 — Web sweep + chrome.** High-traffic `borderRadius:` sweep (Q-NEW8) + mobile/desktop search icon in NavWrapper (item 14 / Q-Misc1). Same PR.
 3. **Session 3 — iPad infrastructure.** Items 5 + 6: layout-mode plumbing (`@AppStorage("ui.layoutMode")`), size-class branches, Appearance picker, rail landscape-only, sheet detents, HomeView cap + 2-col grid, avatar bump with width gate.
-4. **Session 4 — Profile master/detail.** Group E part 1: 21-section shell on iOS, `NavigationSplitView` on iPad, auto-push You on iPhone, iOS Help section.
-5. **Session 5 — Settings IA + hygiene.** Group E part 2: 7 group headers on web rail, three-tier save UX rule, 4 iOS bugs + iOS password parity bug + 2 web confirm-dialog gaps, step-specific auth labels.
+4. **Session 4 — Profile master/detail.** Group E part 1 (Help parity, shipped) + part 2 (21-section shell on iOS, `NavigationSplitView` on iPad ≥700pt, inline-You-at-top on iPhone, shipped 2026-05-12).
+5. **Session 5 — Settings IA + hygiene.** Group E part 2 cleanup: three-tier save UX rule, 4 iOS bugs + iOS password parity bug + 2 web confirm-dialog gaps, step-specific auth labels. (Original "add 7 headers to web rail" item dropped 2026-05-12 — pre-impl review confirmed web already renders 4 group headers via `AppShell.tsx:281-296`; Q-E3's 7-label target diverges from web's current 4-label structure but owner-deferred the relabel as cosmetic.)
 6. **Out-of-band, any time** — Item 21 / Q-Misc2: drop explicit `loadUser` in `AuthViewModel.swift:1441`.
 
 Sessions ship in order — Session N depends on tokens/scaffolding from Sessions 1..N-1.
@@ -117,15 +117,15 @@ Web:
 
 **Kids iOS:** N/A — kids product is iPhone-only reader/family UX; no parent-facing 21-section profile or settings rail.
 
-**Deep-link / push migration:** Audit every `verity://profile*` deep link and every push notification payload that targets Profile before Session 4 opens — old tab-index params (`Overview/Activity/Categories/Milestones`) need to map to the new section IDs.
+**Deep-link / push migration:** Audit completed pre-Session 4 part 2 (2026-05-12). Zero `verity://profile*` callsites exist anywhere (web or iOS); zero Universal Links target Profile (apple-app-site-association declares only `/story`, `/r/`, `/api/auth/callback`); zero push payloads route to Profile; zero analytics events keyed on tab name. The original line-item assumed a migration that was never built. No migration needed — section IDs become the canonical contract going forward.
 
 **Execution prompts:**
 
 > **Session 4 part 1 (this commit) — Help parity + decision-locking.** Closes the Q-E5 iOS↔web Help gap inside the existing SettingsView About hub (full Profile shell ships in part 2). Adds a "Help center" external row pointing at `https://veritypost.com/help`; renames "Send feedback" → "Contact support" (matches web wording); expands `FeedbackSheet` from 3 to 11 topic categories matching web's `/contact` form via a `Menu`-style picker (segmented overflowed at 11). Locks the Q-NEW6 reversal to inline-You-at-top (no auto-push) and concretizes Q-E5 contents in the doc above so part 2 implementation goes straight to code without re-asking.
 
-> **Session 4 part 2 — Profile shell port.** Port iOS to the 21-section master/detail shell using the inline-You-at-top pattern (Q-NEW6 revised). iPhone = `NavigationStack` rooted at the section list; "You" rendered inline-expanded as the first list item containing the existing dashboard cards; the other 20 sections render as `NavigationLink` rows below. iPad (`.regular` size class) = stock `NavigationSplitView` with the same section list as sidebar, default selection You. Wire each non-You section to either an existing iOS destination (FamilyDashboardView, MessagesView, AppearanceSettingsView, the SettingsView subpages) or a clear "view on web" link if no iOS equivalent exists yet. Add the dedicated `HelpSectionView` destination consuming the now-shipped 11-topic FeedbackSheet. Honest day-count per scope agent: 4–5 days. Cross-platform check: web stays on its existing 21-section shell; Session 5 picks up the 7-header Settings IA hygiene.
+> **Session 4 part 2 — Profile shell port.** Port iOS to the 21-section master/detail shell using the inline-You-at-top pattern (Q-NEW6 revised). iPhone = `NavigationStack` rooted at the section list; "You" rendered inline-expanded as the first list item containing the existing dashboard cards; the other 20 sections render as `NavigationLink` rows below. iPad (`.regular` size class AND viewport ≥700pt) = stock `NavigationSplitView` with the same section list as sidebar, default selection You. Wire each non-You section to either an existing iOS destination (FamilyDashboardView, MessagesView, AppearanceSettingsView, the SettingsView subpages) or a clear "view on web" link if no iOS equivalent exists yet. Add the dedicated `HelpSectionView` destination consuming the now-shipped 11-topic FeedbackSheet. Honest day-count per scope agent: 3.5–4 days (down from 4–5 once deep-link migration confirmed dead).
 
-> **Session 5 — Settings IA + hygiene.** Add the 7 group headers to web's settings rail (Q-E3). Apply the three-tier save UX rule everywhere (Q-E4). Fix the 4 iOS bugs (a–d), the iOS password parity bug (e), and the 2 web confirm-dialog gaps (f, g). Add step-specific verbs to MFA and password flows (Q-NEW7). Pressure-test optimistic-revert pattern on every RLS-allowlisted single-value control.
+> **Session 5 — Settings IA + hygiene.** Apply the three-tier save UX rule everywhere (Q-E4). Fix the 4 iOS bugs (a–d), the iOS password parity bug (e), and the 2 web confirm-dialog gaps (f, g). Add step-specific verbs to MFA and password flows (Q-NEW7). Pressure-test optimistic-revert pattern on every RLS-allowlisted single-value control. (Original "add 7 group headers to web's settings rail" line dropped 2026-05-12 — web `AppShell.tsx:281-296` already renders 4 group headers today; Q-E3's 7-label target is a separate relabel-only polish item, owner-deferred.)
 
 **SHIPPED Session 4 part 1 (2026-05-12).**
 
@@ -138,6 +138,30 @@ Web:
 - Kids iOS: N/A — kids product is iPhone-only reader/family UX; no Settings About hub exposing Help.
 
 **Build verification status:** SourceKit cannot resolve the `import Supabase` SPM dependency in the sandbox environment (same as Session 3 part 1's iOS 26.5 SDK gap, `Outstanding.md:218`). Owner to run an iPhone simulator build before merge — first launch on Settings → About should show "Help center" above "Contact support"; tapping Contact support should open a sheet titled "Contact support" with a Topic chevron-row that pops a Menu listing 11 topics.
+
+**SHIPPED Session 4 part 2 (2026-05-12).**
+
+- `ProfileView.swift` — full rewrite (1970→1476 lines). 4-tab `enum ProfileTab` retired. New `ProfileSectionID` enum + `ProfileSectionDef` data model mirror web `ProfileApp.tsx:249-525` verbatim (id / glyph / group / title / reason). 21 sections wired (less Expert Queue + Expert Profile, launch-hidden per commit 7b3541a1).
+- **iPhone shell** — `ScrollView { VStack }` with `topBar` (brand only, gear + Kids pill dropped — settings live inline now), `youSection(user:)` rendered inline-expanded at top (hero + stats + social + quick-actions + previews + bio + card preview + member-since), divider, then `sectionRows(user:)` producing ungrouped rows (Public profile, Background) followed by `Library / Family & expert / Settings / Account` group headers each with their NavigationLinks. Native iOS pattern (Apple Health/Wallet/News/Settings).
+- **iPad shell** — `NavigationSplitView` two-column with section list as sidebar, default selection You. Gated on `horizontalSizeClass == .regular` AND viewport ≥ `VP.LayoutBreak.avatarBump` (700pt) — width gate excludes iPhone Plus/Pro Max landscape (reports `.regular` <700pt per Q-NEW5 adversary finding) and iPad Split-View thirds.
+- **NavigationLink destinations** — Public profile / Background / Invite friends / Your data → `webFallback(title:body:path:)` opens `veritypost.com/profile?section=X` in Safari (web is source of truth for those surfaces). Activity / Categories / Milestones / Help / Sign out → in-app section views built on the existing data loaders. Messages → existing `MessagesView`. Family → existing `FamilyDashboardView`. Identity → existing `AccountSettingsView`. Security → new `securityHub` (3-row sub-rail wrapping Email / Password / MFA — web bundles these into one section; iOS already shipped them as separate subpages so the hub keeps both shapes coherent). Sessions / Notifications / Appearance / Privacy / Plan → existing `LoginActivityView` / `NotificationsSettingsView` / `AppearanceSettingsView` / `DataPrivacyView` / `SubscriptionSettingsView`.
+- **Messages unread badge** — new `loadUnreadDMCount()` calls `get_unread_counts` RPC (migration 038), sums the `unread` field across rows, renders pill on the Messages row. Mirrors web `ProfileApp.tsx:108-117`. Reload on `auth.currentUser?.id` change.
+- **Avatar bump preserved** — `shouldBumpHero` gate (`hSize == .regular && viewportWidth >= 700pt`) still drives 96pt avatar + xxl name in `heroCard(_:)`. Q-NEW5 unchanged.
+- **Email verify gate** — scope narrowed per Q-E5 adversary review. Unverified users see the gate inline in YouSection but Identity / Security / Sessions sections remain reachable from the list so they can self-serve verification (Email + Password + MFA are reachable via securityHub). Web's all-or-nothing block was the wrong analogy for iOS where swipe-back is free.
+- `ContentView.swift` — `MainTabView.profilePath: NavigationPath` added; `NavigationStack(path: $profilePath) { ProfileView() }`. `TextTabBar` gains `onReselectProfile` closure; re-tapping the active Profile tab pops the nav stack to root (Q-NEW6 adversary finding). Native iOS pattern; without it a user deep in Activity → Story would have to swipe back manually.
+
+**Cross-platform footnote:**
+- Web: N/A — web's 21-section shell is the source of truth being mirrored; no web change in this commit. Original "add 7 group headers to web rail" item dropped: pre-impl review confirmed `AppShell.tsx:281-296` already renders 4 group headers. The Q-E3 7-label target is a separate cosmetic relabel; owner-deferred.
+- Kids iOS: N/A — kids product is iPhone-only reader / family UX (`VerityPostKids/VerityPostKids/Info.plist:50-55` locks portrait + `UIRequiresFullScreen=true`). No parent-facing 21-section profile or settings rail exists in `VerityPostKids/`.
+
+**Build verification status:** SourceKit module-resolution gap persists in sandbox (same as Session 3 part 1, Session 4 part 1 — `import Supabase` SPM dependency unreachable). **Owner runs iPhone + iPad simulator builds before merge.** Verify:
+- iPhone first launch: section list scrolls past inline-You dashboard, 18 rows below (2 ungrouped + 4 Library + 1 Family + 6 Settings + 5 Account, modulo perm gating), swipe-back works at every depth.
+- iPhone double-tap Profile tab: pops nav stack to root.
+- iPad mini portrait (744pt, `.regular`): `NavigationSplitView` with sidebar + You default selection.
+- iPad Split View thirds (`.compact`): collapses to NavigationStack-style phone shell.
+- Messages row: shows unread count badge when `get_unread_counts` sum > 0.
+- Email-verify gate: shows inline in YouSection but Identity row stays tappable; tapping it reaches `AccountSettingsView`.
+- Anon user: existing anon hero preserved; section list not rendered.
 
 ### Q-E1 — Profile shell: master/detail wins on both platforms
 - **Question:** Does iOS port web's 21-section master/detail shell (with the "You" dashboard preserved as one section), or does web port iOS's 4-tab dashboard?

@@ -4,79 +4,97 @@ import Supabase
 // @migrated-to-permissions 2026-04-18
 // @feature-verified profile_settings 2026-04-22
 //
-// World-class profile rebuild (2026-04-22). The screen is a live, dense
-// "home for you" — hero stats are always visible; tabs drill into the
-// full lists. Layout:
+// Profile shell port — Session 4 part 2, locked 2026-05-12, shipped 2026-05-12.
+// Mirrors web/src/app/profile/_components/ProfileApp.tsx (21-section master/
+// detail). iPhone = NavigationStack rooted at a List whose first item is the
+// inline-expanded "You" dashboard; the other 20 sections render as
+// NavigationLink rows below grouped by Library / Family & expert / Settings /
+// Account. iPad ≥700pt = NavigationSplitView two-column, default selection
+// You. Outstanding.md Q-E1, Q-E3, Q-E5, Q-NEW6 (revised) baked in.
 //
-//   topBar (flat, shared with HomeView/SettingsView)
-//   [ hero card: score + tier pill ]
-//   [ stat row: Quizzes passed / Comments ]
-//   [ social row: Followers / Following — gated by profile.followers.view.own ]
-//   [ quick action row: Messages / Share / Kids ]
-//   [ recent activity preview — 3 rows + "See all" ]
-//   [ achievement preview — 3 tiles + "See all" ]
-//   [ tab bar: Overview / Activity / Categories / Milestones ]
-//   [ tab content ]
+// Section catalog ordering follows ProfileApp.tsx:249-525 verbatim. Expert
+// Queue + Expert Profile stay launch-hidden (commit 7b3541a1; iOS has no
+// owner-mode toggle so they're absent rather than `hidden: !isOwnerMode`).
 //
-// iOS idioms preserved:
-//   - pull-to-refresh on the outer ScrollView drives every loader
-//   - 44pt tap targets on header/action buttons
-//   - light haptic on tab switch + quick-action tap
-//   - Dynamic Type compatible (relative font styles used everywhere that
-//     isn't fixed-size by design like the avatar glyph)
-//
-// Data sources (real, not mocked):
+// Data flow:
 //   - users.verity_score / quizzes_completed_count / comment_count /
 //     followers_count / following_count / display_name / bio
 //     — loaded by AuthViewModel.loadUser
-//   - reading_log / quiz_attempts / comments — activity feed
-//   - user_achievements + achievements — badge showcase
-//   - comment_votes — per-category upvote tally (milestones tab)
+//   - reading_log / quiz_attempts / comments — Activity section
+//   - categories / reading_log / quiz_attempts / comments / comment_votes — Categories section
+//   - user_achievements + achievements — Milestones section
+//   - get_unread_counts RPC — Messages row badge (mirrors web ProfileApp.tsx:108-117)
+
+// MARK: - Section catalog
+
+enum ProfileSectionID: String, CaseIterable, Identifiable, Hashable {
+    case you, publicProfile, background
+    case activity, messages, categories, milestones
+    case family
+    case identity, security, sessions, notifications, appearance, privacy
+    case plan, refer, help, data, signout
+
+    var id: String { rawValue }
+}
+
+struct ProfileSectionDef: Identifiable, Hashable {
+    let id: ProfileSectionID
+    let glyph: String
+    let group: String?  // nil = ungrouped (top of list)
+    let title: String
+    let reason: String
+
+    var listID: String { id.rawValue }
+}
+
+// MARK: - ProfileView
 
 struct ProfileView: View {
     @EnvironmentObject var auth: AuthViewModel
     @ObservedObject private var perms = PermissionStore.shared
     private let client = SupabaseManager.shared.client
     @Environment(\.accessibilityReduceMotion) var reduceMotion
-    // Q-NEW5 (2026-05-12, owner-revised) — viewport >= 700pt + `.regular`
-    // size class bumps the hero avatar to 96pt. `.regular` alone fires in
-    // iPad Split-View thirds (320pt+) where the 96pt avatar overflows;
-    // pairing it with a width gate keeps thirds at iPhone-sized 68pt but
-    // catches iPad mini portrait full-screen (744pt) and every larger iPad.
     @Environment(\.horizontalSizeClass) private var hSize
+
+    // Layout-mode aware sizing.
+    @AppStorage(VP.layoutModeKey) private var storedLayoutMode: String = VPLayoutMode.auto.rawValue
     @State private var viewportWidth: CGFloat = 0
+    private var effectiveLayout: VPLayoutMode {
+        vpEffectiveLayoutMode(stored: storedLayoutMode, sizeClass: hSize, width: viewportWidth)
+    }
+    /// Hero avatar bump (96pt) when iPad-class viewport. Lowered from the
+    /// locked 768pt to 700pt to capture iPad mini portrait — see Q-NEW5.
     private var shouldBumpHero: Bool {
         hSize == .regular && viewportWidth >= VP.LayoutBreak.avatarBump
     }
+    /// iPad master/detail when `.regular` AND viewport ≥ 700pt. Width gate
+    /// excludes iPhone Plus/Pro Max landscape (reports `.regular` <700pt) and
+    /// iPad Split-View thirds (reports `.compact` regardless of stored mode).
+    private var useSplitView: Bool {
+        effectiveLayout == .expanded && viewportWidth >= VP.LayoutBreak.avatarBump
+    }
 
-    // Permission-gated flags. Populated in a `.task(id: perms.changeToken)`.
-    @State private var canShareProfileCard: Bool = false
-    @State private var canViewCard: Bool = false
-    @State private var canViewActivity: Bool = false
-    @State private var canViewCategories: Bool = false
-    @State private var canViewAchievements: Bool = false
-    @State private var canViewActivityFullHistory: Bool = false
-    @State private var canViewMessages: Bool = false
-    @State private var canViewExpertQueue: Bool = false
-    @State private var canViewFamily: Bool = false
-    @State private var canViewFollowers: Bool = false
-    @State private var canViewFollowing: Bool = false
-    @State private var permsLoaded: Bool = false
-    // T244 — handle for the in-flight pull-to-refresh load. Cancelled
-    // before each new pull so two fast drags don't race.
+    // Permission-gated flags. Populated in `.task(id: perms.changeToken)`.
+    @State private var canShareProfileCard = false
+    @State private var canViewCard = false
+    @State private var canViewActivity = false
+    @State private var canViewCategories = false
+    @State private var canViewAchievements = false
+    @State private var canViewActivityFullHistory = false
+    @State private var canViewMessages = false
+    @State private var canViewFamily = false
+    @State private var canViewFollowers = false
+    @State private var canViewFollowing = false
+    @State private var permsLoaded = false
+
+    // T244 — handle for the in-flight pull-to-refresh load.
     @State private var refreshTask: Task<Void, Never>? = nil
 
-    // Tabs — 4-item set. Overview is the "profile card + my stuff" deeper
-    // view; the hero/stats/quick-actions all sit above the tab bar
-    // and stay visible regardless of tab.
-    enum ProfileTab: String, CaseIterable, Identifiable {
-        case overview   = "Overview"
-        case activity   = "Activity"
-        case categories = "Categories"
-        case milestones = "Milestones"
-        var id: String { rawValue }
-    }
-    @State private var tab: ProfileTab = .overview
+    // iPad sidebar selection.
+    @State private var selectedSection: ProfileSectionID? = .you
+
+    // Messages row badge — `get_unread_counts` RPC sum.
+    @State private var unreadDMCount: Int = 0
 
     // Activity filter — All / Articles / Comments
     enum ActivityFilter: String, CaseIterable, Identifiable {
@@ -100,16 +118,11 @@ struct ProfileView: View {
     @State private var categoriesLoaded = false
     @State private var categoriesLoadError = false
     @State private var userAchievements: [UserAchievement] = []
-    /// All achievement definitions (earned + locked). The milestones grid
-    /// renders both states — earned first, locked after — mirroring web's
-    /// `loadMilestones` / earnedMap pattern at `web/src/app/profile/page.tsx`.
     @State private var allAchievements: [Achievement] = []
-    /// Map of achievement_id → earned_at (ISO string), populated from the
-    /// user_achievements rows. Empty value means locked.
     @State private var earnedMap: [String: Date] = [:]
     @State private var achievementsLoaded = false
 
-    // Expansion state (milestones / categories drilldown)
+    // Expansion state (categories drilldown)
     @State private var expandedCat: String? = nil
     @State private var expandedSub: String? = nil
 
@@ -118,71 +131,101 @@ struct ProfileView: View {
     @State private var navigatedStory: Story? = nil
 
     // Sheets
-    @State private var showSubscription = false
     @State private var showAvatarEdit = false
-
-    // Anon state
     @State private var showLogin = false
     @State private var showSignup = false
 
     // Per-subcategory thresholds for progress bars (match site)
     private let subThresholds: (reads: Int, quizzes: Int, comments: Int, upvotes: Int) = (20, 20, 10, 10)
 
-    // D32: profile card share is gated by `profile.card.share_link`
-    // (server-side plan→permission mapping in compute_effective_perms).
     private func profileCardURL(for username: String) -> URL? {
         let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? username
         return URL(string: "https://veritypost.com/card/\(encoded)")
     }
 
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                topBar
+    private static let achFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"; return f
+    }()
 
-                if let user = auth.currentUser {
-                    if user.emailVerified == false {
-                        // Web parity: the full hero/stats/activity grid
-                        // is hidden until the email is verified. Same copy
-                        // and CTA as `web/src/app/profile/page.tsx` around
-                        // the `!perms.viewOwn && !user.email_verified` branch.
-                        verifyEmailGate
-                        logoutButton
-                    } else {
-                        heroCard(user)
-                        statRow(user)
-                        socialRow(user)
-                        quickActionsRow(user)
-                        recentActivityPreview
-                        achievementsPreview
-                        tabBar
-                        tabContent(user)
-                        logoutButton
-                    }
-                } else if auth.isLoggedIn, let errMsg = auth.userLoadError {
-                    VStack(spacing: 12) {
-                        Text(errMsg)
-                            .font(.system(.subheadline, design: .default, weight: .semibold))
-                            .foregroundColor(VP.text)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                        Button {
-                            Task { await auth.retryLoadUser() }
-                        } label: {
-                            Text("Tap to retry")
-                                .font(.system(.footnote, design: .default, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .frame(minHeight: 44)
-                                .background(VP.accent)
-                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
-                        }
-                    }
-                    .padding(.top, 80)
+    /// Section catalog — drives sidebar/list rendering. Mirror of
+    /// `web/src/app/profile/_components/ProfileApp.tsx:249-525`.
+    /// Permission-gated sections (`messages`, `family`) are dropped from the
+    /// list when their gate is false (matches web's `hidden:` flag).
+    /// Expert Queue + Expert Profile are launch-hidden across both platforms
+    /// (commit 7b3541a1, owner direction 2026-05-08).
+    private var sectionCatalog: [ProfileSectionDef] {
+        var defs: [ProfileSectionDef] = [
+            // ── Top: identity surfaces ─────────────────────────
+            ProfileSectionDef(id: .you, glyph: "✶", group: nil, title: "You",
+                              reason: "Your tier, the numbers behind it, and what to do next."),
+            ProfileSectionDef(id: .publicProfile, glyph: "◐", group: nil, title: "Public profile",
+                              reason: "A faithful preview of what others see when they land on your profile."),
+            ProfileSectionDef(id: .background, glyph: "✥", group: nil, title: "Background",
+                              reason: "A short line that says who you are when you comment."),
+        ]
+        // ── Library ────────────────────────────────────────
+        defs.append(ProfileSectionDef(id: .activity, glyph: "⌛", group: "Library", title: "Activity",
+                                      reason: "Everything you've read, commented on, or followed."))
+        if !permsLoaded || canViewMessages {
+            defs.append(ProfileSectionDef(id: .messages, glyph: "✉", group: "Library", title: "Messages",
+                                          reason: "Direct conversations with readers and experts."))
+        }
+        defs.append(ProfileSectionDef(id: .categories, glyph: "◇", group: "Library", title: "Categories",
+                                      reason: "Your strongest topics and where to grow."))
+        defs.append(ProfileSectionDef(id: .milestones, glyph: "✺", group: "Library", title: "Milestones",
+                                      reason: "The badges you've earned and what's next on the ladder."))
+        // ── Family & expert (conditional) ──────────────────
+        if !permsLoaded || canViewFamily {
+            defs.append(ProfileSectionDef(id: .family, glyph: "◓", group: "Family & expert", title: "Family & kids",
+                                          reason: "Manage kid accounts, seats, and supervisors on your plan."))
+        }
+        // ── Settings ───────────────────────────────────────
+        defs.append(contentsOf: [
+            ProfileSectionDef(id: .identity, glyph: "✎", group: "Settings", title: "Identity",
+                              reason: "Your display name and @handle."),
+            ProfileSectionDef(id: .security, glyph: "⛨", group: "Settings", title: "Security",
+                              reason: "Email, password, and two-factor authentication."),
+            ProfileSectionDef(id: .sessions, glyph: "⌬", group: "Settings", title: "Login activity",
+                              reason: "Where you're currently signed in."),
+            ProfileSectionDef(id: .notifications, glyph: "☷", group: "Settings", title: "Notifications",
+                              reason: "How and where we reach you."),
+            ProfileSectionDef(id: .appearance, glyph: "◑", group: "Settings", title: "Appearance",
+                              reason: "Light, dark, or system."),
+            ProfileSectionDef(id: .privacy, glyph: "⊘", group: "Settings", title: "Privacy",
+                              reason: "Who can message you, see your activity, or find your profile."),
+        ])
+        // ── Account ────────────────────────────────────────
+        defs.append(contentsOf: [
+            ProfileSectionDef(id: .plan, glyph: "◈", group: "Account", title: "Plan",
+                              reason: "Your subscription, payment method, and renewal."),
+            ProfileSectionDef(id: .refer, glyph: "⌘", group: "Account", title: "Invite friends",
+                              reason: "Invite links to share."),
+            ProfileSectionDef(id: .help, glyph: "?", group: "Account", title: "Help & support",
+                              reason: "FAQs and how to reach a human."),
+            ProfileSectionDef(id: .data, glyph: "✕", group: "Account", title: "Your data",
+                              reason: "Get a copy of your data, or close your account."),
+            ProfileSectionDef(id: .signout, glyph: "↪", group: "Account", title: "Sign out",
+                              reason: "End this session, or sign out of every device on your account."),
+        ])
+        return defs
+    }
+
+    /// Group rendering order. Sections with `group == nil` render first
+    /// (mirroring web's ungrouped you/public/background at top).
+    private let groupOrder: [String] = ["Library", "Family & expert", "Settings", "Account"]
+
+    var body: some View {
+        Group {
+            if let user = auth.currentUser {
+                if useSplitView {
+                    iPadShell(user: user)
                 } else {
-                    anonProfileHero
+                    phoneShell(user: user)
                 }
+            } else if auth.isLoggedIn, let errMsg = auth.userLoadError {
+                userLoadErrorView(message: errMsg)
+            } else {
+                anonProfileHero
             }
         }
         .background(VP.bg.ignoresSafeArea())
@@ -194,12 +237,11 @@ struct ProfileView: View {
         )
         .onPreferenceChange(ProfileViewportWidthKey.self) { viewportWidth = $0 }
         .toolbar(.hidden, for: .navigationBar)
-        .navigationBarTitleDisplayMode(.inline)
-        .refreshable {
-            refreshTask?.cancel()
-            refreshTask = Task { await refreshAll() }
-            _ = await refreshTask?.value
-        }
+        // Pull-to-refresh + navigationDestination moved into phoneShell /
+        // iPadShell so they bind to the correct container — see adversary
+        // findings (BLOCKER, 2026-05-12). The outer Group level couldn't
+        // propagate either modifier reliably into the iPad detail pane's
+        // nested NavigationStack.
         .task { await SettingsService.shared.loadIfNeeded() }
         .task {
             if let uid = auth.currentUser?.id {
@@ -208,37 +250,13 @@ struct ProfileView: View {
                 _ = await (a, ach)
             }
         }
-        .task(id: tab) { loadTabData() }
-        .task(id: perms.changeToken) {
-            canShareProfileCard = await PermissionService.shared.has("profile.card_share")
-            canViewCard = await PermissionService.shared.has("profile.card.view")
-            // OwnersAudit Profile Task 5 — switched to canonical short-form
-            // keys (per CLAUDE.md). Web has always used these; iOS was on the
-            // long-form variants which were a migration-142 artifact the 143
-            // rollback was supposed to clean up. Cross-platform parity.
-            // Requires the `profile.categories` DB binding migration to ship
-            // FIRST — see Ongoing Projects/migrations/
-            // 2026-04-26_profile_categories_canonical_binding.sql.
-            canViewActivity = await PermissionService.shared.has("profile.activity")
-            canViewActivityFullHistory = await PermissionService.shared.has("profile.activity.full_history")
-            canViewCategories = await PermissionService.shared.has("profile.categories")
-            canViewAchievements = await PermissionService.shared.has("profile.achievements")
-            canViewMessages = await PermissionService.shared.has("messages.inbox.view")
-            canViewExpertQueue = await PermissionService.shared.has("expert.queue.view")
-            canViewFamily = await PermissionService.shared.has("settings.family.view")
-            canViewFollowers = await PermissionService.shared.has("profile.followers.view.own")
-            canViewFollowing = await PermissionService.shared.has("profile.following.view.own")
-            permsLoaded = true
-        }
-        .navigationDestination(item: $navigatedStory) { story in
-            StoryDetailView(story: story).environmentObject(auth)
-        }
+        .task(id: perms.changeToken) { await loadPerms() }
+        .task(id: auth.currentUser?.id ?? "") { await loadUnreadDMCount() }
         .onChange(of: navigateToSlug) {
             guard let slug = navigateToSlug else { return }
             navigateToSlug = nil
             Task { if let s = await fetchStoryBySlug(slug) { navigatedStory = s } }
         }
-        .sheet(isPresented: $showSubscription) { SubscriptionView().environmentObject(auth) }
         .sheet(isPresented: $showLogin) { LoginView().environmentObject(auth) }
         .sheet(isPresented: $showSignup) { SignupView().environmentObject(auth) }
         .sheet(isPresented: $showAvatarEdit) {
@@ -248,10 +266,59 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Top bar (brand + Kids + Settings)
+    private func loadPerms() async {
+        canShareProfileCard = await PermissionService.shared.has("profile.card_share")
+        canViewCard = await PermissionService.shared.has("profile.card.view")
+        canViewActivity = await PermissionService.shared.has("profile.activity")
+        canViewActivityFullHistory = await PermissionService.shared.has("profile.activity.full_history")
+        canViewCategories = await PermissionService.shared.has("profile.categories")
+        canViewAchievements = await PermissionService.shared.has("profile.achievements")
+        canViewMessages = await PermissionService.shared.has("messages.inbox.view")
+        canViewFamily = await PermissionService.shared.has("settings.family.view")
+        canViewFollowers = await PermissionService.shared.has("profile.followers.view.own")
+        canViewFollowing = await PermissionService.shared.has("profile.following.view.own")
+        permsLoaded = true
+    }
+
+    /// Mirrors web ProfileApp.tsx:108-117 — total unread DM count via the
+    /// migration 038 `get_unread_counts` RPC. Drives the Messages row badge.
+    private func loadUnreadDMCount() async {
+        guard auth.currentUser?.id != nil else { unreadDMCount = 0; return }
+        struct UnreadRow: Decodable { let conversation_id: String; let unread: Int }
+        let rows: [UnreadRow] = (try? await client.rpc("get_unread_counts").execute().value) ?? []
+        unreadDMCount = rows.reduce(0) { $0 + $1.unread }
+    }
+
+    // MARK: - User-load error fallback
+    @ViewBuilder
+    private func userLoadErrorView(message: String) -> some View {
+        VStack(spacing: 0) {
+            topBar
+            VStack(spacing: 12) {
+                Text(message)
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(VP.text)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+                Button { Task { await auth.retryLoadUser() } } label: {
+                    Text("Tap to retry")
+                        .font(.system(.footnote, design: .default, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .frame(minHeight: 44)
+                        .background(VP.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
+                }
+            }
+            .padding(.top, 80)
+            Spacer()
+        }
+    }
+
+    // MARK: - Top bar (brand only — no gear, no Kids pill; settings live inline)
     private var topBar: some View {
         HStack(spacing: 0) {
-            // A52 — canonical brand casing is "Verity Post" (Title Case).
             Text("Verity Post")
                 .font(.system(size: VP.Size.base, weight: .heavy))
                 .tracking(-0.15)
@@ -259,76 +326,52 @@ struct ProfileView: View {
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
             Spacer()
-            if permsLoaded && canViewFamily {
-                NavigationLink {
-                    FamilyDashboardView().environmentObject(auth)
-                } label: {
-                    Text("Kids")
-                        .font(.system(.subheadline, design: .default, weight: .semibold))
-                        .foregroundColor(VP.text)
-                        .padding(.horizontal, 12)
-                        .frame(height: 36)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(VP.border))
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, 8)
-            }
-            NavigationLink {
-                SettingsView().environmentObject(auth)
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: VP.Size.lg, weight: .regular))
-                    .foregroundColor(VP.dim)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel("Settings")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(VP.bg)
-        .overlay(
-            Rectangle().fill(VP.border).frame(height: 1),
-            alignment: .bottom
-        )
+        .overlay(Rectangle().fill(VP.border).frame(height: 1), alignment: .bottom)
     }
 
     // MARK: - Anon hero (shown when not logged in)
     private var anonProfileHero: some View {
-        VStack(spacing: 14) {
-            Spacer().frame(height: 32)
-            AvatarView(outerHex: "#818cf8", innerHex: nil, initials: "?", size: 64)
-            Text("Guest reader")
-                .font(.system(.title3, design: .default, weight: .bold))
-                .foregroundColor(VP.text)
-            Text("Sign in to track reading, quizzes, and achievements.")
-                .font(.footnote)
-                .foregroundColor(VP.dim)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-            Button("Sign in") { showLogin = true }
-                .font(.system(.subheadline, design: .default, weight: .semibold))
-                .foregroundColor(.white)
-                .padding(.horizontal, 28)
-                .padding(.vertical, 12)
-                .frame(minHeight: 44)
-                .background(VP.accent)
-                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-            Button("Create free account") { showSignup = true }
-                .font(.system(.footnote, design: .default, weight: .medium))
-                .foregroundColor(VP.accent)
-
-            Spacer().frame(height: 80)
+        VStack(spacing: 0) {
+            topBar
+            VStack(spacing: 14) {
+                Spacer().frame(height: 32)
+                AvatarView(outerHex: "#818cf8", innerHex: nil, initials: "?", size: 64)
+                Text("Guest reader")
+                    .font(.system(.title3, design: .default, weight: .bold))
+                    .foregroundColor(VP.text)
+                Text("Sign in to track reading, quizzes, and achievements.")
+                    .font(.footnote)
+                    .foregroundColor(VP.dim)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                Button("Sign in") { showLogin = true }
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 44)
+                    .background(VP.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                Button("Create free account") { showSignup = true }
+                    .font(.system(.footnote, design: .default, weight: .medium))
+                    .foregroundColor(VP.accent)
+                Spacer().frame(height: 80)
+            }
+            Spacer()
         }
     }
 
-    // MARK: - Verify-email gate (web parity)
+    // MARK: - Verify-email gate (rendered inline in You section)
     //
-    // Mirrors the `!perms.viewOwn && !user.email_verified` branch on
-    // `web/src/app/profile/page.tsx`. Hides the full profile until the
-    // signup verification email is confirmed; resend lives on
-    // SettingsView so we keep this surface as a clean dead-end with one
-    // CTA back to the verify flow handled at app level.
+    // Web parity: mirrors the `!perms.viewOwn && !user.email_verified` branch
+    // on web. iOS shell port narrows the scope per Outstanding.md Q-E5
+    // adversary review — Identity / Security / Sessions remain reachable
+    // from the section list so the user can self-serve verification without
+    // a dead-end. Other section content gracefully degrades.
     private var verifyEmailGate: some View {
         VStack(spacing: 12) {
             Spacer().frame(height: 32)
@@ -338,7 +381,7 @@ struct ProfileView: View {
             Text("Verify your email")
                 .font(.system(.title3, design: .default, weight: .bold))
                 .foregroundColor(VP.text)
-            Text("Confirm your email to get started.")
+            Text("Confirm your email to get started. The rest of your profile unlocks once it's verified.")
                 .font(.footnote)
                 .foregroundColor(VP.dim)
                 .multilineTextAlignment(.center)
@@ -360,15 +403,303 @@ struct ProfileView: View {
         .padding(.horizontal, 16)
     }
 
+    // MARK: - Phone shell (iPhone, iPad Split-View thirds, anything <700pt)
+    @ViewBuilder
+    private func phoneShell(user: VPUser) -> some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                topBar
+                // Inline-You at top (Q-NEW6 revised — no auto-push; You
+                // dashboard renders inline as first list "item", section
+                // rows below). Native iOS pattern (Health/Wallet/News).
+                youSection(user: user)
+                Divider().background(VP.border).padding(.top, 4)
+                // Group rendering — ungrouped first, then group headers
+                // in `groupOrder`. NavigationLink rows expose the section
+                // destinations.
+                sectionRows(user: user)
+                logoutFooter
+            }
+        }
+        // Pull-to-refresh + cross-section story nav must live on the
+        // ScrollView itself (not the outer Group) so SwiftUI binds them
+        // to the correct container. Adversary finding — outer-Group
+        // placement was unreliable on iPad detail panes.
+        .refreshable {
+            refreshTask?.cancel()
+            refreshTask = Task { await refreshAll() }
+            _ = await refreshTask?.value
+        }
+        .navigationDestination(item: $navigatedStory) { story in
+            StoryDetailView(story: story).environmentObject(auth)
+        }
+    }
 
+    // MARK: - iPad shell (NavigationSplitView ≥ 700pt + `.regular`)
+    @ViewBuilder
+    private func iPadShell(user: VPUser) -> some View {
+        NavigationSplitView {
+            List(selection: $selectedSection) {
+                ForEach(sectionCatalog) { def in
+                    if def.id == .you {
+                        NavigationLink(value: ProfileSectionID.you) {
+                            sidebarRowLabel(def: def, badge: badgeText(for: def.id))
+                        }
+                    } else {
+                        sectionListItem(def: def, user: user, isSidebar: true)
+                    }
+                }
+            }
+            .navigationTitle("Profile")
+            .listStyle(.sidebar)
+        } detail: {
+            // Detail-pane NavigationStack owns story deep-links and the
+            // section-internal push hierarchy (e.g., Security hub →
+            // EmailSettingsView). `navigationDestination` lives here so
+            // tapping an activity-preview row in You section can resolve
+            // the Story binding on the correct stack.
+            NavigationStack {
+                detailView(for: selectedSection ?? .you, user: user)
+                    .navigationDestination(item: $navigatedStory) { story in
+                        StoryDetailView(story: story).environmentObject(auth)
+                    }
+            }
+        }
+    }
+
+    // MARK: - Section rows (phone shell)
+    @ViewBuilder
+    private func sectionRows(user: VPUser) -> some View {
+        let allSections = sectionCatalog.filter { $0.id != .you }
+        let ungrouped = allSections.filter { $0.group == nil }
+        let groupedByName: [String: [ProfileSectionDef]] = Dictionary(grouping: allSections.filter { $0.group != nil }) { $0.group ?? "" }
+
+        VStack(spacing: 0) {
+            // Ungrouped (public profile, background) — rendered without a
+            // header, matching web's three top sections at ProfileApp.tsx:249-285.
+            ForEach(ungrouped) { def in
+                sectionListItem(def: def, user: user, isSidebar: false)
+            }
+            ForEach(groupOrder, id: \.self) { group in
+                if let items = groupedByName[group], !items.isEmpty {
+                    groupHeader(group)
+                    ForEach(items) { def in
+                        sectionListItem(def: def, user: user, isSidebar: false)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func groupHeader(_ name: String) -> some View {
+        Text(name.uppercased())
+            .font(.system(.caption2, design: .default, weight: .bold))
+            .tracking(1)
+            .foregroundColor(VP.dim)
+            .padding(.horizontal, 16)
+            .padding(.top, 20)
+            .padding(.bottom, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    @ViewBuilder
+    private func sectionListItem(def: ProfileSectionDef, user: VPUser, isSidebar: Bool) -> some View {
+        if isSidebar {
+            sidebarRowLabel(def: def, badge: badgeText(for: def.id))
+                .tag(def.id)
+        } else {
+            NavigationLink {
+                detailView(for: def.id, user: user)
+            } label: {
+                phoneRowLabel(def: def, badge: badgeText(for: def.id))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(rowAccessibility(for: def))
+        }
+    }
+
+    private func badgeText(for id: ProfileSectionID) -> String? {
+        if id == .messages, unreadDMCount > 0 {
+            return unreadDMCount > 99 ? "99+" : String(unreadDMCount)
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    private func phoneRowLabel(def: ProfileSectionDef, badge: String?) -> some View {
+        HStack(spacing: 12) {
+            Text(def.glyph)
+                .font(.system(size: VP.Size.lg, weight: .regular))
+                .foregroundColor(VP.dim)
+                .frame(width: 24, alignment: .center)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(def.title)
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(VP.text)
+                Text(def.reason)
+                    .font(.caption2)
+                    .foregroundColor(VP.dim)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            if let badge {
+                Text(badge)
+                    .font(.system(.caption2, design: .default, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(VP.accent)
+                    .clipShape(Capsule())
+            }
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(VP.dim)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(minHeight: 56)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .overlay(Rectangle().fill(VP.rule).frame(height: 1).padding(.leading, 52), alignment: .bottom)
+    }
+
+    @ViewBuilder
+    private func sidebarRowLabel(def: ProfileSectionDef, badge: String?) -> some View {
+        HStack(spacing: 10) {
+            Text(def.glyph)
+                .font(.system(size: VP.Size.base, weight: .regular))
+                .foregroundColor(VP.dim)
+                .frame(width: 20, alignment: .center)
+            Text(def.title)
+                .font(.system(.subheadline, design: .default, weight: .semibold))
+                .foregroundColor(VP.text)
+            Spacer()
+            if let badge {
+                Text(badge)
+                    .font(.system(.caption2, design: .default, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(VP.accent)
+                    .clipShape(Capsule())
+            }
+        }
+        .accessibilityLabel(rowAccessibility(for: def))
+    }
+
+    private func rowAccessibility(for def: ProfileSectionDef) -> String {
+        if def.id == .messages, unreadDMCount > 0 {
+            return "\(def.title). \(unreadDMCount) unread. \(def.reason)"
+        }
+        return "\(def.title). \(def.reason)"
+    }
+
+    // MARK: - Detail dispatch (phone NavigationLink target + iPad detail pane)
+    @ViewBuilder
+    private func detailView(for id: ProfileSectionID, user: VPUser) -> some View {
+        switch id {
+        case .you:
+            // iPad detail view of You — render the same dashboard as the
+            // phone shell's first item, inside a scroll container with
+            // its own top bar so the detail pane has a title.
+            ScrollView {
+                VStack(spacing: 0) {
+                    youSection(user: user)
+                }
+            }
+            .navigationTitle("You")
+            .navigationBarTitleDisplayMode(.inline)
+        case .publicProfile:
+            webFallback(title: "Public profile",
+                        body: "Edit your public bio, avatar, and visibility on the web.",
+                        path: "/profile?section=public")
+        case .background:
+            webFallback(title: "Background",
+                        body: "Add the short line that says who you are when you comment.",
+                        path: "/profile?section=background")
+        case .activity:
+            activitySection
+                .navigationTitle("Activity")
+                .navigationBarTitleDisplayMode(.inline)
+        case .messages:
+            MessagesView()
+                .environmentObject(auth)
+        case .categories:
+            categoriesSection
+                .navigationTitle("Categories")
+                .navigationBarTitleDisplayMode(.inline)
+        case .milestones:
+            milestonesSection(user: user)
+                .navigationTitle("Milestones")
+                .navigationBarTitleDisplayMode(.inline)
+        case .family:
+            FamilyDashboardView()
+                .environmentObject(auth)
+        case .identity:
+            AccountSettingsView()
+                .environmentObject(auth)
+        case .security:
+            securityHub
+                .navigationTitle("Security")
+                .navigationBarTitleDisplayMode(.inline)
+        case .sessions:
+            LoginActivityView()
+                .environmentObject(auth)
+        case .notifications:
+            NotificationsSettingsView()
+                .environmentObject(auth)
+        case .appearance:
+            AppearanceSettingsView()
+                .environmentObject(auth)
+        case .privacy:
+            DataPrivacyView()
+                .environmentObject(auth)
+        case .plan:
+            SubscriptionSettingsView()
+                .environmentObject(auth)
+        case .refer:
+            webFallback(title: "Invite friends",
+                        body: "Two invite links to share. Each one lets one friend join Verity Post.",
+                        path: "/profile?section=refer")
+        case .help:
+            helpSection
+                .navigationTitle("Help & support")
+                .navigationBarTitleDisplayMode(.inline)
+        case .data:
+            webFallback(title: "Your data",
+                        body: "Export your data or close your account on the web.",
+                        path: "/profile?section=data")
+        case .signout:
+            signoutSection
+                .navigationTitle("Sign out")
+                .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    // MARK: - You section (inline-expanded dashboard)
+    @ViewBuilder
+    private func youSection(user: VPUser) -> some View {
+        if user.emailVerified == false {
+            verifyEmailGate
+        } else {
+            VStack(spacing: 0) {
+                heroCard(user)
+                statRow(user)
+                socialRow(user)
+                quickActionsRow(user)
+                recentActivityPreview
+                achievementsPreview(user: user)
+                bioAndCard(user)
+                memberSinceFooter(user)
+                    .padding(.bottom, 8)
+            }
+        }
+    }
 
     // MARK: - Hero card (avatar + display name + verity score)
-    //
-    // Per owner direction: no tier chip, no overall progress bar, no
-    // delta-to-next caption. Tier identity stays neutral (rule
-    // `feedback_no_color_per_tier`). Per-category progress bars live on
-    // the Categories tab — those are engagement meters, unrelated to
-    // tier visuals.
     @ViewBuilder
     private func heroCard(_ user: VPUser) -> some View {
         let score = user.verityScore ?? 0
@@ -437,7 +768,7 @@ struct ProfileView: View {
         .padding(.bottom, 8)
     }
 
-    // MARK: - Stat row (3 tiles)
+    // MARK: - Stat row
     @ViewBuilder
     private func statRow(_ user: VPUser) -> some View {
         HStack(spacing: 8) {
@@ -517,14 +848,11 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Quick actions row (icon buttons)
+    // MARK: - Quick actions row (Inbox / Share / Kids — chip-style)
     @ViewBuilder
     private func quickActionsRow(_ user: VPUser) -> some View {
         let showShare = canShareProfileCard && (user.username?.isEmpty == false)
 
-        // Owner cleanup item 12 (refined 2026-05-08) — Following lives in
-        // HomeSectionsSheet, not the profile shell. Old Following chip
-        // removed; Inbox / Share / Kids stay.
         HStack(spacing: 8) {
             if canViewMessages {
                 NavigationLink {
@@ -551,11 +879,6 @@ struct ProfileView: View {
                 }
                 .buttonStyle(.plain)
             }
-            // Launch-phase hide — owner direction 2026-05-08: Expert Queue
-            // is off until owner manually elevates curated experts out of
-            // the Background pool. Permission state stays live so flipping
-            // back is a one-line change.
-            // else if canViewExpertQueue { ... ExpertQueueView ... }
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
@@ -580,7 +903,7 @@ struct ProfileView: View {
         .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
-    // MARK: - Recent activity preview (top 3 + see all)
+    // MARK: - Recent activity preview (top 3, navigates to Activity section)
     @ViewBuilder
     private var recentActivityPreview: some View {
         let top3 = Array(combinedActivityAllTypes().prefix(3))
@@ -588,9 +911,10 @@ struct ProfileView: View {
             HStack {
                 sectionTitle("Recent activity")
                 Spacer()
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    withAnimation(.easeOut(duration: 0.2)) { tab = .activity }
+                NavigationLink {
+                    activitySection
+                        .navigationTitle("Activity")
+                        .navigationBarTitleDisplayMode(.inline)
                 } label: {
                     HStack(spacing: 2) {
                         Text("See all")
@@ -601,6 +925,9 @@ struct ProfileView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                })
             }
 
             if !activityLoaded && !activityLoadError {
@@ -696,16 +1023,17 @@ struct ProfileView: View {
         combinedActivityAllTypes().prefix(3).last?.id ?? ""
     }
 
-    // MARK: - Achievements preview (top 3 + see all)
+    // MARK: - Achievements preview (top 3, navigates to Milestones section)
     @ViewBuilder
-    private var achievementsPreview: some View {
+    private func achievementsPreview(user: VPUser) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 sectionTitle("Achievements")
                 Spacer()
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    withAnimation(.easeOut(duration: 0.2)) { tab = .milestones }
+                NavigationLink {
+                    milestonesSection(user: user)
+                        .navigationTitle("Milestones")
+                        .navigationBarTitleDisplayMode(.inline)
                 } label: {
                     HStack(spacing: 2) {
                         Text("See all")
@@ -716,6 +1044,9 @@ struct ProfileView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                })
             }
 
             if !achievementsLoaded {
@@ -735,9 +1066,6 @@ struct ProfileView: View {
                     ForEach(Array(userAchievements.prefix(3))) { ua in
                         achievementChip(ua)
                     }
-                    // If the user has fewer than 3 achievements, pad with
-                    // an aspirational "next up" slot so the strip always
-                    // renders three cards.
                     if userAchievements.count < 3 {
                         ForEach(0..<(3 - userAchievements.count), id: \.self) { _ in
                             nextAchievementPlaceholder()
@@ -789,53 +1117,9 @@ struct ProfileView: View {
         )
     }
 
-    // MARK: - Tab bar (4 items, underline style)
-    private var tabBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 0) {
-                ForEach(ProfileTab.allCases) { t in
-                    Button {
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        withAnimation(.easeOut(duration: 0.2)) { tab = t }
-                    } label: {
-                        Text(t.rawValue)
-                            .font(.system(.subheadline, design: .default, weight: tab == t ? .semibold : .medium))
-                            .foregroundColor(tab == t ? VP.text : VP.dim)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 12)
-                            .frame(minHeight: 44)
-                            .overlay(alignment: .bottom) {
-                                Rectangle()
-                                    .fill(tab == t ? VP.text : Color.clear)
-                                    .frame(height: 2)
-                            }
-                    }
-                    .buttonStyle(.plain)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 16)
-        }
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(VP.border).frame(height: 1)
-        }
-        .padding(.bottom, 16)
-    }
-
-    // MARK: - Tab content dispatch
+    // MARK: - Bio + profile card preview (inline within You section)
     @ViewBuilder
-    private func tabContent(_ user: VPUser) -> some View {
-        switch tab {
-        case .overview:   overviewTab(user)
-        case .activity:   activityTab
-        case .categories: categoriesTab
-        case .milestones: milestonesTab(user)
-        }
-    }
-
-    // MARK: - Overview tab (bio + profile card + my-stuff list)
-    @ViewBuilder
-    private func overviewTab(_ user: VPUser) -> some View {
+    private func bioAndCard(_ user: VPUser) -> some View {
         VStack(alignment: .leading, spacing: 20) {
             if let bio = user.bio?.trimmingCharacters(in: .whitespaces), !bio.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
@@ -847,7 +1131,6 @@ struct ProfileView: View {
                 }
             }
 
-            // Profile card preview — mirrors web's card-preview section.
             if canViewCard, let uname = user.username, !uname.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     sectionTitle("Profile card")
@@ -881,37 +1164,9 @@ struct ProfileView: View {
                     }
                 }
             }
-
-            // My stuff — quick-link list. All entries are perm-gated.
-            // Rankings lives here now that the Notifications and Most
-            // Informed tabs were replaced by Browse and Following.
-            VStack(alignment: .leading, spacing: 10) {
-                sectionTitle("My stuff")
-                VStack(spacing: 8) {
-                    quickLink(label: "Rankings",
-                              description: "See the most informed readers",
-                              destination: AnyView(LeaderboardView().environmentObject(auth)))
-                    if canViewMessages {
-                        quickLink(label: "Messages",
-                                  description: "Your direct conversations",
-                                  destination: AnyView(MessagesView().environmentObject(auth)))
-                    }
-                    if canViewFamily {
-                        quickLink(label: "Kids",
-                                  description: "Manage your family plan and kid profiles",
-                                  destination: AnyView(FamilyDashboardView().environmentObject(auth)))
-                    }
-                    // Launch-phase hide — see chip-row note above. Expert
-                    // Queue link returns when owner flips the launch gate.
-                    // if canViewExpertQueue {
-                    //     quickLink(label: "Expert Queue", ...)
-                    // }
-                }
-            }
-
-            memberSinceFooter(user)
         }
         .padding(.horizontal, 16)
+        .padding(.top, 8)
         .padding(.bottom, 8)
     }
 
@@ -919,27 +1174,6 @@ struct ProfileView: View {
         Text(text)
             .font(.system(.subheadline, design: .default, weight: .semibold))
             .foregroundColor(VP.text)
-    }
-
-    private func quickLink(label: String, description: String = "", destination: AnyView) -> some View {
-        NavigationLink { destination } label: {
-            HStack {
-                Text(label)
-                    .font(.system(.subheadline, design: .default, weight: .semibold))
-                    .foregroundColor(VP.text)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(VP.dim)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(VP.card)
-            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
-            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-        }
-        .buttonStyle(.plain)
     }
 
     private func profileCardPreview(user: VPUser) -> some View {
@@ -991,73 +1225,83 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Activity tab (full list + filters)
-    private var activityTab: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                ForEach(ActivityFilter.allCases) { f in
-                    Button {
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        activityFilter = f
-                    } label: {
-                        Text(f.rawValue)
-                            .font(.system(.footnote, design: .default, weight: .semibold))
-                            .foregroundColor(activityFilter == f ? .white : VP.dim)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(activityFilter == f ? VP.accent : Color.white)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: VP.radiusSM).stroke(activityFilter == f ? VP.accent : VP.border)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
+    // MARK: - Activity section (full filtered list)
+    @ViewBuilder
+    private var activitySection: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    ForEach(ActivityFilter.allCases) { f in
+                        Button {
+                            UISelectionFeedbackGenerator().selectionChanged()
+                            activityFilter = f
+                        } label: {
+                            Text(f.rawValue)
+                                .font(.system(.footnote, design: .default, weight: .semibold))
+                                .foregroundColor(activityFilter == f ? .white : VP.dim)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(activityFilter == f ? VP.accent : Color.white)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: VP.radiusSM).stroke(activityFilter == f ? VP.accent : VP.border)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
-
-            if !activityLoaded && !activityLoadError {
-                VStack(spacing: 8) {
-                    ForEach(0..<6, id: \.self) { _ in compactSkeletonRow() }
+                    Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 16)
-            } else if activityLoadError {
-                emptyState(
-                    title: "Couldn\u{2019}t load activity",
-                    description: "There was a problem loading your activity. Pull to refresh."
-                )
-            } else {
-                let filtered = filteredActivityItems()
-                if filtered.isEmpty {
-                    VStack(spacing: 10) {
-                        emptyState(
-                            title: "No activity yet — read an article to get started.",
-                            description: "Read an article or leave a comment to see it here."
-                        )
-                        Button {
-                            auth.pendingHomeJump = true
-                        } label: {
-                            Text("Browse articles")
-                                .font(.system(.footnote, design: .default, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .frame(minHeight: 44)
-                                .background(VP.accent)
-                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-                        }
+                .padding(.top, 12)
+                .padding(.bottom, 12)
+
+                if !activityLoaded && !activityLoadError {
+                    VStack(spacing: 8) {
+                        ForEach(0..<6, id: \.self) { _ in compactSkeletonRow() }
                     }
+                    .padding(.horizontal, 16)
+                } else if activityLoadError {
+                    emptyState(
+                        title: "Couldn\u{2019}t load activity",
+                        description: "There was a problem loading your activity. Pull to refresh."
+                    )
                 } else {
-                    VStack(spacing: 0) {
-                        ForEach(filtered) { item in
-                            activityRow(item)
+                    let filtered = filteredActivityItems()
+                    if filtered.isEmpty {
+                        VStack(spacing: 10) {
+                            emptyState(
+                                title: "No activity yet — read an article to get started.",
+                                description: "Read an article or leave a comment to see it here."
+                            )
+                            Button {
+                                auth.pendingHomeJump = true
+                            } label: {
+                                Text("Browse articles")
+                                    .font(.system(.footnote, design: .default, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 10)
+                                    .frame(minHeight: 44)
+                                    .background(VP.accent)
+                                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                            }
+                        }
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(filtered) { item in
+                                activityRow(item)
+                            }
                         }
                     }
                 }
             }
         }
+        .task { await ensureActivityLoaded() }
+    }
+
+    private func ensureActivityLoaded() async {
+        guard !activityLoaded, !activityLoadError, let uid = auth.currentUser?.id else { return }
+        await loadActivity(userId: uid)
     }
 
     private func combinedActivityAllTypes() -> [ActivityItem] {
@@ -1129,36 +1373,48 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Categories tab (preserves subcategory drilldown)
-    private var categoriesTab: some View {
-        VStack(spacing: 10) {
-            if !categoriesLoaded && !categoriesLoadError {
-                VStack(spacing: 8) {
-                    ForEach(0..<4, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: VP.radiusMD)
-                            .fill(VP.surfaceSunken)
-                            .frame(height: 48)
-                            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+    // MARK: - Categories section
+    @ViewBuilder
+    private var categoriesSection: some View {
+        ScrollView {
+            VStack(spacing: 10) {
+                if !categoriesLoaded && !categoriesLoadError {
+                    VStack(spacing: 8) {
+                        ForEach(0..<4, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: VP.radiusMD)
+                                .fill(VP.surfaceSunken)
+                                .frame(height: 48)
+                                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                        }
                     }
-                }
-                .padding(.horizontal, 16)
-            } else if categoriesLoadError {
-                emptyState(
-                    title: "Couldn\u{2019}t load categories",
-                    description: "There was a problem loading your category progress. Pull to refresh."
-                )
-            } else if categories.isEmpty {
-                emptyState(
-                    title: "No category stats yet — start reading to see your breakdown.",
-                    description: "Choose topics you care about to personalize your feed and unlock category scoring."
-                )
-            } else {
-                ForEach(categories) { cat in
-                    categoryCard(cat)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                } else if categoriesLoadError {
+                    emptyState(
+                        title: "Couldn\u{2019}t load categories",
+                        description: "There was a problem loading your category progress. Pull to refresh."
+                    )
+                } else if categories.isEmpty {
+                    emptyState(
+                        title: "No category stats yet — start reading to see your breakdown.",
+                        description: "Choose topics you care about to personalize your feed and unlock category scoring."
+                    )
+                } else {
+                    ForEach(categories) { cat in
+                        categoryCard(cat)
+                    }
+                    .padding(.top, 12)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 24)
         }
-        .padding(.horizontal, 16)
+        .task { await ensureCategoriesLoaded() }
+    }
+
+    private func ensureCategoriesLoaded() async {
+        guard !categoriesLoaded, !categoriesLoadError, let uid = auth.currentUser?.id else { return }
+        await loadCategories(userId: uid)
     }
 
     private func categoryCard(_ cat: VPCategory) -> some View {
@@ -1286,72 +1542,72 @@ struct ProfileView: View {
         .opacity(unlocked ? 1 : 0.5)
     }
 
-    // MARK: - Milestones tab (achievement grid)
+    // MARK: - Milestones section
     @ViewBuilder
-    private func milestonesTab(_ user: VPUser) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .firstTextBaseline) {
-                    sectionTitle("Achievements")
-                    Spacer()
-                    if achievementsLoaded && !allAchievements.isEmpty {
-                        Text("\(earnedMap.count) of \(allAchievements.count) earned")
-                            .font(.caption)
-                            .foregroundColor(VP.dim)
-                    }
-                }
-                if !achievementsLoaded {
-                    LazyVGrid(
-                        columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)],
-                        spacing: 10
-                    ) {
-                        ForEach(0..<4, id: \.self) { _ in
-                            VStack(spacing: 8) {
-                                SkeletonBar(width: 44, height: 44, radius: VP.radiusMD)
-                                SkeletonBar(width: 80, height: 12)
-                                SkeletonBar(width: 56, height: 10)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(12)
-                            .background(VP.card)
-                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+    private func milestonesSection(user: VPUser) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline) {
+                        sectionTitle("Achievements")
+                        Spacer()
+                        if achievementsLoaded && !allAchievements.isEmpty {
+                            Text("\(earnedMap.count) of \(allAchievements.count) earned")
+                                .font(.caption)
+                                .foregroundColor(VP.dim)
                         }
                     }
-                    .padding(.top, 8)
-                    .accessibilityLabel("Loading achievements")
-                } else if allAchievements.isEmpty {
-                    emptyState(
-                        title: "No achievements unlocked yet — keep reading and quizzing to earn your first.",
-                        description: "Complete a quiz to start collecting badges."
-                    )
-                } else {
-                    // Render earned first, then locked — same ordering
-                    // convention as the web milestones grid. Each tile
-                    // reflects its state: earned (filled, accent badge,
-                    // date) vs locked (dimmed silhouette, Locked badge).
-                    let earnedFirst = allAchievements.sorted { lhs, rhs in
-                        let l = earnedMap[lhs.id] != nil
-                        let r = earnedMap[rhs.id] != nil
-                        if l != r { return l && !r }
-                        return (lhs.name ?? "") < (rhs.name ?? "")
-                    }
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                        ForEach(earnedFirst) { a in
-                            achievementCard(a, earnedAt: earnedMap[a.id])
+                    if !achievementsLoaded {
+                        LazyVGrid(
+                            columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)],
+                            spacing: 10
+                        ) {
+                            ForEach(0..<4, id: \.self) { _ in
+                                VStack(spacing: 8) {
+                                    SkeletonBar(width: 44, height: 44, radius: VP.radiusMD)
+                                    SkeletonBar(width: 80, height: 12)
+                                    SkeletonBar(width: 56, height: 10)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(12)
+                                .background(VP.card)
+                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                            }
+                        }
+                        .padding(.top, 8)
+                        .accessibilityLabel("Loading achievements")
+                    } else if allAchievements.isEmpty {
+                        emptyState(
+                            title: "No achievements unlocked yet — keep reading and quizzing to earn your first.",
+                            description: "Complete a quiz to start collecting badges."
+                        )
+                    } else {
+                        let earnedFirst = allAchievements.sorted { lhs, rhs in
+                            let l = earnedMap[lhs.id] != nil
+                            let r = earnedMap[rhs.id] != nil
+                            if l != r { return l && !r }
+                            return (lhs.name ?? "") < (rhs.name ?? "")
+                        }
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                            ForEach(earnedFirst) { a in
+                                achievementCard(a, earnedAt: earnedMap[a.id])
+                            }
                         }
                     }
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
+        .task { await ensureAchievementsLoaded() }
     }
 
-    /// Single card used for both earned and locked achievements. The
-    /// state is driven by `earnedAt == nil`: locked tiles dim to 0.55
-    /// opacity, use a `lock.fill` glyph and a neutral "Locked" badge;
-    /// earned tiles are at full opacity with the success "Earned" badge
-    /// and the unlocked-on date.
+    private func ensureAchievementsLoaded() async {
+        guard !achievementsLoaded, let uid = auth.currentUser?.id else { return }
+        await loadAchievements(userId: uid)
+    }
+
     private func achievementCard(_ a: Achievement, earnedAt: Date?) -> some View {
         let isEarned = earnedAt != nil
         return VStack(alignment: .leading, spacing: 4) {
@@ -1397,9 +1653,187 @@ struct ProfileView: View {
         .opacity(isEarned ? 1 : 0.55)
     }
 
-    private static let achFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"; return f
-    }()
+    // MARK: - Security hub (wraps Email + Password + MFA as sub-rail)
+    //
+    // Web's SecuritySection bundles email + 2FA in one view; iOS already
+    // ships dedicated EmailSettingsView (:1560), PasswordSettingsView (:1639),
+    // MFASettingsView (:1970). The hub renders them as 3 NavigationLink rows
+    // so the section parity holds without rewriting each subview.
+    @ViewBuilder
+    private var securityHub: some View {
+        List {
+            NavigationLink {
+                EmailSettingsView().environmentObject(auth)
+            } label: {
+                hubRow(icon: "envelope", title: "Email", caption: "Update your email and resend verification.")
+            }
+            NavigationLink {
+                PasswordSettingsView().environmentObject(auth)
+            } label: {
+                hubRow(icon: "lock", title: "Password", caption: "Change your password.")
+            }
+            NavigationLink {
+                MFASettingsView().environmentObject(auth)
+            } label: {
+                hubRow(icon: "key.horizontal", title: "Two-factor authentication", caption: "Authenticator app for sign-in.")
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    private func hubRow(icon: String, title: String, caption: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: VP.Size.lg, weight: .regular))
+                .foregroundColor(VP.dim)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(VP.text)
+                Text(caption)
+                    .font(.caption2)
+                    .foregroundColor(VP.dim)
+                    .lineLimit(2)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Help section (mirrors web LinkOutSection)
+    @ViewBuilder
+    private var helpSection: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("FAQs, status, and how to reach a human.")
+                    .font(.subheadline)
+                    .foregroundColor(VP.soft)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                VStack(spacing: 10) {
+                    Link(destination: URL(string: "https://veritypost.com/help")!) {
+                        linkOutRow(icon: "questionmark.circle.fill", label: "Open help center", subtitle: "Browse the FAQ", isPrimary: true)
+                    }
+                    Link(destination: URL(string: "https://veritypost.com/contact")!) {
+                        linkOutRow(icon: "envelope.fill", label: "Contact support", subtitle: "Send a note to the team", isPrimary: false)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
+            }
+        }
+    }
+
+    private func linkOutRow(icon: String, label: String, subtitle: String, isPrimary: Bool) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: VP.Size.lg, weight: .regular))
+                .foregroundColor(isPrimary ? .white : VP.text)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(isPrimary ? .white : VP.text)
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundColor(isPrimary ? .white.opacity(0.85) : VP.dim)
+            }
+            Spacer()
+            Image(systemName: "arrow.up.right.square")
+                .font(.caption)
+                .foregroundColor(isPrimary ? .white.opacity(0.85) : VP.dim)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(minHeight: 56)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isPrimary ? VP.accent : VP.card)
+        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(isPrimary ? Color.clear : VP.border))
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+    }
+
+    // MARK: - Sign out section
+    @ViewBuilder
+    private var signoutSection: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                Text("Sign out of this device. You can sign back in any time.")
+                    .font(.subheadline)
+                    .foregroundColor(VP.soft)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                    .padding(.top, 16)
+                Button { Task { await auth.logout() } } label: {
+                    Text("Sign out")
+                        .font(.system(.subheadline, design: .default, weight: .semibold))
+                        .foregroundColor(VP.wrong)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                }
+                .padding(.horizontal, 16)
+                Spacer()
+            }
+        }
+    }
+
+    // MARK: - Web fallback (sections without iOS analogues)
+    @ViewBuilder
+    private func webFallback(title: String, body: String, path: String) -> some View {
+        let url = URL(string: "https://veritypost.com\(path)")!
+        ScrollView {
+            VStack(spacing: 14) {
+                Spacer().frame(height: 24)
+                Image(systemName: "globe")
+                    .font(.system(size: VP.Size.display, weight: .regular))
+                    .foregroundColor(VP.dim)
+                Text(title)
+                    .font(.system(.title3, design: .default, weight: .bold))
+                    .foregroundColor(VP.text)
+                Text(body)
+                    .font(.footnote)
+                    .foregroundColor(VP.dim)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                Link(destination: url) {
+                    HStack(spacing: 6) {
+                        Text("Open on web")
+                            .font(.system(.subheadline, design: .default, weight: .semibold))
+                        Image(systemName: "arrow.up.right.square")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 44)
+                    .background(VP.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                }
+                Spacer()
+            }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    // MARK: - Logout footer (phone shell bottom)
+    private var logoutFooter: some View {
+        VStack(spacing: 0) {
+            Button { Task { await auth.logout() } } label: {
+                Text("Sign out")
+                    .font(.system(.subheadline, design: .default, weight: .semibold))
+                    .foregroundColor(VP.wrong)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 100)
+        }
+    }
+
     // MARK: - Empty state helper
     private func emptyState(title: String, description: String) -> some View {
         VStack(spacing: 6) {
@@ -1416,59 +1850,23 @@ struct ProfileView: View {
         .padding(.vertical, 40)
     }
 
-    // MARK: - Logout button
-    private var logoutButton: some View {
-        Button { Task { await auth.logout() } } label: {
-            Text("Sign out")
-                .font(.system(.subheadline, design: .default, weight: .semibold))
-                .foregroundColor(VP.wrong)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
-        .padding(.bottom, 100)
-    }
-
     // MARK: - Refresh (pull-to-refresh)
     private func refreshAll() async {
         guard let uid = auth.currentUser?.id else { return }
-        // Pull every data source the hero + tabs depend on. loadUser
-        // re-fetches the users row so follower/score counts update
-        // inline without waiting for the next auth tick.
         async let a: Void = loadActivity(userId: uid)
         async let c: Void = loadCategories(userId: uid)
         async let ach: Void = loadAchievements(userId: uid)
         async let u: Void = auth.loadUser(id: uid)
-        _ = await (a, c, ach, u)
+        async let unread: Void = loadUnreadDMCount()
+        _ = await (a, c, ach, u, unread)
     }
 
-    // MARK: - Tab-triggered data loading
-    private func loadTabData() {
-        guard let userId = auth.currentUser?.id else { return }
-        switch tab {
-        case .activity where !activityLoaded && !activityLoadError:
-            Task { await loadActivity(userId: userId) }
-        case .categories where !categoriesLoaded && !categoriesLoadError:
-            Task { await loadCategories(userId: userId) }
-        default: break
-        }
-        if tab == .milestones && !achievementsLoaded {
-            Task { await loadAchievements(userId: userId) }
-        }
-    }
-
+    // MARK: - Data loaders (unchanged from pre-shell-port)
     private func loadActivity(userId: String) async {
         do {
             let cutoff = canViewActivityFullHistory
                 ? "1970-01-01T00:00:00Z"
                 : ISO8601DateFormatter().string(from: Date().addingTimeInterval(-30 * 24 * 3600))
-            // reading_log + quiz_attempts carry kid_profile_id when the
-            // row originated in the kids app — filter out so the parent's
-            // adult Activity feed never surfaces their kid's reads or
-            // quizzes. (comments have no kid_profile_id column;
-            // kids don't comment.)
             async let r: [ReadingLogItem] = client.from("reading_log")
                 .select("id, read_at, completed, articles(title, stories(slug))")
                 .eq("user_id", value: userId)
@@ -1529,17 +1927,8 @@ struct ProfileView: View {
         activityLoaded = true
     }
 
-    /// Loads the Categories tab data — top-level categories, their
-    /// subcategories (`parent_id IS NOT NULL` rows from the same self-
-    /// referential `categories` table), and the per-category/per-sub
-    /// tally of reads/quizzes/comments/upvotes that drives the progress
-    /// bars and lock states. Renamed from `loadMilestones` (the
-    /// achievements grid is loaded separately by `loadAchievements`).
     private func loadCategories(userId: String) async {
         do {
-            // Pull every active non-kids category in one round trip,
-            // then split locally into top-level (parent_id == nil) and
-            // sub (parent_id != nil) instead of issuing two queries.
             async let allCats: [VPCategory] = client.from("categories")
                 .select()
                 .eq("is_kids_safe", value: false)
@@ -1560,9 +1949,6 @@ struct ProfileView: View {
 
             let combined = try await allCats
             categories = combined.filter { $0.categoryId == nil }
-            // Subcategories share the same VPCategory shape; cast into
-            // VPSubcategory so the existing render path (which expects
-            // VPSubcategory) keeps working unchanged.
             subcategories = combined
                 .filter { $0.categoryId != nil }
                 .map { VPSubcategory(id: $0.id, categoryId: $0.categoryId, name: $0.name, slug: $0.slug) }
@@ -1579,7 +1965,6 @@ struct ProfileView: View {
             catStats = cat
             subStats = sub
 
-            // Upvotes: join comment_votes -> comments (own only) -> articles.
             struct UpRow: Decodable {
                 let comments: CommentJoin?
                 struct CommentJoin: Decodable {
@@ -1611,15 +1996,6 @@ struct ProfileView: View {
 
     private func loadAchievements(userId: String) async {
         do {
-            // Web parity (`web/src/app/profile/page.tsx` loadMilestones):
-            // pull every public achievement definition AND the user's
-            // earned rows in parallel, then render earned + locked in
-            // the same grid. Without the locked half the user has no
-            // sense of what's even possible to earn.
-            //
-            // `.is("kid_profile_id", value: nil)` keeps the parent's
-            // adult achievement list separate from any kid-earned rows
-            // tied to the same user_id (legacy data).
             async let mineRows: [UserAchievement] = client.from("user_achievements")
                 .select("id, user_id, achievement_id, earned_at, achievements(id, name, category, description)")
                 .eq("user_id", value: userId)
@@ -1675,7 +2051,6 @@ struct AvatarQuickEditSheet: View {
     @EnvironmentObject var auth: AuthViewModel
     @Environment(\.dismiss) private var dismiss
 
-    // 12-color palette — neutrals + vivids. Enough variety, avoids paralysis.
     private let palette: [String] = [
         "#111827", "#6b7280", "#ffffff",
         "#ef4444", "#f59e0b", "#eab308",
@@ -1704,7 +2079,6 @@ struct AvatarQuickEditSheet: View {
     }
 
     private var displayedInitials: String {
-        // 1-3 chars, letters or numbers only, mixed case preserved.
         let filtered = initials.filter { $0.isLetter || $0.isNumber }
         return String(filtered.prefix(3))
     }
@@ -1713,9 +2087,6 @@ struct AvatarQuickEditSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 22) {
-                    // Live preview — actually renders AvatarView so what you
-                    // see here matches what shows on Profile / comments / DMs.
-                    // Same stroke width, same font ratio, same tracking rules.
                     AvatarView(
                         outerHex: outerColor,
                         innerHex: innerColor,
@@ -1813,12 +2184,6 @@ struct AvatarQuickEditSheet: View {
         saving = true
         errorMsg = nil
 
-        // update_own_profile takes `p_fields` — a jsonb object of column
-        // values. Avatar customisation writes both:
-        //   - avatar_color (legacy; mirrors ring color so pre-metadata
-        //     readers still render right)
-        //   - metadata.avatar = { outer, inner, initials, text_color }
-        //     (metadata merges server-side; other keys preserved)
         struct AvatarJSON: Encodable {
             let outer: String
             let inner: String
@@ -1959,9 +2324,7 @@ struct UserFollowListView: View {
     }
 }
 
-// Q-NEW5 (2026-05-12) — viewport-width measurement for the hero-avatar
-// bump gate. ProfileView's body is a ScrollView so this reads the scroll
-// area's width (== viewport width on iOS).
+// Q-NEW5 (2026-05-12) — viewport-width measurement.
 private struct ProfileViewportWidthKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {

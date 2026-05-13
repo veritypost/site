@@ -229,6 +229,12 @@ struct MainTabView: View {
     // StoryDetailView as a sheet so the deep-link doesn't have to push
     // onto a specific tab's nav stack (each tab has its own).
     @State private var deepLinkStory: Story?
+    /// Profile NavigationStack path — bound so re-tapping the Profile tab
+    /// pops back to root (Outstanding.md Q-NEW6 adversary finding;
+    /// shipped Session 4 part 2). Without this, a user deep in a section
+    /// (Activity → Story → StoryDetailView) re-tapping Profile would stay
+    /// pushed and have to swipe back manually.
+    @State private var profilePath = NavigationPath()
     private let deepLinkClient = SupabaseManager.shared.client
 
     // Nav restructure 2026-05-06: matches mobile web. Browse removed
@@ -276,7 +282,7 @@ struct MainTabView: View {
             switch selectedTab {
             case .today: NavigationStack { HomeView() }
             case .profile:
-                NavigationStack {
+                NavigationStack(path: $profilePath) {
                     if isLoggedIn {
                         ProfileView()
                     } else {
@@ -292,7 +298,19 @@ struct MainTabView: View {
         // safeAreaInset makes the tab bar dock above the home indicator
         // automatically — no manual bottom padding, no white gap below.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            TextTabBar(selected: $selectedTab, isLoggedIn: isLoggedIn)
+            TextTabBar(
+                selected: $selectedTab,
+                isLoggedIn: isLoggedIn,
+                onReselectProfile: {
+                    // Pop the Profile NavigationStack to root when the
+                    // user re-taps the active Profile tab. Native iOS
+                    // idiom (Health/Settings/News all do this). Empties
+                    // the NavigationPath; SwiftUI animates the pop.
+                    if !profilePath.isEmpty {
+                        profilePath = NavigationPath()
+                    }
+                }
+            )
         }
         .onChange(of: auth.pendingHomeJump) { _, requested in
             // T66 — cross-view request to flip the tab to Home. Set by
@@ -452,6 +470,11 @@ struct MainTabView: View {
 struct TextTabBar: View {
     @Binding var selected: MainTabView.Tab
     let isLoggedIn: Bool
+    /// Fires when the user taps Profile while Profile is already the
+    /// active tab. Wired in `MainTabView` to clear the profile nav stack
+    /// (pop-to-root). Optional so anon callers (or future call sites)
+    /// can omit it.
+    var onReselectProfile: (() -> Void)? = nil
 
     private struct Item: Identifiable {
         let id: MainTabView.Tab
@@ -478,7 +501,12 @@ struct TextTabBar: View {
         HStack(spacing: 0) {
             ForEach(items) { item in
                 Button {
-                    selected = item.id
+                    if selected == item.id && item.id == .profile {
+                        // Re-tapping the active Profile tab pops to root.
+                        onReselectProfile?()
+                    } else {
+                        selected = item.id
+                    }
                 } label: {
                     Text(item.label)
                         .font(.system(.footnote, design: .default, weight: selected == item.id ? .bold : .medium))
