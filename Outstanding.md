@@ -495,9 +495,12 @@ Per memory `project_verity_monthly_stripe_pending.md`: pricing page shows "Subsc
 
 ---
 
-## 23. Regenerate `web/src/types/database.ts` after recent migrations
+## 23. Regenerate `web/src/types/database.ts` after recent migrations — CLOSED 2026-05-12
 
-The auto-generated Supabase TypeScript types file still references `bookmarks`, `bookmark_collections`, `articles.bookmark_count`, and the seven dropped bookmark functions — all gone from the live DB as of migration `20260512190000`. Same file is also missing the three new `access_requests` columns (`consumed_at`, `consumed_by_user_id`, `consumption_source`) and the `consume_access_request` RPC. The local `as never` casts and inline `Req` type extensions added during the access_requests work were specifically commented as "drop after the next `supabase gen types` run."
+**SHIPPED in commit `b27b5c88` (2026-05-12).** `web/src/types/database.ts` regenerated from the live DB via `mcp__supabase__generate_typescript_types`. The four sweep items closed in the same commit:
+- (a) `as never` casts on `service.rpc('consume_access_request', ...)` dropped in both `approve/route.ts` and `bulk-approve/route.ts`.
+- (b) `ConsumeUpdate` type alias in `approve/route.ts` replaced with bare `TableUpdate<'access_requests'>`.
+- (c) Inline `Req` extension at the top of `admin/access-requests/page.tsx` dropped — `consumed_at` / `consumed_by_user_id` / `consumption_source` / `referral_medium` are now in the generated Row.
+- (d) `updateRow as never` cast in `bulk-approve/route.ts` dropped; imported `TableUpdate`.
 
-**Prompt for the agent team:**
-> Run `supabase gen types typescript --linked > web/src/types/database.ts` (or the project's equivalent script) to regenerate the file from the current live schema. Then sweep the codebase for: (a) any `as never` casts on `service.rpc('consume_access_request', ...)` calls — drop the casts now that the function is typed; (b) the `ConsumeUpdate` type alias in `web/src/app/api/admin/access-requests/[id]/approve/route.ts` — replace with bare `TableUpdate<'access_requests'>`; (c) the inline `Req` type extension at the top of `web/src/app/admin/access-requests/page.tsx` that adds `consumed_at`, `consumed_by_user_id`, `consumption_source` — those become part of the generated Row type; (d) the `updateRow as never` cast in the bulk-approve route. Pressure-test by running `tsc --noEmit` before and after the regen — the only error should remain the pre-existing `CommentThread.tsx:921`.
+Six "drop after the next supabase gen types run" comments removed. Bookmark types / `articles.bookmark_count` / 7 dropped bookmark functions also gone from the regenerated file (matches migration `20260512190000`).
