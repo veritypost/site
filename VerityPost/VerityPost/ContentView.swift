@@ -281,7 +281,7 @@ struct MainTabView: View {
         ZStack {
             switch selectedTab {
             case .today: NavigationStack { HomeView() }
-            case .browse: NavigationStack { BrowseCategoriesView() }.environmentObject(auth)
+            case .browse: NavigationStack { BrowseView() }.environmentObject(auth)
             case .profile:
                 NavigationStack(path: $profilePath) {
                     if isLoggedIn {
