@@ -6,9 +6,12 @@
 // LockedFeatureChip next to it; the API also silently degrades, so the
 // safe failure mode is "user sees latest articles, knows trending exists,
 // has a path to upgrade."
+//
+// 2026-05-13 — sort selection now drives DirectoryShell state via
+// `onChange`; no router push. The shell handles URL sync via
+// history.replaceState so deep links continue to work without forcing
+// an RSC round-trip / loading.tsx flash.
 
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useCallback } from 'react';
 import type { DirectorySort } from '@/lib/directory/types';
 import LockedFeatureChip from './LockedFeatureChip';
 
@@ -16,23 +19,11 @@ interface SortPillProps {
   active: DirectorySort;
   /** True when the viewer holds directory.sort_trending. */
   canTrending: boolean;
+  onChange: (next: DirectorySort) => void;
 }
 
-export default function SortPill({ active, canTrending }: SortPillProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  const setSort = useCallback(
-    (next: DirectorySort) => {
-      const params = new URLSearchParams(searchParams?.toString() || '');
-      if (next === 'latest') params.delete('sort');
-      else params.set('sort', next);
-      const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    },
-    [pathname, router, searchParams],
-  );
+export default function SortPill({ active, canTrending, onChange }: SortPillProps) {
+  const setSort = (next: DirectorySort) => onChange(next);
 
   const pillBase = {
     padding: '4px 12px',

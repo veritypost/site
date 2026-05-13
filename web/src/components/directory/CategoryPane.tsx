@@ -5,11 +5,13 @@
 // filter input that narrows by category NAME (planner-spec'd; pg_trgm
 // server upgrade comes later via /api/directory/categories?q=).
 //
-// Clicking a category navigates to /directory/[catSlug] — the URL is
-// the source of truth, so the active state is read from props (which
-// the parent passes from the route segment), not local state.
+// 2026-05-13 — converted to a controlled button list. Selection is
+// driven by the parent `DirectoryShell` state; clicking a row no
+// longer triggers a Next route navigation. The shell updates URL via
+// history.pushState so deep links + back/forward still work, but the
+// shell does not unmount between selections so there's no loading.tsx
+// flash.
 
-import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import type { DirectoryCategory } from '@/lib/directory/types';
 import CategoryFilterInput from './CategoryFilterInput';
@@ -17,7 +19,7 @@ import CategoryFilterInput from './CategoryFilterInput';
 interface CategoryPaneProps {
   categories: DirectoryCategory[];
   activeSlug: string | null;
-  onSelect?: (slug: string) => void;
+  onSelect: (cat: DirectoryCategory) => void;
 }
 
 export default function CategoryPane({ categories, activeSlug, onSelect }: CategoryPaneProps) {
@@ -68,21 +70,26 @@ export default function CategoryPane({ categories, activeSlug, onSelect }: Categ
           const active = c.slug === activeSlug;
           return (
             <li key={c.id}>
-              <Link
-                href={`/directory/${c.slug}`}
-                onClick={() => onSelect?.(c.slug)}
+              <button
+                type="button"
+                onClick={() => onSelect(c)}
                 aria-current={active ? 'page' : undefined}
                 style={{
                   display: 'flex',
+                  width: '100%',
                   alignItems: 'baseline',
                   justifyContent: 'space-between',
                   gap: 12,
                   padding: '18px 24px',
+                  borderTop: 'none',
+                  borderRight: 'none',
                   borderBottom: '1px solid var(--border, #dcdcdc)',
                   borderLeft: active ? '2px solid var(--accent, #e33010)' : '2px solid transparent',
+                  textAlign: 'left',
                   textDecoration: 'none',
                   color: 'var(--ink, #111)',
                   background: 'transparent',
+                  cursor: 'pointer',
                   fontFamily: '"Source Serif 4", Georgia, serif',
                   fontSize: 20,
                   fontWeight: active ? 600 : 500,
@@ -105,7 +112,7 @@ export default function CategoryPane({ categories, activeSlug, onSelect }: Categ
                     {c.article_count}
                   </span>
                 )}
-              </Link>
+              </button>
             </li>
           );
         })}

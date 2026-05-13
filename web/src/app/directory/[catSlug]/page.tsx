@@ -2,16 +2,25 @@
 // Resolves the slug to a category row, then fetches:
 //   - sibling top-level categories (pane 1)
 //   - children (pane 2)
-//   - pane 3 (ArticlePane fetches its own articles + Editor's Edge)
-// Renders the 3-pane shell.
+//   - initial articles (pane 3)
+//   - Editor's Edge pick (pane 3 hero)
+// Hands the lot to the client-controlled `DirectoryShell`. The shell
+// takes over after hydration; subsequent clicks stay client-side.
 
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import { createServiceClient } from '@/lib/supabase/server';
-import type { DirectoryCategory, DirectorySort } from '@/lib/directory/types';
+import { hasPermissionServer } from '@/lib/auth';
+import { runDirectoryArticles } from '@/lib/directory/runDirectoryArticles';
+import { PERM_DIRECTORY_SORT_TRENDING } from '@/lib/directory/permissions';
+import type {
+  DirectoryArticle,
+  DirectoryCategory,
+  DirectorySort,
+  EditorsEdgePick,
+  EditorsEdgeResponse,
+} from '@/lib/directory/types';
 import DirectoryShell from '@/components/directory/DirectoryShell';
-import CategoryPane from '@/components/directory/CategoryPane';
-import SubcategoryPane from '@/components/directory/SubcategoryPane';
-import ArticlePane from '@/components/directory/ArticlePane';
 
 interface PageProps {
   params: { catSlug: string };
@@ -52,41 +61,79 @@ async function fetchDirectoryData(catSlug: string, subSlug: string | null) {
   return { topLevel, active, subs, subcategory };
 }
 
+async function fetchInitialArticles(
+  categoryId: string,
+  subcategoryId: string | null,
+  requestedSort: DirectorySort,
+): Promise<{ articles: DirectoryArticle[]; total: number; sortApplied: DirectorySort }> {
+  const supabase = createServiceClient();
+  let sortApplied: DirectorySort = 'latest';
+  if (requestedSort === 'trending') {
+    const allowed = await hasPermissionServer(PERM_DIRECTORY_SORT_TRENDING);
+    sortApplied = allowed ? 'trending' : 'latest';
+  }
+  try {
+    const { rows, total } = await runDirectoryArticles({
+      supabase,
+      categoryId,
+      subcategoryId,
+      sort: sortApplied,
+      limit: 30,
+      offset: 0,
+    });
+    return { articles: rows, total, sortApplied };
+  } catch {
+    return { articles: [], total: 0, sortApplied };
+  }
+}
+
+async function fetchInitialEdge(
+  categorySlug: string,
+  subSlug: string | null,
+): Promise<EditorsEdgePick | null> {
+  // Hit the public route so we don't duplicate the (non-trivial) pick
+  // resolution + article hydrate logic. headers() gives us an absolute URL.
+  const h = headers();
+  const host = h.get('x-forwarded-host') || h.get('host') || 'localhost:3000';
+  const proto = h.get('x-forwarded-proto') || 'https';
+  const base = `${proto}://${host}`;
+  const params = new URLSearchParams({ category: categorySlug });
+  if (subSlug) params.set('sub', subSlug);
+  try {
+    const res = await fetch(`${base}/api/directory/editors-edge?${params.toString()}`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as EditorsEdgeResponse;
+    return body.pick;
+  } catch {
+    return null;
+  }
+}
+
 export default async function CategoryDirectoryPage({ params, searchParams }: PageProps) {
   const { catSlug } = params;
   const subSlug = searchParams.sub || null;
-  const sort: DirectorySort = searchParams.sort === 'trending' ? 'trending' : 'latest';
+  const requestedSort: DirectorySort = searchParams.sort === 'trending' ? 'trending' : 'latest';
 
   const { topLevel, active, subs, subcategory } = await fetchDirectoryData(catSlug, subSlug);
+  if (!active) notFound();
 
-  if (!active) {
-    notFound();
-  }
+  const [{ articles, total, sortApplied }, edgePick] = await Promise.all([
+    fetchInitialArticles(active.id, subcategory?.id ?? null, requestedSort),
+    fetchInitialEdge(active.slug, subcategory?.slug ?? null),
+  ]);
 
   return (
     <DirectoryShell
-      activeCategorySlug={active.slug}
-      activeSubcategorySlug={subcategory?.slug ?? null}
-      categoryPane={<CategoryPane categories={topLevel} activeSlug={active.slug} />}
-      subcategoryPane={
-        <SubcategoryPane
-          parent={active}
-          subs={subs}
-          activeSubSlug={subcategory?.slug ?? null}
-          sort={sort}
-        />
-      }
-      articlePane={
-        <ArticlePane
-          category={{ id: active.id, slug: active.slug, name: active.name }}
-          subcategory={
-            subcategory
-              ? { id: subcategory.id, slug: subcategory.slug, name: subcategory.name }
-              : null
-          }
-          sort={sort}
-        />
-      }
+      initialCategories={topLevel}
+      initialActiveCat={active}
+      initialSubcategories={subs}
+      initialActiveSub={subcategory}
+      initialArticles={articles}
+      initialTotal={total}
+      initialEditorsEdge={edgePick}
+      initialSort={sortApplied}
     />
   );
 }

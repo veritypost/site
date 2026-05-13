@@ -2,17 +2,16 @@
 
 // Stream B — Pane 2 (subcategories + sort pill).
 // Renders subcategories for the active top-level category, plus the
-// Latest/Trending sort pill (which the API also enforces). On flat
-// categories (no subcategories), this renders a "section landing"
-// card with the description and the sort pill only — pane 3 still
-// renders behind it.
+// Latest/Trending sort pill. On flat categories (no subcategories), this
+// renders a "section landing" card with the description and the sort pill
+// only — pane 3 still renders behind it.
 //
-// State is URL-driven: subcategory + sort live in query params, so
-// browser-back works without a client state machine.
+// 2026-05-13 — converted to controlled. Selection + sort are driven by
+// `DirectoryShell` callbacks; no router push, no Link. The shell handles
+// URL sync via history.pushState/replaceState so deep links + back/
+// forward keep working without an RSC round-trip.
 
-import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '@/lib/permissions';
 import { PERM_DIRECTORY_SORT_TRENDING } from '@/lib/directory/permissions';
 import type { DirectoryCategory, DirectorySort } from '@/lib/directory/types';
@@ -23,10 +22,14 @@ interface SubcategoryPaneProps {
   parent: DirectoryCategory;
   /** Children of `parent`. Empty array = flat category. */
   subs: DirectoryCategory[];
-  /** Resolved from `?sub=` slug. */
+  /** Slug of the selected subcategory, or null for "All". */
   activeSubSlug: string | null;
-  /** Resolved from `?sort=` (default latest). */
+  /** Current sort. */
   sort: DirectorySort;
+  /** Called with the chosen sub (null = All). */
+  onSelectSub: (sub: DirectoryCategory | null) => void;
+  /** Called when the Latest/Trending pill changes. */
+  onSortChange: (next: DirectorySort) => void;
 }
 
 export default function SubcategoryPane({
@@ -34,10 +37,9 @@ export default function SubcategoryPane({
   subs,
   activeSubSlug,
   sort,
+  onSelectSub,
+  onSortChange,
 }: SubcategoryPaneProps) {
-  const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const [canTrending, setCanTrending] = useState(false);
 
   useEffect(() => {
@@ -53,17 +55,6 @@ export default function SubcategoryPane({
       cancelled = true;
     };
   }, []);
-
-  const setSub = useCallback(
-    (slug: string | null) => {
-      const params = new URLSearchParams(searchParams?.toString() || '');
-      if (slug) params.set('sub', slug);
-      else params.delete('sub');
-      const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    },
-    [pathname, router, searchParams],
-  );
 
   const isFlat = subs.length === 0;
 
@@ -100,7 +91,7 @@ export default function SubcategoryPane({
         }}
       >
         <span>{parent.name}</span>
-        <SortPill active={sort} canTrending={canTrending} />
+        <SortPill active={sort} canTrending={canTrending} onChange={onSortChange} />
       </header>
 
       {isFlat ? (
@@ -146,7 +137,7 @@ export default function SubcategoryPane({
           <li>
             <button
               type="button"
-              onClick={() => setSub(null)}
+              onClick={() => onSelectSub(null)}
               aria-pressed={activeSubSlug === null}
               style={{
                 width: '100%',
@@ -173,29 +164,28 @@ export default function SubcategoryPane({
             const active = s.slug === activeSubSlug;
             return (
               <li key={s.id}>
-                <Link
-                  href={(() => {
-                    const params = new URLSearchParams(searchParams?.toString() || '');
-                    params.set('sub', s.slug);
-                    return `/directory/${parent.slug}?${params.toString()}`;
-                  })()}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setSub(s.slug);
-                  }}
+                <button
+                  type="button"
+                  onClick={() => onSelectSub(s)}
                   aria-current={active ? 'page' : undefined}
                   style={{
                     display: 'flex',
+                    width: '100%',
                     alignItems: 'baseline',
                     justifyContent: 'space-between',
                     gap: 12,
                     padding: '18px 24px',
+                    borderTop: 'none',
+                    borderRight: 'none',
                     borderBottom: '1px solid var(--border, #dcdcdc)',
                     borderLeft: active
                       ? '2px solid var(--accent, #e33010)'
                       : '2px solid transparent',
+                    textAlign: 'left',
                     textDecoration: 'none',
                     color: 'var(--ink, #111)',
+                    background: 'transparent',
+                    cursor: 'pointer',
                     fontFamily: '"Source Serif 4", Georgia, serif',
                     fontSize: 18,
                     fontWeight: active ? 600 : 500,
@@ -216,7 +206,7 @@ export default function SubcategoryPane({
                       {s.article_count}
                     </span>
                   )}
-                </Link>
+                </button>
               </li>
             );
           })}

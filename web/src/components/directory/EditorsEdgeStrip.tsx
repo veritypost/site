@@ -1,50 +1,22 @@
+'use client';
+
 // Stream B — Editor's Edge hero strip at the top of pane 3.
-// Server component. Fetches the current pick for the (category, sub)
-// pair via the public API. Returns null on miss — there is no fallback
-// content per BUILD.md locked decision #7 ("Stale-Edge fallback:
-// nothing renders").
+// Presentational. Receives the current pick from `ArticlePane` /
+// `DirectoryShell`; returns null on miss (no fallback content per
+// BUILD.md locked decision #7).
+//
+// 2026-05-13 — was a server component that fetched its own pick.
+// Refactored to take `pick` as a prop so the parent `DirectoryShell`
+// can swap categories without an RSC round-trip / loading.tsx flash.
 
 import ArticleCard from './ArticleCard';
-import type { EditorsEdgeResponse } from '@/lib/directory/types';
-import { headers } from 'next/headers';
+import type { EditorsEdgePick } from '@/lib/directory/types';
 
 interface EditorsEdgeStripProps {
-  categorySlug: string;
-  subSlug?: string | null;
+  pick: EditorsEdgePick | null;
 }
 
-async function fetchEdge(
-  categorySlug: string,
-  subSlug: string | null,
-): Promise<EditorsEdgeResponse> {
-  // RSCs need an absolute URL when calling internal API routes during
-  // server render. Headers gives us the request host; this matches the
-  // pattern used elsewhere in the app for server-to-API calls.
-  const h = headers();
-  const host = h.get('x-forwarded-host') || h.get('host') || 'localhost:3000';
-  const proto = h.get('x-forwarded-proto') || 'https';
-  const base = `${proto}://${host}`;
-
-  const params = new URLSearchParams({ category: categorySlug });
-  if (subSlug) params.set('sub', subSlug);
-
-  try {
-    const res = await fetch(`${base}/api/directory/editors-edge?${params.toString()}`, {
-      // 60s cache aligns with the route's Cache-Control header.
-      next: { revalidate: 60 },
-    });
-    if (!res.ok) return { pick: null };
-    return (await res.json()) as EditorsEdgeResponse;
-  } catch {
-    return { pick: null };
-  }
-}
-
-export default async function EditorsEdgeStrip({
-  categorySlug,
-  subSlug,
-}: EditorsEdgeStripProps) {
-  const { pick } = await fetchEdge(categorySlug, subSlug ?? null);
+export default function EditorsEdgeStrip({ pick }: EditorsEdgeStripProps) {
   if (!pick) return null;
 
   return (
