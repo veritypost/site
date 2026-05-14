@@ -16,7 +16,22 @@ interface ArticleActionsProps {
 export default function ArticleActions({ storyId, currentUserId }: ArticleActionsProps) {
   return (
     <div style={{ maxWidth: 680, margin: '16px auto 0', padding: '0 20px' }}>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+      {/* v2 editorial palette — references the central --vp-* tokens defined
+          in globals.css (single source of truth for the burgundy redesign).
+          Wrapper draws a thin warm rule top + bottom so the action strip reads
+          as a distinct band beneath the article body. */}
+      <div
+        style={{
+          margin: '28px 0 0',
+          padding: '14px 0',
+          borderTop: '1px solid var(--vp-border-soft)',
+          borderBottom: '1px solid var(--vp-border-soft)',
+          display: 'flex',
+          gap: 8,
+          flexWrap: 'wrap',
+          alignItems: 'center',
+        }}
+      >
         <ShareButton />
         {storyId && <FollowStoryButton storyId={storyId} currentUserId={currentUserId} />}
       </div>

@@ -25,7 +25,7 @@ import type {
 // any slot item whose article is flagged — the article still lives on its
 // own URL with its own ad gating, it just loses its home spotlight.
 const ARTICLE_SELECT =
-  'id, title, stories(slug, lifecycle_status), excerpt, category_id, story_id, is_breaking, is_developing, published_at, cover_image_url, cover_image_alt, ad_eligible, sensitivity_tags';
+  'id, title, stories(slug, lifecycle_status), excerpt, category_id, story_id, is_breaking, is_developing, published_at, updated_at, cover_image_url, cover_image_alt, ad_eligible, sensitivity_tags';
 
 type RawSlotItem = {
   id: string;

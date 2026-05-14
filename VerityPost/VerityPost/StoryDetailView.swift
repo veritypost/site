@@ -391,7 +391,7 @@ struct StoryDetailView: View {
                     } label: {
                         Text(isFollowing ? "Following" : "Follow")
                             .font(.system(.footnote, design: .default, weight: .semibold))
-                            .foregroundColor(isFollowing ? VP.accent : VP.text)
+                            .foregroundColor(isFollowing ? VP.burgundy : VP.text)
                     }
                     .buttonStyle(.bordered)
                     .disabled(followBusy)
@@ -499,7 +499,7 @@ struct StoryDetailView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(RoundedRectangle(cornerRadius: VP.radiusMD).fill(VP.accent))
+                    .background(RoundedRectangle(cornerRadius: VP.radiusMD).fill(VP.burgundy))
                     .shadow(radius: 4)
                     .padding(.top, 8)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -741,7 +741,7 @@ struct StoryDetailView: View {
                     .padding(.horizontal, 28)
                     .padding(.vertical, 12)
                     .frame(minHeight: 44)
-                    .background(VP.accent)
+                    .background(VP.burgundy)
                     .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             }
             .buttonStyle(.plain)
@@ -751,7 +751,7 @@ struct StoryDetailView: View {
             } label: {
                 Text("Already have an account? Sign in")
                     .font(.footnote)
-                    .foregroundColor(VP.accent)
+                    .foregroundColor(VP.burgundy)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .frame(minWidth: 44, minHeight: 44)
@@ -791,7 +791,7 @@ struct StoryDetailView: View {
                     .padding(.horizontal, 22)
                     .padding(.vertical, 10)
                     .frame(minHeight: 44)
-                    .background(VP.accent)
+                    .background(VP.burgundy)
                     .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
             }
             .buttonStyle(.plain)
@@ -837,7 +837,7 @@ struct StoryDetailView: View {
                 Text((categoryName ?? "").uppercased())
                     .font(.system(.caption2, design: .default, weight: .semibold))
                     .tracking(1)
-                    .foregroundColor(VP.accent)
+                    .foregroundColor(VP.burgundy)
                 if story.isBreaking == true { badge("BREAKING", color: VP.breaking) }
                 if story.isDeveloping == true { badge("DEVELOPING", color: VP.amber) }
                 Spacer()
@@ -924,7 +924,7 @@ struct StoryDetailView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 18)
                             .padding(.vertical, 10)
-                            .background(VP.accent)
+                            .background(VP.burgundy)
                             .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
                     }
                 }
@@ -963,52 +963,59 @@ struct StoryDetailView: View {
     @ViewBuilder private var passToCommentCTA: some View {
         let quizRequired = SettingsService.shared.commentBool("quiz_required")
         if quizRequired && !userPassedQuiz {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("PASS TO COMMENT")
-                    .font(.system(.caption2, design: .default, weight: .bold))
-                    .tracking(1)
-                    .foregroundColor(VP.dim)
-                Text("5 questions about what you just read. Get 3 right and the conversation opens.")
-                    .font(.callout)
-                    .foregroundColor(VP.text)
-                    .lineSpacing(2)
-                    .fixedSize(horizontal: false, vertical: true)
+            // v2 mid-body teaser — mirrors web MidBodyQuizTeaser.tsx.
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("COMPREHENSION CHECK")
+                        .font(.system(.caption2, design: .monospaced, weight: .medium))
+                        .tracking(1.0)
+                        .foregroundColor(Self.quizAccent)
+                    Text("5 questions before discussion opens")
+                        .font(.system(size: 16, weight: .regular, design: .serif))
+                        .foregroundColor(VP.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Pass to join the conversation")
+                        .font(.subheadline)
+                        .foregroundColor(Self.quizTextMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
                 if auth.isLoggedIn {
                     Button {
                         activeTab = .discussion
                     } label: {
-                        Text("Start quiz")
-                            .font(.system(.subheadline, design: .default, weight: .bold))
+                        Text("Start quiz →")
+                            .font(.subheadline.weight(.semibold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, 18)
                             .padding(.vertical, 10)
-                            .background(VP.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
+                            .background(Self.quizAccent)
+                            .clipShape(RoundedRectangle(cornerRadius: 999))
                     }
                     .buttonStyle(.plain)
                 } else {
                     Button {
                         showRegistrationSheet = true
                     } label: {
-                        Text("Create free account")
-                            .font(.system(.subheadline, design: .default, weight: .bold))
+                        Text("Create free account →")
+                            .font(.subheadline.weight(.semibold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 20)
+                            .padding(.horizontal, 18)
                             .padding(.vertical, 10)
-                            .background(VP.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
+                            .background(Self.quizAccent)
+                            .clipShape(RoundedRectangle(cornerRadius: 999))
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(20)
+            .padding(16)
             .background(
-                RoundedRectangle(cornerRadius: VP.radiusMD)
-                    .fill(VP.card)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Self.quizSurfaceSoft)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: VP.radiusMD)
-                    .stroke(VP.border, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Self.quizCardBorder, lineWidth: 1)
             )
             .padding(.horizontal, 20)
             .padding(.top, 28)
@@ -1030,7 +1037,7 @@ struct StoryDetailView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(VP.accent)
+                        .background(VP.burgundy)
                         .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                 }
                 .buttonStyle(.plain)
@@ -1064,7 +1071,7 @@ struct StoryDetailView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(VP.accent)
+                    .background(VP.burgundy)
                     .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
             }
             .buttonStyle(.plain)
@@ -1111,10 +1118,10 @@ struct StoryDetailView: View {
                 HStack(spacing: 10) {
                     ZStack {
                         Circle()
-                            .fill(VP.accent.opacity(0.08))
+                            .fill(VP.burgundy.opacity(0.08))
                         Text(glyph)
                             .font(.system(.caption, design: .default, weight: .bold))
-                            .foregroundColor(VP.accent)
+                            .foregroundColor(VP.burgundy)
                     }
                     .frame(width: 24, height: 24)
                     .accessibilityHidden(true)
@@ -1148,7 +1155,7 @@ struct StoryDetailView: View {
                                     .font(.system(size: VP.Size.xs, weight: .semibold))
                             }
                             .font(.system(.caption, design: .default, weight: .semibold))
-                            .foregroundColor(VP.accent)
+                            .foregroundColor(VP.burgundy)
                         }
                     }
                 }
@@ -1163,23 +1170,75 @@ struct StoryDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
     }
 
-    // MARK: - Timeline content
+    // MARK: - Timeline content (v2 redesign)
+    //
+    // Burgundy palette is hardcoded locally — mirrors the web change in
+    // TimelineSection.tsx. The project's redesign brand (VP.brand) is still
+    // blue; flipping the whole palette to burgundy is a project-wide
+    // decision out of scope for this slice.
+    private static let tlAccent     = Color(hex: "8b0f16")
+    private static let tlAccentDark = Color(hex: "64090e")
+    private static let tlAccentSoft = Color(hex: "f4e6e2")
+    private static let tlCardBorder = Color(hex: "ded8ce")
+    private static let tlTextMuted  = Color(hex: "66615a")
+    private static let tlTextSoft   = Color(hex: "8a8379")
+
+    // MARK: - Quiz palette (v2 redesign)
+    //
+    // v2 burgundy palette — aliases over Theme.swift's VP.burgundy* tokens
+    // (single source of truth, mirrors --vp-* in web/src/app/globals.css).
+    // Keeping the local quizAccent/etc. names preserves ~60 callsites in
+    // this file without a sweeping rename. Future iOS v2 surfaces should
+    // reach for VP.burgundy* directly.
+    // VP.right (green) / VP.wrong (red) preserved for result semantics.
+    private static let quizAccent      = VP.burgundy
+    private static let quizAccentDark  = VP.burgundyDark
+    private static let quizAccentSoft  = VP.burgundySoft
+    private static let quizCardBorder  = VP.burgundyQuizBorder // warm outer ring
+    private static let quizBorderSoft  = VP.burgundyBorderSoft
+    private static let quizInnerDiv    = Color(hex: "e9d6c0")
+    private static let quizSurfaceSoft = VP.burgundySurfaceSoft // cream-soft card bg
+    private static let quizTextMuted   = VP.burgundyTextMuted
+    private static let quizTextSoft    = VP.burgundyTextSoft
+
+    private static let tlShortFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM dd"
+        return f
+    }()
+    private static let tlStartedFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d, yyyy"
+        return f
+    }()
+
     @ViewBuilder private var timelineContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("TIMELINE")
-                .font(.system(.caption2, design: .default, weight: .semibold))
-                .tracking(1)
-                .foregroundColor(VP.dim)
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
+            // Header — kicker / story title / count subtitle
+            Text("STORY TIMELINE")
+                .font(.system(.caption2, design: .monospaced, weight: .medium))
+                .tracking(1.2)
+                .foregroundColor(Self.tlAccent)
+                .padding(.bottom, 6)
+
+            if let title = story.title, !title.isEmpty {
+                Text(title)
+                    .font(.system(size: 18, weight: .regular, design: .serif))
+                    .foregroundColor(VP.text)
+                    .lineSpacing(2)
+                    .padding(.bottom, 4)
+            }
+
+            Text(timelineCountSubtitle)
+                .font(.system(size: 12))
+                .foregroundColor(Self.tlTextSoft)
                 .padding(.bottom, 16)
 
             if timeline.isEmpty {
                 Text("No timeline for this story.")
                     .font(.caption)
                     .foregroundColor(VP.dim)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
+                    .padding(.top, 4)
             } else {
                 let hasExplicit = timeline.contains(where: { $0.isCurrent == true })
                 VStack(alignment: .leading, spacing: 0) {
@@ -1191,86 +1250,150 @@ struct StoryDetailView: View {
                         )
                     }
                 }
-                .padding(.horizontal, 20)
             }
-            Spacer().frame(height: 80)
         }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(UIColor.systemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Self.tlCardBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 80)
+    }
+
+    private var timelineCountSubtitle: String {
+        let count = timeline.count
+        let countLabel = "\(count) \(count == 1 ? "event" : "events")"
+        if let firstDate = timeline.compactMap({ $0.eventDate }).min() {
+            return "\(countLabel) · started \(Self.tlStartedFmt.string(from: firstDate))"
+        }
+        return countLabel
     }
 
     private func timelineRow(event: TimelineEvent, isCurrent: Bool, isLast: Bool) -> some View {
-        Group {
-            if event.type == "article", let articleId = event.linkedArticleId {
-                // Article-type entry: tappable, disclosure indicator, no date dot.
-                Button {
-                    Task {
-                        if let story = await fetchStoryByArticleId(articleId) {
-                            linkedArticle = story
-                        }
-                    }
-                } label: {
-                    HStack(alignment: .top, spacing: 14) {
-                        VStack(spacing: 0) {
-                            Circle().fill(VP.accent.opacity(0.35)).frame(width: 8, height: 8)
-                            if !isLast {
-                                Rectangle().fill(VP.tlLine).frame(width: 1).frame(maxHeight: .infinity)
-                            }
-                        }
-                        .frame(width: 14)
+        let dateLabel = (event.eventDate.map { Self.tlShortFmt.string(from: $0).uppercased() }) ?? ""
+        let body = event.text ?? event.summary ?? ""
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(event.text ?? event.summary ?? "")
-                                .font(.subheadline)
-                                .foregroundColor(VP.text)
+        return Group {
+            if isCurrent {
+                // TODAY card — burgundy bordered, accent-soft fill. Dot sits
+                // on the spine at left:-5 in the web mock; we mirror with a
+                // ZStack and a leading-aligned overlay dot.
+                ZStack(alignment: .topLeading) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("TODAY")
+                            .font(.system(.caption2, design: .monospaced, weight: .medium))
+                            .tracking(0.8)
+                            .foregroundColor(Self.tlAccent)
+
+                        if event.type == "article", let articleId = event.linkedArticleId {
+                            Button {
+                                Task {
+                                    if let story = await fetchStoryByArticleId(articleId) {
+                                        linkedArticle = story
+                                    }
+                                }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(body)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundColor(Self.tlAccentDark)
+                                        .lineSpacing(3)
+                                        .multilineTextAlignment(.leading)
+                                    Text("READ THIS COVERAGE →")
+                                        .font(.system(.caption2, design: .monospaced, weight: .semibold))
+                                        .tracking(0.6)
+                                        .foregroundColor(Self.tlAccent)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Text(body)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundColor(Self.tlAccentDark)
                                 .lineSpacing(3)
                                 .multilineTextAlignment(.leading)
-                            Text("Read this coverage")
-                                .font(.caption)
-                                .foregroundColor(VP.dim)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.bottom, 22)
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(VP.dim)
-                            .padding(.top, 2)
                     }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Self.tlAccentSoft)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Self.tlAccent, lineWidth: 1)
+                    )
+
+                    // Burgundy dot with soft ring, sitting on the spine.
+                    Circle()
+                        .fill(Self.tlAccent)
+                        .frame(width: 9, height: 9)
+                        .overlay(Circle().stroke(Self.tlAccentSoft, lineWidth: 3))
+                        .offset(x: -4.5, y: 14)
                 }
-                .buttonStyle(.plain)
+                .padding(.leading, 6) // pulls the card slightly outside the spine column
+                .padding(.bottom, isLast ? 0 : 18)
             } else {
-                // Standard event-type entry: static, date dot.
+                // Standard event — dot on spine, date small-caps, body sans.
                 HStack(alignment: .top, spacing: 14) {
                     VStack(spacing: 0) {
-                        if isCurrent {
-                            Circle()
-                                .fill(VP.bg)
-                                .frame(width: 12, height: 12)
-                                .overlay(Circle().stroke(VP.accent, lineWidth: 2))
-                        } else {
-                            Circle().fill(VP.dim).frame(width: 8, height: 8)
-                        }
+                        Circle()
+                            .fill(Self.tlTextSoft)
+                            .frame(width: 9, height: 9)
+                            .padding(.top, 5)
                         if !isLast {
-                            Rectangle().fill(VP.tlLine).frame(width: 1).frame(maxHeight: .infinity)
+                            Rectangle()
+                                .fill(Self.tlCardBorder)
+                                .frame(width: 1)
+                                .frame(maxHeight: .infinity)
                         }
                     }
-                    .frame(width: 14)
+                    .frame(width: 9)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        if isCurrent {
-                            Text("NOW")
-                                .font(.system(.caption2, design: .default, weight: .bold))
-                                .tracking(1)
-                                .foregroundColor(VP.accent)
+                    if event.type == "article", let articleId = event.linkedArticleId {
+                        Button {
+                            Task {
+                                if let story = await fetchStoryByArticleId(articleId) {
+                                    linkedArticle = story
+                                }
+                            }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(dateLabel)
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .tracking(0.6)
+                                    .foregroundColor(Self.tlTextSoft)
+                                Text(body)
+                                    .font(.subheadline)
+                                    .foregroundColor(Self.tlTextMuted)
+                                    .lineSpacing(3)
+                                    .multilineTextAlignment(.leading)
+                                    .underline()
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.bottom, isLast ? 0 : 18)
                         }
-                        Text(event.eventDate.map { formatDate($0) } ?? "")
-                            .font(.system(.caption, design: .default, weight: .regular))
-                            .foregroundColor(VP.dim)
-                        Text(event.text ?? event.summary ?? "")
-                            .font(.subheadline)
-                            .foregroundColor(VP.soft)
-                            .lineSpacing(3)
+                        .buttonStyle(.plain)
+                    } else {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(dateLabel)
+                                .font(.system(.caption2, design: .monospaced))
+                                .tracking(0.6)
+                                .foregroundColor(Self.tlTextSoft)
+                            Text(body)
+                                .font(.subheadline)
+                                .foregroundColor(Self.tlTextMuted)
+                                .lineSpacing(3)
+                        }
+                        .padding(.bottom, isLast ? 0 : 18)
                     }
-                    .padding(.bottom, 22)
                 }
             }
         }
@@ -1342,149 +1465,238 @@ struct StoryDetailView: View {
     }
 
     @ViewBuilder private var quizIdleCardBody: some View {
-        HStack(alignment: .top, spacing: 0) {
-            // Leading accent bar
-            Rectangle()
-                .fill(VP.accent)
-                .frame(width: 3)
-                .cornerRadius(2)
-            VStack(alignment: .leading, spacing: 10) {
+        // v2 idle card — burgundy editorial chrome; the new card carries
+        // the accent so the old 3pt leading bar is dropped.
+        VStack(alignment: .leading, spacing: 14) {
+            // Header: kicker + serif title + divider
+            VStack(alignment: .leading, spacing: 6) {
+                Text("COMPREHENSION CHECK")
+                    .font(.system(.caption2, design: .monospaced, weight: .medium))
+                    .tracking(1.2)
+                    .foregroundColor(Self.quizAccent)
                 // Voice unified with the Article-tab `passToCommentCTA` per
                 // adversary review — single phrase across both entry points
                 // so readers don't see two flavors of the same mechanic.
-                Text("Pass to comment.")
-                    .font(.headline)
+                Text("How well did you follow the story?")
+                    .font(.system(size: 22, weight: .regular, design: .serif))
                     .foregroundColor(VP.text)
-                Text("5 questions about what you just read. Get 3 right and the conversation opens.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
                     .lineSpacing(2)
-                if let err = quizError {
-                    Text(err).font(.caption).foregroundColor(VP.wrong)
-                }
-                if canTakeQuiz {
-                    Button {
-                        Task { await startQuiz() }
-                    } label: {
-                        Text(quizStage == .loading
-                             ? "Starting quiz…"
-                             : (quizError != nil ? "Try again" : "Take the quiz"))
-                            .font(.system(.subheadline, design: .default, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(VP.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-                    }
-                    .disabled(quizStage == .loading)
-                    .buttonStyle(.plain)
-                    .padding(.top, 4)
-                }
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(16)
+            .padding(.bottom, 14)
+            .overlay(
+                Rectangle()
+                    .fill(Self.quizInnerDiv)
+                    .frame(height: 1),
+                alignment: .bottom
+            )
+
+            Text("5 questions · about 90 seconds · unlocks discussion")
+                .font(.caption)
+                .foregroundColor(Self.quizTextMuted)
+
+            if let err = quizError {
+                Text(err).font(.caption).foregroundColor(VP.wrong)
+            }
+
+            if canTakeQuiz {
+                Button {
+                    Task { await startQuiz() }
+                } label: {
+                    Text(quizStage == .loading
+                         ? "Starting quiz…"
+                         : (quizError != nil ? "Try again" : "Take the quiz →"))
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 14)
+                        .background(Self.quizAccent)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(quizStage == .loading)
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+            }
         }
+        .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(VP.card)
-        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.accent.opacity(0.35), lineWidth: 1.5))
-        .clipped()
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Self.quizSurfaceSoft)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Self.quizCardBorder, lineWidth: 1)
+        )
     }
 
     @ViewBuilder private var quizAnsweringCard: some View {
         let qi = quizCurrent
         if qi < quizQuestions.count {
             let q = quizQuestions[qi]
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Question \(qi + 1) of \(quizQuestions.count)")
-                        .font(.system(.caption, design: .default, weight: .bold))
-                        .foregroundColor(VP.dim)
-                    Spacer()
-                    if !hasUnlimitedQuizAttempts, let used = quizAttemptMeta?.attempts_used, let max = quizAttemptMeta?.max_attempts {
-                        Text("\(used) of \(max) used")
-                            .font(.caption)
-                            .foregroundColor(VP.dim)
-                    }
-                }
-                Text(q.question_text)
-                    .font(.system(.callout, design: .default, weight: .semibold))
-                    .foregroundColor(VP.text)
-                ForEach(Array(q.options.enumerated()), id: \.offset) { oi, opt in
-                    quizOption(quizId: q.id, oi: oi, text: opt.text)
-                }
-                if quizStage == .submitting {
-                    Text("Grading…").font(.caption).foregroundColor(VP.dim)
-                }
-                if let err = quizError {
-                    HStack(spacing: 8) {
-                        Text(err).font(.caption).foregroundColor(VP.wrong)
-                        Button {
-                            Task { await submitQuiz() }
-                        } label: {
-                            Text("Try again")
-                                .font(.system(.caption, design: .default, weight: .semibold))
-                                .foregroundColor(VP.accent)
+            // Outer card — cream-soft chrome.
+            VStack(alignment: .leading, spacing: 14) {
+                // Inner question card — white nested surface.
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("QUESTION \(qi + 1) OF \(quizQuestions.count)")
+                            .font(.system(.caption2, design: .monospaced, weight: .medium))
+                            .tracking(0.8)
+                            .foregroundColor(Self.quizTextSoft)
+                        Spacer()
+                        if !hasUnlimitedQuizAttempts, let used = quizAttemptMeta?.attempts_used, let max = quizAttemptMeta?.max_attempts {
+                            Text("\(used) of \(max) used")
+                                .font(.caption)
+                                .foregroundColor(Self.quizTextSoft)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(quizStage == .submitting)
+                    }
+                    Text(q.question_text)
+                        .font(.system(size: 17, weight: .regular, design: .serif))
+                        .foregroundColor(VP.text)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ForEach(Array(q.options.enumerated()), id: \.offset) { oi, opt in
+                        quizOption(quizId: q.id, oi: oi, text: opt.text)
+                    }
+                    if quizStage == .submitting {
+                        Text("GRADING…")
+                            .font(.system(.caption2, design: .monospaced, weight: .medium))
+                            .tracking(0.6)
+                            .foregroundColor(Self.quizTextSoft)
+                    }
+                    if let err = quizError {
+                        HStack(spacing: 8) {
+                            Text(err).font(.caption).foregroundColor(VP.wrong)
+                            Button {
+                                Task { await submitQuiz() }
+                            } label: {
+                                Text("Try again")
+                                    .font(.system(.caption, design: .default, weight: .semibold))
+                                    .foregroundColor(Self.quizAccent)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(quizStage == .submitting)
+                        }
                     }
                 }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color(UIColor.systemBackground))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Self.quizBorderSoft, lineWidth: 1)
+                )
             }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(Self.quizSurfaceSoft)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(Self.quizCardBorder, lineWidth: 1)
+            )
         }
     }
 
     @ViewBuilder private var quizResultCard: some View {
         if let r = quizResult {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(r.passed
-                     ? "Discussion unlocked."
-                     : "Not quite — try again.")
-                    .font(.headline)
-                    .foregroundColor(r.passed ? VP.right : VP.text)
-                if let pct = r.percentile {
-                    Text("Better than \(pct)% of readers on this article.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                if !hasUnlimitedQuizAttempts, let remaining = r.attempts_remaining, !r.passed {
-                    Text("You have \(remaining) attempt\(remaining == 1 ? "" : "s") left.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-
-                // D41: per-question breakdown with explanations, every attempt.
+            if r.passed {
+                // Passed branch — accent-soft chrome, serif headline.
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(r.results) { row in
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(row.question_text)
-                                .font(.system(.footnote, design: .default, weight: .semibold))
-                                .foregroundColor(VP.text)
-                            if row.is_correct {
-                                Label("Correct", systemImage: "checkmark.circle.fill")
-                                    .font(.system(.caption, design: .default, weight: .semibold))
-                                    .foregroundColor(VP.right)
-                            } else {
-                                let correctText = row.options.indices.contains(row.correct_answer)
-                                    ? row.options[row.correct_answer].text : ""
-                                Label("Correct: \(correctText)", systemImage: "xmark.circle.fill")
-                                    .font(.system(.caption, design: .default, weight: .semibold))
-                                    .foregroundColor(VP.wrong)
-                            }
-                            if let ex = row.explanation, !ex.isEmpty {
-                                Text(ex)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .lineSpacing(2)
-                            }
-                        }
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                    Text("Discussion unlocked.")
+                        .font(.system(size: 28, weight: .regular, design: .serif))
+                        .foregroundColor(Self.quizAccentDark)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("\(r.results.filter { $0.is_correct }.count) of \(r.results.count).")
+                        .font(.caption.weight(.medium))
+                        .foregroundColor(Self.quizAccentDark.opacity(0.75))
+                    if let pct = r.percentile {
+                        Text("Better than \(pct)% of readers on this article.")
+                            .font(.subheadline)
+                            .foregroundColor(Self.quizAccentDark.opacity(0.65))
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(Self.quizAccentSoft)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(Self.quizAccent, lineWidth: 1)
+                )
+            } else {
+                // Failed branch — cream chrome, header row + per-Q breakdown.
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("YOUR RESULT")
+                            .font(.system(.caption2, design: .monospaced, weight: .medium))
+                            .tracking(1.0)
+                            .foregroundColor(Self.quizTextSoft)
+                        Text("\(r.results.filter { $0.is_correct }.count) of \(r.results.count).")
+                            .font(.system(size: 22, weight: .regular, design: .serif))
+                            .foregroundColor(VP.text)
+                    }
 
-                if !r.passed {
+                    if !hasUnlimitedQuizAttempts, let remaining = r.attempts_remaining {
+                        Text("You have \(remaining) attempt\(remaining == 1 ? "" : "s") left.")
+                            .font(.subheadline)
+                            .foregroundColor(Self.quizTextMuted)
+                    }
+
+                    // D41: per-question breakdown — white inner cards.
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(Array(r.results.enumerated()), id: \.element.id) { idx, row in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("QUESTION \(idx + 1)")
+                                    .font(.system(.caption2, design: .monospaced, weight: .medium))
+                                    .tracking(0.6)
+                                    .foregroundColor(Self.quizTextSoft)
+                                Text(row.question_text)
+                                    .font(.system(size: 16, weight: .regular, design: .serif))
+                                    .foregroundColor(VP.text)
+                                    .lineSpacing(2)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if row.is_correct {
+                                    Label("Correct", systemImage: "checkmark.circle.fill")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundColor(VP.right)
+                                } else {
+                                    let correctText = row.options.indices.contains(row.correct_answer)
+                                        ? row.options[row.correct_answer].text : ""
+                                    Label("Correct: \(correctText)", systemImage: "xmark.circle.fill")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundColor(VP.wrong)
+                                }
+                                if let ex = row.explanation, !ex.isEmpty {
+                                    Text(ex)
+                                        .font(.caption)
+                                        .foregroundColor(Self.quizTextMuted)
+                                        .lineSpacing(2)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Color(UIColor.systemBackground))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Self.quizBorderSoft, lineWidth: 1)
+                            )
+                        }
+                    }
+
                     let outOfAttempts = !hasUnlimitedQuizAttempts && (r.attempts_remaining ?? 0) == 0
                     if outOfAttempts {
                         Text("You've used both free attempts. Upgrade for unlimited retakes.")
@@ -1492,12 +1704,13 @@ struct StoryDetailView: View {
                             .foregroundColor(VP.text)
                         Button { showSubscription = true } label: {
                             Text("View plans")
-                                .font(.system(.subheadline, design: .default, weight: .bold))
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(VP.accent)
-                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                                .padding(.horizontal, 22)
+                                .padding(.vertical, 14)
+                                .background(Self.quizAccent)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
                     } else if canRetakeQuiz {
@@ -1505,25 +1718,28 @@ struct StoryDetailView: View {
                             Task { await startQuiz() }
                         } label: {
                             Text("Retake with fresh questions")
-                                .font(.system(.subheadline, design: .default, weight: .bold))
+                                .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(VP.accent)
-                                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                                .padding(.horizontal, 22)
+                                .padding(.vertical, 14)
+                                .background(Self.quizAccent)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(24)
+                .background(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(Self.quizSurfaceSoft)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(Self.quizCardBorder, lineWidth: 1)
+                )
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-            .overlay(
-                RoundedRectangle(cornerRadius: VP.radiusMD)
-                    .stroke(r.passed ? VP.right.opacity(0.4) : Color(.systemRed).opacity(0.3), lineWidth: 1)
-            )
         }
     }
 
@@ -1534,12 +1750,12 @@ struct StoryDetailView: View {
             return rows[i].is_correct ? VP.successBright : VP.wrong
         }
         if i == quizCurrent && (quizStage == .answering || quizStage == .submitting) {
-            return VP.accent
+            return Self.quizAccent
         }
         if i < quizQuestions.count, quizAnswers[quizQuestions[i].id] != nil {
-            return VP.accent.opacity(0.4)
+            return Self.quizAccent
         }
-        return Color(.systemGray5)
+        return Self.quizCardBorder
     }
 
     private func quizOption(quizId: String, oi: Int, text: String) -> some View {
@@ -1569,25 +1785,28 @@ struct StoryDetailView: View {
             }
         } label: {
             HStack(spacing: 10) {
-                // Letter badge
+                // Letter chip — 22x22 (smaller, editorial).
                 Text(["A", "B", "C", "D"][min(oi, 3)])
-                    .font(.system(.caption, design: .default, weight: .semibold))
-                    .foregroundColor(selected ? VP.accent : .secondary)
-                    .frame(width: 24, height: 24)
-                    .background(selected ? Color.white : Color.primary.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusXS))
+                    .font(.system(.caption2, design: .monospaced, weight: .semibold))
+                    .foregroundColor(selected ? .white : Self.quizTextSoft)
+                    .frame(width: 22, height: 22)
+                    .background(selected ? Self.quizAccent : Self.quizBorderSoft)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 Text(text)
-                    .foregroundColor(selected ? .white : VP.text)
+                    .foregroundColor(selected ? Self.quizAccentDark : VP.text)
                     .font(.system(.subheadline, design: .default, weight: selected ? .semibold : .regular))
                     .multilineTextAlignment(.leading)
                 Spacer()
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .frame(minHeight: 44)
-            .background(selected ? VP.accent : Color(.secondarySystemBackground))
-            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(selected ? VP.accent : VP.border, lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+            .background(selected ? Self.quizAccentSoft : Color(UIColor.systemBackground))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(selected ? Self.quizAccent : Self.quizBorderSoft, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             .opacity(answered && !selected ? 0.35 : 1.0)
             .animation(.easeInOut(duration: 0.15), value: selected)
         }
@@ -1598,74 +1817,144 @@ struct StoryDetailView: View {
     // MARK: - Discussion body
     @ViewBuilder private var discussionBody: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // v2 burgundy editorial header — mono kicker + comment count,
+            // segmented sort pills + expert filter pill matching the web
+            // CommentThread.tsx redesign. VP.expertColor preserved for the
+            // expert filter identity (green = expert signal across surfaces).
             HStack(alignment: .center, spacing: 10) {
                 Text("DISCUSSION")
-                    .font(.system(.caption2, design: .default, weight: .bold))
-                    .tracking(1)
-                    .foregroundColor(VP.dim)
+                    .font(.system(.caption2, design: .monospaced, weight: .medium))
+                    .tracking(1.0)
+                    .foregroundColor(Self.quizAccent)
+                if comments.count > 0 {
+                    Text("· \(comments.count)")
+                        .font(.subheadline)
+                        .foregroundColor(Self.quizTextMuted)
+                }
                 if comments.contains(where: { $0.isExpertReply == true }) {
                     Button {
                         expertFilterActive.toggle()
                     } label: {
                         Text(expertFilterActive ? "Expert · showing only" : "Expert")
                             .font(.system(.caption, design: .default, weight: .semibold))
-                            .foregroundColor(expertFilterActive ? Color(hex: "#16a34a") : VP.dim)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
+                            .foregroundColor(expertFilterActive ? .white : Self.quizTextMuted)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
                             .background(
                                 RoundedRectangle(cornerRadius: VP.radiusFull)
-                                    .fill(expertFilterActive ? Color(hex: "#16a34a").opacity(0.10) : Color.clear)
+                                    .fill(expertFilterActive ? Self.quizAccent : Color.clear)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: VP.radiusFull)
-                                    .stroke(expertFilterActive ? Color(hex: "#16a34a") : VP.border, lineWidth: 1)
+                                    .stroke(expertFilterActive ? Self.quizAccent : Self.quizBorderSoft, lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
                 }
                 Spacer()
-                // C1 — Top / Newest sort toggle (web parity).
-                Picker("Sort", selection: $commentSortOrder) {
-                    Text("Top").tag("top")
-                    Text("Newest").tag("newest")
+                // C1 — Top / Newest sort toggle (web parity), v2 segmented pills.
+                HStack(spacing: 6) {
+                    sortPill(label: "Top",     value: "top")
+                    sortPill(label: "Newest",  value: "newest")
                 }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 160)
             }
-            .padding(.top, 20)
+            .padding(.vertical, 16)
             .padding(.horizontal, 20)
 
             if !auth.isLoggedIn {
-                Text("Sign in to join the discussion.")
-                    .font(.footnote)
-                    .foregroundColor(VP.soft)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(VP.card)
-                    .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
-                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
+                // Anon gate — burgundy editorial card with mono kicker +
+                // serif headline + accent CTA. Preserves the registration
+                // sheet path; tap behavior unchanged from the prior copy.
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("DISCUSSION LOCKED")
+                        .font(.system(.caption2, design: .monospaced, weight: .medium))
+                        .tracking(1.0)
+                        .foregroundColor(Self.quizAccent)
+                    Text("Sign in to join the conversation.")
+                        .font(.system(size: 18, weight: .regular, design: .serif))
+                        .foregroundColor(VP.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        showRegistrationSheet = true
+                    } label: {
+                        Text("Sign In")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 22)
+                            .padding(.vertical, 14)
+                            .background(Self.quizAccent)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Self.quizAccentSoft)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Self.quizAccent, lineWidth: 1)
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
             } else {
                 composer
                     .padding(.horizontal, 20)
-                    .padding(.top, 12)
+                    .padding(.top, 4)
                     .id("composer")
             }
 
             // Comments
             if comments.isEmpty {
-                Text("No comments yet. Be the first to share your thoughts.")
-                    .font(.footnote)
-                    .foregroundColor(VP.dim)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-                    .padding(.horizontal, 20)
+                // Editorial empty state — serif headline + muted subhead.
+                VStack(alignment: .center, spacing: 8) {
+                    Text("Be the first to comment")
+                        .font(.system(size: 22, weight: .regular, design: .serif))
+                        .foregroundColor(VP.text)
+                    Text("You read it. You passed.")
+                        .font(.subheadline)
+                        .foregroundColor(Self.quizTextMuted)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 36)
+                .padding(.horizontal, 20)
             } else {
                 threadedCommentList
                     .padding(.top, 8)
             }
         }
+    }
+
+    /// Segmented sort pill — Top / Newest. v2 burgundy palette.
+    /// Inactive = transparent + muted text; active = soft cream bg +
+    /// burgundy text + warm stroke. Tap haptic preserved.
+    @ViewBuilder
+    private func sortPill(label: String, value: String) -> some View {
+        let isActive = commentSortOrder == value
+        Button {
+            UISelectionFeedbackGenerator().selectionChanged()
+            commentSortOrder = value
+        } label: {
+            Text(label)
+                .font(.system(size: 13, weight: isActive ? .semibold : .medium))
+                .foregroundColor(isActive ? Self.quizAccent : Self.quizTextMuted)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: VP.radiusFull)
+                        .fill(isActive ? Self.quizSurfaceSoft : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: VP.radiusFull)
+                        .stroke(isActive ? Self.quizCardBorder : Color.clear, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Sort: \(label)")
     }
 
     /// T12 — flatten the visible comments into a depth-aware render order.
@@ -1749,29 +2038,44 @@ struct StoryDetailView: View {
             }
             return "."
         }()
+        // v2 mute banner — cream-soft surface, dashed warm stroke, mono
+        // kicker. The deep burgundy text mirrors the locked-quiz tone.
+        // Appeal link stays underlined for affordance + a11y.
         return VStack(alignment: .leading, spacing: 6) {
+            Text("POSTING REQUIRES VERITY")
+                .font(.system(.caption2, design: .monospaced, weight: .medium))
+                .tracking(1.0)
+                .foregroundColor(Self.quizAccent)
             Text("You can't post comments right now.")
-                .font(.system(.footnote, design: .default, weight: .bold))
-                .foregroundColor(Color(hex: "991b1b"))
+                .font(.system(size: 15, weight: .semibold, design: .serif))
+                .foregroundColor(Self.quizAccentDark)
             Text("Posting is blocked \(untilText)")
                 .font(.footnote)
-                .foregroundColor(Color(hex: "991b1b"))
+                .foregroundColor(Self.quizTextMuted)
             if !mute.banned {
                 Link(
                     "File an appeal",
                     destination: SupabaseManager.shared.siteURL.appendingPathComponent("appeal")
                 )
-                .font(.system(.footnote, design: .default, weight: .bold))
-                .foregroundColor(Color(hex: "991b1b"))
+                .font(.system(.footnote, design: .default, weight: .semibold))
+                .foregroundColor(Self.quizAccent)
                 .underline()
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color(hex: "fef2f2"))
-        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.failBorder))
-        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Self.quizSurfaceSoft)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(
+                    Self.quizCardBorder,
+                    style: StrokeStyle(lineWidth: 1, dash: [4, 3])
+                )
+        )
     }
 
     private var activeComposer: some View {
@@ -1780,8 +2084,10 @@ struct StoryDetailView: View {
             // rendered as the locked quiz player so this branch never runs;
             // once the user has passed, the headline confirms they unlocked it.
             if userPassedQuiz {
+                // v2 composer headline — serif editorial voice mirrors the
+                // quiz pass-card tone after unlock.
                 Text("What did you think?")
-                    .font(.system(.subheadline, design: .default, weight: .bold))
+                    .font(.system(size: 17, weight: .regular, design: .serif))
                     .foregroundColor(VP.text)
                     .padding(.bottom, 8)
             }
@@ -1792,7 +2098,7 @@ struct StoryDetailView: View {
                 HStack(spacing: 8) {
                     Text("Replying to ")
                         .font(.caption)
-                        .foregroundColor(VP.dim)
+                        .foregroundColor(Self.quizTextMuted)
                     + Text("@\(parent.users?.username ?? "user")")
                         .font(.system(.caption, design: .default, weight: .semibold))
                         .foregroundColor(VP.text)
@@ -1803,14 +2109,15 @@ struct StoryDetailView: View {
                     } label: {
                         Text("Cancel")
                             .font(.system(.caption, design: .default, weight: .semibold))
-                            .foregroundColor(VP.accent)
+                            .foregroundColor(Self.quizAccent)
                     }
                     .buttonStyle(.plain)
                 }
                 .padding(.bottom, 8)
             }
 
-            // D21: paid-only @mention autocomplete dropdown.
+            // D21: paid-only @mention autocomplete dropdown — v2 white card,
+            // warm-soft stroke, 44pt min row height.
             if canMentionAutocomplete && !mentionSuggestions.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(mentionSuggestions) { u in
@@ -1825,20 +2132,24 @@ struct StoryDetailView: View {
                                 if let score = u.verityScore {
                                     Text("\(score)")
                                         .font(.caption)
-                                        .foregroundColor(VP.dim)
+                                        .foregroundColor(Self.quizTextMuted)
                                 }
                                 Spacer()
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .frame(minHeight: 44)
                         }
                         .buttonStyle(.plain)
-                        Divider().background(VP.border)
+                        Divider().background(Self.quizBorderSoft)
                     }
                 }
-                .background(VP.bg)
-                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
-                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                .background(Color(UIColor.systemBackground))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Self.quizBorderSoft, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .padding(.bottom, 8)
             }
 
@@ -1849,23 +2160,31 @@ struct StoryDetailView: View {
             if let picker = expertPicker {
                 expertPickerOverlay(picker)
             }
-            // Transient inline notice (rate-limit, duplicate, cap-hit).
+            // Transient inline notice (rate-limit, duplicate, cap-hit) —
+            // v2 cream-soft + dashed warm stroke, mono kicker tone.
             if let notice = expertPickerNotice {
                 Text(notice)
                     .font(.caption)
-                    .foregroundColor(VP.warn)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .foregroundColor(Self.quizAccentDark)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(VP.warnSoft)
-                    .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.warn.opacity(0.4)))
-                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Self.quizAccentSoft)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Self.quizAccent.opacity(0.4), lineWidth: 1)
+                    )
                     .padding(.bottom, 8)
             }
 
             HStack(alignment: .top, spacing: 10) {
                 AvatarView(user: auth.currentUser, size: 32)
                 VStack(alignment: .leading, spacing: 8) {
+                    // v2 composer input — white card with warm-soft stroke
+                    // matching the quiz inner-question chrome.
                     TextField("Join the discussion…", text: $commentText, axis: .vertical)
                         .font(.subheadline)
                         .foregroundColor(VP.text)
@@ -1883,17 +2202,25 @@ struct StoryDetailView: View {
                             ToolbarItemGroup(placement: .keyboard) {
                                 Spacer()
                                 Button("Done") { composerFocused = false }
-                                    .foregroundColor(VP.accent)
+                                    .foregroundColor(Self.quizAccent)
                             }
                         }
                         .onChange(of: commentText) { _, new in
                             handleMentionChange(new)
                         }
-                        .padding(10)
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color(UIColor.systemBackground))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Self.quizBorderSoft, lineWidth: 1)
+                        )
 
-                    // Firsthand self-tag toggle (web parity).
+                    // Firsthand self-tag toggle (web parity) — v2 palette:
+                    // unchecked = quizTextSoft outline, checked = burgundy
+                    // ink fill with white checkmark.
                     Button {
                         commentFirsthand.toggle()
                         if commentFirsthand {
@@ -1912,20 +2239,20 @@ struct StoryDetailView: View {
                         HStack(spacing: 7) {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 3)
-                                    .stroke(commentFirsthand ? VP.text : VP.dim, lineWidth: 1.5)
+                                    .stroke(commentFirsthand ? Self.quizAccent : Self.quizTextSoft, lineWidth: 1.5)
                                     .frame(width: 14, height: 14)
                                 if commentFirsthand {
                                     RoundedRectangle(cornerRadius: 2)
-                                        .fill(VP.text)
+                                        .fill(Self.quizAccent)
                                         .frame(width: 14, height: 14)
                                     Image(systemName: "checkmark")
                                         .font(.system(size: 9, weight: .bold))
-                                        .foregroundColor(VP.bg)
+                                        .foregroundColor(.white)
                                 }
                             }
                             Text("I know this firsthand")
                                 .font(.system(.footnote, design: .serif).italic())
-                                .foregroundColor(commentFirsthand ? VP.text : VP.dim)
+                                .foregroundColor(commentFirsthand ? VP.text : Self.quizTextMuted)
                         }
                     }
                     .buttonStyle(.plain)
@@ -1935,7 +2262,7 @@ struct StoryDetailView: View {
                         HStack(spacing: 8) {
                             Text("How do you know?")
                                 .font(.system(.caption, design: .serif).italic())
-                                .foregroundColor(VP.dim)
+                                .foregroundColor(Self.quizTextMuted)
                                 .layoutPriority(0)
                             TextField(
                                 "e.g. dad of three  ·  civil engineer, 30 yrs",
@@ -1948,9 +2275,12 @@ struct StoryDetailView: View {
                                     commentFirsthandContext = String(new.prefix(80))
                                 }
                             }
+                            // Mono char counter, tracked 0.04. Warn = system
+                            // yellow per spec; soft = quizTextSoft.
                             Text("\(80 - commentFirsthandContext.count)")
-                                .font(.system(.caption2, design: .serif).italic())
-                                .foregroundColor(commentFirsthandContext.count > 68 ? VP.warn : VP.muted)
+                                .font(.system(.caption2, design: .monospaced))
+                                .tracking(0.04)
+                                .foregroundColor(commentFirsthandContext.count > 68 ? VP.warn : Self.quizTextSoft)
                                 .monospacedDigit()
                         }
                         .padding(.top, 4)
@@ -1971,20 +2301,23 @@ struct StoryDetailView: View {
 
                     HStack {
                         Spacer()
+                        // v2 Post button — accent burgundy rounded-12 rect
+                        // (matches the quiz CTA). Disabled / rate-limit state
+                        // collapses to quizTextSoft so the button still reads
+                        // but signals "not yet."
                         Button {
                             Task { await postComment() }
                         } label: {
                             Text(commentSubmitting ? "Posting…" : (commentRateRemainingSec > 0 ? "Wait \(commentRateRemainingSec)s" : "Post"))
-                                .font(.system(.subheadline, design: .default, weight: .semibold))
+                                .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 18)
-                                .padding(.vertical, 8)
+                                .padding(.horizontal, 22)
+                                .padding(.vertical, 12)
                                 .background(
-                                    Capsule().fill(
-                                        commentText.trimmingCharacters(in: .whitespaces).isEmpty || commentRateRemainingSec > 0
-                                        ? VP.muted : VP.accent
-                                    )
+                                    commentText.trimmingCharacters(in: .whitespaces).isEmpty || commentRateRemainingSec > 0
+                                    ? Self.quizTextSoft : Self.quizAccent
                                 )
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
                         .disabled(commentText.trimmingCharacters(in: .whitespaces).isEmpty || commentSubmitting || commentRateRemainingSec > 0)
@@ -1992,9 +2325,14 @@ struct StoryDetailView: View {
                 }
             }
             .padding(16)
-            .background(VP.card)
-            .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
-            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Self.quizSurfaceSoft)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Self.quizCardBorder, lineWidth: 1)
+            )
         }
     }
 
@@ -2188,6 +2526,9 @@ struct StoryDetailView: View {
     /// (always shown) + directed experts list (may be empty).
     @ViewBuilder
     private func expertPickerOverlay(_ picker: ExpertPickerData) -> some View {
+        // v2 expert picker — white card, warm-soft stroke, 44pt min row.
+        // VP.expertColor (#16a34a) preserved on the megaphone glyph since
+        // green = expert identity across surfaces, not a chrome accent.
         VStack(alignment: .leading, spacing: 0) {
             // Broadcast button — always visible. Inserts `@expert` sentinel.
             Button {
@@ -2203,22 +2544,22 @@ struct StoryDetailView: View {
                             .foregroundColor(VP.text)
                         Text("Broadcast — counts as 3 mentions")
                             .font(.caption2)
-                            .foregroundColor(VP.dim)
+                            .foregroundColor(Self.quizTextMuted)
                     }
                     Spacer()
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             }
             .buttonStyle(.plain)
-            Divider().background(VP.border)
+            Divider().background(Self.quizBorderSoft)
             if picker.experts.isEmpty {
                 Text("No active experts in \(picker.categoryName) right now.")
                     .font(.caption)
-                    .foregroundColor(VP.dim)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
+                    .foregroundColor(Self.quizTextMuted)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
             } else {
                 ForEach(picker.experts) { expert in
                     Button {
@@ -2238,22 +2579,26 @@ struct StoryDetailView: View {
                                 if let title = expert.expertTitle, !title.isEmpty {
                                     Text(title)
                                         .font(.caption2)
-                                        .foregroundColor(VP.dim)
+                                        .foregroundColor(Self.quizTextMuted)
                                 }
                             }
                             Spacer()
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .frame(minHeight: 44)
                     }
                     .buttonStyle(.plain)
-                    Divider().background(VP.border)
+                    Divider().background(Self.quizBorderSoft)
                 }
             }
         }
-        .background(VP.bg)
-        .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
-        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+        .background(Color(UIColor.systemBackground))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Self.quizBorderSoft, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .padding(.bottom, 8)
     }
 
@@ -2271,9 +2616,11 @@ struct StoryDetailView: View {
             avatarWithScoreCard(for: comment, initials: initials)
             VStack(alignment: .leading, spacing: 4) {
                 if comment.isPinned == true {
-                    Text("Pinned as Article Context")
-                        .font(.system(.caption2, design: .default, weight: .bold))
-                        .foregroundColor(VP.accent)
+                    // v2 pinned kicker — mono caption, burgundy ACCENT.
+                    Text("PINNED AS ARTICLE CONTEXT")
+                        .font(.system(.caption2, design: .monospaced, weight: .medium))
+                        .tracking(1.0)
+                        .foregroundColor(Self.quizAccent)
                 }
                 // EXPERT_THREADS Wave 5 — distinctive chrome attaches to
                 // author.is_expert AND article.category ∈
@@ -2340,13 +2687,14 @@ struct StoryDetailView: View {
                     if comment.isEdited == true && !comment.isDeleted {
                         Text("(edited)")
                             .font(.caption2)
-                            .foregroundColor(VP.dim)
+                            .foregroundColor(Self.quizTextSoft)
                     }
                     Spacer()
                     if let d = comment.createdAt {
+                        // v2 timestamp — mono caption, soft warm grey.
                         Text(timeAgo(d))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundColor(Self.quizTextSoft)
                     }
                 }
                 if comment.isDeleted {
@@ -2360,14 +2708,22 @@ struct StoryDetailView: View {
                 } else if isEditing {
                     // A123 — inline edit mode. Server still owns the
                     // edit window; this just lets the user revise the
-                    // body and PATCH /api/comments/[id].
+                    // body and PATCH /api/comments/[id]. v2 chrome: white
+                    // card + warm-soft stroke; Save = accent burgundy,
+                    // Cancel = ghost text.
                     TextEditor(text: $editingCommentBody)
                         .font(.subheadline)
                         .foregroundColor(VP.text)
                         .frame(minHeight: 80)
                         .padding(8)
-                        .background(VP.card)
-                        .overlay(RoundedRectangle(cornerRadius: VP.radiusSM).stroke(VP.border))
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color(UIColor.systemBackground))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Self.quizBorderSoft, lineWidth: 1)
+                        )
                         .accessibilityLabel("Edit comment")
                     HStack(spacing: 10) {
                         Button {
@@ -2375,7 +2731,7 @@ struct StoryDetailView: View {
                         } label: {
                             Text("Cancel")
                                 .font(.system(.caption, design: .default, weight: .semibold))
-                                .foregroundColor(VP.dim)
+                                .foregroundColor(Self.quizTextMuted)
                         }
                         .buttonStyle(.plain)
                         .disabled(editSaving)
@@ -2388,10 +2744,10 @@ struct StoryDetailView: View {
                                 Text("Save")
                                     .font(.system(.caption, design: .default, weight: .semibold))
                                     .foregroundColor(.white)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 4)
-                                    .background(VP.accent)
-                                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusXS))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 6)
+                                    .background(Self.quizAccent)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                         }
                         .buttonStyle(.plain)
@@ -2406,22 +2762,32 @@ struct StoryDetailView: View {
                 if !comment.isDeleted,
                    let rwe = comment.realWorldExperience?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !rwe.isEmpty {
-                    HStack(spacing: 0) {
-                        Text("— I know this firsthand")
-                            .font(.system(.footnote, design: .serif).italic())
-                            .foregroundColor(VP.dim)
-                        Text(" ")
-                            .font(.system(.footnote, design: .serif).italic())
-                        Text("·")
-                            .font(.system(.footnote, design: .serif).italic())
-                            .foregroundColor(VP.muted)
-                        Text(" ")
-                            .font(.system(.footnote, design: .serif).italic())
-                        Text(rwe)
-                            .font(.system(.footnote, design: .serif).italic())
-                            .foregroundColor(VP.text)
-                        Spacer(minLength: 0)
+                    // v2 firsthand callout — 2pt burgundy leading bar +
+                    // accent-soft fill, serif italic body. Matches the
+                    // composer's firsthand affordance on the read side.
+                    HStack(alignment: .top, spacing: 10) {
+                        Rectangle()
+                            .fill(Self.quizAccent)
+                            .frame(width: 2)
+                        HStack(spacing: 0) {
+                            Text("— I know this firsthand")
+                                .font(.system(size: 14, design: .serif).italic())
+                                .foregroundColor(Self.quizAccentDark)
+                            Text(" · ")
+                                .font(.system(size: 14, design: .serif).italic())
+                                .foregroundColor(Self.quizTextSoft)
+                            Text(rwe)
+                                .font(.system(size: 14, design: .serif).italic())
+                                .foregroundColor(VP.text)
+                            Spacer(minLength: 0)
+                        }
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Self.quizAccentSoft)
+                    )
                     .padding(.top, 6)
                 }
                 if !comment.isDeleted && !isEditing {
@@ -2469,7 +2835,7 @@ struct StoryDetailView: View {
                         } label: {
                             Text("Edit")
                                 .font(.system(.caption, design: .default, weight: .semibold))
-                                .foregroundColor(VP.accent)
+                                .foregroundColor(Self.quizAccent)
                         }
                         .buttonStyle(.plain)
                         .padding(.top, 4)
@@ -2643,7 +3009,7 @@ struct StoryDetailView: View {
             case .text(let s):
                 return acc + Text(s)
             case .mention(let uname):
-                return acc + Text("@\(uname)").foregroundColor(VP.accent).fontWeight(.semibold)
+                return acc + Text("@\(uname)").foregroundColor(Self.quizAccent).fontWeight(.semibold)
             }
         }
         combined
@@ -2807,7 +3173,7 @@ struct StoryDetailView: View {
                     } label: {
                         Text("Reopen")
                             .font(.system(size: VP.Size.xs, weight: .semibold))
-                            .foregroundColor(VP.accent)
+                            .foregroundColor(Self.quizAccent)
                     }
                     .buttonStyle(.plain)
                 }
@@ -2843,7 +3209,7 @@ struct StoryDetailView: View {
                 } label: {
                     Text("Allow another reply")
                         .font(.system(size: VP.Size.xs, weight: .semibold))
-                        .foregroundColor(VP.accent)
+                        .foregroundColor(Self.quizAccent)
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 2)
@@ -2953,15 +3319,15 @@ struct StoryDetailView: View {
             VStack(spacing: 8) {
                 Image(systemName: "star.fill")
                     .font(.system(size: 44, weight: .bold))
-                    .foregroundColor(VP.accent)
+                    .foregroundColor(VP.burgundy)
                     .symbolEffect(.bounce, value: showPassBurst)
                 if let delta = pointsDelta, pointsDeltaVisible {
                     Text("+\(delta) points")
                         .font(.system(.subheadline, design: .default, weight: .bold))
-                        .foregroundColor(VP.accent)
+                        .foregroundColor(VP.burgundy)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
-                        .background(RoundedRectangle(cornerRadius: VP.radiusFull).fill(VP.accent.opacity(0.1)))
+                        .background(RoundedRectangle(cornerRadius: VP.radiusFull).fill(VP.burgundy.opacity(0.1)))
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
@@ -4260,19 +4626,26 @@ struct StoryDetailView: View {
     /// top-level + reply composers.
     @ViewBuilder
     private func intentPickerChip(value: String?, label: String) -> some View {
+        // v2 composer intent chip — pill row beneath the input. Inactive
+        // = cream-soft bg + warm-soft stroke + muted text. Active = accent
+        // soft bg + burgundy stroke + deep burgundy text. Matches the
+        // composer pill spec for the comment redesign; tap = mutex select.
         let isActive = commentIntent == value
-        let accent = intentAccent(value)
         Button {
             commentIntent = value
         } label: {
             Text(label)
-                .font(.system(size: 11, weight: isActive ? .semibold : .medium))
-                .foregroundColor(isActive ? (accent ?? VP.text) : VP.dim)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
+                .font(.system(size: 12, weight: isActive ? .semibold : .medium))
+                .foregroundColor(isActive ? Self.quizAccentDark : Self.quizTextMuted)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: VP.radiusFull)
+                        .fill(isActive ? Self.quizAccentSoft : Self.quizSurfaceSoft)
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: VP.radiusFull)
-                        .stroke(isActive ? (accent ?? VP.text) : VP.border, lineWidth: 1)
+                        .stroke(isActive ? Self.quizAccent : Self.quizBorderSoft, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)

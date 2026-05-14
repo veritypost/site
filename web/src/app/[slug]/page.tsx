@@ -420,7 +420,7 @@ export default async function ArticleSlugPage({
         }
         timelineSlot={
           <>
-            <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} showTease={false} articleCountReached={articleCountReached} currentArticleId={article.id} />
+            <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} storyTitle={story.title} showTease={false} articleCountReached={articleCountReached} currentArticleId={article.id} />
             {/* article_rail: sticky right-rail on desktop ≥1180px (globals.css:828);
                 tabbed inside the Timeline panel on mobile/tablet (display:none under
                 the default Article tab — wasted serve calls on <1180px viewports). */}

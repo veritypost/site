@@ -291,6 +291,20 @@ export default function SectionsMenu() {
           font-style: italic;
           color: ${C.dim};
         }
+        .vp-home-sections-search:focus {
+          border-bottom-color: ${C.accent} !important;
+        }
+        .vp-home-sections-close { transition: color 160ms ease-out; }
+        .vp-home-sections-close:hover { color: ${C.text} !important; }
+        .vp-home-sections-result:hover {
+          background: ${C.accentSoft} !important;
+        }
+        .vp-home-sections-result mark {
+          background: ${C.accentSoft};
+          color: ${C.accentDark};
+          padding: 0 2px;
+          border-radius: 3px;
+        }
         @media (prefers-reduced-motion: reduce) {
           .vp-home-sections-overlay { animation: none; }
         }
@@ -328,7 +342,7 @@ export default function SectionsMenu() {
               position: 'fixed',
               inset: 0,
               zIndex: Z.CRITICAL_MODAL,
-              background: 'var(--bg)',
+              background: C.bg,
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -347,8 +361,8 @@ export default function SectionsMenu() {
               <span
                 style={{
                   fontFamily: serifStack,
-                  fontSize: 18,
-                  fontWeight: 600,
+                  fontSize: 22,
+                  fontWeight: 400,
                   letterSpacing: '-0.01em',
                   color: C.text,
                 }}
@@ -358,6 +372,7 @@ export default function SectionsMenu() {
               <button
                 type="button"
                 onClick={close}
+                className="vp-home-sections-close"
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -365,7 +380,7 @@ export default function SectionsMenu() {
                   fontFamily: serifStack,
                   fontStyle: 'italic',
                   fontSize: 14,
-                  color: C.text,
+                  color: C.muted,
                   cursor: 'pointer',
                 }}
               >
@@ -553,13 +568,14 @@ function SearchResults({
             prefetch={false}
             onClick={onNavigate}
             onMouseEnter={() => onHighlight(idx)}
+            className="vp-home-sections-result"
             style={{
               display: 'block',
               textDecoration: 'none',
               color: 'inherit',
-              background: isHighlighted ? 'var(--p-surface-sunken)' : 'transparent',
-              padding: '12px 10px',
-              margin: '0 -10px',
+              background: isHighlighted ? C.accentSoft : 'transparent',
+              padding: '12px 16px',
+              margin: '0 -16px',
               borderRadius: 4,
               transition: 'background 120ms ease',
             }}
@@ -570,7 +586,7 @@ function SearchResults({
                 // falls through to Georgia). Ensures the same family as
                 // UpNextSheet + NextStoryFooter card titles.
                 fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
-                fontSize: 17,
+                fontSize: 16,
                 fontWeight: 500,
                 color: C.text,
                 lineHeight: 1.3,
@@ -583,13 +599,18 @@ function SearchResults({
             {a.excerpt && (
               <p
                 style={{
-                  // Hardcoded --stone-700 -> editorial muted-ink token.
-                  // Line-height 1.5 -> 1.4 (matches UpNextSheet excerpt).
+                  // v2 — sans 13, muted; line-clamp 2 keeps rows scannable.
+                  fontFamily:
+                    'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
                   fontSize: 13,
-                  color: 'var(--p-ink-muted)',
+                  color: C.muted,
                   lineHeight: 1.4,
                   marginTop: 5,
                   marginBottom: 0,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
                 }}
               >
                 {a.excerpt}
@@ -600,9 +621,10 @@ function SearchResults({
                 style={{
                   fontFamily: MONO_STACK,
                   fontSize: 10,
-                  color: 'var(--p-ink-dim)',
+                  color: C.dim,
                   marginTop: 8,
-                  letterSpacing: '0.01em',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
                   lineHeight: 1.5,
                 }}
               >
@@ -804,7 +826,7 @@ function FollowingRow({
                           width: 6,
                           height: 6,
                           borderRadius: '50%',
-                          background: r.unread ? C.text : 'transparent',
+                          background: r.unread ? C.accent : 'transparent',
                           flexShrink: 0,
                         }}
                       />
@@ -881,7 +903,7 @@ function AllRow({ active, onNavigate }: { active: boolean; onNavigate: () => voi
             fontSize: 22,
             fontWeight: active ? 600 : 500,
             letterSpacing: '-0.015em',
-            color: C.text,
+            color: active ? C.accent : C.text,
           }}
         >
           Home
@@ -917,7 +939,7 @@ function CategoryRow({
         fontFamily: serifStack,
         fontSize: 22,
         fontWeight: expanded || parentActive ? 600 : 500,
-        color: C.text,
+        color: parentActive ? C.accent : C.text,
         letterSpacing: '-0.015em',
       }}
     >
@@ -986,7 +1008,7 @@ function CategoryRow({
                 style={{
                   fontSize: 14,
                   fontWeight: subActive ? 600 : 400,
-                  color: subActive ? C.text : C.muted,
+                  color: subActive ? C.accent : C.muted,
                   textDecoration: 'none',
                   padding: '2px 0',
                 }}

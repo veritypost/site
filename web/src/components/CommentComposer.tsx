@@ -53,6 +53,27 @@ type MentionSuggest =
 
 const PICKER_CACHE_TTL_MS = 60_000;
 
+// v2 editorial palette — references the central --vp-* tokens defined
+// in globals.css (single source of truth for the burgundy redesign).
+const ACCENT = 'var(--vp-accent)';
+const ACCENT_DARK = 'var(--vp-accent-dark)';
+const ACCENT_SOFT = 'var(--vp-accent-soft)';
+const BORDER = 'var(--vp-border)';
+const BORDER_SOFT = 'var(--vp-border-soft)';
+const SURFACE = 'var(--vp-surface)';
+const SURFACE_SOFT = 'var(--vp-surface-soft)';
+const TEXT = 'var(--vp-ink)';
+const TEXT_MUTED = 'var(--vp-text-muted)';
+const TEXT_SOFT = 'var(--vp-text-soft)';
+const WARN = '#92400e';
+const DANGER_BG = '#fee2e2';
+const DANGER_BORDER = '#fecaca';
+const DANGER_TEXT = '#b91c1c';
+
+const MONO = 'var(--font-ibm-mono), "SFMono-Regular", Consolas, monospace';
+const SERIF = '"Source Serif 4", var(--font-source-serif), Georgia, serif';
+const SANS = 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+
 export default function CommentComposer({
   articleId,
   parentId = null,
@@ -475,19 +496,35 @@ export default function CommentComposer({
   const showMentionHint = permsLoaded && !canMention && draftHasMention;
 
   if (!permsLoaded) return null;
-  if (!canPost) return <div style={muteBannerStyle}>Posting comments requires a Verity subscription.</div>;
+  if (!canPost) return (
+    <div style={muteBannerStyle}>
+      Posting comments requires a Verity subscription.{' '}
+      <a href="/pricing" style={{ color: ACCENT, textDecoration: 'underline', fontWeight: 500 }}>Upgrade</a>.
+    </div>
+  );
   if (muteState) return <div style={muteBannerStyle}>Posting is disabled while the account notice at the top of the page applies.</div>;
   if (quizPassed === false && !muteState && permsLoaded) {
     return (
       <div style={{
-        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 16/18 inset matches CommentComposer container surface
         padding: '16px 18px',
-        border: '1px solid var(--border, #e5e5e5)',
-        borderRadius: 12, // magic — intentional (between --r-md 10 and --r-lg 14 for the lock panel)
-        marginBottom: 'var(--s4)',
+        border: `1px solid ${ACCENT}`,
+        borderRadius: 16,
+        marginBottom: 16,
+        background: ACCENT_SOFT,
       }}>
-        <div style={{ fontSize: 14, color: 'var(--dim, #888)', lineHeight: 1.5 }}>
-          {hasQuiz ? 'Take the quiz.' : 'Comments are locked on this article.'}
+        <div style={{
+          fontFamily: MONO,
+          fontSize: 10,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: ACCENT,
+          fontWeight: 600,
+          marginBottom: 6,
+        }}>
+          Discussion Locked
+        </div>
+        <div style={{ fontFamily: SANS, fontSize: 14, color: ACCENT_DARK, lineHeight: 1.5 }}>
+          {hasQuiz ? 'Pass the quiz to join the conversation.' : 'Comments are locked on this article.'}
         </div>
       </div>
     );
@@ -510,7 +547,7 @@ export default function CommentComposer({
     color: string;
     bg: string;
   }> = [
-    { value: null,             label: 'No intent',      replyLabel: 'Just replying',    color: 'var(--text)', bg: 'transparent' },
+    { value: null,             label: 'No intent',      replyLabel: 'Just replying',    color: 'var(--vp-ink)', bg: 'transparent' },
     { value: 'add_context',    label: 'Add Context',    replyLabel: 'Adding to this',   color: '#3d6b4f', bg: 'rgba(61,107,79,0.05)' },
     { value: 'different_take', label: 'Different Take', replyLabel: 'A different take', color: '#a14b1a', bg: 'rgba(161,75,26,0.05)' },
     { value: 'question',       label: 'Question',       replyLabel: 'Question',         color: '#4a6e8a', bg: 'rgba(74,110,138,0.05)' },
@@ -521,7 +558,7 @@ export default function CommentComposer({
   return (
     <div style={isReply ? replyContainerStyle : containerStyle}>
 
-      <div style={{ position: 'relative', ...(isReply ? { borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 } : {}) }}>
+      <div style={{ position: 'relative' }}>
         <div
           ref={editorRef}
           contentEditable
@@ -533,22 +570,21 @@ export default function CommentComposer({
           role="textbox"
           aria-multiline="true"
           aria-label={isReply ? 'Reply text' : 'Comment text'}
-          style={{
-            ...editorStyle,
-            ...(isReply ? { minHeight: 60, fontSize: 14.5, lineHeight: 1.55 } : {}),
-          }}
+          style={editorStyle}
         />
         {isEmpty && (
           <div
             aria-hidden
             style={{
               position: 'absolute',
-              top: isReply ? 16 : 4,
+              top: 4,
               left: 0,
               pointerEvents: 'none',
-              fontSize: isReply ? 14.5 : 14,
-              lineHeight: 1.6,
-              color: 'var(--p-ink-faint, #bbb)',
+              fontFamily: SANS,
+              fontSize: 15,
+              lineHeight: 1.55,
+              color: TEXT_SOFT,
+              opacity: 0.8,
               userSelect: 'none',
             }}
           >
@@ -572,25 +608,24 @@ export default function CommentComposer({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8,
+                gap: 10,
                 width: '100%',
-                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6/10 row inset for the mention dropdown
-                padding: '6px 10px',
+                padding: '8px 12px',
                 border: 'none',
-                background: i === mentionSuggest.activeIndex ? 'var(--accent-bg)' : 'transparent',
+                background: i === mentionSuggest.activeIndex ? SURFACE_SOFT : 'transparent',
                 cursor: 'pointer',
-                borderRadius: 'var(--r-sm)',
+                borderRadius: 8,
                 textAlign: 'left',
               }}
             >
               <span style={{ width: 24, height: 24, borderRadius: '50%', background: u.avatar_color || '#ccc', backgroundImage: u.avatar_url ? `url(${u.avatar_url})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff' }}>
                 {!u.avatar_url && u.username ? u.username[0].toUpperCase() : ''}
               </span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text, #1a1a1a)' }}>@{u.username}</span>
+              <span style={{ fontFamily: SANS, fontSize: 13, fontWeight: 600, color: TEXT }}>@{u.username}</span>
               {u.display_name && u.display_name !== u.username && (
-                <span style={{ fontSize: 12, color: 'var(--dim, #666)', marginLeft: 2 }}>{u.display_name}</span>
+                <span style={{ fontFamily: SANS, fontSize: 12, color: TEXT_MUTED, marginLeft: 2 }}>{u.display_name}</span>
               )}
-              {u.is_expert && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--success-text)', marginLeft: 'auto' }}>Expert</span>}
+              {u.is_expert && <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, color: ACCENT, marginLeft: 'auto' }}>Expert</span>}
             </button>
           ))}
         </div>
@@ -611,29 +646,33 @@ export default function CommentComposer({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8,
+                gap: 10,
                 width: '100%',
-                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 7/10 row inset emphasises the broadcast row vs 6/10 bare-mention rows
-                padding: '7px 10px',
+                padding: '8px 12px',
                 border: 'none',
-                background: visibleActive === 0 ? 'rgba(22,163,74,0.10)' : 'rgba(22,163,74,0.04)',
+                background: visibleActive === 0 ? ACCENT_SOFT : 'transparent',
                 cursor: 'pointer',
-                borderRadius: 'var(--r-sm)',
+                borderRadius: 8,
                 textAlign: 'left',
-                borderBottom: filtered.length > 0 ? '1px solid var(--border, #e5e5e5)' : 'none',
-                marginBottom: filtered.length > 0 ? 'var(--s1)' : 'var(--s0)',
+                borderBottom: filtered.length > 0 ? `1px solid ${BORDER_SOFT}` : 'none',
+                marginBottom: filtered.length > 0 ? 4 : 0,
+                fontFamily: MONO,
+                fontSize: 10,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                color: ACCENT,
               }}
             >
-              <span aria-hidden style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--success-text)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>★</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--success-text)' }}>{broadcastLabel}</span>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--dim, #888)', marginLeft: 'auto' }}>Broadcast</span>
+              <span>{broadcastLabel}</span>
+              <span style={{ marginLeft: 'auto' }}>Broadcast</span>
             </button>
             {filtered.length === 0 && partial.length === 0 && (
               <div style={{
+                fontFamily: SANS,
                 fontSize: 12,
-                color: 'var(--dim, #666)',
-                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6/10 row inset matches the mention dropdown rows
-                padding: '6px 10px',
+                color: TEXT_MUTED,
+                padding: '8px 12px',
               }}>No experts in this category are available right now.</div>
             )}
             {filtered.map((u, i) => {
@@ -645,30 +684,29 @@ export default function CommentComposer({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 8,
+                    gap: 10,
                     width: '100%',
-                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6/10 row inset for the mention dropdown
-                    padding: '6px 10px',
+                    padding: '8px 12px',
                     border: 'none',
-                    background: idx === sugg.activeIndex ? 'var(--accent-bg)' : 'transparent',
+                    background: idx === sugg.activeIndex ? SURFACE_SOFT : 'transparent',
                     cursor: 'pointer',
-                    borderRadius: 'var(--r-sm)',
+                    borderRadius: 8,
                     textAlign: 'left',
                   }}
                 >
                   <span style={{ width: 24, height: 24, borderRadius: '50%', background: u.avatar_color || '#ccc', backgroundImage: u.avatar_url ? `url(${u.avatar_url})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff' }}>
                     {!u.avatar_url && u.username ? u.username[0].toUpperCase() : ''}
                   </span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text, #1a1a1a)' }}>@expert_{u.username}</span>
-                  {u.expert_title && <span style={{ fontSize: 12, color: 'var(--dim, #666)', marginLeft: 2 }}>{u.expert_title}</span>}
-                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--success-text)', marginLeft: 'auto' }}>Expert</span>
+                  <span style={{ fontFamily: SANS, fontSize: 13, fontWeight: 600, color: TEXT }}>@expert_{u.username}</span>
+                  {u.expert_title && <span style={{ fontFamily: SANS, fontSize: 12, color: TEXT_MUTED, marginLeft: 2 }}>{u.expert_title}</span>}
+                  <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, color: ACCENT, marginLeft: 'auto' }}>Expert</span>
                 </button>
               );
             })}
           </div>
         );
       })()}
-      <div style={{ marginTop: isReply ? 12 : 8 }}>
+      <div style={{ marginTop: 12 }}>
         <div
           style={{
             display: 'flex',
@@ -681,13 +719,6 @@ export default function CommentComposer({
         >
           {INTENT_OPTIONS.map((opt) => {
             const active = intent === opt.value;
-            const isNeutral = opt.value === null;
-            // Neutral idle: muted ink on neutral border. Intent idle: intent
-            // color text + border, transparent fill. On state inverts to a
-            // solid fill (ink for neutral, intent color for intents).
-            const idleColor = isNeutral ? 'var(--text-secondary)' : opt.color;
-            const idleBorder = isNeutral ? 'var(--border)' : opt.color;
-            const activeFill = isNeutral ? 'var(--text)' : opt.color;
             return (
               <button
                 key={String(opt.value)}
@@ -697,26 +728,29 @@ export default function CommentComposer({
                 aria-label={isReply ? opt.replyLabel : opt.label}
                 onClick={() => setIntent(opt.value)}
                 onMouseEnter={(e) => {
-                  if (!active && !isNeutral) e.currentTarget.style.background = opt.bg;
+                  if (!active) {
+                    e.currentTarget.style.borderColor = ACCENT_SOFT;
+                    e.currentTarget.style.color = TEXT;
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  if (!active) e.currentTarget.style.background = 'transparent';
+                  if (!active) {
+                    e.currentTarget.style.borderColor = BORDER;
+                    e.currentTarget.style.color = TEXT_MUTED;
+                  }
                 }}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 7,
-                  fontSize: 12.5,
+                  fontFamily: SANS,
+                  fontSize: 12,
                   fontWeight: 500,
-                  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8/14 sits between CommentRow's 6/12 reply and 9/16 top-level action pills
-                  padding: '8px 14px',
-                  border: `1px solid ${active ? activeFill : idleBorder}`,
-                  borderRadius: 0,
-                  background: active ? activeFill : 'transparent',
-                  // Active text contrasts on the fill. Neutral pill flips with
-                  // theme (white-on-ink-light, dark-on-white-ink-dark). Intent
-                  // pills always render white-on-brand-color regardless of theme.
-                  color: active ? (isNeutral ? 'var(--bg)' : '#fcfcfc') : idleColor,
+                  padding: '6px 12px',
+                  border: `1px solid ${active ? ACCENT : BORDER}`,
+                  borderRadius: 999,
+                  background: active ? ACCENT_SOFT : SURFACE_SOFT,
+                  color: active ? ACCENT_DARK : TEXT_MUTED,
                   cursor: 'pointer',
                   letterSpacing: '0',
                   lineHeight: 1.2,
@@ -729,13 +763,13 @@ export default function CommentComposer({
           })}
         </div>
       </div>
-      <div style={footerStyle}>
+      <div style={formattingToolbarStyle}>
         {(
           [
             { command: 'bold',          label: 'B',  title: 'Bold',          extraStyle: { fontWeight: 700 as const } },
             { command: 'italic',        label: 'I',  title: 'Italic',        extraStyle: { fontStyle: 'italic' as const } },
             { command: 'strikeThrough', label: 'S',  title: 'Strikethrough', extraStyle: { textDecoration: 'line-through' as const } },
-            { command: 'code',          label: '`',  title: 'Code',          extraStyle: { fontFamily: 'monospace' } },
+            { command: 'code',          label: '`',  title: 'Code',          extraStyle: { fontFamily: MONO } },
           ] as const
         ).map(({ command, label, title, extraStyle }) => (
           <button
@@ -747,37 +781,48 @@ export default function CommentComposer({
               if (command === 'code') applyCodeFormat();
               else applyFormat(command);
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = ACCENT;
+              e.currentTarget.style.color = ACCENT;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = BORDER;
+              e.currentTarget.style.color = TEXT_MUTED;
+            }}
             style={{
               ...extraStyle,
-              fontSize: 12,
-              width: 26,
-              height: 26,
+              fontSize: 13,
+              width: 28,
+              height: 28,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid var(--border)',
-              borderRadius: 0,
-              background: 'transparent',
-              color: 'var(--muted-foreground)',
+              border: `1px solid ${BORDER}`,
+              borderRadius: 8,
+              background: SURFACE,
+              color: TEXT_MUTED,
               cursor: 'pointer',
-              padding: 'var(--s0)',
+              padding: 0,
               flexShrink: 0,
             }}
           >
             {label}
           </button>
         ))}
-        <span style={{ flex: 1 }} />
+      </div>
+      <div style={firsthandRowStyle}>
         {firsthand ? (
           <span
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 8,
-              flex: '1 1 240px',
+              width: '100%',
               minWidth: 0,
-              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 4/6 inset gives the firsthand row a tighter rhythm than other toolbar controls
-              padding: '4px 6px',
+              background: SURFACE,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 10,
+              padding: '10px 12px',
             }}
           >
             <button
@@ -786,12 +831,12 @@ export default function CommentComposer({
               aria-pressed={true}
               aria-label="Turn off firsthand"
               style={{
-                width: 12,
-                height: 12,
-                borderRadius: 3, // magic — intentional (below --r-sm 6 — checkbox square needs a hairline radius)
-                border: '1.5px solid var(--p-ink, #0a0a0a)',
-                background: 'var(--p-ink, #0a0a0a)',
-                padding: 'var(--s0)',
+                width: 16,
+                height: 16,
+                borderRadius: 3,
+                border: `1.5px solid ${ACCENT}`,
+                background: ACCENT,
+                padding: 0,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -799,8 +844,8 @@ export default function CommentComposer({
                 flexShrink: 0,
               }}
             >
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
-                <path d="M1.5 4l1.7 1.7L6.5 2.5" stroke="var(--p-bg, #fff)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              <svg width="10" height="10" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+                <path d="M1.5 4l1.7 1.7L6.5 2.5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
             <input
@@ -813,26 +858,28 @@ export default function CommentComposer({
               style={{
                 flex: 1,
                 minWidth: 0,
-                fontFamily: 'var(--font-serif), Georgia, serif',
+                fontFamily: SERIF,
                 fontStyle: 'italic',
-                fontSize: 13,
-                color: 'var(--p-ink, #0a0a0a)',
+                fontSize: 14,
+                color: TEXT,
                 border: 'none',
                 outline: 'none',
                 background: 'transparent',
-                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: tight 2px inset for the inline firsthand context input
                 padding: '2px 0',
                 letterSpacing: '0.01em',
               }}
             />
             <span
               style={{
-                fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
+                fontFamily: MONO,
                 fontSize: 10,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                fontWeight: 500,
                 color:
                   firsthandContext.length > FIRSTHAND_CONTEXT_LIMIT - 12
-                    ? '#a14b1a'
-                    : 'var(--muted-foreground)',
+                    ? WARN
+                    : TEXT_SOFT,
                 fontVariantNumeric: 'tabular-nums',
                 flexShrink: 0,
               }}
@@ -841,127 +888,120 @@ export default function CommentComposer({
             </span>
           </span>
         ) : (
-          <button
-            type="button"
-            onClick={() => {
-              setFirsthand(true);
-              if (!firsthandContext.trim() && profileBackgroundOneline.trim()) {
-                setFirsthandContext(profileBackgroundOneline.trim().slice(0, FIRSTHAND_CONTEXT_LIMIT));
-              }
-            }}
-            aria-pressed={false}
+          <label
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 7,
-              background: 'transparent',
-              border: 'none',
-              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 4/6 inset matches the firsthand-on sibling for visual rhythm
-              padding: '4px 6px',
+              gap: 8,
               cursor: 'pointer',
-              fontFamily: 'var(--font-serif), Georgia, serif',
-              fontStyle: 'italic',
-              fontSize: 12.5,
-              letterSpacing: '0.01em',
-              color: 'var(--p-ink-muted, #52525b)',
-              opacity: 0.78,
-              transition: 'color 140ms ease, opacity 140ms ease',
+              fontFamily: SANS,
+              fontSize: 13,
+              color: TEXT,
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.78'; }}
           >
-            <span
-              aria-hidden="true"
+            <input
+              type="checkbox"
+              checked={false}
+              onChange={() => {
+                setFirsthand(true);
+                if (!firsthandContext.trim() && profileBackgroundOneline.trim()) {
+                  setFirsthandContext(profileBackgroundOneline.trim().slice(0, FIRSTHAND_CONTEXT_LIMIT));
+                }
+              }}
               style={{
-                width: 12,
-                height: 12,
-                borderRadius: 3, // magic — intentional (below --r-sm 6 — checkbox square needs a hairline radius)
-                border: '1.5px solid currentColor',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                width: 16,
+                height: 16,
+                accentColor: ACCENT,
+                margin: 0,
+                cursor: 'pointer',
                 flexShrink: 0,
-                background: 'transparent',
               }}
             />
             I know this firsthand
-          </button>
+          </label>
         )}
+      </div>
+      <div style={footerStyle}>
         <span
           aria-live="polite"
           style={{
-            fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
-            fontSize: 10.5,
-            letterSpacing: '0.08em',
-            color: bodyText.length > COMMENT_BODY_MAX - 200 ? '#a14b1a' : 'var(--muted-foreground)',
+            fontFamily: MONO,
+            fontSize: 10,
+            letterSpacing: '0.04em',
+            fontWeight: 500,
+            color: bodyText.length > COMMENT_BODY_MAX - 200 ? WARN : TEXT_SOFT,
             fontVariantNumeric: 'tabular-nums',
           }}
         >
           {bodyText.length} / {COMMENT_BODY_MAX}
         </span>
-        {onCancel && <button onClick={onCancel} style={cancelBtnStyle}>Cancel</button>}
-        <button
-          onClick={submit}
-          disabled={isEmpty || busy}
-          onMouseEnter={(e) => {
-            if (!isEmpty && !busy) e.currentTarget.style.background = '#e33010';
-          }}
-          onMouseLeave={(e) => {
-            if (!isEmpty && !busy) e.currentTarget.style.background = 'var(--text)';
-          }}
-          style={{
-            ...postBtnStyle,
-            background: !isEmpty && !busy ? 'var(--text)' : 'transparent',
-            color: !isEmpty && !busy ? 'var(--bg)' : 'var(--muted)',
-            border: !isEmpty && !busy ? '1px solid var(--text)' : '1px solid var(--border)',
-            cursor: !isEmpty && !busy ? 'pointer' : 'default',
-          }}
-        >
-          {busy ? 'Sending…' : isReply ? 'Send reply' : 'Post'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = TEXT;
+                e.currentTarget.style.textDecoration = 'underline';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = TEXT_MUTED;
+                e.currentTarget.style.textDecoration = 'none';
+              }}
+              style={cancelBtnStyle}
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            onClick={submit}
+            disabled={isEmpty || busy}
+            onMouseEnter={(e) => {
+              if (!isEmpty && !busy) e.currentTarget.style.background = ACCENT_DARK;
+            }}
+            onMouseLeave={(e) => {
+              if (!isEmpty && !busy) e.currentTarget.style.background = ACCENT;
+            }}
+            style={{
+              ...postBtnStyle,
+              opacity: isEmpty || busy ? 0.5 : 1,
+              cursor: !isEmpty && !busy ? 'pointer' : 'default',
+            }}
+          >
+            {busy ? 'Sending…' : isReply ? 'Send reply' : 'Post'}
+          </button>
+        </div>
       </div>
-      {error && <div style={{ fontSize: 12, color: '#dc2626', marginTop: 6 }}>{error}</div>}
+      {error && <div style={submitErrorStyle}>{error}</div>}
     </div>
   );
 }
 
 const containerStyle: CSSProperties = {
-  // Top-level composer keeps a soft hairline border but inherits the
-  // sharp-corner institutional treatment of the reply panel — no
-  // box-shadow, no rounded corners.
-  border: '1px solid var(--border)',
-  borderRadius: 0,
-  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 16/18 container inset (18 off-grid keeps the editor breathing room)
+  border: `1px solid ${BORDER}`,
+  borderRadius: 16,
   padding: '16px 18px',
-  background: 'var(--bg)',
-  marginBottom: 'var(--s4)',
+  background: SURFACE_SOFT,
+  marginTop: 16,
+  marginBottom: 16,
 };
 const replyContainerStyle: CSSProperties = {
-  // Reply panel — heavier 1.5px ink border, page-bg fill, sharp corners.
-  // Reads as a deliberate institutional surface inside the tinted reply
-  // block, not a floating dialog. Matches the mockup's "what kind of
-  // reply?" picker container.
-  border: '1.5px solid var(--text)',
-  borderRadius: 0,
-  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 16/18 container inset matches the top-level composer
+  border: `1px solid ${BORDER}`,
+  borderRadius: 16,
   padding: '16px 18px',
-  background: 'var(--bg)',
-  marginBottom: 'var(--s3)',
-  marginTop: 18, // magic — intentional (between --s4 16 and --s5 20 — slight bump above the reply panel)
+  background: SURFACE,
+  marginTop: 12,
+  marginBottom: 12,
 };
 const editorStyle: CSSProperties = {
-  // 14/1.6 -> 15/1.7. Closer to the comment body's 16/1.7 — what you
-  // type matches what you'll see published. Antialiased + kern/liga
-  // for crisp serif rendering of inline emphasis.
   width: '100%',
   minHeight: 72,
   background: 'transparent',
-  color: 'var(--text)',
+  color: TEXT,
+  fontFamily: SANS,
   fontSize: 15,
-  lineHeight: 1.7,
-  padding: 'var(--s1) var(--s0)',
+  lineHeight: 1.55,
+  padding: '4px 0',
   outline: 'none',
-  fontFamily: 'inherit',
   wordBreak: 'break-word',
   whiteSpace: 'pre-wrap',
   WebkitFontSmoothing: 'antialiased',
@@ -969,79 +1009,104 @@ const editorStyle: CSSProperties = {
   textRendering: 'optimizeLegibility',
   fontFeatureSettings: '"kern" 1, "liga" 1',
 };
-const footerStyle: CSSProperties = {
+const formattingToolbarStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
+  gap: 4,
+  marginTop: 12,
+};
+const firsthandRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  marginTop: 12,
+};
+const footerStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
   gap: 12,
-  rowGap: 8,
-  flexWrap: 'wrap',
-  marginTop: 10, // magic — intentional (between --s2 8 and --s3 12 — footer rhythm above the divider)
-  paddingTop: 10, // magic — intentional (between --s2 8 and --s3 12 — footer rhythm above the divider)
-  borderTop: '1px solid var(--border)',
+  marginTop: 12,
+  paddingTop: 12,
+  borderTop: `1px solid ${BORDER_SOFT}`,
 };
 const cancelBtnStyle: CSSProperties = {
-  background: 'none',
+  background: 'transparent',
   border: 'none',
-  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 4/6 inset keeps Cancel as a quiet text-style affordance
-  padding: '4px 6px',
-  fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
-  fontSize: 10,
-  fontWeight: 600,
-  letterSpacing: '0.14em',
-  textTransform: 'uppercase',
-  color: 'var(--muted-foreground)',
+  padding: '8px 14px',
+  fontFamily: SANS,
+  fontSize: 13,
+  fontWeight: 500,
+  color: TEXT_MUTED,
   cursor: 'pointer',
+  transition: 'color 120ms',
 };
 const postBtnStyle: CSSProperties = {
-  fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
-  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 9/16 matches CommentRow's top-level action-pill inset
-  padding: '9px 16px',
-  borderRadius: 0,
-  fontSize: 10.5,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.14em',
-  transition: 'background 120ms',
+  background: ACCENT,
+  color: '#fff',
+  border: 'none',
+  borderRadius: 10,
+  padding: '10px 22px',
+  fontFamily: SANS,
+  fontSize: 14,
+  fontWeight: 600,
+  minHeight: 44,
+  transition: 'background 120ms, opacity 120ms',
 };
 const mentionDropdownStyle: CSSProperties = {
-  background: 'var(--bg)',
-  border: '1px solid var(--border)',
-  borderRadius: 'var(--r-md)',
-  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-  padding: 'var(--s1)',
-  marginBottom: 'var(--s2)',
+  background: SURFACE,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 12,
+  boxShadow: '0 6px 18px rgba(23,23,23,0.08)',
+  padding: 4,
+  marginTop: 8,
+  marginBottom: 8,
+  minWidth: 280,
   maxHeight: 240,
   overflowY: 'auto',
 };
 const mentionHintStyle: CSSProperties = {
-  fontSize: 12,
-  color: '#b45309',
-  background: '#fffbeb',
-  border: '1px solid #fde68a',
-  borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the mention-hint notice)
-  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8/10 inset matches the dialog form-input rhythm
-  padding: '8px 10px',
-  marginBottom: 'var(--s2)',
+  fontFamily: SANS,
+  fontSize: 13,
+  color: ACCENT_DARK,
+  background: ACCENT_SOFT,
+  border: `1px solid ${ACCENT}`,
+  borderRadius: 10,
+  padding: '8px 12px',
+  marginTop: 8,
+  marginBottom: 8,
   lineHeight: 1.4,
 };
 const pickerNoticeStyle: CSSProperties = {
+  fontFamily: SANS,
   fontSize: 12,
-  color: 'var(--dim, #666)',
-  background: 'var(--card, #f7f7f7)',
-  border: '1px solid var(--border, #e5e5e5)',
-  borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the picker notice)
-  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6/10 inset keeps the notice tighter than the mention hint
-  padding: '6px 10px',
-  marginBottom: 'var(--s2)',
+  color: TEXT_MUTED,
+  background: SURFACE_SOFT,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 10,
+  padding: '8px 12px',
+  marginTop: 8,
+  marginBottom: 8,
 };
 const muteBannerStyle: CSSProperties = {
-  border: '1px solid var(--danger-border)',
-  borderRadius: 12, // magic — intentional (between --r-md 10 and --r-lg 14 — banner surface)
-  padding: 'var(--s3) var(--s4)',
-  background: 'var(--danger-bg)',
-  marginBottom: 'var(--s4)',
-  fontSize: 14,
-  color: '#991b1b',
+  background: SURFACE_SOFT,
+  border: `1px dashed ${BORDER}`,
+  borderRadius: 12,
+  padding: '12px 16px',
+  marginBottom: 16,
+  fontFamily: SANS,
+  fontSize: 13,
+  color: TEXT_MUTED,
+};
+const submitErrorStyle: CSSProperties = {
+  background: DANGER_BG,
+  border: `1px solid ${DANGER_BORDER}`,
+  borderRadius: 10,
+  padding: '10px 14px',
+  color: DANGER_TEXT,
+  fontFamily: SANS,
+  fontSize: 13,
+  marginTop: 12,
 };
 
 function escapeRe(s: string): string {

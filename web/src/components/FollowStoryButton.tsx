@@ -10,6 +10,14 @@ import { useEffect, useState } from 'react';
 import { friendlyError } from '@/lib/friendlyError';
 import { useRegistrationWall } from '@/components/RegistrationWall';
 
+// v2 editorial palette — references the central --vp-* tokens defined
+// in globals.css (single source of truth for the burgundy redesign).
+const ACCENT = 'var(--vp-accent)';
+const BORDER = 'var(--vp-border)';
+const SURFACE_SOFT = 'var(--vp-surface-soft)';
+const TEXT_MUTED = 'var(--vp-text-muted)';
+const SANS = 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+
 interface FollowStoryButtonProps {
   storyId: string;
   currentUserId: string | null;
@@ -21,6 +29,7 @@ export default function FollowStoryButton({ storyId, currentUserId }: FollowStor
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [hydrated, setHydrated] = useState(false);
+  const [hover, setHover] = useState(false);
 
   useEffect(() => {
     if (!currentUserId) {
@@ -52,7 +61,9 @@ export default function FollowStoryButton({ storyId, currentUserId }: FollowStor
     return (
       <button
         onClick={openWall}
-        style={baseStyle(false)}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={baseStyle(false, hover)}
       >
         Follow
       </button>
@@ -94,7 +105,13 @@ export default function FollowStoryButton({ storyId, currentUserId }: FollowStor
 
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-      <button onClick={handleToggle} disabled={busy} style={baseStyle(following)}>
+      <button
+        onClick={handleToggle}
+        disabled={busy}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={baseStyle(following, hover)}
+      >
         {busy ? '…' : following ? 'Following' : 'Follow'}
       </button>
       {error && <span style={{ fontSize: 11, color: 'var(--danger, #b94040)' }}>{error}</span>}
@@ -102,19 +119,22 @@ export default function FollowStoryButton({ storyId, currentUserId }: FollowStor
   );
 }
 
-function baseStyle(active: boolean) {
+function baseStyle(active: boolean, hover: boolean = false) {
+  // v2 pill chrome — active fills with burgundy; inactive sits on SURFACE_SOFT
+  // with a warm border that borrows ACCENT on hover. No hover state on active
+  // (already filled) so the eye doesn't double-treat it.
   return {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 6,
-    fontSize: 14,
-    fontWeight: 600 as const,
-    letterSpacing: '-0.005em',
-    color: active ? 'var(--bg, #fff)' : 'var(--text, #1a1a1a)',
-    background: active ? 'var(--accent, #111)' : 'transparent',
-    border: `1px solid ${active ? 'var(--accent, #111)' : 'var(--border, #e5e5e5)'}`,
-    borderRadius: 10,
-    padding: '0 16px',
+    fontFamily: SANS,
+    fontSize: 13,
+    fontWeight: 500 as const,
+    color: active ? '#ffffff' : hover ? ACCENT : TEXT_MUTED,
+    background: active ? ACCENT : SURFACE_SOFT,
+    border: `1px solid ${active ? ACCENT : hover ? ACCENT : BORDER}`,
+    borderRadius: 999,
+    padding: '8px 16px',
     minHeight: 44,
     cursor: 'pointer',
     transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',

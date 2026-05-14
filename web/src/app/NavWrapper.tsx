@@ -346,12 +346,12 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   const showAdminBanner = authLoaded && canSeeAdmin;
 
   const C = {
-    bg: 'var(--bg)',
-    card: 'var(--card)',
-    border: 'var(--border)',
-    text: 'var(--text)',
-    dim: 'var(--muted)',
-    accent: 'var(--accent)',
+    bg: 'var(--vp-surface)',
+    card: 'var(--vp-surface)',
+    border: 'var(--vp-border)',
+    text: 'var(--vp-ink)',
+    dim: 'var(--vp-text-muted)',
+    accent: 'var(--vp-accent)',
   } as const;
 
   // Bottom nav shows the same 4 slots for anon and signed-in users. The
@@ -382,11 +382,12 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     left: 0,
     right: 0,
     zIndex: Z.CRITICAL_NAV,
-    // Theme-aware glass — mirrors topBarStyle. --bg-rgb flips
-    // 255,255,255 (light) → 18,18,18 (dark) so the bar reads dark in
-    // dark mode instead of staying hardcoded white. Letter colors
-    // (C.accent / C.dim) are already var-driven and flip with theme.
-    background: 'rgba(var(--bg-rgb), 0.97)',
+    // v2 chrome — cream-translucent locked-light, matching topBarStyle.
+    // Owner-locked decision: bottom nav mirrors the top bar's locked
+    // burgundy palette instead of flipping with --bg-rgb. Letter colors
+    // (C.accent / C.dim) now resolve to --vp-accent / --vp-text-muted,
+    // which read correctly on cream.
+    background: 'rgba(247, 244, 239, 0.92)',
     backdropFilter: 'blur(12px)',
     borderTop: `1px solid ${C.border}`,
     display: 'flex',
@@ -416,12 +417,13 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     left: 0,
     right: 0,
     zIndex: Z.CRITICAL_NAV,
-    // Theme-aware glass: --bg-rgb flips light → dark with the theme so
-    // the wordmark stays legible in both modes (text is C.text =
-    // var(--text), which already inverts).
-    background: 'rgba(var(--bg-rgb), 0.97)',
+    // v2 chrome — cream-translucent + warm border. Mirrors the v2
+    // article + home migration's choice to lock the light burgundy
+    // palette across modes; previous theme-aware --bg-rgb flip is
+    // gone to keep the masthead consistent with the rest of v2.
+    background: 'rgba(247, 244, 239, 0.92)',
     backdropFilter: 'blur(12px)',
-    borderBottom: `1px solid ${C.border}`,
+    borderBottom: '1px solid var(--vp-border)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -479,13 +481,22 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
 
         {showFooter && (
           <footer
+            className="vp-footer"
             style={{
               maxWidth: 1280,
               margin: '0 auto',
               padding: '32px 16px 24px',
-              borderTop: '1px solid var(--border)',
+              borderTop: '1px solid var(--vp-border)',
             }}
           >
+            {/* v2 burgundy token migration — hover affordance for legal
+                links + cookie-pref button. Inline styles can't express
+                :hover, so a scoped style block targets descendants of
+                `.vp-footer`. */}
+            <style>{`
+              .vp-footer a, .vp-footer button { transition: color 0.15s ease; }
+              .vp-footer a:hover, .vp-footer button:hover { color: var(--vp-accent); }
+            `}</style>
             <div
               style={{
                 display: 'flex',
@@ -519,7 +530,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                   href={link.href}
                   style={{
                     fontSize: 11,
-                    color: 'var(--muted)',
+                    color: 'var(--vp-text-muted)',
                     textDecoration: 'none',
                   }}
                 >
@@ -538,7 +549,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 }}
                 style={{
                   fontSize: 11,
-                  color: 'var(--muted)',
+                  color: 'var(--vp-text-muted)',
                   background: 'transparent',
                   border: 'none',
                   padding: 0,
@@ -549,7 +560,17 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 Cookie preferences
               </button>
             </div>
-            <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--muted)' }}>
+            {/* Plex Mono on the copyright line picks up the v2 editorial
+                signature at a small size; legal links stay sans-serif for
+                readability. */}
+            <div
+              style={{
+                textAlign: 'center',
+                fontSize: 10,
+                color: 'var(--vp-text-soft)',
+                fontFamily: 'var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace',
+              }}
+            >
               © {new Date().getFullYear()} {BRAND_LEGAL_ENTITY}. All rights reserved.
             </div>
           </footer>
@@ -585,10 +606,11 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               aria-label={topBarActive ? `${BRAND_NAME} home` : undefined}
               aria-current={topBarActive ? 'page' : undefined}
               style={{
-                fontSize: 15,
-                fontWeight: 800,
-                letterSpacing: '-0.01em',
-                color: C.text,
+                fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
+                fontSize: 22,
+                fontWeight: 400,
+                letterSpacing: '0.02em',
+                color: 'var(--vp-ink)',
                 textDecoration: 'none',
               }}
             >

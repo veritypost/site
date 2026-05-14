@@ -4,26 +4,43 @@ import React from 'react';
 
 export default function RhStyles() {
   const css = `
+    /* v2 palette — internal --rh-* tokens are aliases over the
+       centralized --vp-* token block in app/globals.css (single source
+       of truth for the burgundy editorial palette). Existing
+       var(--rh-*) references throughout this stylesheet keep working;
+       only the values below change. */
     .vp-rh {
-      --rh-bg: var(--p-bg, #ffffff);
-      --rh-ink: var(--p-ink, #000000);
-      --rh-ink-2: var(--p-ink-soft, #2a2a2a);
-      --rh-ink-3: var(--p-ink-muted, #6a6a6a);
-      --rh-accent: #ff2d00;
+      --rh-bg: var(--vp-surface);
+      --rh-ink: var(--vp-ink);
+      --rh-ink-2: var(--vp-text-muted);
+      --rh-ink-3: var(--vp-text-soft);
+      --rh-accent: var(--vp-accent);
+      --rh-accent-soft: var(--vp-accent-soft);
+      --rh-accent-dark: var(--vp-accent-dark);
+      --rh-border: var(--vp-border);
+      --rh-border-soft: var(--vp-border-soft);
+      --rh-surface-soft: var(--vp-surface-soft);
       background: var(--rh-bg);
       color: var(--rh-ink);
       min-height: 100vh;
     }
-    /* Brand-red accent stays scoped to .vp-rh. The light value is the
-       editorial red; the dark variant brightens for AA contrast against
-       the dark page background. Not tokenized in globals.css because
-       --p-accent is product-blue, not brand-red — keeping these
-       distinct avoids collapsing two different design intents. */
+    /* Keep the light burgundy palette on dark mode rather than flipping
+       the entire home to a dark theme. The article page made the same
+       choice after the v2 migration; home should match. */
     @media (prefers-color-scheme: dark) {
-      .vp-rh { --rh-accent: #ff5a3a; }
+      .vp-rh {
+        --rh-bg: var(--vp-surface);
+        --rh-ink: var(--vp-ink);
+        --rh-ink-2: var(--vp-text-muted);
+        --rh-ink-3: var(--vp-text-soft);
+        --rh-accent: var(--vp-accent);
+        --rh-accent-soft: var(--vp-accent-soft);
+        --rh-accent-dark: var(--vp-accent-dark);
+        --rh-border: var(--vp-border);
+        --rh-border-soft: var(--vp-border-soft);
+        --rh-surface-soft: var(--vp-surface-soft);
+      }
     }
-    :root.dark .vp-rh,
-    [data-theme="dark"] .vp-rh { --rh-accent: #ff5a3a; }
 
     /* Bundle 7 — font-family bindings. The CSS variables are sourced
        from next/font invocations in app/layout.js (single source of truth)
@@ -41,10 +58,7 @@ export default function RhStyles() {
       font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
     }
     .vp-rh-tag,
-    .vp-rh-tag-accent,
-    .vp-rh-tl-label,
-    .vp-rh-readmore,
-    .vp-rh-timeline li strong {
+    .vp-rh-tag-accent {
       font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
@@ -73,11 +87,113 @@ export default function RhStyles() {
     @media (min-width: 720px) {
       .vp-rh-grid {
         grid-template-columns: 1fr 1fr;
-        border-left: 1px solid var(--rh-ink);
+        border-left: 1px solid var(--rh-border);
       }
     }
     @media (min-width: 1100px) {
       .vp-rh-grid { grid-template-columns: 1fr 1fr 1fr; }
+    }
+
+    /* Section head — mono label + optional "more" link. Grid-spans the row;
+       used by cluster slots that opt in via config.title. */
+    .vp-rh-sect-head {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 24px 24px 12px;
+      border-bottom: 1px solid var(--rh-border);
+    }
+    .vp-rh-sect-head__title {
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--rh-ink-2);
+      font-weight: 500;
+    }
+    .vp-rh-sect-head__more {
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--rh-accent);
+      font-weight: 500;
+    }
+    .vp-rh-sect-head__more:hover { color: var(--rh-accent-dark); }
+
+    /* ============ DENSITY WALL (cluster slot) ============ */
+    .vp-rh-density-wall {
+      grid-column: 1 / -1;
+      padding: 0 24px 24px;
+    }
+    .vp-rh-density-wall .vp-rh-sect-head {
+      padding-left: 0;
+      padding-right: 0;
+    }
+    @media (min-width: 720px) {
+      .vp-rh-density-wall { padding: 0 32px 32px; }
+    }
+    @media (min-width: 1100px) {
+      .vp-rh-density-wall { padding: 0 40px 40px; }
+    }
+    .vp-rh-story-preview {
+      padding: 16px 0;
+      border-bottom: 1px solid var(--rh-border-soft);
+      display: block;
+    }
+    .vp-rh-story-preview:last-child { border-bottom: 0; }
+    .vp-rh-density-wall .vp-rh-card-ad {
+      border-right: 0;
+      border-bottom: 1px solid var(--rh-border-soft);
+      padding: 16px 0;
+      min-height: 0;
+    }
+    .vp-rh-density-wall .vp-rh-card-ad:last-child { border-bottom: 0; }
+    .vp-rh-story-preview__kicker {
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--rh-ink-3);
+    }
+    .vp-rh-story-preview__kicker .sep {
+      margin: 0 8px;
+      opacity: 0.6;
+    }
+    .vp-rh-story-preview__title {
+      margin: 6px 0 6px;
+      font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+      font-size: 22px;
+      line-height: 1.05;
+      letter-spacing: -0.025em;
+      font-weight: 400;
+      color: var(--rh-ink);
+    }
+    .vp-rh-story-preview__title a {
+      color: inherit;
+      text-decoration: none;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .vp-rh-story-preview__title a:hover { color: var(--rh-accent-dark); }
+    }
+    .vp-rh-story-preview__summary {
+      margin: 0;
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--rh-ink-2);
+      max-width: 62ch;
+    }
+    .vp-rh-story-state {
+      margin-top: 10px;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      letter-spacing: 0.02em;
+      color: var(--rh-ink-3);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
     }
 
     /* ============ CARD ============ */
@@ -89,8 +205,8 @@ export default function RhStyles() {
       flex-direction: column;
       gap: 12px;
       transition: background .15s, color .15s;
-      border-right: 1px solid var(--rh-ink);
-      border-bottom: 1px solid var(--rh-ink);
+      border-right: 1px solid var(--rh-border);
+      border-bottom: 1px solid var(--rh-border);
       position: relative;
       cursor: pointer;
     }
@@ -98,7 +214,7 @@ export default function RhStyles() {
       .vp-rh-grid > .vp-rh-card:nth-child(2n) { border-right: none; }
     }
     @media (min-width: 1100px) {
-      .vp-rh-grid > .vp-rh-card:nth-child(2n) { border-right: 1px solid var(--rh-ink); }
+      .vp-rh-grid > .vp-rh-card:nth-child(2n) { border-right: 1px solid var(--rh-border); }
       .vp-rh-grid > .vp-rh-card:nth-child(3n) { border-right: none; }
     }
 
@@ -109,32 +225,25 @@ export default function RhStyles() {
       right: 22px;
       font-size: 22px;
       font-weight: 600;
-      color: var(--rh-ink-3);
+      color: var(--rh-accent);
       transition: color .15s, transform .15s;
       line-height: 1;
     }
 
-    /* hover-invert — gated on hover-capable devices so touch taps don't
-       trigger a brief inverted flash (mobile tap would otherwise
+    /* Hover — subtle burgundy-cream tint instead of the older
+       invert-to-black behavior. Gated on hover-capable devices so touch
+       taps don't trigger a brief flash (mobile tap would otherwise
        :hover-stick until the next tap elsewhere). */
-    @media (hover: hover) {
+    @media (hover: hover) and (pointer: fine) {
       .vp-rh-card:hover {
-        background: var(--rh-ink);
-        color: var(--rh-bg);
+        background: var(--rh-accent-soft);
       }
-      .vp-rh-card:hover .vp-rh-title,
-      .vp-rh-card:hover .vp-rh-summary { color: var(--rh-bg); }
-      /* Tag chip on hover. Use --rh-bg (dark in dark theme, light in
-         light theme) on top of brand-red --rh-accent so contrast stays
-         AA in both themes — light-on-red was sub-AA in dark mode. */
-      .vp-rh-card:hover .vp-rh-tag { background: var(--rh-accent); color: var(--rh-bg); }
       .vp-rh-card:hover .vp-rh-arrow {
-        color: var(--rh-accent);
+        color: var(--rh-accent-dark);
         transform: translateX(4px);
       }
       .vp-rh-card-ad:hover {
         background: var(--rh-bg);
-        color: var(--rh-ink);
       }
     }
 
@@ -150,7 +259,7 @@ export default function RhStyles() {
     }
 
     /* ad cell — same border treatment as article cards, but suppresses
-       the hover-invert and the persistent arrow cue (those are article
+       the hover tint and the persistent arrow cue (those are article
        affordances; the ad has its own click target and visual). */
     .vp-rh-card-ad {
       cursor: default;
@@ -159,43 +268,61 @@ export default function RhStyles() {
     }
     .vp-rh-card-ad .vp-rh-arrow { display: none; }
 
-    /* tag chip */
+    /* tag chip — Plex Mono, calmer letter-spacing (was 0.2em + weight 700,
+       which read as ALL-CAPS shouty against the new editorial chrome). */
     .vp-rh-tag {
       font-size: 10px;
-      letter-spacing: 0.2em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--rh-bg);
-      background: var(--rh-ink);
-      font-weight: 600;
+      color: var(--rh-accent);
+      background: transparent;
+      font-weight: 500;
       align-self: flex-start;
-      padding: 4px 10px;
+      padding: 4px 0;
     }
+    .vp-rh-tag--lead { font-size: 11px; }
     .vp-rh-tag-accent {
-      background: var(--rh-accent);
-      color: var(--rh-bg);
+      color: var(--rh-accent);
+      background: transparent;
     }
 
+    /* density-wall card title — editorial weight 400 matches the hero,
+       so the page reads as one typography system rather than display
+       headlines bolted onto an editorial centerpiece. */
     .vp-rh-title {
       margin: 0;
-      font-weight: 700;
+      font-weight: 400;
       font-size: 22px;
-      line-height: 1.12;
-      letter-spacing: -0.018em;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
       color: var(--rh-ink);
     }
     .vp-rh-summary {
       margin: 0;
       font-size: 14.5px;
-      line-height: 1.5;
+      line-height: 1.55;
       color: var(--rh-ink-2);
       font-weight: 400;
       max-width: 60ch;
     }
 
     /* ============ LEAD ============ */
+    /* v2 hero — cream gradient + warm border + soft elevation + radius 28.
+       Weight 400 with tight letter-spacing reads as editorial elegance,
+       not display punch. Hover state is intentionally suppressed (the
+       card is its own destination; no need to invert). */
     .vp-rh-lead {
       cursor: default;
-      padding: 26px 24px;
+      padding: 22px 18px;
+      background: linear-gradient(180deg, var(--rh-bg) 0%, var(--rh-surface-soft) 100%);
+      border: 1px solid var(--rh-border);
+      border-radius: 22px;
+      box-shadow: 0 12px 28px rgba(20, 16, 12, 0.05);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .vp-rh-lead:hover {
+        background: linear-gradient(180deg, var(--rh-bg) 0%, var(--rh-surface-soft) 100%);
+      }
     }
     .vp-rh-lead-link {
       display: contents;
@@ -203,18 +330,18 @@ export default function RhStyles() {
     .vp-rh-lead-content {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
     }
     .vp-rh-lead-title {
-      margin: 0;
-      font-size: 30px;
-      line-height: 1.05;
-      letter-spacing: -0.022em;
-      font-weight: 700;
+      margin: 8px 0 12px;
+      font-size: 32px;
+      line-height: 1.0;
+      letter-spacing: -0.035em;
+      font-weight: 400;
       color: var(--rh-ink);
     }
     .vp-rh-lead-summary {
-      margin: 0;
+      margin: 0 0 14px;
       font-size: 15px;
       line-height: 1.5;
       color: var(--rh-ink-2);
@@ -224,106 +351,121 @@ export default function RhStyles() {
     @media (min-width: 720px) {
       .vp-rh-lead {
         grid-column: 1 / -1;
-        border-right: none;
-        padding: 48px 40px;
-      }
-      /* Lead's hover-invert is intentionally suppressed at tablet+. The
-         reset only matters when hover is capable; nested guard keeps
-         touch taps clean. */
-      @media (hover: hover) {
-        .vp-rh-lead:hover {
-          background: var(--rh-bg);
-          color: var(--rh-ink);
-        }
+        border-right: 1px solid var(--rh-border);
+        padding: 32px 36px;
+        border-radius: 28px;
+        box-shadow: 0 18px 48px rgba(20, 16, 12, 0.06);
       }
       .vp-rh-lead-content { max-width: 880px; }
-      .vp-rh-lead-title { font-size: 44px; max-width: 22ch; }
-      .vp-rh-lead-summary { font-size: 17px; line-height: 1.5; max-width: 60ch; }
+      .vp-rh-lead-title { font-size: clamp(38px, 4vw, 56px); max-width: 22ch; margin: 10px 0 12px; }
+      .vp-rh-lead-summary { font-size: 17px; line-height: 1.55; max-width: 60ch; }
 
       /* When the parent story has timeline data, the lead splits into
          a 1.618:1 content/timeline grid. */
       .vp-rh-lead-with-timeline {
         display: grid;
         grid-template-columns: 1.618fr 1fr;
-        gap: 48px;
+        gap: 40px;
         align-items: start;
       }
       .vp-rh-lead-with-timeline .vp-rh-lead-content { max-width: none; }
-      .vp-rh-lead-with-timeline .vp-rh-lead-title { font-size: 40px; max-width: 18ch; }
+      .vp-rh-lead-with-timeline .vp-rh-lead-title { font-size: clamp(36px, 3.6vw, 44px); max-width: 18ch; }
     }
     @media (min-width: 1100px) {
-      .vp-rh-lead { padding: 64px 56px; }
-      .vp-rh-lead-title { font-size: 60px; max-width: 24ch; }
-      .vp-rh-lead-with-timeline .vp-rh-lead-title { font-size: 48px; }
+      .vp-rh-lead { padding: 44px 48px; }
+      .vp-rh-lead-with-timeline .vp-rh-lead-title { font-size: clamp(40px, 3.8vw, 48px); }
     }
 
-    /* Timeline preview inside lead. */
+    /* Timeline preview inside lead — round-dotted, vertical-connector,
+       gray-label variant matching the v2 mock's .lead-timeline. */
     .vp-rh-timeline {
-      border-left: 2px solid var(--rh-ink);
-      padding-left: 24px;
-      display: none;
+      border-left: 0;
+      padding-left: 0;
+      margin-top: 24px;
+      border-top: 1px solid var(--rh-border-soft);
+      padding-top: 18px;
     }
     @media (min-width: 720px) {
-      .vp-rh-timeline { display: block; }
+      .vp-rh-timeline {
+        border-left: 1px solid var(--rh-border-soft);
+        padding-left: 20px;
+        margin-top: 0;
+        border-top: 0;
+        padding-top: 0;
+      }
     }
     .vp-rh-tl-label {
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 10px;
-      letter-spacing: 0.22em;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--rh-ink-3);
       margin-bottom: 14px;
       display: block;
+      font-weight: 500;
     }
     .vp-rh-timeline ul {
       list-style: none;
-      margin: 0 0 20px;
+      margin: 0;
       padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
     }
-    .vp-rh-timeline li {
-      font-size: 14px;
-      line-height: 1.4;
-      color: var(--rh-ink-2);
-      padding-left: 14px;
+    .vp-rh-tl-event {
       position: relative;
+      padding: 0 0 14px 18px;
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--rh-ink);
     }
-    .vp-rh-timeline li::before {
+    .vp-rh-tl-event::before {
       content: "";
       position: absolute;
       left: 0;
-      top: 7px;
-      width: 6px;
-      height: 6px;
-      background: var(--rh-ink);
+      top: 5px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--rh-ink-3);
     }
-    .vp-rh-timeline li.now::before { background: var(--rh-accent); }
-    .vp-rh-timeline li strong {
-      font-size: 11px;
+    .vp-rh-tl-event::after {
+      content: "";
+      position: absolute;
+      left: 3.5px;
+      top: 13px;
+      bottom: -2px;
+      width: 1px;
+      background: var(--rh-border);
+    }
+    .vp-rh-tl-event:last-child::after { display: none; }
+    .vp-rh-tl-event--now::before {
+      background: var(--rh-accent);
+      box-shadow: 0 0 0 3px var(--rh-accent-soft);
+    }
+    .vp-rh-tl-event--now {
+      font-weight: 600;
+      color: var(--rh-accent-dark);
+    }
+    .vp-rh-tl-date {
+      display: block;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: var(--rh-ink);
-      font-weight: 600;
-      margin-right: 6px;
+      color: var(--rh-ink-3);
+      margin-bottom: 2px;
     }
-    .vp-rh-readmore {
-      font-size: 10px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--rh-ink);
-      font-weight: 600;
-      border-bottom: 2px solid var(--rh-accent);
-      padding-bottom: 2px;
-      display: inline-block;
+    .vp-rh-tl-event--now .vp-rh-tl-date {
+      color: var(--rh-accent);
     }
-    .vp-rh-readmore:hover { color: var(--rh-accent); }
 
-    /* ============ AD: TICKER ============ */
+    /* ============ AD: TICKER ============
+       v2 cream-soft chrome (was always-dark black bg + green/yellow text). */
     .vp-rh-ticker {
       grid-column: 1 / -1;
-      background: #000;
-      color: #fff;
+      background: var(--rh-surface-soft);
+      color: var(--rh-ink);
+      border: 1px solid var(--rh-border);
+      border-radius: 14px;
       font-size: 10px;
       padding: 8px 24px;
       display: flex;
@@ -332,11 +474,12 @@ export default function RhStyles() {
       white-space: nowrap;
       letter-spacing: 0.06em;
     }
-    .vp-rh-ticker .item span { color: #00ff95; margin-left: 6px; }
+    .vp-rh-ticker .item span { color: var(--rh-ink); font-size: 13px; margin-left: 6px; }
     .vp-rh-ticker .sponsor {
-      color: #ffd166;
+      color: var(--rh-accent);
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
       font-weight: 700;
-      border-left: 1px solid #333;
+      border-left: 1px solid var(--rh-border-soft);
       padding-left: 40px;
       margin-left: auto;
     }
@@ -344,9 +487,9 @@ export default function RhStyles() {
     /* ============ AD: INSIGHT ROW ============ */
     .vp-rh-insight {
       grid-column: 1 / -1;
-      background: var(--p-surface, #f6f4ef);
-      border-top: 4px solid var(--rh-ink);
-      border-bottom: 4px solid var(--rh-ink);
+      background: var(--rh-surface-soft);
+      border-top: 2px solid var(--rh-accent);
+      border-bottom: 2px solid var(--rh-accent);
       padding: 48px 32px;
       display: grid;
       grid-template-columns: 1fr;
@@ -360,7 +503,7 @@ export default function RhStyles() {
       font-size: 10px;
       letter-spacing: 0.2em;
       text-transform: uppercase;
-      color: var(--rh-bg);
+      color: #ffffff;
       background: var(--rh-accent);
       padding: 4px 10px;
       align-self: flex-start;
@@ -381,8 +524,8 @@ export default function RhStyles() {
     }
     .vp-rh-insight .chart {
       height: 200px;
-      background: repeating-linear-gradient(45deg, #eee, #eee 10px, #f5f5f5 10px, #f5f5f5 20px);
-      border: 1px solid var(--rh-ink-3);
+      background: repeating-linear-gradient(45deg, var(--rh-border-soft), var(--rh-border-soft) 10px, var(--rh-surface-soft) 10px, var(--rh-surface-soft) 20px);
+      border: 1px solid var(--rh-border);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -397,9 +540,9 @@ export default function RhStyles() {
       grid-column: 1 / -1;
       display: grid;
       grid-template-columns: 1fr;
-      background: var(--rh-ink);
+      background: var(--rh-border);
       gap: 1px;
-      border-top: 4px solid var(--rh-accent);
+      border-top: 2px solid var(--rh-accent);
     }
     @media (min-width: 720px) {
       .vp-rh-discovery { grid-template-columns: 1fr 1fr; }
@@ -415,57 +558,54 @@ export default function RhStyles() {
       gap: 12px;
       transition: background .15s, color .15s;
     }
-    .vp-rh-discovery a:hover { background: var(--rh-ink); color: var(--rh-bg); }
+    @media (hover: hover) and (pointer: fine) {
+      .vp-rh-discovery a:hover { background: var(--rh-accent-soft); }
+    }
     .vp-rh-discovery .source {
       font-size: 9px;
       letter-spacing: 0.16em;
       text-transform: uppercase;
       color: var(--rh-ink-3);
     }
-    .vp-rh-discovery a:hover .source { color: #999; }
     .vp-rh-discovery .title {
       font-size: 16px;
       font-weight: 700;
       line-height: 1.22;
       letter-spacing: -0.01em;
+      color: var(--rh-ink);
     }
 
     /* ============ ENGAGEMENT (quiz card) ============
-       Surface is always-dark — matches .vp-rh-ticker / .vp-rh-discovery
-       precedent. Does NOT flip with theme (the slot's inline white text
-       would otherwise become invisible in dark mode). */
+       v2 cream-soft chrome with burgundy stroke (was always-dark #0a0a0a).
+       Same chrome family as the article page quiz. */
     .vp-quiz-card {
-      background: #0a0a0a;
-      color: #fafafa;
+      background: var(--rh-surface-soft);
+      color: var(--rh-ink);
       padding: 24px;
       display: flex;
       flex-direction: column;
       gap: 0;
-      border-right: 1px solid var(--rh-ink);
-      border-bottom: 1px solid var(--rh-ink);
+      border: 1px solid var(--rh-accent);
+      border-radius: 22px;
       min-height: 220px;
       position: relative;
     }
     @media (min-width: 720px) {
-      .vp-rh-grid > .vp-quiz-card:nth-child(2n) { border-right: none; }
       .vp-quiz-card { padding: 28px; }
-    }
-    @media (min-width: 1100px) {
-      .vp-rh-grid > .vp-quiz-card:nth-child(2n) { border-right: 1px solid var(--rh-ink); }
-      .vp-rh-grid > .vp-quiz-card:nth-child(3n) { border-right: none; }
     }
 
     /* ============ LIST RAIL ============
-       Always-dark island (same precedent as .vp-quiz-card). */
+       v2 cream-soft chrome (was always-dark island). Cream rather than
+       white so the rail reads as its own surface against the white cards. */
     .vp-rail-block {
-      background: #0a0a0a;
-      color: #fafafa;
+      background: var(--rh-surface-soft);
+      color: var(--rh-ink);
       padding: 24px;
       display: flex;
       flex-direction: column;
       gap: 14px;
-      border-right: 1px solid var(--rh-ink);
-      border-bottom: 1px solid var(--rh-ink);
+      border: 1px solid var(--rh-border);
+      border-radius: 18px;
       min-height: 220px;
     }
     .vp-rail__title {
@@ -476,15 +616,10 @@ export default function RhStyles() {
       color: var(--rh-accent);
       font-weight: 700;
       padding-bottom: 12px;
-      border-bottom: 1px solid rgba(242, 231, 214, 0.18);
+      border-bottom: 1px solid var(--rh-border-soft);
     }
     @media (min-width: 720px) {
-      .vp-rh-grid > .vp-rail-block:nth-child(2n) { border-right: none; }
       .vp-rail-block { padding: 28px; }
-    }
-    @media (min-width: 1100px) {
-      .vp-rh-grid > .vp-rail-block:nth-child(2n) { border-right: 1px solid var(--rh-ink); }
-      .vp-rh-grid > .vp-rail-block:nth-child(3n) { border-right: none; }
     }
 
     /* ============ SECOND LEAD (feature take) ============ */
@@ -492,8 +627,8 @@ export default function RhStyles() {
       background: var(--rh-bg);
       color: var(--rh-ink);
       padding: 24px;
-      border-right: 1px solid var(--rh-ink);
-      border-bottom: 1px solid var(--rh-ink);
+      border-right: 1px solid var(--rh-border);
+      border-bottom: 1px solid var(--rh-border);
       position: relative;
       cursor: pointer;
       transition: background .15s, color .15s;
@@ -508,7 +643,7 @@ export default function RhStyles() {
       width: 100%;
       aspect-ratio: 16 / 9;
       overflow: hidden;
-      background: var(--p-surface);
+      background: var(--rh-surface-soft);
     }
     .vp-feature-take__body {
       display: flex;
@@ -521,6 +656,7 @@ export default function RhStyles() {
       font-weight: 700;
       letter-spacing: 0.12em;
       text-transform: uppercase;
+      color: var(--rh-accent);
     }
     .vp-feature-take__hed {
       margin: 0;
@@ -552,20 +688,18 @@ export default function RhStyles() {
       .vp-feature-take__hed { font-size: 38px; }
       .vp-feature-take__dek { font-size: 16px; }
     }
-    @media (hover: hover) {
+    @media (hover: hover) and (pointer: fine) {
       .vp-feature-take:hover {
-        background: var(--rh-ink);
-        color: var(--rh-bg);
+        background: var(--rh-accent-soft);
       }
-      .vp-feature-take:hover .vp-feature-take__hed,
-      .vp-feature-take:hover .vp-feature-take__dek { color: var(--rh-bg); }
+      .vp-feature-take:hover .vp-feature-take__hed { color: var(--rh-accent-dark); }
     }
 
     /* ============ SECTION HEAD (shared by river / frontline / editors-band) ============ */
     .vp-section-head {
       grid-column: 1 / -1;
       padding: 32px 24px 12px;
-      border-bottom: 1px solid var(--rh-ink);
+      border-bottom: 1px solid var(--rh-border);
     }
     .vp-section-head__label {
       margin: 0;
@@ -573,7 +707,7 @@ export default function RhStyles() {
       font-weight: 700;
       letter-spacing: 0.18em;
       text-transform: uppercase;
-      color: var(--rh-ink);
+      color: var(--rh-accent);
     }
     @media (min-width: 720px) {
       .vp-section-head { padding: 40px 32px 14px; }
@@ -587,13 +721,13 @@ export default function RhStyles() {
       grid-column: 1 / -1;
       display: grid;
       grid-template-columns: 1fr;
-      border-bottom: 1px solid var(--rh-ink);
+      border-bottom: 1px solid var(--rh-border);
     }
     .vp-river-grid {
       display: grid;
       grid-template-columns: 1fr;
       gap: 0;
-      border-top: 1px solid var(--rh-ink);
+      border-top: 1px solid var(--rh-border);
     }
     @media (min-width: 720px) {
       .vp-river-grid { grid-template-columns: 1fr 1fr; }
@@ -601,15 +735,15 @@ export default function RhStyles() {
     }
     @media (min-width: 1100px) {
       .vp-river-grid { grid-template-columns: repeat(4, 1fr); }
-      .vp-river-grid > .vp-river-card:nth-child(2n) { border-right: 1px solid var(--rh-ink); }
+      .vp-river-grid > .vp-river-card:nth-child(2n) { border-right: 1px solid var(--rh-border); }
       .vp-river-grid > .vp-river-card:nth-child(4n) { border-right: none; }
     }
     .vp-river-card {
       background: var(--rh-bg);
       color: var(--rh-ink);
       padding: 20px;
-      border-right: 1px solid var(--rh-ink);
-      border-bottom: 1px solid var(--rh-ink);
+      border-right: 1px solid var(--rh-border);
+      border-bottom: 1px solid var(--rh-border);
       display: flex;
       flex-direction: column;
       gap: 10px;
@@ -624,7 +758,7 @@ export default function RhStyles() {
       width: 100%;
       aspect-ratio: 4 / 3;
       overflow: hidden;
-      background: var(--p-surface);
+      background: var(--rh-surface-soft);
     }
     .vp-river-card__cat {
       margin: 0;
@@ -632,6 +766,7 @@ export default function RhStyles() {
       font-weight: 700;
       letter-spacing: 0.12em;
       text-transform: uppercase;
+      color: var(--rh-accent);
     }
     .vp-river-card__hed {
       margin: 0;
@@ -655,14 +790,11 @@ export default function RhStyles() {
       color: var(--rh-ink-3);
       padding-top: 8px;
     }
-    @media (hover: hover) {
+    @media (hover: hover) and (pointer: fine) {
       .vp-river-card:hover {
-        background: var(--rh-ink);
-        color: var(--rh-bg);
+        background: var(--rh-accent-soft);
       }
-      .vp-river-card:hover .vp-river-card__hed,
-      .vp-river-card:hover .vp-river-card__dek { color: var(--rh-bg); }
-      .vp-river-card:hover .vp-river-card__meta { color: var(--rh-bg); opacity: 0.6; }
+      .vp-river-card:hover .vp-river-card__hed { color: var(--rh-accent-dark); }
     }
 
     /* ============ SECONDARY PAIR (front line) ============ */
@@ -670,12 +802,12 @@ export default function RhStyles() {
       grid-column: 1 / -1;
       display: grid;
       grid-template-columns: 1fr;
-      border-bottom: 1px solid var(--rh-ink);
+      border-bottom: 1px solid var(--rh-border);
     }
     .vp-frontline__grid {
       display: grid;
       grid-template-columns: 1fr;
-      border-top: 1px solid var(--rh-ink);
+      border-top: 1px solid var(--rh-border);
     }
     @media (min-width: 720px) {
       .vp-frontline__grid { grid-template-columns: 1fr 1fr; }
@@ -683,15 +815,15 @@ export default function RhStyles() {
     }
     @media (min-width: 1100px) {
       .vp-frontline__grid { grid-template-columns: repeat(4, 1fr); }
-      .vp-frontline__grid > .vp-frontline__card:nth-child(2n) { border-right: 1px solid var(--rh-ink); }
+      .vp-frontline__grid > .vp-frontline__card:nth-child(2n) { border-right: 1px solid var(--rh-border); }
       .vp-frontline__grid > .vp-frontline__card:nth-child(4n) { border-right: none; }
     }
     .vp-frontline__card {
       background: var(--rh-bg);
       color: var(--rh-ink);
       padding: 20px 24px 24px;
-      border-right: 1px solid var(--rh-ink);
-      border-bottom: 1px solid var(--rh-ink);
+      border-right: 1px solid var(--rh-border);
+      border-bottom: 1px solid var(--rh-border);
       display: flex;
       cursor: pointer;
       transition: background .15s, color .15s;
@@ -710,14 +842,14 @@ export default function RhStyles() {
       font-weight: 700;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: var(--rh-ink);
+      color: var(--rh-accent);
     }
     .vp-frontline__cat::before {
       content: "";
       display: inline-block;
       width: 8px;
       height: 8px;
-      background: var(--cat-dot, var(--rh-ink));
+      background: var(--cat-dot, var(--rh-accent));
       border-radius: 50%;
       flex-shrink: 0;
     }
@@ -743,15 +875,11 @@ export default function RhStyles() {
       text-transform: uppercase;
       color: var(--rh-ink-3);
     }
-    @media (hover: hover) {
+    @media (hover: hover) and (pointer: fine) {
       .vp-frontline__card:hover {
-        background: var(--rh-ink);
-        color: var(--rh-bg);
+        background: var(--rh-accent-soft);
       }
-      .vp-frontline__card:hover .vp-frontline__hed,
-      .vp-frontline__card:hover .vp-frontline__dek { color: var(--rh-bg); }
-      .vp-frontline__card:hover .vp-frontline__cat,
-      .vp-frontline__card:hover .vp-frontline__meta { color: var(--rh-bg); opacity: 0.7; }
+      .vp-frontline__card:hover .vp-frontline__hed { color: var(--rh-accent-dark); }
     }
 
     /* ============ EDITORS PICKS (worth your time) ============ */
@@ -759,13 +887,13 @@ export default function RhStyles() {
       grid-column: 1 / -1;
       display: grid;
       grid-template-columns: 1fr;
-      background: var(--p-surface);
-      border-bottom: 1px solid var(--rh-ink);
+      background: var(--rh-surface-soft);
+      border-bottom: 1px solid var(--rh-border);
     }
     .vp-editors-band__grid {
       display: grid;
       grid-template-columns: 1fr;
-      border-top: 1px solid var(--rh-ink);
+      border-top: 1px solid var(--rh-border);
     }
     @media (min-width: 720px) {
       .vp-editors-band__grid { grid-template-columns: 1fr 1fr; }
@@ -773,15 +901,15 @@ export default function RhStyles() {
     }
     @media (min-width: 1100px) {
       .vp-editors-band__grid { grid-template-columns: repeat(3, 1fr); }
-      .vp-editors-band__grid > .vp-editors-band__card:nth-child(2n) { border-right: 1px solid var(--rh-ink); }
+      .vp-editors-band__grid > .vp-editors-band__card:nth-child(2n) { border-right: 1px solid var(--rh-border); }
       .vp-editors-band__grid > .vp-editors-band__card:nth-child(3n) { border-right: none; }
     }
     .vp-editors-band__card {
-      background: var(--p-surface);
+      background: var(--rh-surface-soft);
       color: var(--rh-ink);
       padding: 20px 24px;
-      border-right: 1px solid var(--rh-ink);
-      border-bottom: 1px solid var(--rh-ink);
+      border-right: 1px solid var(--rh-border);
+      border-bottom: 1px solid var(--rh-border);
       cursor: pointer;
       transition: background .15s, color .15s;
     }
@@ -796,6 +924,7 @@ export default function RhStyles() {
       font-weight: 700;
       letter-spacing: 0.14em;
       text-transform: uppercase;
+      color: var(--rh-accent);
     }
     .vp-editors-band__hed {
       margin: 0;
@@ -812,23 +941,22 @@ export default function RhStyles() {
       color: var(--rh-ink-2);
       max-width: 50ch;
     }
-    @media (hover: hover) {
+    @media (hover: hover) and (pointer: fine) {
       .vp-editors-band__card:hover {
-        background: var(--rh-ink);
-        color: var(--rh-bg);
+        background: var(--rh-accent-soft);
       }
-      .vp-editors-band__card:hover .vp-editors-band__hed,
-      .vp-editors-band__card:hover .vp-editors-band__dek { color: var(--rh-bg); }
+      .vp-editors-band__card:hover .vp-editors-band__hed { color: var(--rh-accent-dark); }
     }
 
     /* ============ BY THE NUMBERS — compact rail ============
-       Always-dark island (matches .vp-quiz-card / .vp-rail-block). */
+       v2 cream-soft chrome (was always-dark island). Same treatment as
+       .vp-rail-block / .vp-quiz-card. */
     .vp-btn-rail {
-      background: #0a0a0a;
-      color: #fafafa;
+      background: var(--rh-surface-soft);
+      color: var(--rh-ink);
       padding: 28px 24px;
-      border-right: 1px solid var(--rh-ink);
-      border-bottom: 1px solid var(--rh-ink);
+      border: 1px solid var(--rh-border);
+      border-radius: 18px;
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -847,37 +975,28 @@ export default function RhStyles() {
       line-height: 1;
       font-weight: 800;
       letter-spacing: -0.02em;
-      color: #fafafa;
+      color: var(--rh-accent);
     }
     .vp-btn-rail__cap {
       font-size: 13px;
       line-height: 1.4;
-      color: #fafafa;
-      opacity: 0.8;
+      color: var(--rh-ink-2);
       max-width: 28ch;
     }
     .vp-btn-rail__sub {
       font-size: 10px;
       letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: #fafafa;
-      opacity: 0.55;
+      color: var(--rh-ink-3);
       padding-top: 4px;
-    }
-    @media (min-width: 720px) {
-      .vp-rh-grid > .vp-btn-rail:nth-child(2n) { border-right: none; }
-    }
-    @media (min-width: 1100px) {
-      .vp-rh-grid > .vp-btn-rail:nth-child(2n) { border-right: 1px solid var(--rh-ink); }
-      .vp-rh-grid > .vp-btn-rail:nth-child(3n) { border-right: none; }
     }
 
     /* ============ BY THE NUMBERS — wide band ============ */
     .vp-btn-band-wide {
       grid-column: 1 / -1;
-      background: var(--p-surface, #f6f4ef);
-      border-top: 4px solid var(--rh-ink);
-      border-bottom: 4px solid var(--rh-ink);
+      background: var(--rh-surface-soft);
+      border-top: 2px solid var(--rh-accent);
+      border-bottom: 2px solid var(--rh-accent);
       padding: 40px 24px;
       display: flex;
       flex-direction: column;
@@ -888,7 +1007,7 @@ export default function RhStyles() {
       letter-spacing: 0.22em;
       text-transform: uppercase;
       font-weight: 700;
-      color: var(--rh-ink);
+      color: var(--rh-accent);
     }
     .vp-btn-band-wide__grid {
       display: grid;

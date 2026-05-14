@@ -7,18 +7,27 @@ import type { Tables } from '@/types/database-helpers';
 
 export type HomeStory = Pick<
   Tables<'articles'>,
-  'id' | 'title' | 'excerpt' | 'category_id' | 'is_breaking' | 'is_developing' | 'published_at'
+  'id' | 'title' | 'excerpt' | 'category_id' | 'is_breaking' | 'is_developing' | 'published_at' | 'updated_at'
 > & {
   stories: { slug: string | null; lifecycle_status: string | null } | null;
 };
 
+// v2 palette — burgundy editorial accent + warm tones. Values resolve
+// from the centralized --vp-* token block in app/globals.css so the
+// home, masthead, article, and comment surfaces all share one source
+// of truth. Change a token in globals.css and every consumer follows.
 export const HOME_COLORS = {
-  bg: 'var(--p-bg)',
-  text: 'var(--p-ink)',
-  soft: 'var(--p-ink-soft)',
-  dim: 'var(--p-ink-dim)',
-  muted: 'var(--p-ink-muted)',
-  rule: 'var(--p-border)',
+  bg: 'var(--vp-surface)',
+  text: 'var(--vp-ink)',
+  soft: 'var(--vp-text-muted)',
+  dim: 'var(--vp-text-soft)',
+  muted: 'var(--vp-text-muted)',
+  rule: 'var(--vp-border)',
+  accent: 'var(--vp-accent)',
+  accentSoft: 'var(--vp-accent-soft)',
+  accentDark: 'var(--vp-accent-dark)',
+  borderSoft: 'var(--vp-border-soft)',
+  surfaceSoft: 'var(--vp-surface-soft)',
 };
 
 export const HOME_SERIF_STACK = "var(--font-source-serif), Georgia, 'Times New Roman', serif";

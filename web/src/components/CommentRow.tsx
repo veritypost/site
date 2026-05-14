@@ -54,22 +54,41 @@ const TAG_META: Record<TagKind, { label: string }> = {
   helpful: { label: 'Helpful' },
 };
 
-// Unified intent metadata — same labels + colors on top-level and replies.
-// Colors are pulled from the new editorial intent palette:
-//   add_context    → deep green   (#3d6b4f)  bg rgba(61,107,79,0.05)
-//   different_take → rust amber   (#a14b1a)  bg rgba(161,75,26,0.05)
-//   question       → slate blue   (#4a6e8a)  bg rgba(74,110,138,0.05)
+// v2 editorial palette — references the central --vp-* tokens defined
+// in globals.css (single source of truth for the burgundy redesign).
+const VP_ACCENT       = 'var(--vp-accent)';
+const VP_ACCENT_DARK  = 'var(--vp-accent-dark)';
+const VP_ACCENT_SOFT  = 'var(--vp-accent-soft)';
+const VP_BORDER       = 'var(--vp-border)';
+const VP_BORDER_SOFT  = 'var(--vp-border-soft)';
+const VP_SURFACE_SOFT = 'var(--vp-surface-soft)';
+const VP_TEXT         = 'var(--vp-ink)';
+const VP_TEXT_MUTED   = 'var(--vp-text-muted)';
+const VP_TEXT_SOFT    = 'var(--vp-text-soft)';
+
+const VP_MONO  = 'var(--font-ibm-mono), "SFMono-Regular", Consolas, monospace';
+const VP_SERIF = '"Source Serif 4", var(--font-source-serif), Georgia, serif';
+const VP_SANS  = 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+
+// Unified intent metadata — v2 editorial palette. Per-intent reply
+// backgrounds DROPPED in v2: with the warm cream surface + ACCENT_SOFT tint
+// on every nested reply, layering a second tinted background per intent
+// (green / amber / blue) made the thread read noisy and broke the burgundy +
+// cream identity. The intent signal now lives solely in the byline chip /
+// reply tag header — text label only, accent-colored. Reply containers all
+// render on the same standard surface.
+//
 // `tagLabel` is the threaded-reply tag header; `label` is the meta-line
-// intent chip. Text labels only (owner rule: no glyphs in chrome). `bg` is
-// the tinted container background applied to threaded (depth > 0) reply
-// blocks.
+// intent chip. `color` is the chip / header text color; we keep three muted
+// tones (slate / olive / rust) so intents remain distinguishable at a
+// glance while sitting within the editorial neutral range.
 const INTENT_META: Record<
   Intent,
-  { label: string; tagLabel: string; color: string; bg: string }
+  { label: string; tagLabel: string; color: string }
 > = {
-  question:       { label: 'Question',       tagLabel: 'Question',         color: '#4a6e8a', bg: 'rgba(74,110,138,0.05)' },
-  add_context:    { label: 'Adding to this', tagLabel: 'Adding to this',   color: '#3d6b4f', bg: 'rgba(61,107,79,0.05)' },
-  different_take: { label: 'Different take', tagLabel: 'A different take', color: '#a14b1a', bg: 'rgba(161,75,26,0.05)' },
+  question:       { label: 'Question',       tagLabel: 'Question',         color: '#4a6e8a' },
+  add_context:    { label: 'Adding to this', tagLabel: 'Adding to this',   color: '#3d6b4f' },
+  different_take: { label: 'Different take', tagLabel: 'A different take', color: '#a14b1a' },
 };
 
 export type EnrichedComment = CommentRowDb & {
@@ -168,8 +187,8 @@ function applyFormatting(text: string, baseKey: string | number): ReactNode[] {
     if (m[2] !== undefined)      out.push(<strong key={k} style={{ fontWeight: 700 }}>{m[2]}</strong>);
     else if (m[3] !== undefined) out.push(<em key={k} style={{ fontStyle: 'italic', fontWeight: 'inherit' }}>{m[3]}</em>);
     else if (m[4] !== undefined) out.push(<span key={k} style={{ textDecoration: 'line-through' }}>{m[4]}</span>);
-    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 1px 5px tunes the inline-code chip; off-grid by design
-    else if (m[5] !== undefined) out.push(<code key={k} style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.88em', background: 'rgba(0,0,0,0.06)', borderRadius: 3, padding: '1px 5px' }}>{m[5]}</code>);
+    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 1px 4px tunes the inline-code chip; off-grid by design
+    else if (m[5] !== undefined) out.push(<code key={k} style={{ fontFamily: VP_MONO, fontSize: '0.88em', background: VP_SURFACE_SOFT, borderRadius: 4, padding: '1px 4px' }}>{m[5]}</code>);
     last = m.index + m[0].length;
   }
   if (last < text.length) out.push(text.slice(last));
@@ -199,11 +218,11 @@ function renderBody(
       // signaling that the token is potentially inert.
       const expertStyle: React.CSSProperties = inertVisualGiveaway
         ? {
-            color: 'var(--p-ink-faint)',
+            color: VP_TEXT_SOFT,
             fontWeight: 600,
             textDecoration: 'line-through',
           }
-        : { color: 'var(--success-text)', fontWeight: 700 };
+        : { color: '#16a34a', fontWeight: 600 };
       const label = directedName ? `@expert_${directedName}` : '@expert';
       parts.push(
         <span key={idx} style={expertStyle} title={
@@ -226,7 +245,7 @@ function renderBody(
         <a
           key={idx}
           href={`/card/${name}`}
-          style={{ color: 'var(--p-ink)', fontWeight: 600, textDecoration: 'none' }}
+          style={{ color: VP_ACCENT, fontWeight: 500, textDecoration: 'none' }}
         >
           @{name}
         </a>
@@ -440,45 +459,41 @@ export default function CommentRow({
     return comment.helpful_count ?? 0;
   }
 
-  // Threaded reply container treatment — only depth > 0 gets the tinted
-  // background + intent-colored left border. Top-level comments stay
-  // visually neutral; their intent (if any) renders as a small chip near
-  // the meta line instead.
+  // v2 threaded reply container — warm cream left border + faint ACCENT_SOFT
+  // tint for visual nesting clarity. Per-intent backgrounds are dropped (see
+  // INTENT_META comment); intent now shows only as the byline chip / tag
+  // header text color, never as a container bg.
   const intentMeta = comment.intent ? INTENT_META[comment.intent] : null;
   const isThreadedReply = depth > 0 && !showExpertChrome;
-  const replyTintBg = isThreadedReply
-    ? (intentMeta ? intentMeta.bg : 'var(--accent-bg)')
-    : undefined;
-  const replyTintBorder = isThreadedReply
-    ? (intentMeta ? intentMeta.color : 'var(--border)')
-    : undefined;
   // Tag header for threaded replies. Plain reply (no intent) uses the
-  // institutional "Reply" label in the muted ink; intent replies use
-  // the intent's tag label + color. Top-level comments keep the small
+  // institutional "Reply" label in TEXT_SOFT; intent replies use the
+  // intent's tag label + muted tone. Top-level comments keep the small
   // meta-line chip and don't render this header.
   const replyTagText = intentMeta ? intentMeta.tagLabel : 'Reply';
-  const replyTagColor = intentMeta ? intentMeta.color : 'var(--muted-foreground)';
+  const replyTagColor = intentMeta ? intentMeta.color : VP_TEXT_SOFT;
 
   return (
     <div
       id={`comment-${comment.id}`}
       style={{
         ...(depth === 0 && !showExpertChrome ? {
-          paddingTop: 28, // magic — intentional (between --s6 24 and --s7 32)
-          paddingBottom: 'var(--s6)',
-          borderBottom: '1px solid var(--border, #e5e5e5)',
+          padding: '24px 0',
+          borderBottom: `1px solid ${VP_BORDER_SOFT}`,
+          background: 'transparent',
         } : {}),
         ...(isThreadedReply ? {
-          // eslint-disable-next-line no-restricted-syntax -- 14px is intentional off-grid for the threaded-reply container
-          padding: '14px 16px',
-          background: replyTintBg,
-          borderLeft: `3px solid ${replyTintBorder}`,
-          marginTop: 'var(--s1)',
-          marginBottom: 'var(--s1)',
+          // v2: warm cream left rail + faint ACCENT_SOFT tint for nesting
+          // clarity. Intent backgrounds intentionally not applied here.
+          marginLeft: 18,
+          paddingLeft: 18,
+          paddingTop: 14,
+          paddingBottom: 14,
+          background: 'rgba(244, 230, 226, 0.18)',
+          borderLeft: `2px solid ${VP_BORDER}`,
         } : {}),
         ...(showExpertChrome ? {
           background: '#f0faf4',
-          borderLeft: '3px solid var(--success-text)',
+          borderLeft: '3px solid #16a34a',
           // eslint-disable-next-line no-restricted-syntax -- 8px is intentional off-grid radius
           borderRadius: '0 8px 8px 0',
           // eslint-disable-next-line no-restricted-syntax -- 14px is intentional off-grid for the expert-chrome container
@@ -491,13 +506,13 @@ export default function CommentRow({
       {isThreadedReply && (
         <div
           style={{
-            fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: '0.22em',
+            fontFamily: VP_MONO,
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: '0.08em',
             textTransform: 'uppercase',
             color: replyTagColor,
-            marginBottom: 8,
+            marginBottom: 6,
           }}
         >
           {replyTagText}
@@ -519,59 +534,61 @@ export default function CommentRow({
         >
           {showExpertChrome && (
             <div style={{
-              fontSize: 11,
+              fontFamily: VP_MONO,
+              fontSize: 10,
               fontWeight: 700,
-              letterSpacing: '0.07em',
+              letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              color: 'var(--success-text)',
-              marginBottom: 4,
+              color: '#16a34a',
+              marginBottom: 6,
             }}>
               {comment.is_expert_reply
                 ? `Expert Reply${user.expert_title ? ` · ${user.expert_title}` : ''}`
                 : `Verified Expert${expertCategoryName ? ` · ${expertCategoryName}` : (user.expert_title ? ` · ${user.expert_title}` : '')}`}
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--p-ink)', letterSpacing: '-0.005em' }}>
-                  {user.username || 'user'}
-                </span>
-                {SHOW_EXPERT_CHROME_ON_COMMENTS && <VerifiedBadge user={user} />}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <button
-                  onClick={copyLink}
-                  title="Copy link to comment"
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+              <span style={{ fontFamily: VP_SANS, fontSize: 13, fontWeight: 600, color: VP_TEXT }}>
+                {user.username || 'user'}
+              </span>
+              {SHOW_EXPERT_CHROME_ON_COMMENTS && <VerifiedBadge user={user} />}
+              {/* Top-level intent chip — replies render their intent as a
+                  tag header above the meta line instead, so this only
+                  fires on depth === 0 to avoid duplication. */}
+              {depth === 0 && intentMeta && (
+                <span
                   style={{
-                    background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                    fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
-                    fontSize: 10, lineHeight: 1, letterSpacing: '0.12em',
+                    fontFamily: VP_MONO,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: '0.08em',
                     textTransform: 'uppercase',
-                    color: copiedLink ? 'var(--success-text)' : 'var(--muted-foreground)',
-                    transition: 'color 100ms',
+                    color: VP_ACCENT,
+                    background: VP_ACCENT_SOFT,
+                    padding: '3px 8px',
+                    borderRadius: 999,
                   }}
                 >
-                  {copiedLink ? 'Copied!' : `${timeAgo(comment.created_at)}${comment.is_edited ? ' · edited' : ''}`}
-                </button>
-                {/* Top-level intent chip — replies render their intent as a
-                    tag header above the meta line instead, so this only
-                    fires on depth === 0 to avoid duplication. */}
-                {depth === 0 && intentMeta && (
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
-                      fontSize: 9,
-                      fontWeight: 700,
-                      letterSpacing: '0.22em',
-                      textTransform: 'uppercase',
-                      color: intentMeta.color,
-                    }}
-                  >
-                    {intentMeta.tagLabel}
-                  </span>
-                )}
-              </div>
+                  {intentMeta.tagLabel}
+                </span>
+              )}
+              <button
+                onClick={copyLink}
+                title="Copy link to comment"
+                style={{
+                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  fontFamily: VP_MONO,
+                  fontSize: 10, lineHeight: 1, letterSpacing: '0.04em',
+                  color: copiedLink ? VP_ACCENT : VP_TEXT_SOFT,
+                  transition: 'color 100ms',
+                  textDecoration: 'none',
+                }}
+                onMouseEnter={(e) => { if (!copiedLink) (e.currentTarget as HTMLButtonElement).style.textDecoration = 'underline'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.textDecoration = 'none'; }}
+              >
+                {copiedLink ? 'Copied!' : `${timeAgo(comment.created_at)}${comment.is_edited ? ' · edited' : ''}`}
+              </button>
             </div>
             {/* context menu — header row */}
             {!isDeleted && !editing && hasMenuItems && (
@@ -584,16 +601,18 @@ export default function CommentRow({
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: menuOpen ? 'var(--p-ink)' : 'var(--p-ink-faint)',
+                    color: menuOpen ? VP_ACCENT : VP_TEXT_SOFT,
                     cursor: 'pointer',
                     fontSize: 15,
-                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 2x6 tunes the kebab-menu hit-target
-                    padding: '2px 6px',
+                    padding: 4,
                     lineHeight: 1,
                     letterSpacing: '0.06em',
                     touchAction: 'manipulation',
                     WebkitTapHighlightColor: 'transparent',
+                    transition: 'color 120ms',
                   }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = VP_ACCENT; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = menuOpen ? VP_ACCENT : VP_TEXT_SOFT; }}
                 >
                   &#x22ef;
                 </button>
@@ -604,12 +623,12 @@ export default function CommentRow({
                       right: 0,
                       top: '100%',
                       zIndex: 10,
-                      background: 'var(--bg)',
-                      border: '1px solid var(--p-border)',
-                      borderRadius: 8,
-                      boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
-                      minWidth: 140,
-                      padding: 4,
+                      background: '#ffffff',
+                      border: `1px solid ${VP_BORDER}`,
+                      borderRadius: 12,
+                      boxShadow: '0 6px 18px rgba(23,23,23,0.08)',
+                      minWidth: 160,
+                      padding: 6,
                     }}
                   >
                     {isOwner ? (
@@ -667,12 +686,10 @@ export default function CommentRow({
 
           {editing ? (
             <div style={{
-              borderLeft: '3px solid var(--p-ink)',
-              borderRadius: '0 var(--r-md) var(--r-md) 0',
-              border: '1px solid var(--p-border)',
-              // eslint-disable-next-line no-restricted-syntax -- 10px is intentional off-grid (between --s2 8 and --s3 12)
-              padding: '10px 12px',
-              background: 'var(--card, #f7f7f7)',
+              background: VP_SURFACE_SOFT,
+              border: `1px solid ${VP_BORDER}`,
+              borderRadius: 12,
+              padding: '12px 14px',
               marginBottom: 2,
             }}>
               <textarea
@@ -682,32 +699,33 @@ export default function CommentRow({
                 rows={3}
                 style={{
                   width: '100%',
-                  background: 'transparent',
-                  border: 'none',
+                  background: '#ffffff',
+                  border: `1px solid ${VP_BORDER}`,
+                  borderRadius: 8,
+                  fontFamily: VP_SANS,
                   fontSize: 14,
-                  lineHeight: 1.6,
-                  color: 'var(--p-ink)',
+                  lineHeight: 1.55,
+                  color: VP_TEXT,
                   outline: 'none',
-                  fontFamily: 'inherit',
                   resize: 'vertical',
-                  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: tight 2px inset for the inline edit textarea
-                  padding: '2px 0',
+                  padding: '8px 10px',
                 }}
               />
-              <div style={{ display: 'flex', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--p-border)' }}>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                 <button
                   onClick={doSaveEdit}
                   disabled={busy === 'edit' || !editBody.trim()}
                   style={{
-                    fontSize: 13,
-                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 7px vertical matches the editor's compact toolbar
-                    padding: '7px 16px',
-                    borderRadius: 9,
-                    border: 'none',
-                    background: editBody.trim() && busy !== 'edit' ? 'var(--p-ink)' : 'var(--muted)',
-                    color: 'var(--p-bg)',
-                    fontWeight: 700,
+                    fontFamily: VP_SANS,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    padding: '6px 14px',
+                    borderRadius: 999,
+                    border: `1px solid ${editBody.trim() && busy !== 'edit' ? VP_ACCENT : VP_BORDER}`,
+                    background: editBody.trim() && busy !== 'edit' ? VP_ACCENT : VP_SURFACE_SOFT,
+                    color: editBody.trim() && busy !== 'edit' ? '#ffffff' : VP_TEXT_SOFT,
                     cursor: busy === 'edit' || !editBody.trim() ? 'default' : 'pointer',
+                    transition: 'color 120ms, background 120ms, border-color 120ms',
                   }}
                 >
                   {busy === 'edit' ? 'Saving…' : 'Save'}
@@ -718,13 +736,14 @@ export default function CommentRow({
                     setEditBody(comment.body || '');
                   }}
                   style={{
-                    fontSize: 13,
-                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 7x14 sits a hair tighter than Save for visual rhythm
-                    padding: '7px 14px',
-                    borderRadius: 9,
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'var(--p-ink-muted)',
+                    fontFamily: VP_SANS,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    padding: '6px 14px',
+                    borderRadius: 999,
+                    border: `1px solid ${VP_BORDER}`,
+                    background: VP_SURFACE_SOFT,
+                    color: VP_TEXT_MUTED,
                     cursor: 'pointer',
                   }}
                 >
@@ -735,9 +754,10 @@ export default function CommentRow({
           ) : isDeleted ? (
             <div
               style={{
+                fontFamily: VP_SANS,
                 fontSize: 13,
-                lineHeight: 1.65,
-                color: 'var(--p-ink-muted)',
+                lineHeight: 1.55,
+                color: VP_TEXT_SOFT,
                 fontStyle: 'italic',
               }}
             >
@@ -746,10 +766,10 @@ export default function CommentRow({
           ) : (
             <div
               style={{
-                fontSize: 16,
-                lineHeight: 1.7,
-                color: 'var(--p-ink)',
-                letterSpacing: '-0.005em',
+                fontFamily: VP_SANS,
+                fontSize: 15,
+                lineHeight: 1.55,
+                color: VP_TEXT,
                 marginBottom: 2,
                 WebkitFontSmoothing: 'antialiased',
                 MozOsxFontSmoothing: 'grayscale',
@@ -775,11 +795,11 @@ export default function CommentRow({
             </div>
           )}
           {blurred && (
-            <div style={{ fontSize: 12, marginTop: 6, color: 'var(--p-ink-muted)' }}>
+            <div style={{ fontFamily: VP_SANS, fontSize: 12, marginTop: 6, color: VP_TEXT_MUTED }}>
               Expert response &mdash;{' '}
               <a
                 href="/profile/settings#billing"
-                style={{ color: 'var(--p-ink)', fontWeight: 600 }}
+                style={{ color: VP_ACCENT, fontWeight: 600 }}
               >
                 available on paid plans
               </a>
@@ -793,12 +813,14 @@ export default function CommentRow({
             <div
               style={{
                 marginTop: 8,
-                fontFamily: 'var(--font-serif), Georgia, serif',
+                padding: '8px 12px',
+                borderLeft: `2px solid ${VP_ACCENT}`,
+                background: VP_ACCENT_SOFT,
+                fontFamily: VP_SERIF,
                 fontStyle: 'italic',
-                fontSize: 13,
-                lineHeight: 1.45,
-                color: 'var(--p-ink-muted, #52525b)',
-                letterSpacing: '0.01em',
+                fontSize: 14,
+                lineHeight: 1.5,
+                color: VP_TEXT,
                 animation: 'vpFadeIn 220ms ease-out',
               }}
             >
@@ -806,8 +828,8 @@ export default function CommentRow({
               {firsthandContext && (
                 <>
                   {' '}
-                  <span style={{ color: 'var(--p-ink-faint, #a1a1aa)' }}>·</span>{' '}
-                  <span style={{ color: 'var(--p-ink, #0a0a0a)', fontStyle: 'italic' }}>
+                  <span style={{ color: VP_TEXT_SOFT, fontStyle: 'normal' }}>·</span>{' '}
+                  <span style={{ color: VP_TEXT, fontStyle: 'italic' }}>
                     {firsthandContext}
                   </span>
                 </>
@@ -883,14 +905,11 @@ export default function CommentRow({
               : askerCapHit
                 ? `Conversation complete with @${user.username || 'expert'} — they can grant another reply if you have a follow-up.`
                 : undefined;
-            // Smaller action buttons on threaded replies to keep the
-            // nested block visually lighter (mockup spec — 6px 12px / 12px
-            // font on replies vs 9px 16px / 13px on top-level).
-            const actionPad = isThreadedReply ? '6px 12px' : '9px 16px';
-            const actionFontSize = isThreadedReply ? 12 : 13;
-            // Sharp-cornered institutional pill used by I agree / Helpful /
-            // Reply (and the legacy Quote reply / thread toggle entries). On
-            // state inverts to ink fill, white label, count at 0.85 opacity.
+            const actionFontSize = 12;
+            // v2 pill base — radius 999, BORDER + SURFACE_SOFT bg in resting
+            // state, ACCENT outline on hover, ACCENT fill + white text when
+            // active. Hover handled inline via onMouseEnter/Leave because
+            // we're inlining styles (no CSS class layer here).
             function actionPillStyle(opts: {
               on: boolean;
               disabled?: boolean;
@@ -900,24 +919,42 @@ export default function CommentRow({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                fontFamily: 'inherit',
+                fontFamily: VP_SANS,
                 fontSize: actionFontSize,
                 fontWeight: 500,
                 lineHeight: 1.2,
-                padding: actionPad,
-                border: `1px solid ${on ? 'var(--text)' : 'var(--border)'}`,
-                borderRadius: 0,
-                background: on ? 'var(--text)' : 'transparent',
+                padding: '6px 14px',
+                border: `1px solid ${on ? VP_ACCENT : VP_BORDER}`,
+                borderRadius: 999,
+                background: on ? VP_ACCENT : VP_SURFACE_SOFT,
                 color: disabled
-                  ? 'var(--muted)'
+                  ? VP_TEXT_SOFT
                   : on
-                    ? 'var(--bg)'
-                    : 'var(--text-secondary)',
+                    ? '#ffffff'
+                    : VP_TEXT_MUTED,
                 cursor: disabled ? 'default' : 'pointer',
                 letterSpacing: '0',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
                 transition: 'color 120ms, background 120ms, border-color 120ms',
+              };
+            }
+            // Shared hover handlers — borderColor + color → ACCENT, never
+            // mutates the active state.
+            function pillHoverEnter(on: boolean, disabled?: boolean) {
+              return (e: React.MouseEvent<HTMLButtonElement>) => {
+                if (disabled || on) return;
+                const el = e.currentTarget;
+                el.style.borderColor = VP_ACCENT;
+                el.style.color = VP_ACCENT;
+              };
+            }
+            function pillHoverLeave(on: boolean, disabled?: boolean) {
+              return (e: React.MouseEvent<HTMLButtonElement>) => {
+                if (disabled || on) return;
+                const el = e.currentTarget;
+                el.style.borderColor = VP_BORDER;
+                el.style.color = VP_TEXT_MUTED;
               };
             }
             // Tally line — render above the action row. Mono small caps,
@@ -943,6 +980,8 @@ export default function CommentRow({
                   }}
                   disabled={replyDisabled}
                   title={replyTitle}
+                  onMouseEnter={pillHoverEnter(replyOpen, replyDisabled)}
+                  onMouseLeave={pillHoverLeave(replyOpen, replyDisabled)}
                   style={actionPillStyle({ on: replyOpen, disabled: replyDisabled })}
                 >
                   <span>Reply</span>
@@ -958,30 +997,31 @@ export default function CommentRow({
                       gap: 8,
                       flexWrap: 'wrap',
                       marginTop: 12,
-                      fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
-                      fontSize: 9.5,
+                      marginBottom: 6,
+                      fontFamily: VP_MONO,
+                      fontSize: 11,
                       fontWeight: 500,
-                      letterSpacing: '0.08em',
+                      letterSpacing: '0.04em',
                       textTransform: 'uppercase',
-                      color: 'var(--muted-foreground)',
+                      color: VP_TEXT_SOFT,
                     }}
                     aria-label="Comment tally"
                   >
                     {tallySegments.map((seg, i) => (
                       <span key={seg.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                         {i > 0 && (
-                          <span aria-hidden="true" style={{ color: 'var(--border)' }}>·</span>
+                          <span aria-hidden="true" style={{ color: VP_TEXT_SOFT, opacity: 0.5 }}>·</span>
                         )}
                         {/* "Agreed by 24" / "Helpful 19" — label first. For
                             replies we render "4 replies" with the count first. */}
                         {seg.label === 'Agreed by' || seg.label === 'Helpful' ? (
                           <>
                             <span>{seg.label}</span>
-                            <span style={{ color: 'var(--text)', fontWeight: 700 }}>{seg.n}</span>
+                            <span style={{ color: VP_TEXT, fontWeight: 700 }}>{seg.n}</span>
                           </>
                         ) : (
                           <>
-                            <span style={{ color: 'var(--text)', fontWeight: 700 }}>{seg.n}</span>
+                            <span style={{ color: VP_TEXT, fontWeight: 700 }}>{seg.n}</span>
                             <span>{seg.label}</span>
                           </>
                         )}
@@ -989,7 +1029,7 @@ export default function CommentRow({
                     ))}
                   </div>
                 )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: showTally ? 8 : 14, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: showTally ? 6 : 10, flexWrap: 'wrap' }}>
                   {/* Quote reply — appears when reader has selected text in this comment's body */}
                   {selectedQuote && canReply && !replyOpen && (
                     <button
@@ -999,6 +1039,8 @@ export default function CommentRow({
                         window.getSelection()?.removeAllRanges();
                         setReplyOpen(true);
                       }}
+                      onMouseEnter={pillHoverEnter(false)}
+                      onMouseLeave={pillHoverLeave(false)}
                       style={actionPillStyle({ on: false })}
                     >
                       <span>Quote reply</span>
@@ -1014,15 +1056,17 @@ export default function CommentRow({
                         onClick={() => doTag(k)}
                         disabled={!!busy}
                         aria-pressed={active}
+                        onMouseEnter={pillHoverEnter(active, !!busy)}
+                        onMouseLeave={pillHoverLeave(active, !!busy)}
                         style={actionPillStyle({ on: active, disabled: !!busy })}
                       >
                         <span>{meta.label}</span>
                         {count > 0 && (
                           <span
                             style={{
-                              fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
-                              fontSize: actionFontSize - 2,
-                              opacity: active ? 0.85 : 0.6,
+                              fontFamily: VP_SANS,
+                              fontSize: 11,
+                              opacity: 0.7,
                               marginLeft: 2,
                             }}
                           >
@@ -1036,8 +1080,9 @@ export default function CommentRow({
                   {askerRepliesLeft != null && askerRepliesLeft > 0 && (
                     <span
                       style={{
+                        fontFamily: VP_SANS,
                         fontSize: 11,
-                        color: 'var(--p-ink-muted)',
+                        color: VP_TEXT_MUTED,
                         marginLeft: 4,
                       }}
                       aria-label={`${askerRepliesLeft} replies left in this expert chain`}
@@ -1046,6 +1091,8 @@ export default function CommentRow({
                     </span>
                   )}
                   {showAllowFollowup && (
+                    // Grant followup — primary expert action; ACCENT fill +
+                    // white label per pill-variation spec.
                     <button
                       onClick={async () => {
                         if (busy === 'grant') return;
@@ -1058,23 +1105,28 @@ export default function CommentRow({
                       }}
                       disabled={busy === 'grant'}
                       style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        fontFamily: VP_SANS,
                         fontSize: 12,
                         fontWeight: 600,
-                        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: compact 30pt-min control padding off the 4-grid
-                        padding: '4px 10px',
-                        borderRadius: 'var(--r-sm)',
-                        minHeight: 30,
-                        border: '1px solid var(--success-text)',
-                        background: 'rgba(22,163,74,0.06)',
-                        color: 'var(--success-text)',
+                        padding: '6px 14px',
+                        borderRadius: 999,
+                        border: `1px solid ${VP_ACCENT}`,
+                        background: VP_ACCENT,
+                        color: '#ffffff',
                         cursor: busy === 'grant' ? 'default' : 'pointer',
-                        marginLeft: 4,
+                        transition: 'background 120ms, border-color 120ms',
                       }}
+                      onMouseEnter={(e) => { if (busy !== 'grant') (e.currentTarget as HTMLButtonElement).style.background = VP_ACCENT_DARK; }}
+                      onMouseLeave={(e) => { if (busy !== 'grant') (e.currentTarget as HTMLButtonElement).style.background = VP_ACCENT; }}
                     >
                       {busy === 'grant' ? 'Granting…' : 'Allow another reply'}
                     </button>
                   )}
                   {showClose && (
+                    // Close thread — secondary; pill base, ACCENT_SOFT bg +
+                    // ACCENT text per spec.
                     <button
                       onClick={async () => {
                         if (busy === 'close' || closeCooldown > 0) return;
@@ -1090,19 +1142,22 @@ export default function CommentRow({
                       }}
                       disabled={busy === 'close' || closeCooldown > 0}
                       style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        fontFamily: VP_SANS,
                         fontSize: 12,
-                        fontWeight: 600,
-                        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: compact 30pt-min control padding off the 4-grid
-                        padding: '4px 10px',
-                        borderRadius: 'var(--r-sm)',
-                        minHeight: 30,
-                        border: '1px solid var(--p-border)',
-                        background: 'transparent',
-                        color: closeCooldown > 0 ? 'var(--p-ink-faint)' : 'var(--p-ink-muted)',
+                        fontWeight: 500,
+                        padding: '6px 14px',
+                        borderRadius: 999,
+                        border: `1px solid ${VP_BORDER}`,
+                        background: VP_ACCENT_SOFT,
+                        color: closeCooldown > 0 ? VP_TEXT_SOFT : VP_ACCENT,
                         cursor: busy === 'close' || closeCooldown > 0 ? 'default' : 'pointer',
-                        marginLeft: 4,
+                        transition: 'color 120ms, border-color 120ms',
                       }}
                       title={closeCooldown > 0 ? `Try again in ${closeCooldown}s.` : undefined}
+                      onMouseEnter={(e) => { if (busy !== 'close' && closeCooldown === 0) (e.currentTarget as HTMLButtonElement).style.borderColor = VP_ACCENT; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = VP_BORDER; }}
                     >
                       {closeCooldown > 0
                         ? `Close thread (${closeCooldown}s)`
@@ -1112,6 +1167,7 @@ export default function CommentRow({
                     </button>
                   )}
                   {showReopen && (
+                    // Reopen — pill base with ACCENT text per spec.
                     <button
                       onClick={async () => {
                         if (busy === 'reopen') return;
@@ -1124,31 +1180,34 @@ export default function CommentRow({
                       }}
                       disabled={busy === 'reopen'}
                       style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        fontFamily: VP_SANS,
                         fontSize: 12,
-                        fontWeight: 600,
-                        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: compact 30pt-min control padding off the 4-grid
-                        padding: '4px 10px',
-                        borderRadius: 'var(--r-sm)',
-                        minHeight: 30,
-                        border: '1px solid var(--p-border)',
-                        background: 'transparent',
-                        color: 'var(--p-ink-muted)',
+                        fontWeight: 500,
+                        padding: '6px 14px',
+                        borderRadius: 999,
+                        border: `1px solid ${VP_BORDER}`,
+                        background: VP_SURFACE_SOFT,
+                        color: VP_ACCENT,
                         cursor: busy === 'reopen' ? 'default' : 'pointer',
-                        marginLeft: 4,
+                        transition: 'border-color 120ms',
                       }}
+                      onMouseEnter={(e) => { if (busy !== 'reopen') (e.currentTarget as HTMLButtonElement).style.borderColor = VP_ACCENT; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = VP_BORDER; }}
                     >
                       {busy === 'reopen' ? 'Reopening…' : 'Reopen (mod)'}
                     </button>
                   )}
                   {isExpertThreadRoot && isExpertThreadClosed && !showReopen && (
                     <span
-                      style={{ fontSize: 11, color: 'var(--p-ink-faint)', marginLeft: 8 }}
+                      style={{ fontFamily: VP_SANS, fontSize: 11, color: VP_TEXT_SOFT, marginLeft: 8 }}
                     >
                       Thread closed
                     </span>
                   )}
                   {askerCapHit && (
-                    <span style={{ fontSize: 11, color: 'var(--p-ink-muted)', marginLeft: 8 }}>
+                    <span style={{ fontFamily: VP_SANS, fontSize: 11, color: VP_TEXT_MUTED, marginLeft: 8 }}>
                       Conversation complete with @{user.username || 'expert'} — they can grant another reply if you have a follow-up.
                     </span>
                   )}
@@ -1156,6 +1215,8 @@ export default function CommentRow({
                   {depth === 0 && replies.length > 0 && (
                     <button
                       onClick={() => setRepliesOpen((v) => !v)}
+                      onMouseEnter={pillHoverEnter(repliesOpen)}
+                      onMouseLeave={pillHoverLeave(repliesOpen)}
                       style={actionPillStyle({ on: repliesOpen })}
                     >
                       <span>
@@ -1191,12 +1252,12 @@ export default function CommentRow({
             <div
               style={{
                 marginTop: 18,
-                marginLeft: 28,
+                marginLeft: 18,
                 paddingLeft: 18,
-                borderLeft: '2px solid var(--border)',
+                borderLeft: `2px solid ${VP_BORDER}`,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 24,
+                gap: 18,
               }}
             >
               {replies.map((r, i) => (
@@ -1220,17 +1281,29 @@ function MenuItem({ children, onClick, danger }: MenuItemProps) {
   return (
     <button
       onClick={onClick}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget;
+        el.style.background = VP_SURFACE_SOFT;
+        if (danger) el.style.color = '#b91c1c';
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget;
+        el.style.background = 'transparent';
+        el.style.color = danger ? '#dc2626' : VP_TEXT;
+      }}
       style={{
         display: 'block',
         width: '100%',
         textAlign: 'left',
-        padding: 'var(--s2) var(--s3)',
+        padding: '8px 14px',
+        fontFamily: VP_SANS,
         fontSize: 13,
         background: 'transparent',
         border: 'none',
-        color: danger ? '#dc2626' : 'var(--p-ink)',
+        color: danger ? '#dc2626' : VP_TEXT,
         cursor: 'pointer',
-        borderRadius: 'var(--r-sm)',
+        borderRadius: 8,
+        transition: 'background 100ms, color 100ms',
       }}
     >
       {children}
@@ -1249,14 +1322,14 @@ function ScorePopoverRow({ label, value }: { label: string; value: number | null
         padding: 'var(--s1) var(--s0)',
       }}
     >
-      <span style={{ fontSize: 12, color: 'var(--p-ink-muted, #71717a)' }}>{label}</span>
+      <span style={{ fontSize: 12, color: 'var(--vp-text-muted)' }}>{label}</span>
       <span
         style={{
           fontVariantNumeric: 'tabular-nums',
           fontSize: 18,
           fontWeight: 700,
           letterSpacing: '-0.01em',
-          color: 'var(--p-ink, #111)',
+          color: 'var(--vp-ink)',
         }}
       >
         {value != null ? value : '—'}
@@ -1395,14 +1468,14 @@ function AvatarWithScoreCard({
             left: 0,
             zIndex: 50,
             minWidth: 232,
-            background: 'var(--card, #ffffff)',
-            border: '1px solid var(--border, #e5e5e5)',
+            background: 'var(--vp-surface)',
+            border: '1px solid var(--vp-border)',
             borderRadius: 12, // magic — intentional (between --r-md 10 and --r-lg 14 for the score card)
             // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 14/16/10 tuned for the score-card popover insets
             padding: '14px 16px 10px',
             boxShadow: '0 12px 32px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)',
             fontSize: 13,
-            color: 'var(--p-ink, #111)',
+            color: 'var(--vp-ink)',
           }}
         >
           <div
@@ -1412,7 +1485,7 @@ function AvatarWithScoreCard({
               fontWeight: 700,
               letterSpacing: '-0.01em',
               marginBottom: 10,
-              color: 'var(--p-ink, #111)',
+              color: 'var(--vp-ink)',
             }}
           >
             {user.username ? `@${user.username}` : 'Reader'}
@@ -1423,7 +1496,7 @@ function AvatarWithScoreCard({
             aria-hidden="true"
             style={{
               height: 1,
-              background: 'var(--border, #e5e5e5)',
+              background: 'var(--vp-border)',
               margin: '10px -16px 6px',
             }}
           />
@@ -1436,13 +1509,13 @@ function AvatarWithScoreCard({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: 12,
-                color: 'var(--p-ink, #111)',
+                color: 'var(--vp-ink)',
                 textDecoration: 'none',
                 fontSize: 13,
                 fontWeight: 500,
                 // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6px vertical inset for the View profile row
                 padding: '6px 0',
-                borderRadius: 'var(--r-sm)',
+                borderRadius: 6,
               }}
             >
               <span>View profile</span>

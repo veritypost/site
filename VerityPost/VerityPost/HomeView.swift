@@ -466,27 +466,6 @@ struct HomeView: View {
                         .foregroundColor(.white.opacity(0.65))
                         .padding(.bottom, 14)
                 }
-                if story.isBreaking == true {
-                    Text("Breaking")
-                        .font(.system(.caption2, design: .default, weight: .semibold))
-                        .tracking(0.8)
-                        .textCase(.uppercase)
-                        .foregroundColor(.white.opacity(0.9))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(RoundedRectangle(cornerRadius: 3).fill(Color.black.opacity(0.25)))
-                        .padding(.bottom, 8)
-                } else if story.isDeveloping == true {
-                    Text("Developing")
-                        .font(.system(.caption2, design: .default, weight: .semibold))
-                        .tracking(0.8)
-                        .textCase(.uppercase)
-                        .foregroundColor(VP.warn)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(RoundedRectangle(cornerRadius: 3).fill(Color.black.opacity(0.25)))
-                        .padding(.bottom, 8)
-                }
                 Text(story.title ?? "Untitled")
                     .font(.system(size: heroTitleSize, weight: .bold, design: .serif))
                     .tracking(-0.4)
@@ -501,10 +480,9 @@ struct HomeView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 14)
                 }
-                Text(timeShort(story.publishedAt))
-                    .font(.system(.footnote, design: .default, weight: .medium))
-                    .foregroundColor(.white.opacity(0.55))
-                    .padding(.top, 10)
+                heroStatusRow(for: story)
+                    .padding(.top, 14)
+                    .padding(.bottom, 4)
             }
             // Q-NEW3 (2026-05-12) — content capped at 680pt centered;
             // colored hero background still runs edge-to-edge as a banner
@@ -523,6 +501,59 @@ struct HomeView: View {
             .accessibilityAddTraits(.isLink)
         }
         .buttonStyle(.plain)
+    }
+
+    // Lead status row — mono pills under the hero deck. Mirrors the v2 web
+    // Lead's `LIFECYCLE · N events · Updated Xm ago` strip. iOS hero feed
+    // doesn't fetch timeline events, so the event-count pill is omitted by
+    // design; lifecycle (BREAKING / DEVELOPING) and the relative published
+    // time render when the underlying data is present, and a pill is gracefully
+    // skipped when its field is missing.
+    @ViewBuilder
+    private func heroStatusRow(for story: Story) -> some View {
+        let lifecycleLabel: String? = {
+            if story.isBreaking == true { return "BREAKING" }
+            if story.isDeveloping == true { return "DEVELOPING" }
+            return nil
+        }()
+        let updatedLabel: String? = story.publishedAt.map { "Updated \(timeAgo($0))" }
+
+        let segments: [(text: String, isLifecycle: Bool)] = {
+            var out: [(String, Bool)] = []
+            if let l = lifecycleLabel { out.append((l, true)) }
+            if let u = updatedLabel { out.append((u, false)) }
+            return out
+        }()
+
+        // Hero sits on a category-tinted dark bg (see heroBg). Burgundy text
+        // on warm-tone palettes (public-health #3d1a1a, asia #2a1a1a, movies
+        // #2a1a2a) sub-AA — burgundy-on-burgundy is invisible. Use white-
+        // opacity family on iOS hero so contrast works on every category
+        // tint. Web Lead uses burgundy because its bg is cream gradient.
+        if !segments.isEmpty {
+            HStack(spacing: 6) {
+                ForEach(Array(segments.enumerated()), id: \.offset) { idx, seg in
+                    if idx > 0 {
+                        Text("·")
+                            .font(.system(.caption2, design: .monospaced, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    if seg.isLifecycle {
+                        Text(seg.text)
+                            .font(.system(.caption2, design: .monospaced, weight: .medium))
+                            .tracking(1.2)
+                            .textCase(.uppercase)
+                            .foregroundColor(.white.opacity(0.95))
+                    } else {
+                        Text(seg.text)
+                            .font(.system(.caption2, design: .monospaced, weight: .medium))
+                            .tracking(1.0)
+                            .foregroundColor(.white.opacity(0.65))
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     @ViewBuilder

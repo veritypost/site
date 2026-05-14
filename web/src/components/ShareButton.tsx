@@ -2,9 +2,18 @@
 
 import { useState } from 'react';
 
+// v2 editorial palette — references the central --vp-* tokens defined
+// in globals.css (single source of truth for the burgundy redesign).
+const ACCENT = 'var(--vp-accent)';
+const BORDER = 'var(--vp-border)';
+const SURFACE_SOFT = 'var(--vp-surface-soft)';
+const TEXT_MUTED = 'var(--vp-text-muted)';
+const SANS = 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+
 export default function ShareButton() {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
+  const [hover, setHover] = useState(false);
 
   async function handleCopy() {
     try {
@@ -18,23 +27,40 @@ export default function ShareButton() {
     }
   }
 
+  // Three visual states layered over the v2 pill chrome:
+  //   1. copyFailed → warm danger outline + text
+  //   2. copied     → ACCENT fill (parity w/ Follow active state)
+  //   3. default    → SURFACE_SOFT pill, hover borrows ACCENT
+  const isActive = copied;
+  const isFailed = copyFailed;
+
+  const background = isFailed ? SURFACE_SOFT : isActive ? ACCENT : SURFACE_SOFT;
+  const color = isFailed ? 'var(--danger, #dc2626)' : isActive ? '#ffffff' : hover ? ACCENT : TEXT_MUTED;
+  const borderColor = isFailed
+    ? 'var(--danger, #dc2626)'
+    : isActive
+      ? ACCENT
+      : hover
+        ? ACCENT
+        : BORDER;
+
   return (
     <button
       onClick={handleCopy}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       style={{
-        // Match the article-page button family (14/600/10r) so it lines
-        // up with the other action buttons in the ArticleActions row.
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,
-        fontSize: 14,
-        fontWeight: 600,
-        letterSpacing: '-0.005em',
-        color: copyFailed ? 'var(--danger, #dc2626)' : copied ? '#fff' : 'var(--text, #1a1a1a)',
-        background: copyFailed ? 'transparent' : copied ? 'var(--accent)' : 'transparent',
-        border: `1px solid ${copyFailed ? 'var(--danger, #dc2626)' : copied ? 'var(--accent)' : 'var(--border, #e5e5e5)'}`,
-        borderRadius: 10,
-        padding: '0 16px',
+        fontFamily: SANS,
+        fontSize: 13,
+        fontWeight: 500,
+        color,
+        background,
+        border: `1px solid ${borderColor}`,
+        borderRadius: 999,
+        padding: '8px 16px',
         minHeight: 44,
         cursor: 'pointer',
         transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',

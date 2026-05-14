@@ -1,8 +1,5 @@
 'use client';
 
-import { formatTimelineDate } from '@/lib/dates';
-import { useRegistrationWall } from '@/components/RegistrationWall';
-
 export type TimelineItem = {
   id: string;
   event_date: string;
@@ -13,119 +10,197 @@ export type TimelineItem = {
   metadata?: unknown;
 };
 
-const SECTION_STYLE: React.CSSProperties = {
-  marginTop: 40,
-  paddingTop: 24,
-  borderTop: '1px solid var(--p-border)',
+// v2 editorial palette — references the central --vp-* tokens defined
+// in globals.css (single source of truth for the burgundy redesign).
+const ACCENT = 'var(--vp-accent)';
+const ACCENT_DARK = 'var(--vp-accent-dark)';
+const ACCENT_SOFT = 'var(--vp-accent-soft)';
+const BORDER = 'var(--vp-border)';
+const TEXT = 'var(--vp-ink)';
+const TEXT_MUTED = 'var(--vp-text-muted)';
+const TEXT_SOFT = 'var(--vp-text-soft)';
+const SURFACE = 'var(--vp-surface)';
+
+const MONO = 'var(--font-ibm-mono), "SFMono-Regular", Consolas, monospace';
+const SERIF = '"Source Serif 4", var(--font-source-serif), Georgia, serif';
+const SANS = 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+
+const CARD_STYLE: React.CSSProperties = {
+  marginTop: 32,
+  background: SURFACE,
+  border: `1px solid ${BORDER}`,
+  borderRadius: 20,
+  padding: 20,
 };
 
-const HEADING_STYLE: React.CSSProperties = {
-  // Aligned to the editorial meta family — matches byline, Sources
-  // heading, NextStoryFooter, mobile reader tab strip.
-  fontSize: 11,
-  fontWeight: 600,
+const KICKER_STYLE: React.CSSProperties = {
+  fontFamily: MONO,
+  fontSize: 10,
+  fontWeight: 500,
   letterSpacing: '0.1em',
-  textTransform: 'uppercase' as const,
-  color: 'var(--p-ink-muted)',
-  margin: '0 0 24px',
+  textTransform: 'uppercase',
+  color: ACCENT,
+  marginBottom: 6,
+};
+
+const TITLE_STYLE: React.CSSProperties = {
+  margin: '0 0 4px',
+  fontFamily: SERIF,
+  fontSize: 18,
+  lineHeight: 1.15,
+  letterSpacing: '-0.02em',
+  fontWeight: 400,
+  color: TEXT,
+};
+
+const COUNT_STYLE: React.CSSProperties = {
+  fontFamily: SANS,
+  fontSize: 12,
+  color: TEXT_SOFT,
+  marginBottom: 16,
+};
+
+const LIST_STYLE: React.CSSProperties = {
+  position: 'relative',
+  paddingLeft: 18,
 };
 
 const SPINE_STYLE: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column' as const,
-  gap: 0,
+  position: 'absolute',
+  left: 5,
+  top: 6,
+  bottom: 6,
+  width: 1,
+  background: BORDER,
 };
 
 const EVENT_STYLE: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '80px 20px 1fr',
-  gap: '0 12px',
-  position: 'relative' as const,
+  position: 'relative',
+  padding: '0 0 18px',
+  fontFamily: SANS,
+  fontSize: 13,
+  lineHeight: 1.45,
+  color: TEXT_MUTED,
 };
 
-const DATE_STYLE: React.CSSProperties = {
-  fontSize: 12,
-  color: 'var(--p-ink-muted)',
-  paddingTop: 5,
-  textAlign: 'right' as const,
-  whiteSpace: 'nowrap' as const,
-};
-
-const DOT_COL_STYLE: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column' as const,
-  alignItems: 'center',
+const EVENT_LAST_STYLE: React.CSSProperties = {
+  ...EVENT_STYLE,
+  paddingBottom: 0,
 };
 
 const DOT_STYLE: React.CSSProperties = {
-  width: 7,
-  height: 7,
+  position: 'absolute',
+  left: -17,
+  top: 5,
+  width: 9,
+  height: 9,
   borderRadius: '50%',
-  background: 'var(--p-border)',
-  flexShrink: 0,
-  marginTop: 6,
+  background: TEXT_SOFT,
 };
 
-const LINE_STYLE: React.CSSProperties = {
-  flex: 1,
-  width: 1,
-  background: 'var(--p-border)',
-  minHeight: 16,
-};
-
-const CONTENT_STYLE: React.CSSProperties = {
-  paddingBottom: 24,
-};
-
-const LABEL_STYLE: React.CSSProperties = {
-  // Serif for timeline labels — each event reads as a small headline.
-  // 14px sans -> 15px Source Serif 4 with -0.005em tracking, 1.35
-  // line-height. Same family as the article body.
-  fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
-  fontSize: 15,
-  lineHeight: 1.35,
-  letterSpacing: '-0.005em',
-  color: 'var(--p-ink)',
-  margin: '0 0 4px',
-};
-
-const NOW_BADGE_STYLE: React.CSSProperties = {
-  // Weight 700 -> 600, ink color instead of accent. Same restraint
-  // pass: editorial badges shouldn't shout. Tighter padding.
-  display: 'inline-block',
+const DATE_STYLE: React.CSSProperties = {
+  display: 'block',
+  fontFamily: MONO,
   fontSize: 10,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: TEXT_SOFT,
+  marginBottom: 3,
+};
+
+const NOW_EVENT_STYLE: React.CSSProperties = {
+  position: 'relative',
+  marginLeft: -12,
+  padding: 12,
+  border: `1px solid ${ACCENT}`,
+  borderRadius: 14,
+  background: ACCENT_SOFT,
+  color: ACCENT_DARK,
+  fontWeight: 500,
+  fontFamily: SANS,
+  fontSize: 13,
+  lineHeight: 1.45,
+};
+
+const NOW_DOT_STYLE: React.CSSProperties = {
+  position: 'absolute',
+  left: -5,
+  top: 17,
+  width: 9,
+  height: 9,
+  borderRadius: '50%',
+  background: ACCENT,
+  boxShadow: `0 0 0 3px ${ACCENT_SOFT}`,
+};
+
+const NOW_DATE_STYLE: React.CSSProperties = {
+  ...DATE_STYLE,
+  color: ACCENT,
+};
+
+const READ_COVERAGE_STYLE: React.CSSProperties = {
+  display: 'inline-block',
+  marginTop: 6,
+  fontFamily: MONO,
+  fontSize: 10,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: ACCENT,
   fontWeight: 600,
-  letterSpacing: '0.1em',
-  textTransform: 'uppercase' as const,
-  color: 'var(--p-ink)',
-  border: '1px solid var(--p-ink)',
-  padding: '1px 6px',
-  borderRadius: 4,
-  marginBottom: 6,
+  textDecoration: 'none',
 };
 
 interface TimelineSectionProps {
   events: TimelineItem[];
   storySlug?: string;
+  storyTitle?: string;
   showTease?: boolean;
   articleCountReached?: boolean;
   currentArticleId?: string;
 }
 
-export default function TimelineSection({ events, storySlug, showTease = false, articleCountReached = false, currentArticleId }: TimelineSectionProps) {
-  const { openWall } = useRegistrationWall();
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// String-parse YYYY-MM-DD to avoid UTC off-by-one day shifts in negative
+// timezones. Mirrors the safety pattern used by formatTimelineDate in lib/dates.
+function parseIsoDate(iso: string): { y: number; m: number; d: number } | null {
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  return { y: Number(match[1]), m: Number(match[2]), d: Number(match[3]) };
+}
+
+function formatDateShort(iso: string): string {
+  const parsed = parseIsoDate(iso);
+  if (!parsed) return iso;
+  return `${MONTHS_SHORT[parsed.m - 1]} ${String(parsed.d).padStart(2, '0')}`;
+}
+
+function formatStartedDate(iso: string): string {
+  const parsed = parseIsoDate(iso);
+  if (!parsed) return iso;
+  return `${MONTHS_SHORT[parsed.m - 1]} ${parsed.d}, ${parsed.y}`;
+}
+
+export default function TimelineSection({
+  events,
+  storySlug,
+  storyTitle,
+  showTease = false,
+  articleCountReached = false,
+  currentArticleId,
+}: TimelineSectionProps) {
   if (!events.length && !showTease) return null;
 
   if (showTease) {
     return (
-      <section style={SECTION_STYLE}>
-        <h2 style={{ ...HEADING_STYLE, margin: '0 0 6px' }}>Timeline</h2>
-        <p style={{ fontSize: 14, color: 'var(--p-ink-muted)', margin: '0 0 8px', lineHeight: 1.5 }}>
+      <section style={CARD_STYLE}>
+        <div style={KICKER_STYLE}>Story timeline</div>
+        {storyTitle && <h2 style={TITLE_STYLE}>{storyTitle}</h2>}
+        <p style={{ ...COUNT_STYLE, marginBottom: 0 }}>
           {articleCountReached ? 'Available with an account.' : (
             <>
               The story timeline is a Verity Plus perk.{' '}
-              <a href="/pricing" style={{ color: 'var(--p-ink)', fontWeight: 500 }}>
+              <a href="/pricing" style={{ color: ACCENT, fontWeight: 500, textDecoration: 'underline', textUnderlineOffset: 2 }}>
                 See plans
               </a>
             </>
@@ -139,59 +214,66 @@ export default function TimelineSection({ events, storySlug, showTease = false, 
     (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
   );
 
-  // Most-recent event index: prefer the last article-typed event, fall back to the last event overall.
   const lastArticleIdx = sorted.reduce<number>((acc, ev, i) => (ev.type === 'article' ? i : acc), -1);
   const nowIdx = lastArticleIdx >= 0 ? lastArticleIdx : sorted.length - 1;
 
+  const firstDate = sorted[0] ? formatStartedDate(sorted[0].event_date) : '';
+
   return (
-    <section style={SECTION_STYLE}>
-      <h2 style={HEADING_STYLE}>Timeline</h2>
-      <div style={SPINE_STYLE}>
+    <section style={CARD_STYLE}>
+      <div style={KICKER_STYLE}>Story timeline</div>
+      {storyTitle && <h2 style={TITLE_STYLE}>{storyTitle}</h2>}
+      <div style={COUNT_STYLE}>
+        {sorted.length} {sorted.length === 1 ? 'event' : 'events'}
+        {firstDate ? ` · started ${firstDate}` : ''}
+      </div>
+
+      <div style={LIST_STYLE}>
+        <div style={SPINE_STYLE} />
         {sorted.map((ev, i) => {
           const isNow = i === nowIdx;
-          const dotStyle: React.CSSProperties = isNow
-            ? {
-                ...DOT_STYLE,
-                width: 10,
-                height: 10,
-                background: 'var(--p-accent)',
-                boxShadow: '0 0 0 2px #fff, 0 0 0 4px var(--p-accent)',
-                marginTop: 5,
-              }
-            : DOT_STYLE;
+          const isLast = i === sorted.length - 1;
+          const dateLabel = (((ev.metadata as Record<string, unknown> | null)?.date_display as string | undefined)
+            || formatDateShort(ev.event_date));
+
+          const labelNode = ev.type === 'article' && storySlug && ev.linked_article_id ? (
+            <a
+              href={`/${storySlug}?a=${ev.linked_article_id}`}
+              style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
+            >
+              {ev.event_label}
+            </a>
+          ) : (
+            <>{ev.event_label}</>
+          );
+
+          if (isNow) {
+            const showReadLink = ev.type === 'article'
+              && ev.linked_article_id
+              && ev.linked_article_id !== currentArticleId
+              && storySlug;
+            return (
+              <div key={ev.id} style={NOW_EVENT_STYLE}>
+                <span style={NOW_DOT_STYLE} />
+                <span style={NOW_DATE_STYLE}>Today</span>
+                <div>{labelNode}</div>
+                {showReadLink && (
+                  <a
+                    href={`/${storySlug}?a=${ev.linked_article_id}`}
+                    style={READ_COVERAGE_STYLE}
+                  >
+                    Read this coverage →
+                  </a>
+                )}
+              </div>
+            );
+          }
 
           return (
-            <div key={ev.id} style={EVENT_STYLE}>
-              <div style={DATE_STYLE}>{((ev.metadata as Record<string, unknown> | null)?.date_display as string | undefined) || formatTimelineDate(ev.event_date)}</div>
-              <div style={DOT_COL_STYLE}>
-                <div style={dotStyle} />
-                {i < sorted.length - 1 && <div style={LINE_STYLE} />}
-              </div>
-              <div style={CONTENT_STYLE}>
-                {isNow && <span style={NOW_BADGE_STYLE}>Now</span>}
-                {ev.type === 'article' && storySlug && ev.linked_article_id ? (
-                  <p style={LABEL_STYLE}>
-                    <a
-                      href={`/${storySlug}?a=${ev.linked_article_id}`}
-                      style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 }}
-                    >
-                      {ev.event_label}
-                    </a>
-                  </p>
-                ) : (
-                  <p style={LABEL_STYLE}>{ev.event_label}</p>
-                )}
-                {isNow && ev.type === 'article' && ev.linked_article_id !== currentArticleId && (
-                  ev.linked_article_id && storySlug ? (
-                    <a
-                      href={`/${storySlug}?a=${ev.linked_article_id}`}
-                      style={{ fontSize: 13, fontWeight: 500, color: 'var(--p-accent)', marginTop: 2, display: 'inline-block', textDecoration: 'none' }}
-                    >
-                      Read this coverage
-                    </a>
-                  ) : null
-                )}
-              </div>
+            <div key={ev.id} style={isLast ? EVENT_LAST_STYLE : EVENT_STYLE}>
+              <span style={DOT_STYLE} />
+              <span style={DATE_STYLE}>{dateLabel}</span>
+              <div>{labelNode}</div>
             </div>
           );
         })}
@@ -199,3 +281,4 @@ export default function TimelineSection({ events, storySlug, showTease = false, 
     </section>
   );
 }
+

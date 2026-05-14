@@ -33,6 +33,17 @@ export type ArticleSurfaceProps = {
   isSignedIn?: boolean;
 };
 
+// v2 editorial palette — references the central --vp-* tokens defined
+// in globals.css (single source of truth for the burgundy redesign).
+const TEXT = 'var(--vp-ink)';
+const TEXT_MUTED = 'var(--vp-text-muted)';
+const TEXT_SOFT = 'var(--vp-text-soft)';
+const BORDER_SOFT = 'var(--vp-border-soft)';
+
+const MONO = 'var(--font-ibm-mono), "SFMono-Regular", Consolas, monospace';
+const SERIF = '"Source Serif 4", var(--font-source-serif), Georgia, serif';
+const SANS = 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+
 const PAGE_STYLE: React.CSSProperties = {
   maxWidth: 680,
   margin: '0 auto',
@@ -48,42 +59,71 @@ const PAGE_STYLE: React.CSSProperties = {
 };
 
 const TITLE_STYLE: React.CSSProperties = {
-  // 36 → 44; weight 700 → 600 for editorial restraint; tighter
-  // tracking matches modern news-app titles (NYT, Atlantic).
-  fontSize: 44,
-  fontWeight: 600,
-  lineHeight: 1.1,
-  letterSpacing: '-0.02em',
-  margin: '0 0 var(--s2)',
-  color: 'var(--p-ink)',
+  // v2: editorial regular weight (400), bigger 52px desktop, tighter tracking.
+  // Mobile scales naturally via the 680px max-width container + viewport
+  // width — at <640px the parent padding collapses and 52px is still legible
+  // on iPhone-class viewports. If mobile pressure shows up in QA, add a
+  // matchMedia-driven override; not needed for first ship.
+  fontFamily: SERIF,
+  fontSize: 52,
+  fontWeight: 400,
+  lineHeight: 1.0,
+  letterSpacing: '-0.04em',
+  // eslint-disable-next-line no-restricted-syntax -- 14px is intentional off-grid (between --s1 8 and --s2 12 + 2)
+  margin: '0 0 14px',
+  color: TEXT,
 };
 
 const SUBTITLE_STYLE: React.CSSProperties = {
-  // Italic deck — classic editorial deck convention; keeps the visual
-  // distinction between title and lead without competing on size.
+  // v2: switch from serif-italic to sans regular per redesign mock.
+  // Deck reads as a quieter sibling of the headline, not a competing
+  // typographic register.
+  fontFamily: SANS,
   fontSize: 19,
-  lineHeight: 1.45,
-  fontStyle: 'italic',
-  // eslint-disable-next-line no-restricted-syntax -- 28px is intentional off-grid (between --s6 24 and --s7 32)
-  margin: '0 0 28px',
-  color: 'var(--p-ink-muted)',
+  lineHeight: 1.5,
+  fontStyle: 'normal',
+  fontWeight: 400,
+  // eslint-disable-next-line no-restricted-syntax -- 24px chosen to match v2 mock; equals --s6 but kept literal for parity with TimelineSection
+  margin: '0 0 24px',
+  color: TEXT_MUTED,
 };
 
-const BYLINE_STYLE: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
-  textTransform: 'uppercase',
-  letterSpacing: '0.1em',
-  marginBottom: 'var(--s6)',
-  color: 'var(--p-ink-muted)',
+const BYLINE_ROW_STYLE: React.CSSProperties = {
+  // v2 row 1: "By Verity Post" — sans, normal weight, ink.
+  fontFamily: SANS,
+  fontSize: 13,
+  fontWeight: 400,
+  color: TEXT,
+  // eslint-disable-next-line no-restricted-syntax -- 6px sits below --s1 8 for tight stacking against the meta row
+  margin: '0 0 6px',
+};
+
+const BYLINE_META_STYLE: React.CSSProperties = {
+  // v2 row 2: date in mono caps-tracking, soft tone. The divider that
+  // closes the title block lives on BYLINE_BLOCK_STYLE so it renders even
+  // for articles without a published_at (drafts, previews).
+  fontFamily: MONO,
+  fontSize: 10,
+  letterSpacing: '0.04em',
+  color: TEXT_SOFT,
+  margin: 0,
+};
+
+const BYLINE_BLOCK_STYLE: React.CSSProperties = {
+  // eslint-disable-next-line no-restricted-syntax -- 18px is intentional off-grid (between --s4 16 and --s5 20) to match v2 mock spacing
+  margin: '0 0 18px',
+  paddingBottom: 18,
+  borderBottom: `1px solid ${BORDER_SOFT}`,
 };
 
 const BODY_STYLE: React.CSSProperties = {
-  // 17 → 18, 1.6 → 1.7 — measurable readability win on long-form prose.
-  // Per-paragraph spacing handled in globals.css under [data-article-body].
+  // v2: pin serif explicitly (was inheriting), tighten leading 1.7 → 1.68.
+  // Per-paragraph spacing + drop cap handled in globals.css under
+  // [data-article-body].
+  fontFamily: SERIF,
   fontSize: 18,
-  lineHeight: 1.7,
-  color: 'var(--p-ink)',
+  lineHeight: 1.68,
+  color: TEXT,
 };
 
 export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody = true, isSignedIn = false }: ArticleSurfaceProps) {
@@ -147,9 +187,14 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
       )}
       <h1 style={TITLE_STYLE}>{article.title}</h1>
       {article.subtitle && <p style={SUBTITLE_STYLE}>{article.subtitle}</p>}
-      <p style={BYLINE_STYLE}>
-        Verity Post{article.published_at ? ` · ${new Date(article.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` : ''}
-      </p>
+      <div style={BYLINE_BLOCK_STYLE}>
+        <p style={BYLINE_ROW_STYLE}>By Verity Post</p>
+        {article.published_at && (
+          <p style={BYLINE_META_STYLE}>
+            {new Date(article.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+        )}
+      </div>
       {/* article_header: between title/byline block and body (DECISION #048) */}
       <Ad placement="article_header" page="article" position="header" articleId={article.id} />
       {canViewBody ? (

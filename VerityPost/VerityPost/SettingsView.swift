@@ -3042,9 +3042,39 @@ struct VerificationRequestView: View {
     }
 }
 
-// FlowLayout was duplicated here and in AlertsView.swift. Removed the
-// duplicate; the AlertsView declaration is module-visible and serves
-// both call sites. Caller at line ~2320 passes spacing explicitly.
+// Wrapping flow container used by chip pickers (SettingsView, PublicProfileView).
+// Originally lived in AlertsView.swift, which was deleted in cleanup commit
+// a05654c2 — re-homed here so the two remaining call sites resolve.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+    var lineSpacing: CGFloat = 6
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxW = proposal.width ?? .infinity
+        var x: CGFloat = 0; var y: CGFloat = 0; var lineH: CGFloat = 0; var totalW: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x + s.width > maxW && x > 0 {
+                y += lineH + lineSpacing; totalW = max(totalW, x - spacing); x = 0; lineH = 0
+            }
+            x += s.width + spacing
+            lineH = max(lineH, s.height)
+        }
+        totalW = max(totalW, x - spacing)
+        return CGSize(width: max(0, totalW), height: y + lineH)
+    }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x: CGFloat = bounds.minX; var y: CGFloat = bounds.minY; var lineH: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x + s.width > bounds.maxX && x > bounds.minX {
+                y += lineH + lineSpacing; x = bounds.minX; lineH = 0
+            }
+            v.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(s))
+            x += s.width + spacing
+            lineH = max(lineH, s.height)
+        }
+    }
+}
 
 // MARK: - Expert settings (role=expert)
 //

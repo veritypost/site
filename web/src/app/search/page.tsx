@@ -191,20 +191,23 @@ function SearchPageContent() {
   }
 
   const filterStyle: CSSProperties = {
-    padding: '8px 10px',
-    borderRadius: 8,
-    border: '1px solid var(--border)',
+    padding: '8px 12px',
+    borderRadius: 10,
+    border: '1px solid var(--vp-border)',
     fontSize: 13,
-    // F6: removed outline: 'none' so browser default focus ring shows
-    background: 'var(--bg)',
+    background: 'var(--vp-surface)',
+    color: 'var(--vp-ink)',
   };
 
   // F15: skeleton while canView is null (perms not yet hydrated)
   if (canView === null) {
     return (
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600, margin: '0 0 16px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>Search</h1>
-        <div style={{ height: 44, background: 'var(--card, #f0f0f0)', borderRadius: 10, marginBottom: 16 }} />
+        <h1 style={{ fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif', fontSize: 32, fontWeight: 400, margin: '0 0 16px', letterSpacing: '-0.02em', lineHeight: 1.15, color: 'var(--vp-ink)' }}>Search</h1>
+        <div style={{ height: 44, background: 'var(--vp-border-soft)', borderRadius: 10, marginBottom: 16 }} />
+        <div style={{ fontFamily: 'var(--font-ibm-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--vp-text-soft)', fontWeight: 500 }}>
+          Searching…
+        </div>
       </div>
     );
   }
@@ -212,11 +215,11 @@ function SearchPageContent() {
   if (!canView) {
     return (
       <div style={{ maxWidth: 520, margin: '64px auto', padding: '0 16px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600, margin: '0 0 12px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>Search unavailable</h1>
+        <h1 style={{ fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif', fontSize: 28, fontWeight: 400, margin: '0 0 12px', letterSpacing: '-0.02em', lineHeight: 1.15, color: 'var(--vp-ink)' }}>Search unavailable</h1>
         {/* F16: branch copy on auth state */}
         {!isAuthed
-          ? <p style={{ fontSize: 13, color: '#666' }}>Sign in to use search.</p>
-          : <p style={{ fontSize: 13, color: '#666' }}>Search is unavailable on your account. <a href="/appeal">Contact support →</a></p>
+          ? <p style={{ fontSize: 14, color: 'var(--vp-text-muted)', lineHeight: 1.55 }}>Sign in to use search.</p>
+          : <p style={{ fontSize: 14, color: 'var(--vp-text-muted)', lineHeight: 1.55 }}>Search is unavailable on your account. <a href="/appeal" style={{ color: 'var(--vp-accent)' }}>Contact support →</a></p>
         }
       </div>
     );
@@ -224,7 +227,45 @@ function SearchPageContent() {
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
-      <h1 style={{ fontSize: 28, fontWeight: 600, margin: '0 0 16px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>Search</h1>
+      <style>{`
+        .vp-search-input {
+          transition: border-color 0.15s ease;
+        }
+        .vp-search-input:focus {
+          outline: none;
+          border-color: var(--vp-accent) !important;
+        }
+        .vp-search-input::placeholder {
+          font-family: "Source Serif 4", var(--font-source-serif), Georgia, serif;
+          font-style: italic;
+          color: var(--vp-text-soft);
+        }
+        .vp-search-submit:hover:not(:disabled) {
+          background: var(--vp-accent-dark) !important;
+        }
+        .vp-search-row {
+          transition: background 0.15s ease;
+        }
+        .vp-search-row:hover {
+          background: var(--vp-accent-soft) !important;
+        }
+        .vp-filter-field {
+          transition: border-color 0.15s ease;
+        }
+        .vp-filter-field:focus {
+          outline: none;
+          border-color: var(--vp-accent) !important;
+        }
+        .vp-chip {
+          transition: border-color 0.15s ease, color 0.15s ease;
+        }
+        .vp-chip:hover {
+          border-color: var(--vp-accent) !important;
+          color: var(--vp-accent) !important;
+        }
+      `}</style>
+
+      <h1 style={{ fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif', fontSize: 32, fontWeight: 400, margin: '0 0 16px', letterSpacing: '-0.02em', lineHeight: 1.15, color: 'var(--vp-ink)' }}>Search</h1>
 
       {/* F11: visually-hidden live region for screen readers */}
       <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }} aria-live="polite" aria-atomic="true">
@@ -233,8 +274,9 @@ function SearchPageContent() {
 
       {/* F17: form wrapper so Enter and submit button both trigger runSearch */}
       <form role="search" onSubmit={(e) => { e.preventDefault(); runSearch(); }}>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <input
+            className="vp-search-input"
             value={q}
             onChange={(e) => { setQ(e.target.value); setHasInteracted(true); }}
             placeholder="Search by keyword"
@@ -243,23 +285,25 @@ function SearchPageContent() {
               flex: 1,
               padding: '10px 14px',
               borderRadius: 10,
-              border: '1px solid var(--border, #e5e5e5)',
+              border: '1px solid var(--vp-border)',
+              background: 'var(--vp-surface)',
+              color: 'var(--vp-ink)',
               fontSize: 14,
-              // F6: removed outline: 'none' so browser default focus ring shows
             }}
           />
           {/* F17: type="submit" + F25: aria-disabled */}
           <button
             type="submit"
+            className="vp-search-submit"
             disabled={!q.trim() || loading}
             aria-disabled={!q.trim() || loading}
             style={{
-              padding: '10px 18px',
+              padding: '12px 22px',
               minHeight: 44,
               borderRadius: 10,
-              border: 'none',
-              background: q.trim() && !loading ? 'var(--text)' : 'var(--border)',
-              color: 'var(--bg)',
+              border: q.trim() && !loading ? '1px solid var(--vp-accent)' : '1px solid var(--vp-border)',
+              background: q.trim() && !loading ? 'var(--vp-accent)' : 'var(--vp-surface-soft)',
+              color: q.trim() && !loading ? '#fff' : 'var(--vp-text-soft)',
               fontSize: 14,
               fontWeight: 600,
               cursor: q.trim() && !loading ? 'pointer' : 'default',
@@ -272,8 +316,8 @@ function SearchPageContent() {
 
       {canAdvanced ? (
         // F12: fieldset/legend wrapping the filter grid
-        <fieldset style={{ border: 'none', padding: 0, margin: '0 0 16px 0' }}>
-          <legend style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 6, fontWeight: 600 }}>Advanced filters</legend>
+        <fieldset style={{ border: '1px solid var(--vp-border-soft)', borderRadius: 14, padding: 16, margin: '0 0 16px 0' }}>
+          <legend style={{ fontFamily: 'var(--font-ibm-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--vp-accent)', fontWeight: 500, padding: '0 6px' }}>Advanced filters</legend>
           <div
             style={{
               display: 'grid',
@@ -284,6 +328,7 @@ function SearchPageContent() {
             {canFilterCategory && (
               // F10: aria-label for category select
               <select
+                className="vp-filter-field"
                 value={category}
                 onChange={(e) => { setCategory(e.target.value); pushUrlState({ category: e.target.value }); }}
                 style={filterStyle}
@@ -300,6 +345,7 @@ function SearchPageContent() {
             {canFilterDate && (
               <>
                 <input
+                  className="vp-filter-field"
                   type="date"
                   value={from}
                   onChange={(e) => { setFrom(e.target.value); pushUrlState({ from: e.target.value }); }}
@@ -309,6 +355,7 @@ function SearchPageContent() {
                   aria-label="From date"
                 />
                 <input
+                  className="vp-filter-field"
                   type="date"
                   value={to}
                   // F31: min attribute prevents browser from picking a date before 'from'
@@ -324,6 +371,7 @@ function SearchPageContent() {
             {canFilterSource && (
               // F10: aria-label for source input
               <input
+                className="vp-filter-field"
                 value={source}
                 onChange={(e) => { setSource(e.target.value); pushUrlState({ source: e.target.value }); }}
                 // F29: Enter triggers search
@@ -340,18 +388,19 @@ function SearchPageContent() {
         !canAdvanced && hasInteracted && (
           <div
             style={{
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              borderRadius: 10,
+              background: 'var(--vp-surface-soft)',
+              border: '1px solid var(--vp-border-soft)',
+              borderRadius: 12,
               padding: '10px 14px',
               marginBottom: 16,
-              fontSize: 12,
-              color: 'var(--dim)',
+              fontSize: 13,
+              color: 'var(--vp-text-muted)',
+              lineHeight: 1.55,
             }}
           >
             {isAuthed === false
-              ? <>Advanced filters (date range, category, source) are available to signed-in users.{' '}<Link href="/login">Sign in →</Link></>
-              : <>Advanced filters are a Verity Plus perk.{' '}<Link href="/pricing">See plans →</Link></>
+              ? <>Advanced filters (date range, category, source) are available to signed-in users.{' '}<Link href="/login" style={{ color: 'var(--vp-accent)' }}>Sign in →</Link></>
+              : <>Advanced filters are a Verity Plus perk.{' '}<Link href="/pricing" style={{ color: 'var(--vp-accent)' }}>See plans →</Link></>
             }
           </div>
         )
@@ -365,13 +414,16 @@ function SearchPageContent() {
       {ignoredFilters.length > 0 && !ignoredFiltersDismissed && (
         <div
           style={{
-            background: '#fffbe6',
-            border: '1px solid #ffe58f',
-            borderRadius: 8,
-            padding: '8px 12px',
+            background: 'var(--vp-accent-soft)',
+            border: '1px solid var(--vp-quiz-border)',
+            borderRadius: 12,
+            padding: '10px 14px',
             marginBottom: 10,
-            fontSize: 12,
-            color: '#666',
+            fontFamily: 'var(--font-ibm-mono)',
+            fontSize: 11,
+            color: 'var(--vp-accent-dark)',
+            letterSpacing: '0.06em',
+            fontWeight: 500,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -387,7 +439,7 @@ function SearchPageContent() {
           <button
             type="button"
             onClick={() => setIgnoredFiltersDismissed(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#888', padding: 0 }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--vp-accent)', padding: 0, textDecoration: 'underline' }}
             aria-label="Dismiss notice"
           >
             ✕
@@ -396,15 +448,26 @@ function SearchPageContent() {
       )}
 
       {/* F13: fontSize 12 instead of 11; F11: aria-live on result count */}
-      <div style={{ fontSize: 12, color: '#999', marginBottom: 6 }} aria-live="polite" aria-atomic="true">
+      <div style={{ fontFamily: 'var(--font-ibm-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--vp-text-soft)', fontWeight: 500, marginBottom: 8 }} aria-live="polite" aria-atomic="true">
         {results.length > 0 ? `${results.length} result${results.length === 1 ? '' : 's'}` : null}
       </div>
 
       {/* F30: pre-search blank state — keyword prompt + category quick-chips
           so the page isn't a dead end when a user lands without a query. */}
       {!q && !loading && (
-        <div style={{ padding: '24px 0 8px', textAlign: 'center' }}>
-          <div style={{ color: '#666', fontSize: 13, marginBottom: 18 }}>
+        <div
+          style={{
+            background: 'var(--vp-surface-soft)',
+            border: '1px solid var(--vp-quiz-border)',
+            borderRadius: 18,
+            padding: '36px 24px',
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif', fontSize: 22, fontWeight: 400, color: 'var(--vp-ink)', letterSpacing: '-0.02em', marginBottom: 10 }}>
+            Search by keyword
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--vp-text-muted)', lineHeight: 1.55, marginBottom: 18 }}>
             Search by keyword, or jump into a section.
           </div>
           {categories.length > 0 && (
@@ -412,7 +475,7 @@ function SearchPageContent() {
               style={{
                 display: 'flex',
                 flexWrap: 'wrap',
-                gap: 6,
+                gap: 8,
                 justifyContent: 'center',
                 maxWidth: 560,
                 margin: '0 auto',
@@ -421,14 +484,16 @@ function SearchPageContent() {
               {categories.slice(0, 10).map((c) => (
                 <Link
                   key={c.id}
+                  className="vp-chip"
                   href={`/?cat=${c.slug}`}
                   style={{
-                    padding: '7px 14px',
+                    padding: '8px 14px',
                     borderRadius: 999,
-                    border: '1px solid var(--border)',
-                    background: 'var(--card)',
-                    color: 'var(--text)',
+                    border: '1px solid var(--vp-border)',
+                    background: 'var(--vp-surface-soft)',
+                    color: 'var(--vp-text-muted)',
                     fontSize: 13,
+                    fontWeight: 500,
                     textDecoration: 'none',
                   }}
                 >
@@ -440,37 +505,36 @@ function SearchPageContent() {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
         {results.map((a) => (
           <Link
             key={a.id}
+            className="vp-search-row"
             href={`/${a.stories!.slug}`}
             prefetch={false}
             style={{
               display: 'block',
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              borderRadius: 10,
+              background: 'var(--vp-surface)',
+              borderBottom: '1px solid var(--vp-border-soft)',
               padding: 14,
               textDecoration: 'none',
-              color: 'var(--text)',
+              color: 'var(--vp-ink)',
             }}
           >
             <div style={{
-              // 15/600 sans -> 17/500 Source Serif 4. Aligned to the
-              // article-card-in-list family (UpNextSheet, NextStoryFooter,
-              // SectionsMenu search results).
+              // Source Serif 4 18/400 — editorial weight matching hero + article body
               fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
-              fontSize: 17,
-              fontWeight: 500,
+              fontSize: 18,
+              fontWeight: 400,
               lineHeight: 1.3,
-              letterSpacing: '-0.01em',
+              letterSpacing: '-0.02em',
+              color: 'var(--vp-ink)',
               marginBottom: 6,
             }}>{a.title}</div>
             {a.excerpt && (
-              <div style={{ fontSize: 14, color: 'var(--p-ink-muted)', lineHeight: 1.5, marginBottom: 6 }}>{a.excerpt}</div>
+              <div style={{ fontSize: 14, color: 'var(--vp-text-muted)', lineHeight: 1.55, marginBottom: 6 }}>{a.excerpt}</div>
             )}
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)' }}>
+            <div style={{ fontFamily: 'var(--font-ibm-mono)', fontSize: 10, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--vp-text-soft)' }}>
               {a.categories?.name}
               {a.categories?.name && a.published_at ? ' · ' : ''}
               {/* F5: hybrid timestamp — relative if <24h, absolute otherwise */}
@@ -484,11 +548,19 @@ function SearchPageContent() {
           </Link>
         ))}
         {results.length === 0 && !loading && q && (
-          <div style={{ padding: 40, textAlign: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 600, color: '#111', marginBottom: 6, letterSpacing: '-0.01em' }}>
+          <div
+            style={{
+              background: 'var(--vp-surface-soft)',
+              border: '1px solid var(--vp-quiz-border)',
+              borderRadius: 18,
+              padding: '36px 24px',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif', fontSize: 22, fontWeight: 400, color: 'var(--vp-ink)', marginBottom: 8, letterSpacing: '-0.02em' }}>
               No matches
             </div>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 14, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 14, color: 'var(--vp-text-muted)', marginBottom: 16, lineHeight: 1.55 }}>
               Try shorter keywords, or browse by category.
             </div>
             <Link
@@ -496,11 +568,11 @@ function SearchPageContent() {
               aria-label="Browse categories"
               style={{
                 display: 'inline-block',
-                padding: '9px 18px',
-                background: '#111',
+                padding: '10px 20px',
+                background: 'var(--vp-accent)',
                 color: '#fff',
-                borderRadius: 8,
-                fontSize: 13,
+                borderRadius: 10,
+                fontSize: 14,
                 fontWeight: 600,
                 textDecoration: 'none',
               }}
@@ -514,7 +586,7 @@ function SearchPageContent() {
               style={{
                 marginTop: 24,
                 paddingTop: 18,
-                borderTop: '1px solid var(--border, #e5e5e5)',
+                borderTop: '1px solid var(--vp-border-soft)',
                 textAlign: 'left',
                 maxWidth: 320,
                 marginLeft: 'auto',
@@ -523,12 +595,13 @@ function SearchPageContent() {
             >
               <div
                 style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: 'var(--p-ink-muted)',
+                  fontFamily: 'var(--font-ibm-mono)',
+                  fontSize: 10,
+                  fontWeight: 500,
+                  color: 'var(--vp-text-soft)',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.1em',
-                  marginBottom: 8,
+                  letterSpacing: '0.08em',
+                  marginBottom: 10,
                 }}
               >
                 Try a different search
@@ -538,7 +611,7 @@ function SearchPageContent() {
                   margin: 0,
                   paddingLeft: 18,
                   fontSize: 13,
-                  color: '#666',
+                  color: 'var(--vp-text-muted)',
                   lineHeight: 1.7,
                 }}
               >
@@ -546,7 +619,7 @@ function SearchPageContent() {
                 <li>Check spelling.</li>
                 <li>
                   Browse{' '}
-                  <Link href="/" style={{ color: '#111', fontWeight: 600 }}>
+                  <Link href="/" style={{ color: 'var(--vp-accent)', fontWeight: 600 }}>
                     categories
                   </Link>
                   .
@@ -564,8 +637,11 @@ export default function SearchPage() {
   return (
     <Suspense fallback={
       <div style={{ maxWidth: 820, margin: '0 auto', padding: '24px 16px 80px' }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600, margin: '0 0 16px', letterSpacing: '-0.02em', lineHeight: 1.15 }}>Search</h1>
-        <div style={{ height: 44, background: 'var(--card, #f0f0f0)', borderRadius: 10, marginBottom: 16 }} />
+        <h1 style={{ fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif', fontSize: 32, fontWeight: 400, margin: '0 0 16px', letterSpacing: '-0.02em', lineHeight: 1.15, color: 'var(--vp-ink)' }}>Search</h1>
+        <div style={{ height: 44, background: 'var(--vp-border-soft)', borderRadius: 10, marginBottom: 16 }} />
+        <div style={{ fontFamily: 'var(--font-ibm-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--vp-text-soft)', fontWeight: 500 }}>
+          Searching…
+        </div>
       </div>
     }>
       <SearchPageContent />

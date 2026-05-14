@@ -3,6 +3,18 @@ import { useState } from 'react';
 import ArticleQuiz, { QuizPassAchievement } from './ArticleQuiz';
 import CommentThread from './CommentThread';
 
+// v2 editorial palette — references the central --vp-* tokens defined
+// in globals.css (single source of truth for the burgundy redesign).
+const ACCENT = 'var(--vp-accent)';
+const ACCENT_DARK = 'var(--vp-accent-dark)';
+const QUIZ_BORDER = 'var(--vp-quiz-border)';
+const SURFACE_SOFT = 'var(--vp-surface-soft)';
+const TEXT = 'var(--vp-ink)';
+const TEXT_MUTED = 'var(--vp-text-muted)';
+const MONO = 'var(--font-ibm-mono), "SFMono-Regular", Consolas, monospace';
+const SERIF = '"Source Serif 4", var(--font-source-serif), Georgia, serif';
+const SANS = 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+
 interface ArticleEngagementZoneProps {
   articleId: string;
   articleCategoryId?: string | null;
@@ -26,6 +38,7 @@ export default function ArticleEngagementZone({
 }: ArticleEngagementZoneProps) {
   const [hasPassed, setHasPassed] = useState(initialPassed || canBypassQuiz);
   const [justPassedThisSession, setJustPassedThisSession] = useState(false);
+  const [ctaHover, setCtaHover] = useState(false);
 
   function handlePass(_achievements?: QuizPassAchievement[]) {
     setHasPassed(true);
@@ -42,13 +55,16 @@ export default function ArticleEngagementZone({
     <section id="discussion" style={sectionStyle}>
       {isPreview && (
         <div style={{
-          background: 'var(--warn-bg, #fffbeb)',
-          border: '1px solid var(--warn-border, #fde68a)',
-          borderRadius: 8,
-          padding: '8px 14px',
-          fontSize: 12,
+          background: '#fef3c7',
+          border: `1px solid ${QUIZ_BORDER}`,
+          borderRadius: 12,
+          padding: '10px 16px',
+          fontSize: 11,
           fontWeight: 600,
-          color: 'var(--warn-text, #b45309)',
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          fontFamily: MONO,
+          color: '#92400e',
           marginBottom: 16,
         }}>
           DRAFT — not visible to readers
@@ -73,39 +89,68 @@ export default function ArticleEngagementZone({
         <div
           style={{
             marginTop: 32,
-            padding: '24px 20px',
-            borderRadius: 12,
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            textAlign: 'center',
+            padding: '28px 24px',
+            borderRadius: 22,
+            background: SURFACE_SOFT,
+            border: `1px solid ${QUIZ_BORDER}`,
+            textAlign: 'left',
           }}
         >
-          <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
+          <div style={{
+            fontFamily: MONO,
+            fontSize: 10,
+            fontWeight: 500,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: ACCENT,
+            marginBottom: 8,
+          }}>
+            Discussion locked
+          </div>
+          <div style={{
+            fontFamily: SERIF,
+            fontSize: 24,
+            fontWeight: 400,
+            color: TEXT,
+            lineHeight: 1.15,
+            letterSpacing: '-0.02em',
+            marginBottom: 8,
+          }}>
             Earn the discussion
           </div>
-          <p style={{ fontSize: 14, color: 'var(--dim)', margin: '0 0 16px', lineHeight: 1.55 }}>
-            Pass the comprehension quiz to join the conversation. Comments are open to readers who&rsquo;ve shown they&rsquo;ve read the piece.
+          <p style={{
+            fontFamily: SANS,
+            fontSize: 14,
+            color: TEXT_MUTED,
+            lineHeight: 1.6,
+            margin: '0 0 20px',
+          }}>
+            Pass a short comprehension check to join the conversation. Comments stay open to readers who&rsquo;ve shown they&rsquo;ve read the piece.
           </p>
           <a
             href="/signup"
+            onMouseEnter={() => setCtaHover(true)}
+            onMouseLeave={() => setCtaHover(false)}
             style={{
               display: 'inline-block',
-              padding: '10px 22px',
-              borderRadius: 9,
-              background: 'var(--accent)',
-              color: 'var(--bg)',
+              padding: '12px 22px',
+              borderRadius: 10,
+              background: ctaHover ? ACCENT_DARK : ACCENT,
+              color: '#fff',
+              fontFamily: SANS,
               fontSize: 14,
-              fontWeight: 700,
+              fontWeight: 600,
               textDecoration: 'none',
+              transition: 'background 0.15s ease',
             }}
           >
-            Create free account
+            Create free account →
           </a>
         </div>
       ) : (!hasQuiz || hasPassed) ? (
         <>
           <div style={{
-            borderTop: '1px solid var(--border)',
+            borderTop: '1px solid var(--vp-border)',
             marginTop: 40,
             paddingTop: 32,
           }}>
@@ -119,8 +164,8 @@ export default function ArticleEngagementZone({
             {articleCategoryId && articleCategoryName ? (
               <div style={{
                 marginTop: 24, paddingTop: 16,
-                borderTop: '1px solid var(--border)',
-                fontSize: 13, color: 'var(--dim)', textAlign: 'center',
+                borderTop: '1px solid var(--vp-border)',
+                fontSize: 13, color: 'var(--vp-text-soft)', textAlign: 'center',
               }}>
                 <a
                   href={`/leaderboard?cat=${articleCategoryId}`}

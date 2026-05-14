@@ -1254,7 +1254,7 @@ function LayoutCanvas({
           <span className="vp-admin-outline" style={selectionOutline(anchor)} />
           <div className="vp-rh-lead-link">
             <div className="vp-rh-lead-content">
-              <span className="vp-rh-tag vp-rh-tag-accent">
+              <span className="vp-rh-tag vp-rh-tag-accent vp-rh-tag--lead">
                 {categoryName(story.category_id)}
               </span>
               <h2 className="vp-rh-lead-title">{story.title}</h2>
@@ -1265,7 +1265,7 @@ function LayoutCanvas({
           </div>
           {hasTimeline && (
             <aside className="vp-rh-timeline">
-              <span className="vp-rh-tl-label">Timeline</span>
+              <span className="vp-rh-tl-label">How we got here</span>
               <ul>
                 {leadTimeline.map((t, i) => {
                   const isNow =
@@ -1273,22 +1273,23 @@ function LayoutCanvas({
                   const dateLabel = (() => {
                     const d = new Date(t.event_date);
                     if (Number.isNaN(d.getTime())) return '';
-                    return d
-                      .toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })
-                      .toUpperCase();
+                    return new Intl.DateTimeFormat('en-US', {
+                      timeZone: 'America/New_York',
+                      month: 'short',
+                      day: '2-digit',
+                    }).format(d);
                   })();
                   return (
-                    <li key={t.id} className={isNow ? 'now' : undefined}>
-                      <strong>{isNow ? 'Today: ' : `${dateLabel}: `}</strong>
-                      <span>{t.event_label}</span>
+                    <li
+                      key={t.id}
+                      className={`vp-rh-tl-event${isNow ? ' vp-rh-tl-event--now' : ''}`}
+                    >
+                      <span className="vp-rh-tl-date">{isNow ? 'Today' : dateLabel}</span>
+                      {isNow ? `${t.event_label} — this article` : t.event_label}
                     </li>
                   );
                 })}
               </ul>
-              <span className="vp-rh-readmore">Read full report →</span>
             </aside>
           )}
         </article>

@@ -58,17 +58,27 @@ interface ArticleQuizProps {
   onPass?: (newAchievements?: QuizPassAchievement[]) => void;
 }
 
-// T82 — values point at globals.css CSS vars so brand-color edits cascade.
-// `success`/`danger`/`warn` keep inline hex (deeper variants than canonical).
+// v2 editorial palette — references the central --vp-* tokens defined
+// in globals.css (single source of truth for the burgundy redesign).
 const C = {
-  card: 'var(--card)',
-  border: 'var(--border)',
-  text: 'var(--text)',
-  dim: 'var(--dim)',
-  accent: 'var(--accent)',
-  success: '#16a34a',
-  danger: '#dc2626',
+  accent: 'var(--vp-accent)',
+  accentDark: 'var(--vp-accent-dark)',
+  accentSoft: 'var(--vp-accent-soft)',
+  border: 'var(--vp-border)',
+  borderSoft: 'var(--vp-border-soft)',
+  surface: 'var(--vp-surface)',
+  surfaceSoft: 'var(--vp-surface-soft)',
+  quizBorder: 'var(--vp-quiz-border)',
+  innerDivider: '#e9d6c0',
+  text: 'var(--vp-ink)',
+  textMuted: 'var(--vp-text-muted)',
+  textSoft: 'var(--vp-text-soft)',
+  success: '#15803d',
+  danger: '#b91c1c',
   warn: '#b45309',
+  mono: 'var(--font-ibm-mono), "SFMono-Regular", Consolas, monospace',
+  serif: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
+  sans: 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
 };
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
@@ -220,32 +230,49 @@ export default function ArticleQuiz({
       <>
         <div
           style={{
-            background: 'var(--p-success-soft, #ecfdf5)',
-            border: `1px solid ${C.success}`,
-            borderRadius: 12,
+            background: C.accentSoft,
+            border: `1px solid ${C.accent}`,
+            borderRadius: 14,
             padding: '14px 18px',
             marginTop: 24,
           }}
         >
-          <div style={{ fontWeight: 700, color: C.success, fontSize: 14 }}>
-            {isKid ? 'Quiz passed!' : 'Discussion unlocked'}
+          <div
+            style={{
+              fontFamily: C.mono,
+              fontSize: 10,
+              fontWeight: 500,
+              color: C.accent,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase' as const,
+            }}
+          >
+            Discussion unlocked
           </div>
           {/* T141 — give passed-state a forward path. One line, two
               targets: jump to the unlocked thread, or go pick the next
               read. Same-category recirc is owned by T11; this is just
               the "what now?" beat. */}
           {!isKid && (
-            <div style={{ fontSize: 12, color: C.dim, marginTop: 10, lineHeight: 1.5 }}>
+            <div
+              style={{
+                fontFamily: C.sans,
+                fontSize: 12,
+                color: C.accentDark,
+                marginTop: 8,
+                lineHeight: 1.5,
+              }}
+            >
               <a
                 href="#discussion"
-                style={{ color: C.accent, textDecoration: 'underline', fontWeight: 600 }}
+                style={{ color: C.accent, textDecoration: 'underline' }}
               >
                 Jump to discussion
               </a>
               {' · '}
               <a
                 href="/"
-                style={{ color: C.accent, textDecoration: 'underline', fontWeight: 600 }}
+                style={{ color: C.accent, textDecoration: 'underline' }}
               >
                 Browse for your next article
               </a>
@@ -273,56 +300,101 @@ export default function ArticleQuiz({
           conflicts are enforced manually via ad_targets exclude
           rules (not gated in schema), per the design lock.
         */}
-        <QuizSponsorEyebrow articleId={articleId} dim={C.dim} />
+        <QuizSponsorEyebrow articleId={articleId} dim={C.textMuted} />
       <div style={{
-        background: 'var(--bg)',
-        border: `1px solid ${C.border}`,
-        borderRadius: 14,
-        padding: '28px 28px 24px',
+        background: C.surfaceSoft,
+        border: `1px solid ${C.quizBorder}`,
+        borderRadius: 22,
+        padding: 24,
         marginTop: 40,
-        boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
       }}>
-        <div style={{
-          fontSize: 11,
-          fontWeight: 600,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase' as const,
-          color: C.dim,
-          marginBottom: 14,
-        }}>
-          Quiz
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            flexWrap: 'wrap',
+            gap: 14,
+            marginBottom: 18,
+            paddingBottom: 14,
+            borderBottom: `1px solid ${C.innerDivider}`,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontFamily: C.mono,
+                fontSize: 10,
+                fontWeight: 500,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase' as const,
+                color: C.accent,
+                marginBottom: 6,
+              }}
+            >
+              Comprehension check
+            </div>
+            <div
+              style={{
+                fontFamily: C.serif,
+                fontSize: 24,
+                fontWeight: 400,
+                color: C.text,
+                lineHeight: 1.1,
+                letterSpacing: '-0.025em',
+                marginTop: 0,
+              }}
+            >
+              How well did you follow the story?
+            </div>
+          </div>
+          <div
+            style={{
+              fontFamily: C.sans,
+              fontSize: 13,
+              color: C.textMuted,
+            }}
+          >
+            5 questions · about 90 seconds · unlocks discussion
+          </div>
         </div>
-        <div style={{
-          fontSize: 22,
-          fontWeight: 600,
-          color: C.text,
-          lineHeight: 1.25,
-          letterSpacing: '-0.02em',
-          marginBottom: 24,
-        }}>
-          How well did you follow the story?
-        </div>
-        {error && <div style={{ fontSize: 12, color: C.danger, marginBottom: 10 }}>{error}</div>}
+        {error && (
+          <div
+            style={{
+              fontFamily: C.sans,
+              fontSize: 12,
+              color: C.danger,
+              marginBottom: 10,
+            }}
+          >
+            {error}
+          </div>
+        )}
         <button
           onClick={startAttempt}
           disabled={stage === 'loading-start'}
+          onMouseEnter={(e) => {
+            if (stage !== 'loading-start') e.currentTarget.style.background = C.accentDark;
+          }}
+          onMouseLeave={(e) => {
+            if (stage !== 'loading-start') e.currentTarget.style.background = C.accent;
+          }}
           style={{
-            display: 'block',
-            width: '100%',
-            padding: '15px 20px',
+            display: 'inline-block',
+            padding: '14px 22px',
+            minHeight: 44,
             borderRadius: 10,
             border: 'none',
             background: C.accent,
-            color: 'var(--bg)',
-            fontSize: 16,
+            color: '#fff',
+            fontFamily: C.sans,
+            fontSize: 14,
             fontWeight: 600,
             cursor: stage === 'loading-start' ? 'default' : 'pointer',
             opacity: stage === 'loading-start' ? 0.6 : 1,
-            fontFamily: 'inherit',
-            letterSpacing: '-0.005em',
           }}
         >
-          {stage === 'loading-start' ? 'Loading…' : 'Take the quiz'}
+          {stage === 'loading-start' ? 'Loading…' : 'Take the quiz →'}
         </button>
       </div>
       </>
@@ -336,149 +408,182 @@ export default function ArticleQuiz({
     return (
       <div
         style={{
-          background: C.card,
-          border: `1px solid ${C.border}`,
-          borderRadius: 14,
-          padding: '18px 20px',
+          background: C.surfaceSoft,
+          border: `1px solid ${C.quizBorder}`,
+          borderRadius: 22,
+          padding: 24,
           marginTop: 24,
         }}
       >
         <div
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'baseline',
-            marginBottom: 10,
+            background: C.surface,
+            border: `1px solid ${C.borderSoft}`,
+            borderRadius: 16,
+            padding: 20,
           }}
         >
           <div
             style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: C.dim,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
+              fontFamily: C.mono,
+              fontSize: 10,
+              fontWeight: 500,
+              color: C.textSoft,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase' as const,
+              marginBottom: 6,
             }}
           >
             Question {currentIndex + 1} of {questions.length}
           </div>
-        </div>
 
-        <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-          {questions.map((_, i) => (
-            <div
-              key={i}
-              style={{
-                flex: 1,
-                height: 5,
-                borderRadius: 4,
-                background:
-                  i < currentIndex
-                    ? C.dim
-                    : i === currentIndex
+          <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+            {questions.map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  height: 4,
+                  borderRadius: 4,
+                  background:
+                    i < currentIndex
                       ? C.accent
-                      : C.border,
-                transition: 'background 250ms ease',
-              }}
-            />
-          ))}
-        </div>
+                      : i === currentIndex
+                        ? C.accent
+                        : C.border,
+                  transition: 'background 250ms ease',
+                }}
+              />
+            ))}
+          </div>
 
-        {q && (
-          <>
+          {q && (
+            <>
+              <div
+                style={{
+                  fontFamily: C.serif,
+                  fontSize: 18,
+                  fontWeight: 400,
+                  color: C.text,
+                  lineHeight: 1.3,
+                  marginBottom: 16,
+                }}
+              >
+                {q.question_text}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {q.options?.map((opt, oi) => {
+                  const selected = answers[q.id] === opt.text;
+                  const anySelected = answers[q.id] != null;
+                  const letter = OPTION_LETTERS[oi] ?? String(oi + 1);
+                  return (
+                    <button
+                      key={oi}
+                      onClick={() => !grading && !anySelected && selectOption(q, oi)}
+                      disabled={grading || anySelected}
+                      onMouseEnter={(e) => {
+                        if (!grading && !anySelected) {
+                          e.currentTarget.style.borderColor = C.accent;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!grading && !anySelected) {
+                          e.currentTarget.style.borderColor = C.border;
+                        }
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '12px 14px',
+                        borderRadius: 12,
+                        border: `1px solid ${selected ? C.accent : C.border}`,
+                        background: selected ? C.accentSoft : C.surface,
+                        color: selected ? C.accentDark : C.text,
+                        cursor: grading || anySelected ? 'default' : 'pointer',
+                        fontFamily: C.sans,
+                        fontSize: 14,
+                        fontWeight: 400,
+                        opacity: anySelected && !selected ? 0.38 : 1,
+                        transition: 'all 150ms ease',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 22,
+                          height: 22,
+                          borderRadius: 6,
+                          flexShrink: 0,
+                          fontFamily: C.mono,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          background: selected ? C.accent : C.borderSoft,
+                          color: selected ? '#fff' : C.textSoft,
+                          transition: 'background 150ms ease, color 150ms ease',
+                        }}
+                      >
+                        {letter}
+                      </span>
+                      {opt.text}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {grading && (
             <div
               style={{
-                fontSize: 17,
-                color: C.text,
-                marginBottom: 18,
-                lineHeight: 1.6,
-                fontWeight: 600,
+                fontFamily: C.mono,
+                fontSize: 11,
+                color: C.textSoft,
+                marginTop: 14,
+                textAlign: 'center',
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase' as const,
               }}
             >
-              {q.question_text}
+              {'Grading…'}
             </div>
-            {q.options?.map((opt, oi) => {
-              const selected = answers[q.id] === opt.text;
-              const anySelected = answers[q.id] != null;
-              const letter = OPTION_LETTERS[oi] ?? String(oi + 1);
-              return (
-                <button
-                  key={oi}
-                  onClick={() => !grading && !anySelected && selectOption(q, oi)}
-                  disabled={grading || anySelected}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '12px 14px',
-                    borderRadius: 10,
-                    border: `2px solid ${selected ? C.accent : C.border}`,
-                    background: selected ? C.accent : C.card,
-                    color: selected ? 'var(--bg)' : C.text,
-                    marginBottom: 8,
-                    cursor: grading || anySelected ? 'default' : 'pointer',
-                    fontSize: 14,
-                    fontWeight: selected ? 600 : 400,
-                    fontFamily: 'inherit',
-                    opacity: anySelected && !selected ? 0.38 : 1,
-                    transition: 'all 150ms ease',
-                  }}
-                >
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: 22,
-                      height: 22,
-                      borderRadius: 6,
-                      flexShrink: 0,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      background: selected ? '#fff' : 'var(--border)',
-                      color: selected ? 'var(--accent)' : 'var(--dim)',
-                      transition: 'background 150ms ease, color 150ms ease',
-                    }}
-                  >
-                    {letter}
-                  </span>
-                  {opt.text}
-                </button>
-              );
-            })}
-          </>
-        )}
-
-        {grading && (
-          <div
-            style={{
-              fontSize: 13,
-              color: C.dim,
-              marginTop: 14,
-              textAlign: 'center',
-              letterSpacing: '0.04em',
-            }}
-          >
-            {'Grading…'}
-          </div>
-        )}
-        {error && stage === 'answering' && (
-          <>
-            <p style={{ fontSize: 13, color: 'var(--danger, #dc2626)', margin: '10px 0 8px' }}>{error}</p>
-            <button
-              onClick={() => { setError(''); setAnswers({}); setCurrentIndex(0); setStage('idle'); }}
-              style={{
-                fontSize: 12, fontWeight: 600, color: 'var(--accent, #111)',
-                background: 'transparent', border: 'none', padding: 0,
-                cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3,
-              }}
-            >
-              Try again
-            </button>
-          </>
-        )}
+          )}
+          {error && stage === 'answering' && (
+            <>
+              <p
+                style={{
+                  fontFamily: C.sans,
+                  fontSize: 13,
+                  color: C.danger,
+                  margin: '10px 0 8px',
+                }}
+              >
+                {error}
+              </p>
+              <button
+                onClick={() => { setError(''); setAnswers({}); setCurrentIndex(0); setStage('idle'); }}
+                style={{
+                  fontFamily: C.sans,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: C.accent,
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: 3,
+                }}
+              >
+                Try again
+              </button>
+            </>
+          )}
+        </div>
       </div>
     );
   }
@@ -499,10 +604,10 @@ export default function ArticleQuiz({
             role="status"
             aria-live="polite"
             style={{
-              background: 'var(--card, #f7f7f7)',
-              border: `1px solid ${C.border}`,
-              borderRadius: 14,
-              padding: '28px 28px 26px',
+              background: C.accentSoft,
+              border: `1px solid ${C.accent}`,
+              borderRadius: 22,
+              padding: '32px 28px',
               marginTop: 24,
               textAlign: 'left',
               opacity: passRevealed ? 1 : 0,
@@ -512,22 +617,24 @@ export default function ArticleQuiz({
           >
             <div
               style={{
-                fontSize: 28,
-                fontWeight: 600,
-                color: C.text,
-                lineHeight: 1.1,
-                letterSpacing: '-0.02em',
+                fontFamily: C.serif,
+                fontSize: 32,
+                fontWeight: 400,
+                color: C.accentDark,
+                lineHeight: 1.05,
+                letterSpacing: '-0.025em',
               }}
             >
               You&rsquo;re in.
             </div>
             <div
               style={{
+                fontFamily: C.sans,
                 fontSize: 14,
                 fontWeight: 500,
-                color: C.dim,
+                color: C.accentDark,
+                opacity: 0.75,
                 marginTop: 8,
-                lineHeight: 1.4,
               }}
             >
               {correct} of {total}.
@@ -541,21 +648,45 @@ export default function ArticleQuiz({
       <>
         <div
           style={{
-            background: C.card,
-            border: `1px solid ${C.border}`,
-            borderRadius: 12,
-            padding: '20px',
+            background: C.surfaceSoft,
+            border: `1px solid ${C.quizBorder}`,
+            borderRadius: 22,
+            padding: 24,
             marginTop: 24,
           }}
         >
           <div
             style={{
-              fontSize: 18,
-              fontWeight: 600,
-              color: C.text,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              marginBottom: 14,
+              paddingBottom: 12,
+              borderBottom: `1px solid ${C.innerDivider}`,
             }}
           >
-            {correct} of {total}.
+            <div
+              style={{
+                fontFamily: C.mono,
+                fontSize: 10,
+                fontWeight: 500,
+                color: C.textSoft,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase' as const,
+              }}
+            >
+              Your result
+            </div>
+            <div
+              style={{
+                fontFamily: C.serif,
+                fontSize: 24,
+                fontWeight: 400,
+                color: C.text,
+              }}
+            >
+              {correct} of {total}.
+            </div>
           </div>
 
 
@@ -563,28 +694,41 @@ export default function ArticleQuiz({
             <div
               key={r.quiz_id}
               style={{
-                background: C.card,
-                border: `1px solid ${C.border}`,
-                borderRadius: 10,
-                padding: '12px 14px',
+                background: C.surface,
+                border: `1px solid ${C.borderSoft}`,
+                borderRadius: 14,
+                padding: 16,
                 marginBottom: 10,
               }}
             >
               <div
                 style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  textTransform: 'uppercase',
+                  fontFamily: C.mono,
+                  fontSize: 10,
+                  fontWeight: 500,
+                  textTransform: 'uppercase' as const,
                   letterSpacing: '0.1em',
-                  color: C.dim,
+                  color: C.textSoft,
                   marginBottom: 4,
                 }}
               >
                 Question {i + 1}
               </div>
-              <div style={{ fontSize: 14, color: C.text, marginBottom: 8, lineHeight: 1.5 }}>{r.question_text}</div>
               <div
                 style={{
+                  fontFamily: C.serif,
+                  fontSize: 16,
+                  fontWeight: 400,
+                  color: C.text,
+                  marginBottom: 8,
+                  lineHeight: 1.4,
+                }}
+              >
+                {r.question_text}
+              </div>
+              <div
+                style={{
+                  fontFamily: C.sans,
                   fontSize: 13,
                   color: r.is_correct ? C.success : C.danger,
                   fontWeight: 600,
@@ -595,12 +739,27 @@ export default function ArticleQuiz({
                   : `Incorrect — you picked "${r.selected_answer ?? '—'}"`}
               </div>
               {!r.is_correct && (
-                <div style={{ fontSize: 13, color: C.text, marginTop: 2 }}>
+                <div
+                  style={{
+                    fontFamily: C.sans,
+                    fontSize: 13,
+                    color: C.text,
+                    marginTop: 2,
+                  }}
+                >
                   Correct answer: <b>{r.options?.[r.correct_answer]?.text ?? '—'}</b>
                 </div>
               )}
               {r.explanation && (
-                <div style={{ fontSize: 13, color: C.dim, marginTop: 6, lineHeight: 1.6 }}>
+                <div
+                  style={{
+                    fontFamily: C.sans,
+                    fontSize: 13,
+                    color: C.textMuted,
+                    marginTop: 6,
+                    lineHeight: 1.5,
+                  }}
+                >
                   {r.explanation}
                 </div>
               )}
@@ -610,20 +769,21 @@ export default function ArticleQuiz({
           {showRetakeButton && (
             <button
               onClick={startAttempt}
+              onMouseEnter={(e) => { e.currentTarget.style.background = C.accentDark; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = C.accent; }}
               style={{
-                display: 'block',
-                width: '100%',
-                padding: '13px 20px',
+                display: 'inline-block',
+                padding: '14px 22px',
+                minHeight: 44,
                 borderRadius: 10,
                 border: 'none',
                 background: C.accent,
-                color: 'var(--bg)',
-                fontSize: 15,
+                color: '#fff',
+                fontFamily: C.sans,
+                fontSize: 14,
                 fontWeight: 600,
                 cursor: 'pointer',
-                marginTop: 4,
-                fontFamily: 'inherit',
-                letterSpacing: '-0.005em',
+                marginTop: 8,
               }}
             >
               Take another look and try again

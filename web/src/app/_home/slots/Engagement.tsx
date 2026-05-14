@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { C, serifStack } from './_shared';
 import type { SlotRow } from '../types';
 
 type QuizOption = { letter: string; text: string };
@@ -39,10 +40,12 @@ export default function Engagement({ slot }: { slot: SlotRow }) {
     <aside className="vp-quiz-card">
       <div
         style={{
-          font: '700 10px/1 var(--p-sans)',
-          letterSpacing: '.14em',
+          fontFamily: 'var(--font-ibm-mono), "SFMono-Regular", Consolas, monospace',
+          fontSize: 10,
+          fontWeight: 500,
+          letterSpacing: '0.1em',
           textTransform: 'uppercase',
-          color: 'rgba(255,255,255,0.72)',
+          color: C.accent,
           marginBottom: 8,
         }}
       >
@@ -50,29 +53,43 @@ export default function Engagement({ slot }: { slot: SlotRow }) {
       </div>
       <h3
         style={{
-          font: '600 18px/1.35 var(--p-serif)',
-          color: '#fff',
-          margin: '0 0 14px',
+          fontFamily: serifStack,
+          fontSize: 20,
+          fontWeight: 400,
+          lineHeight: 1.2,
+          letterSpacing: '-0.02em',
+          color: C.text,
+          margin: '0 0 16px',
         }}
       >
         {question}
       </h3>
       {showOptions && (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
           {options.map((opt) => (
             <div
               key={opt.letter}
               style={{
-                border: '1px solid rgba(255,255,255,0.14)',
-                padding: '10px 12px',
-                borderRadius: 0,
-                font: '500 13px/1.3 var(--p-sans)',
-                marginBottom: 6,
-                background: 'rgba(255,255,255,0.06)',
-                color: 'rgba(255,255,255,0.92)',
+                border: `1px solid ${C.rule}`,
+                padding: '10px 14px',
+                borderRadius: 12,
+                fontSize: 13,
+                fontWeight: 500,
+                lineHeight: 1.4,
+                background: C.bg,
+                color: C.text,
               }}
             >
-              <span style={{ fontWeight: 700, marginRight: 8 }}>{opt.letter}.</span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-ibm-mono), "SFMono-Regular", Consolas, monospace',
+                  fontWeight: 600,
+                  marginRight: 8,
+                  color: C.muted,
+                }}
+              >
+                {opt.letter}.
+              </span>
               {opt.text}
             </div>
           ))}
@@ -83,18 +100,18 @@ export default function Engagement({ slot }: { slot: SlotRow }) {
         style={{
           display: 'block',
           width: '100%',
-          background: '#f2e7d6',
-          color: '#171311',
-          padding: '9px 14px',
-          font: '700 11px/1 var(--p-sans)',
-          letterSpacing: '.08em',
-          textTransform: 'uppercase',
-          borderRadius: 0,
+          background: C.accent,
+          color: '#fff',
+          padding: '12px 18px',
+          fontSize: 14,
+          fontWeight: 600,
+          letterSpacing: '-0.005em',
+          borderRadius: 10,
           border: 0,
           cursor: 'pointer',
           textAlign: 'center',
           textDecoration: 'none',
-          marginTop: showOptions ? 8 : 0,
+          marginTop: showOptions ? 0 : 4,
         }}
       >
         {ctaLabel}

@@ -5,63 +5,108 @@ interface NextStoryFooterProps {
   nearbyStories: { slug: string; title: string }[];
 }
 
+// v2 editorial palette — references the central --vp-* tokens defined
+// in globals.css (single source of truth for the burgundy redesign).
+const ACCENT = 'var(--vp-accent)';
+const BORDER_SOFT = 'var(--vp-border-soft)';
+const SURFACE_SOFT = 'var(--vp-surface-soft)';
+const QUIZ_BORDER = 'var(--vp-quiz-border)';
+const TEXT = 'var(--vp-ink)';
+
+const MONO = 'var(--font-ibm-mono), "SFMono-Regular", Consolas, monospace';
+const SERIF = '"Source Serif 4", var(--font-source-serif), Georgia, serif';
+
 export default function NextStoryFooter({ category, nearbyStories }: NextStoryFooterProps) {
+  if (!(nearbyStories.length > 0 && category)) {
+    return (
+      <footer style={{ marginTop: 40 }}>
+        <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px' }} />
+      </footer>
+    );
+  }
+
   return (
-    <footer style={{ marginTop: 48, borderTop: '1px solid var(--border, #e5e5e5)' }}>
-    <div style={{ maxWidth: 680, margin: '0 auto', padding: '24px 20px 0' }}>
-      {nearbyStories.length > 0 && category && (
-        <section style={{ marginBottom: 28 }}>
+    <footer style={{ marginTop: 40 }}>
+      {/* Hover affordance for the story-title links. Inline styles can't
+          do :hover, so a tiny scoped <style> block carries it. */}
+      <style>{`
+        .vp-next-story-link { color: ${TEXT}; transition: color 120ms ease; }
+        .vp-next-story-link:hover { color: ${ACCENT}; }
+      `}</style>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px' }}>
+        <section
+          style={{
+            background: SURFACE_SOFT,
+            border: `1px solid ${QUIZ_BORDER}`,
+            borderRadius: 18,
+            padding: '20px 24px',
+          }}
+        >
           <p
             style={{
-              // Match the byline meta style: 11px small-caps, 0.1em
-              // letter-spacing, weight 600. Same family of editorial
-              // chrome across the page.
-              fontSize: 11,
-              fontWeight: 600,
+              // Plex Mono kicker — same family of chrome as the timeline +
+              // quiz cards. Category name keeps its underline link.
+              fontFamily: MONO,
+              fontSize: 10,
+              fontWeight: 500,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
-              color: 'var(--p-ink-muted)',
-              margin: '0 0 16px',
+              color: ACCENT,
+              margin: 0,
+              paddingBottom: 12,
+              marginBottom: 12,
+              borderBottom: `1px solid ${BORDER_SOFT}`,
             }}
           >
             More in{' '}
             <Link
               href={`/?cat=${category.slug}`}
-              style={{ color: 'inherit', textDecoration: 'underline', textDecorationThickness: 1, textUnderlineOffset: '0.18em' }}
+              style={{
+                color: ACCENT,
+                textDecoration: 'underline',
+                textDecorationThickness: 1,
+                textUnderlineOffset: '0.18em',
+              }}
             >
-              {category.name}
+              {category.name.toUpperCase()}
             </Link>
           </p>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {nearbyStories.map((s) => (
-              <li key={s.slug}>
-                <Link
-                  href={`/${s.slug}`}
-                  // Serif headlines for the up-next list — same family as
-                  // the article body, slightly larger and weight 500 so
-                  // each link reads as a real headline, not a list item.
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {nearbyStories.map((s, idx) => {
+              const isLast = idx === nearbyStories.length - 1;
+              return (
+                <li
+                  key={s.slug}
                   style={{
-                    fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
-                    fontSize: 17,
-                    fontWeight: 500,
-                    lineHeight: 1.3,
-                    letterSpacing: '-0.01em',
-                    color: 'var(--p-ink)',
-                    textDecoration: 'none',
+                    padding: '12px 0',
+                    borderBottom: isLast ? 'none' : `1px solid ${BORDER_SOFT}`,
                   }}
                 >
-                  {s.title}
-                </Link>
-              </li>
-            ))}
+                  <Link
+                    href={`/${s.slug}`}
+                    className="vp-next-story-link"
+                    style={{
+                      fontFamily: SERIF,
+                      fontSize: 17,
+                      fontWeight: 400,
+                      lineHeight: 1.3,
+                      letterSpacing: '-0.01em',
+                      textDecoration: 'none',
+                      display: 'block',
+                    }}
+                  >
+                    {s.title}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </section>
-      )}
+      </div>
       {/* End-of-article "Back to home" pill removed — the global top-bar
           chevron + wordmark already cover home navigation, and the bottom
           nav's Home tab is a third path. Three home affordances on a
           single page was noise. */}
-    </div>
     </footer>
   );
 }

@@ -138,6 +138,37 @@
   /* Focus ring */
   --p-ring: rgba(11, 92, 255, 0.30);
   --p-ring-strong: rgba(11, 92, 255, 0.60);
+
+  /* ============================================================
+     v2 editorial palette — burgundy + warm cream + Plex Mono.
+     ============================================================
+     Single source of truth for v2 redesign surfaces (article
+     page, home page, masthead). Previously every migrated file
+     hardcoded these literals with a "hardcoded because global
+     accent is still blue" comment; this block makes them tokens
+     so a palette tweak is one edit, not 16.
+
+     Scope: surfaces explicitly migrated to v2. The legacy --p-*
+     brand stays blue for admin chrome, kid pages, and anything
+     that hasn't joined the v2 sweep. When the whole site
+     eventually migrates, --p-* values flip to match these.
+
+     No dark-mode override: v2 surfaces are locked to the light
+     burgundy palette across modes — same call the article + home
+     migrations already made.
+  */
+  --vp-accent: #8b0f16;
+  --vp-accent-dark: #64090e;
+  --vp-accent-soft: #f4e6e2;
+  --vp-surface: #ffffff;
+  --vp-surface-soft: #fbf7ef;
+  --vp-border: #ded8ce;
+  --vp-border-soft: #eee8df;
+  --vp-quiz-border: #e4cdb8;
+  --vp-ink: #171717;
+  --vp-text-muted: #66615a;
+  --vp-text-soft: #8a8379;
+
   /* Radius scale — Q-D2 (2026-05-12). Mirrors iOS VP.Radius. */
   --r-sm: 6px;
   --r-md: 10px;
@@ -412,6 +443,37 @@
   /* Focus ring */
   --p-ring: rgba(11, 92, 255, 0.30);
   --p-ring-strong: rgba(11, 92, 255, 0.60);
+
+  /* ============================================================
+     v2 editorial palette — burgundy + warm cream + Plex Mono.
+     ============================================================
+     Single source of truth for v2 redesign surfaces (article
+     page, home page, masthead). Previously every migrated file
+     hardcoded these literals with a "hardcoded because global
+     accent is still blue" comment; this block makes them tokens
+     so a palette tweak is one edit, not 16.
+
+     Scope: surfaces explicitly migrated to v2. The legacy --p-*
+     brand stays blue for admin chrome, kid pages, and anything
+     that hasn't joined the v2 sweep. When the whole site
+     eventually migrates, --p-* values flip to match these.
+
+     No dark-mode override: v2 surfaces are locked to the light
+     burgundy palette across modes — same call the article + home
+     migrations already made.
+  */
+  --vp-accent: #8b0f16;
+  --vp-accent-dark: #64090e;
+  --vp-accent-soft: #f4e6e2;
+  --vp-surface: #ffffff;
+  --vp-surface-soft: #fbf7ef;
+  --vp-border: #ded8ce;
+  --vp-border-soft: #eee8df;
+  --vp-quiz-border: #e4cdb8;
+  --vp-ink: #171717;
+  --vp-text-muted: #66615a;
+  --vp-text-soft: #8a8379;
+
   /* Radius scale — Q-D2 (2026-05-12). Mirrors iOS VP.Radius. */
   --r-sm: 6px;
   --r-md: 10px;
@@ -707,6 +769,16 @@ body {
 }
 [data-article-body] > p:last-child {
   margin-bottom: 0;
+}
+/* v2 article body drop cap — first paragraph only. Pins serif explicitly so it survives any font inheritance. */
+[data-article-body] p:first-of-type::first-letter {
+  font-family: "Source Serif 4", var(--font-source-serif), Georgia, serif;
+  font-size: 54px;
+  line-height: 0.85;
+  float: left;
+  padding: 4px 10px 0 0;
+  color: #171717;
+  font-weight: 400;
 }
 [data-article-body] h2 {
   font-family: 'Source Serif 4', var(--font-source-serif), Georgia, serif;

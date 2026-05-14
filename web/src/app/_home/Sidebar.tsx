@@ -82,7 +82,7 @@ export default function Sidebar({
         }
         .vp-home-sidebar:hover,
         .vp-home-sidebar:focus-within {
-          scrollbar-color: var(--p-border-strong, rgba(0,0,0,0.18)) transparent;
+          scrollbar-color: ${C.rule} transparent;
         }
         .vp-home-sidebar::-webkit-scrollbar { width: 10px; height: 10px; }
         .vp-home-sidebar::-webkit-scrollbar-track { background: transparent; }
@@ -95,19 +95,19 @@ export default function Sidebar({
         }
         .vp-home-sidebar:hover::-webkit-scrollbar-thumb,
         .vp-home-sidebar:focus-within::-webkit-scrollbar-thumb {
-          background-color: var(--p-border-strong, rgba(0,0,0,0.18));
+          background-color: ${C.rule};
         }
         .vp-home-sidebar::-webkit-scrollbar-thumb:hover {
-          background-color: var(--p-ink-faint, rgba(0,0,0,0.32));
+          background-color: ${C.accent};
         }
         .vp-home-sidebar::-webkit-scrollbar-thumb:active {
-          background-color: var(--p-ink-dim, rgba(0,0,0,0.45));
+          background-color: ${C.accentDark};
         }
 
         .vp-home-sidebar a { transition: color 160ms ease-out; outline: none; }
-        .vp-home-sidebar a:hover { color: var(--p-ink) !important; }
+        .vp-home-sidebar a:hover { color: ${C.accent} !important; }
         .vp-home-sidebar a:focus-visible {
-          outline: 2px solid var(--p-ink);
+          outline: 2px solid ${C.accent};
           outline-offset: 2px;
           border-radius: 2px;
         }
@@ -179,8 +179,8 @@ function SidebarSection({
             textDecoration: 'none',
             fontFamily: serifStack,
             fontSize: 15,
-            fontWeight: active ? 700 : 600,
-            color: active ? C.text : C.soft,
+            fontWeight: active ? 600 : 500,
+            color: active ? C.accent : C.text,
             letterSpacing: '-0.005em',
           }}
         >
@@ -200,8 +200,8 @@ function SidebarSection({
                   display: 'block',
                   textDecoration: 'none',
                   fontSize: 12,
-                  fontWeight: subActive ? 700 : 400,
-                  color: subActive ? C.text : C.muted,
+                  fontWeight: subActive ? 600 : 400,
+                  color: subActive ? C.accent : C.muted,
                   paddingTop: 5,
                   paddingBottom: 5,
                 }}

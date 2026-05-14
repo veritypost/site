@@ -8,11 +8,13 @@
 // will move to HomeLayout.tsx in a follow-up step — so this file ships
 // no <style> tags.
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { unstable_cache } from 'next/cache';
 import { createServiceClient } from '@/lib/supabase/server';
 import type { SlotRow } from '../types';
 import type { CardCtx, HomeStory } from './_shared';
+import { timeShort, HOME_EDITORIAL_TZ } from '../_shared';
 
 type TimelineRow = {
   id: string;
@@ -61,12 +63,29 @@ function categoryName(
   return c?.name || 'News';
 }
 
-function shortDate(iso: string): string {
+function eventDateLabel(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d
-    .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    .toUpperCase();
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: HOME_EDITORIAL_TZ,
+    month: 'short',
+    day: '2-digit',
+  }).format(d);
+}
+
+// Derive the lifecycle label (e.g. "Developing", "Breaking") shown in the
+// hero status row. Prefer the canonical `stories.lifecycle_status` text,
+// fall back to the per-article booleans so older rows without a story-level
+// status still light up correctly. Returns null when there's nothing to
+// surface, so the caller can omit the pill cleanly.
+function lifecycleLabel(story: HomeStory): string | null {
+  const raw = story.stories?.lifecycle_status?.trim();
+  if (raw) {
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  }
+  if (story.is_breaking) return 'Breaking';
+  if (story.is_developing) return 'Developing';
+  return null;
 }
 
 export default async function Lead({
@@ -93,6 +112,37 @@ export default async function Lead({
 
   const leadCat = categoryName(lead, ctx.categoryById);
   const hasTimeline = leadTimeline.length > 0;
+  const lifecycle = lifecycleLabel(lead);
+  const updatedAgo = timeShort(lead.updated_at ?? lead.published_at);
+  const timelineCount = leadTimeline.length;
+  // Compose pills as a list so we can interleave separators without
+  // ending up with leading/trailing dots when fields are missing.
+  const statusPills: ReactNode[] = [];
+  if (lifecycle) {
+    statusPills.push(
+      <span
+        key="lifecycle"
+        style={{
+          color: 'var(--vp-accent)',
+          fontWeight: 500,
+          textTransform: 'uppercase',
+          letterSpacing: '0.1em',
+        }}
+      >
+        {lifecycle}
+      </span>,
+    );
+  }
+  if (timelineCount > 0) {
+    statusPills.push(
+      <span key="timeline">
+        {timelineCount} timeline {timelineCount === 1 ? 'event' : 'events'}
+      </span>,
+    );
+  }
+  if (updatedAgo) {
+    statusPills.push(<span key="updated">Last changed {updatedAgo}</span>);
+  }
 
   return (
     <article
@@ -100,7 +150,7 @@ export default async function Lead({
     >
       <Link href={articleHref(lead)} className="vp-rh-lead-link" data-testid="home-article-link">
         <div className="vp-rh-lead-content">
-          <span className="vp-rh-tag vp-rh-tag-accent">
+          <span className="vp-rh-tag vp-rh-tag-accent vp-rh-tag--lead">
             {leadCat}
           </span>
           <h2 className="vp-rh-lead-title">
@@ -109,37 +159,56 @@ export default async function Lead({
           {lead.excerpt && (
             <p className="vp-rh-lead-summary">{lead.excerpt}</p>
           )}
+          {statusPills.length > 0 && (
+            <div
+              style={{
+                margin: '14px 0 4px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+                fontFamily:
+                  'var(--font-ibm-mono), "SFMono-Regular", Consolas, monospace',
+                fontSize: 11,
+                letterSpacing: '0.06em',
+                color: 'var(--vp-text-soft)',
+                alignItems: 'center',
+              }}
+            >
+              {statusPills.map((pill, i) => (
+                <span
+                  key={i}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                >
+                  {i > 0 && <span style={{ opacity: 0.5 }}>·</span>}
+                  {pill}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </Link>
       {hasTimeline && (
         <aside className="vp-rh-timeline">
-          <span className="vp-rh-tl-label">Timeline</span>
+          <span className="vp-rh-tl-label">How we got here</span>
           <ul>
             {leadTimeline.map((t, i) => {
               const isNow =
                 !!t.metadata?.current || i === leadTimeline.length - 1;
+              const dateLabel = isNow ? 'Today' : eventDateLabel(t.event_date);
+              const eventText = isNow
+                ? `${t.event_label} — this article`
+                : t.event_label;
               return (
-                <li key={t.id} className={isNow ? 'now' : undefined}>
-                  <strong>
-                    {isNow ? 'Today: ' : `${shortDate(t.event_date)}: `}
-                  </strong>
-                  <span>{t.event_label}</span>
+                <li
+                  key={t.id}
+                  className={`vp-rh-tl-event${isNow ? ' vp-rh-tl-event--now' : ''}`}
+                >
+                  <span className="vp-rh-tl-date">{dateLabel}</span>
+                  {eventText}
                 </li>
               );
             })}
           </ul>
-          {/* Inner CTA is a visual cue for sighted users — same destination
-              as the outer Link wrapping the article body. Hidden from
-              assistive tech to avoid the "two landing targets to the same
-              story" duplication. */}
-          <Link
-            href={articleHref(lead)}
-            className="vp-rh-readmore"
-            aria-hidden="true"
-            tabIndex={-1}
-          >
-            Read full report →
-          </Link>
         </aside>
       )}
     </article>

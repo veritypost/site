@@ -1,9 +1,12 @@
 // Feature block — non-story editorial: By the Numbers, Quote of the Day,
 // Pull Quote, Receipts. Wired to the live `daily_features` table. Adapts
 // to slot width:
-//   - wide (span >= 8): full-width "by the numbers" band — paper-2 bg,
-//     2px black top+bottom rules, three figures in red.
-//   - narrow (span <= 6): dark navy rail card — single figure in white.
+//   - wide (span >= 8): full-width "by the numbers" band — cream-soft
+//     paper bg, 2px burgundy top+bottom rules, three figures in burgundy.
+//   - narrow (span <= 6): cream-soft rail card — single figure in
+//     burgundy on the warm v2 palette (matches article page chrome).
+// Chrome class hooks are styled in styles.tsx; this component only
+// owns inline typography + token-driven color via HOME_COLORS (C.*).
 // Left-aligned by editorial rule.
 
 import { unstable_cache } from 'next/cache';
@@ -162,13 +165,15 @@ function FeatureBody({
           maxWidth: 720,
         }}
       >
-        “{item.quote}”
+        <span style={{ color: C.accent }}>“</span>
+        {item.quote}
+        <span style={{ color: C.accent }}>”</span>
         {attribution && (
           <footer
             style={{
               fontSize: compact ? 12 : 13,
               fontStyle: 'italic',
-              color: C.dim,
+              color: C.muted,
               marginTop: 12,
               fontWeight: 400,
               letterSpacing: 0,

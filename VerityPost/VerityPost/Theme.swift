@@ -149,7 +149,25 @@ enum VP {
 
     // Verified / expert badges
     static let verified    = Color(hex: "0b5cff")
-    static let expertColor = Color(hex: "7c3aed")
+    // Green is the expert identity across surfaces (comment filter pill,
+    // megaphone glyph, web parity). Flipped from purple #7c3aed to match
+    // the long-standing inline comments — owner-decision 2026-05-14.
+    static let expertColor = Color(hex: "16a34a")
+
+    // v2 burgundy editorial palette — mirrors the --vp-* CSS tokens in
+    // web/src/app/globals.css. Locked-light: stays burgundy in both light
+    // and dark UIInterfaceStyle (same call the article + home web
+    // migrations made). Add new v2 iOS surfaces by reaching for these,
+    // not by re-hardcoding hex literals.
+    static let burgundy       = Color(hex: "8b0f16")
+    static let burgundyDark   = Color(hex: "64090e")
+    static let burgundySoft   = Color(hex: "f4e6e2")
+    static let burgundyBorder = Color(hex: "ded8ce")
+    static let burgundyBorderSoft = Color(hex: "eee8df")
+    static let burgundySurfaceSoft = Color(hex: "fbf7ef")
+    static let burgundyQuizBorder = Color(hex: "e4cdb8")
+    static let burgundyTextMuted = Color(hex: "66615a")
+    static let burgundyTextSoft = Color(hex: "8a8379")
 
     // Section A — comment-tag chip colors. Mirror the hex literals on
     // the web side (CommentRow.tsx → TAG_META). 'context' reuses

@@ -16,14 +16,16 @@ export default function Promo({ slot }: { slot: SlotRow }) {
     return (
       <section
         style={{
-          border: '1px dashed var(--p-border)',
-          background: 'var(--p-surface)',
+          border: `1px dashed ${C.rule}`,
+          background: C.surfaceSoft,
           padding: 28,
           textAlign: 'center',
-          font: '600 11px/1 var(--p-sans, system-ui)',
-          letterSpacing: '0.12em',
+          fontFamily: 'var(--font-ibm-mono), "SFMono-Regular", Consolas, monospace',
+          fontSize: 11,
+          fontWeight: 500,
+          letterSpacing: '0.1em',
           textTransform: 'uppercase',
-          color: 'var(--p-ink-dim)',
+          color: C.dim,
         }}
       >
         Advertisement · {adLabel}

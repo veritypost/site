@@ -21,6 +21,21 @@ import { friendlyError } from '@/lib/friendlyError';
 
 type CommentDb = Database['public']['Tables']['comments']['Row'];
 
+// v2 editorial palette — references the central --vp-* tokens defined
+// in globals.css (single source of truth for the burgundy redesign).
+const ACCENT       = 'var(--vp-accent)';
+const ACCENT_DARK  = 'var(--vp-accent-dark)';
+const ACCENT_SOFT  = 'var(--vp-accent-soft)';
+const BORDER       = 'var(--vp-border)';
+const BORDER_SOFT  = 'var(--vp-border-soft)';
+const SURFACE_SOFT = 'var(--vp-surface-soft)';
+const TEXT         = 'var(--vp-ink)';
+const TEXT_MUTED   = 'var(--vp-text-muted)';
+const TEXT_SOFT    = 'var(--vp-text-soft)';
+const MONO  = 'var(--font-ibm-mono), "SFMono-Regular", Consolas, monospace';
+const SERIF = '"Source Serif 4", var(--font-source-serif), Georgia, serif';
+const SANS  = 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+
 // T32 — Web comment-report categories must mirror the iOS ReportReason
 // enum at VerityPost/VerityPost/BlockService.swift so reports landing in
 // the `reports` table from either surface use the same set of strings.
@@ -832,8 +847,20 @@ export default function CommentThread({
     // Three comment-shaped rows: avatar circle + 2-3 text lines each.
     // Shimmer animation defined in globals.css (.vp-skeleton / vpShimmer).
     return (
-      <div style={{ padding: 'var(--s3) var(--s0)', display: 'flex', flexDirection: 'column', gap: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <div
+        style={{
+          background: '#ffffff',
+          border: `1px solid ${BORDER}`,
+          borderRadius: 22,
+          overflow: 'hidden',
+          marginTop: 24,
+          padding: '18px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 18,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingBottom: 14, borderBottom: `1px solid ${BORDER_SOFT}` }}>
           <Skeleton width={32} height={32} style={{ borderRadius: '50%', flexShrink: 0 }} />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <Skeleton width="55%" height={13} />
@@ -862,17 +889,31 @@ export default function CommentThread({
 
   if (loadError) {
     return (
-      <div style={{ padding: 'var(--s4) var(--s0)' }}>
-        {/* eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px bottom inset reads tighter than --s3 12 under this 14px line */}
-        <p style={{ fontSize: 14, color: 'var(--dim, #888)', margin: '0 0 10px' }}>
+      <div
+        style={{
+          background: '#ffffff',
+          border: `1px solid ${BORDER}`,
+          borderRadius: 22,
+          overflow: 'hidden',
+          marginTop: 24,
+          padding: '24px 20px',
+        }}
+      >
+        <p style={{ fontSize: 14, color: TEXT_MUTED, margin: '0 0 10px', fontFamily: SANS }}>
           Comments couldn&apos;t load.
         </p>
         <button
           onClick={() => { setLoadError(false); loadAll(); }}
           style={{
-            fontSize: 13, color: 'var(--accent, #111)', background: 'transparent',
-            border: 'none', padding: 0, cursor: 'pointer',
-            textDecoration: 'underline', textUnderlineOffset: 3,
+            fontSize: 13,
+            color: ACCENT,
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            textDecoration: 'underline',
+            textUnderlineOffset: 3,
+            fontFamily: SANS,
           }}
         >
           Try again
@@ -885,14 +926,15 @@ export default function CommentThread({
     return (
       <div
         style={{
-          // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 16/18 inset matches CommentComposer container surface
-          padding: '16px 18px',
-          border: '1px solid var(--border, #e5e5e5)',
-          borderRadius: 12, // magic — intentional (between --r-md 10 and --r-lg 14 for the notice panel)
-          marginBottom: 'var(--s4)',
+          background: '#ffffff',
+          border: `1px solid ${BORDER}`,
+          borderRadius: 22,
+          overflow: 'hidden',
+          marginTop: 24,
+          padding: '18px 20px',
         }}
       >
-        <div style={{ fontSize: 14, color: 'var(--dim, #888)', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 14, color: TEXT_MUTED, lineHeight: 1.5, fontFamily: SANS }}>
           Comments aren&apos;t available for your account.
         </div>
       </div>
@@ -961,7 +1003,17 @@ export default function CommentThread({
   };
 
   return (
-    <div style={{ maxWidth: 680, margin: '0 auto' }}>
+    <div
+      style={{
+        maxWidth: 680,
+        margin: '0 auto',
+        background: '#ffffff',
+        border: `1px solid ${BORDER}`,
+        borderRadius: 22,
+        overflow: 'hidden',
+        marginTop: 24,
+      }}
+    >
       {/* Quiz Gate Brand — make the moat visible. Header is the trust
           signal: every commenter passed the comprehension quiz, by
           construction (schema/013 post_comment RPC; no role bypass).
@@ -972,38 +1024,53 @@ export default function CommentThread({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 'var(--s5)',
-          paddingBottom: 'var(--s3)',
-          borderBottom: '1px solid var(--border)',
+          gap: 14,
+          flexWrap: 'wrap',
+          padding: '18px 20px',
+          borderBottom: `1px solid ${BORDER_SOFT}`,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text, #1a1a1a)' }}>
-              {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <h2 style={{
+              fontFamily: SERIF,
+              fontSize: 20,
+              fontWeight: 400,
+              letterSpacing: '-0.02em',
+              color: TEXT,
+              margin: 0,
+            }}>
+              Discussion
+            </h2>
+            <span style={{ fontFamily: SANS, fontSize: 13, color: TEXT_MUTED }}>
+              &middot; {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
             </span>
           </div>
           <div style={{ display: 'flex', gap: 4 }}>
-            {(['top', 'newest'] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setSort(s)}
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: sort === s ? 'var(--bg, #fff)' : 'var(--dim, #999)',
-                  background: sort === s ? 'var(--text, #111)' : 'transparent',
-                  border: 'none',
-                  borderRadius: 'var(--r-pill)',
-                  cursor: 'pointer',
-                  // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 5px vertical keeps the pill sort-toggle compact off the 4-grid
-                  padding: '5px 12px',
-                }}
-              >
-                {s === 'top' ? 'Top' : 'Newest'}
-              </button>
-            ))}
+            {(['top', 'newest'] as const).map((s) => {
+              const isActive = sort === s;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setSort(s)}
+                  style={{
+                    fontFamily: SANS,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: isActive ? ACCENT : TEXT_MUTED,
+                    background: isActive ? SURFACE_SOFT : 'transparent',
+                    border: `1px solid ${isActive ? BORDER : 'transparent'}`,
+                    borderRadius: 999,
+                    cursor: 'pointer',
+                    padding: '6px 12px',
+                  }}
+                >
+                  {s === 'top' ? 'Top' : 'Newest'}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
+      <div style={{ padding: '18px 20px' }}>
 
       {currentUserId && quizPassed && (
         <CommentComposer
@@ -1017,16 +1084,31 @@ export default function CommentThread({
       {expertDialogOpen && (
         <div
           style={{
-            background: '#fffbeb',
-            border: '1px solid #fde68a',
-            borderRadius: 'var(--r-md)',
-            // eslint-disable-next-line no-restricted-syntax -- 14px is intentional off-grid for the expert-ask panel (matches CommentRow expert-chrome inset)
-            padding: '14px 16px',
+            background: SURFACE_SOFT,
+            border: `1px solid ${ACCENT_SOFT}`,
+            borderRadius: 18,
+            padding: 24,
             marginBottom: 'var(--s4)',
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#b45309', marginBottom: 6 }}>
-            Ask an Expert &mdash; routes to the category queue
+          <div style={{
+            fontFamily: SERIF,
+            fontSize: 20,
+            fontWeight: 400,
+            color: TEXT,
+            letterSpacing: '-0.02em',
+            marginBottom: 6,
+          }}>
+            Ask an Expert
+          </div>
+          <div style={{
+            fontFamily: SANS,
+            fontSize: 14,
+            color: TEXT_MUTED,
+            lineHeight: 1.5,
+            marginBottom: 14,
+          }}>
+            Your question routes to the category queue for an approved expert.
           </div>
           <textarea
             value={expertQuestion}
@@ -1035,27 +1117,31 @@ export default function CommentThread({
             placeholder="Frame a specific question an expert can answer."
             style={{
               width: '100%',
-              padding: 'var(--s2)',
-              borderRadius: 8, // magic \u2014 intentional (between --r-sm 6 and --r-md 10 for the textarea inside this panel)
-              border: '1px solid #e5e5e5',
-              fontSize: 13,
+              padding: 12,
+              borderRadius: 12,
+              border: `1px solid ${BORDER}`,
+              background: '#ffffff',
+              fontSize: 14,
               outline: 'none',
-              fontFamily: 'inherit',
+              fontFamily: SANS,
+              color: TEXT,
+              boxSizing: 'border-box',
+              resize: 'vertical',
             }}
           />
-          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 14 }}>
             <button
               onClick={submitExpertQuestion}
               disabled={!expertQuestion.trim() || expertSubmitting}
               style={{
-                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6/14 inset for the compact Send-to-queue button
-                padding: '6px 14px',
-                borderRadius: 7, // magic \u2014 intentional (between --r-sm 6 and --r-md 10)
+                padding: '12px 22px',
+                borderRadius: 10,
                 border: 'none',
-                background: expertQuestion.trim() && !expertSubmitting ? '#111' : '#ccc',
-                color: '#fff',
-                fontSize: 12,
-                fontWeight: 700,
+                background: expertQuestion.trim() && !expertSubmitting ? ACCENT : '#c9c2b6',
+                color: '#ffffff',
+                fontFamily: SANS,
+                fontSize: 14,
+                fontWeight: 600,
                 cursor: expertQuestion.trim() && !expertSubmitting ? 'pointer' : 'default',
               }}
             >
@@ -1067,15 +1153,15 @@ export default function CommentThread({
                 setExpertQuestion('');
               }}
               style={{
-                // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 6/14 inset matches the sibling Send button
-                padding: '6px 14px',
-                borderRadius: 7, // magic \u2014 intentional (between --r-sm 6 and --r-md 10)
-                border: '1px solid #e5e5e5',
+                padding: 0,
+                border: 'none',
                 background: 'transparent',
-                color: '#111',
-                fontSize: 12,
-                fontWeight: 600,
+                color: TEXT_MUTED,
+                fontFamily: SANS,
+                fontSize: 13,
                 cursor: 'pointer',
+                textDecoration: 'underline',
+                textUnderlineOffset: 3,
               }}
             >
               Cancel
@@ -1084,21 +1170,48 @@ export default function CommentThread({
         </div>
       )}
 
-      {error && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 'var(--s2)' }}>{error}</div>}
-      {flashMessage && (
+      {error && (
         <div
           style={{
+            fontFamily: SANS,
             fontSize: 13,
-            color: '#166534',
-            background: '#ecfdf5',
-            border: '1px solid #bbf7d0',
-            borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the flash banner)
-            // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10/12 inset matches CommentRow's inline edit container
-            padding: '10px 12px',
+            color: '#b91c1c',
+            background: '#fee2e2',
+            border: '1px solid #fecaca',
+            borderRadius: 12,
+            padding: '12px 16px',
             marginBottom: 'var(--s2)',
           }}
         >
-          {flashMessage}
+          {error}
+        </div>
+      )}
+      {flashMessage && (
+        <div
+          style={{
+            background: ACCENT_SOFT,
+            border: `1px solid ${ACCENT}`,
+            borderRadius: 12,
+            padding: '12px 16px',
+            marginBottom: 'var(--s2)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+          }}
+        >
+          <div style={{
+            fontFamily: MONO,
+            fontSize: 11,
+            fontWeight: 500,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            color: ACCENT_DARK,
+          }}>
+            Received
+          </div>
+          <div style={{ fontFamily: SANS, fontSize: 13, color: ACCENT_DARK, lineHeight: 1.5 }}>
+            {flashMessage}
+          </div>
         </div>
       )}
 
@@ -1114,7 +1227,14 @@ export default function CommentThread({
           >
             <div
               id="comment-dialog-title"
-              style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 /* magic — intentional (between --s2 8 and --s3 12) */ }}
+              style={{
+                fontFamily: SERIF,
+                fontSize: 22,
+                fontWeight: 400,
+                letterSpacing: '-0.02em',
+                color: TEXT,
+                marginBottom: 6,
+              }}
             >
               {dialog.action === 'delete' && 'Delete this comment?'}
               {dialog.action === 'report' && 'Report this comment'}
@@ -1124,16 +1244,21 @@ export default function CommentThread({
             </div>
 
             {dialog.action === 'delete' && (
-              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 14px bottom inset gives the delete prose more breathing room before the buttons
-              <p style={{ fontSize: 13, color: 'var(--dim, #666)', margin: '0 0 14px 0' }}>
+              <p style={{ fontFamily: SANS, fontSize: 14, color: TEXT_MUTED, lineHeight: 1.5, margin: '0 0 18px 0' }}>
                 The comment will be replaced with a removed marker. This can&apos;t be undone.
               </p>
             )}
             {dialog.action === 'block' && (
-              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 14px bottom inset matches the delete-prose sibling
-              <p style={{ fontSize: 13, color: 'var(--dim, #666)', margin: '0 0 14px 0' }}>
+              <p style={{ fontFamily: SANS, fontSize: 14, color: TEXT_MUTED, lineHeight: 1.5, margin: '0 0 18px 0' }}>
                 You won&apos;t see their comments and they won&apos;t see yours.
               </p>
+            )}
+            {(dialog.action === 'report' || dialog.action === 'flag' || dialog.action === 'hide') && (
+              <div style={{ fontFamily: SANS, fontSize: 14, color: TEXT_MUTED, lineHeight: 1.5, marginBottom: 18 }}>
+                {dialog.action === 'report' && 'Pick the category that fits best. Our team reviews every report.'}
+                {dialog.action === 'flag' && 'Give moderators a heads-up about this comment.'}
+                {dialog.action === 'hide' && 'Hide this comment from the public thread. Choose a reason for the audit log.'}
+              </div>
             )}
 
             {dialog.action === 'report' && (
@@ -1142,16 +1267,18 @@ export default function CommentThread({
               // the user picks "Other"; for the named categories the reason
               // alone is sent and the description field is suppressed.
               <>
-                <fieldset style={{ border: 'none', padding: 'var(--s0)', margin: '0 0 10px 0' /* magic — intentional: 10px bottom matches the dialog title rhythm */ }}>
+                <fieldset style={{ border: 'none', padding: 0, margin: '0 0 12px 0' }}>
                   <legend
                     style={{
                       display: 'block',
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: 'var(--dim, #666)',
+                      fontFamily: MONO,
+                      fontSize: 10,
+                      fontWeight: 500,
+                      color: TEXT_SOFT,
                       textTransform: 'uppercase',
-                      marginBottom: 'var(--s1)' /* visual rhythm: tightened from 6 */,
-                      padding: 'var(--s0)',
+                      letterSpacing: '0.08em',
+                      marginBottom: 6,
+                      padding: 0,
                     }}
                   >
                     Reason
@@ -1164,10 +1291,11 @@ export default function CommentThread({
                           display: 'flex',
                           alignItems: 'center',
                           gap: 8,
-                          fontSize: 13,
-                          color: 'var(--text-primary, #111)',
+                          fontFamily: SANS,
+                          fontSize: 14,
+                          color: TEXT,
                           cursor: 'pointer',
-                          minHeight: 28, // magic — intentional (between --s6 24 and --s7 32 for the radio-row hit-target)
+                          minHeight: 28,
                         }}
                       >
                         <input
@@ -1177,7 +1305,7 @@ export default function CommentThread({
                           checked={dialog.reason === r.value}
                           onChange={() => updateDialog({ reason: r.value })}
                           autoFocus={idx === 0}
-                          style={{ margin: 0 }}
+                          style={{ margin: 0, accentColor: ACCENT }}
                         />
                         {r.label}
                       </label>
@@ -1189,11 +1317,13 @@ export default function CommentThread({
                     <label
                       style={{
                         display: 'block',
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: 'var(--dim, #666)',
+                        fontFamily: MONO,
+                        fontSize: 10,
+                        fontWeight: 500,
+                        color: TEXT_SOFT,
                         textTransform: 'uppercase',
-                        marginBottom: 'var(--s1)',
+                        letterSpacing: '0.08em',
+                        marginBottom: 6,
                       }}
                     >
                       Tell us more
@@ -1206,14 +1336,15 @@ export default function CommentThread({
                       placeholder="What's the issue?"
                       style={{
                         width: '100%',
-                        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8/10 input inset standard for the report/flag/hide dialogs
-                        padding: '8px 10px',
-                        borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the form input)
-                        border: '1px solid var(--border, #e5e5e5)',
-                        fontSize: 13,
+                        padding: '10px 14px',
+                        borderRadius: 10,
+                        border: `1px solid ${BORDER}`,
+                        background: '#ffffff',
+                        fontFamily: SANS,
+                        fontSize: 14,
+                        color: TEXT,
                         outline: 'none',
-                        fontFamily: 'inherit',
-                        marginBottom: 10, // magic — intentional (between --s2 8 and --s3 12 — matches the title rhythm)
+                        marginBottom: 12,
                         boxSizing: 'border-box',
                         resize: 'vertical',
                       }}
@@ -1228,11 +1359,13 @@ export default function CommentThread({
                 <label
                   style={{
                     display: 'block',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: 'var(--dim, #666)',
+                    fontFamily: MONO,
+                    fontSize: 10,
+                    fontWeight: 500,
+                    color: TEXT_SOFT,
                     textTransform: 'uppercase',
-                    marginBottom: 'var(--s1)',
+                    letterSpacing: '0.08em',
+                    marginBottom: 6,
                   }}
                 >
                   Reason
@@ -1244,25 +1377,28 @@ export default function CommentThread({
                   placeholder="e.g. harassment, spam, misinformation"
                   style={{
                     width: '100%',
-                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8/10 input inset standard for the report/flag/hide dialogs
-                    padding: '8px 10px',
-                    borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the form input)
-                    border: '1px solid var(--border, #e5e5e5)',
-                    fontSize: 13,
+                    padding: '10px 14px',
+                    borderRadius: 10,
+                    border: `1px solid ${BORDER}`,
+                    background: '#ffffff',
+                    fontFamily: SANS,
+                    fontSize: 14,
+                    color: TEXT,
                     outline: 'none',
-                    fontFamily: 'inherit',
-                    marginBottom: 10, // magic — intentional (between --s2 8 and --s3 12 — dialog form rhythm)
+                    marginBottom: 12,
                     boxSizing: 'border-box',
                   }}
                 />
                 <label
                   style={{
                     display: 'block',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: 'var(--dim, #666)',
+                    fontFamily: MONO,
+                    fontSize: 10,
+                    fontWeight: 500,
+                    color: TEXT_SOFT,
                     textTransform: 'uppercase',
-                    marginBottom: 'var(--s1)',
+                    letterSpacing: '0.08em',
+                    marginBottom: 6,
                   }}
                 >
                   Context (optional)
@@ -1273,14 +1409,15 @@ export default function CommentThread({
                   rows={3}
                   style={{
                     width: '100%',
-                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8/10 input inset standard for the report/flag/hide dialogs
-                    padding: '8px 10px',
-                    borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the form input)
-                    border: '1px solid var(--border, #e5e5e5)',
-                    fontSize: 13,
+                    padding: '10px 14px',
+                    borderRadius: 10,
+                    border: `1px solid ${BORDER}`,
+                    background: '#ffffff',
+                    fontFamily: SANS,
+                    fontSize: 14,
+                    color: TEXT,
                     outline: 'none',
-                    fontFamily: 'inherit',
-                    marginBottom: 10, // magic — intentional (between --s2 8 and --s3 12 — dialog form rhythm)
+                    marginBottom: 12,
                     boxSizing: 'border-box',
                     resize: 'vertical',
                   }}
@@ -1293,14 +1430,16 @@ export default function CommentThread({
                 <label
                   style={{
                     display: 'block',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: 'var(--dim, #666)',
+                    fontFamily: MONO,
+                    fontSize: 10,
+                    fontWeight: 500,
+                    color: TEXT_SOFT,
                     textTransform: 'uppercase',
-                    marginBottom: 'var(--s1)',
+                    letterSpacing: '0.08em',
+                    marginBottom: 6,
                   }}
                 >
-                  Reason <span style={{ color: 'var(--danger, #dc2626)' }}>*</span>
+                  Reason <span style={{ color: '#b91c1c' }}>*</span>
                 </label>
                 <select
                   value={dialog.reason}
@@ -1308,15 +1447,14 @@ export default function CommentThread({
                   autoFocus
                   style={{
                     width: '100%',
-                    // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8/10 input inset standard for the report/flag/hide dialogs
-                    padding: '8px 10px',
-                    borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the form input)
-                    border: '1px solid var(--border, #e5e5e5)',
-                    fontSize: 13,
-                    fontFamily: 'inherit',
-                    marginBottom: 10, // magic — intentional (between --s2 8 and --s3 12 — dialog form rhythm)
-                    background: 'var(--card, #fff)',
-                    color: 'var(--text, #111)',
+                    padding: '10px 14px',
+                    borderRadius: 10,
+                    border: `1px solid ${BORDER}`,
+                    background: '#ffffff',
+                    fontFamily: SANS,
+                    fontSize: 14,
+                    color: TEXT,
+                    marginBottom: 12,
                   }}
                 >
                   <option value="">Select a reason…</option>
@@ -1329,14 +1467,16 @@ export default function CommentThread({
                     <label
                       style={{
                         display: 'block',
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: 'var(--dim, #666)',
+                        fontFamily: MONO,
+                        fontSize: 10,
+                        fontWeight: 500,
+                        color: TEXT_SOFT,
                         textTransform: 'uppercase',
-                        marginBottom: 'var(--s1)',
+                        letterSpacing: '0.08em',
+                        marginBottom: 6,
                       }}
                     >
-                      Context <span style={{ color: 'var(--danger, #dc2626)' }}>*</span>
+                      Context <span style={{ color: '#b91c1c' }}>*</span>
                     </label>
                     <textarea
                       value={dialog.description}
@@ -1346,13 +1486,15 @@ export default function CommentThread({
                       placeholder="Describe the issue."
                       style={{
                         width: '100%',
-                        // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 8/10 input inset standard for the report/flag/hide dialogs
-                        padding: '8px 10px',
-                        borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the form input)
-                        border: '1px solid var(--border, #e5e5e5)',
-                        fontSize: 13,
-                        fontFamily: 'inherit',
-                        marginBottom: 10, // magic — intentional (between --s2 8 and --s3 12 — dialog form rhythm)
+                        padding: '10px 14px',
+                        borderRadius: 10,
+                        border: `1px solid ${BORDER}`,
+                        background: '#ffffff',
+                        fontFamily: SANS,
+                        fontSize: 14,
+                        color: TEXT,
+                        outline: 'none',
+                        marginBottom: 12,
                         boxSizing: 'border-box',
                         resize: 'vertical',
                       }}
@@ -1363,24 +1505,25 @@ export default function CommentThread({
             )}
 
             {dialog.error && (
-              // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 10px bottom inset matches dialog form rhythm
-              <p style={{ fontSize: 12, color: 'var(--danger, #dc2626)', margin: '0 0 10px 0' }}>
+              <p style={{ fontFamily: SANS, fontSize: 13, color: '#b91c1c', margin: '0 0 12px 0' }}>
                 {dialog.error}
               </p>
             )}
 
-            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 14 /* magic — intentional (between --s3 12 and --s4 16 — dialog button rhythm) */ }}>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center', marginTop: 18 }}>
               <button
                 onClick={closeDialog}
                 style={{
-                  padding: 'var(--s2) var(--s4)',
-                  borderRadius: 9, // magic — intentional (between --r-sm 6 and --r-md 10 — matches CommentRow inline-edit Save/Cancel)
-                  border: '1px solid var(--border, #e5e5e5)',
+                  padding: 0,
+                  border: 'none',
                   background: 'transparent',
+                  fontFamily: SANS,
                   fontSize: 13,
                   cursor: 'pointer',
-                  color: 'var(--dim, #666)',
-                  fontFamily: 'inherit',
+                  color: TEXT_MUTED,
+                  textDecoration: 'underline',
+                  textUnderlineOffset: 3,
+                  marginRight: 6,
                 }}
               >
                 Cancel
@@ -1401,21 +1544,19 @@ export default function CommentThread({
                     (!dialog.reason || (dialog.reason === 'other' && !dialog.description.trim())))
                 }
                 style={{
-                  padding: 'var(--s2) var(--s4)',
-                  borderRadius: 9, // magic — intentional (between --r-sm 6 and --r-md 10 — matches CommentRow inline-edit Save/Cancel)
+                  padding: '12px 22px',
+                  borderRadius: 10,
                   border: 'none',
                   background:
-                    dialog.action === 'delete' || dialog.action === 'block'
-                      ? '#dc2626'
-                      : 'var(--accent)',
-                  color:
-                    dialog.action === 'delete' || dialog.action === 'block'
-                      ? '#fff'
-                      : 'var(--bg)',
-                  fontSize: 13,
-                  fontWeight: 700,
+                    dialog.action === 'delete' || dialog.action === 'block' || dialog.action === 'hide'
+                      ? '#b91c1c'
+                      : ACCENT,
+                  color: '#ffffff',
+                  fontFamily: SANS,
+                  fontSize: 14,
+                  fontWeight: 600,
                   cursor: dialog.submitting ? 'default' : 'pointer',
-                  fontFamily: 'inherit',
+                  opacity: dialog.submitting ? 0.7 : 1,
                 }}
               >
                 {dialog.submitting
@@ -1443,11 +1584,18 @@ export default function CommentThread({
         // T11 — when the article has same-category siblings, the story
         // page passes them in via `emptyStateExtra` so the passed-but-
         // alone reader has an editorial follow-up rather than a dead end.
-        <div style={{ padding: 'var(--s2) var(--s0) var(--s7)' }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text, #111)', letterSpacing: '-0.01em', marginBottom: 6 }}>
-            Be the first.
+        <div style={{ padding: '36px 20px', textAlign: 'center' }}>
+          <div style={{
+            fontFamily: SERIF,
+            fontSize: 22,
+            fontWeight: 400,
+            letterSpacing: '-0.02em',
+            color: TEXT,
+            marginBottom: 8,
+          }}>
+            Be the first to comment.
           </div>
-          <div style={{ fontSize: 14, color: 'var(--dim, #666)', lineHeight: 1.5 }}>
+          <div style={{ fontFamily: SANS, fontSize: 14, color: TEXT_MUTED, lineHeight: 1.5 }}>
             You read it. You passed. Your take belongs here.
           </div>
           {emptyStateExtra && <div style={{ marginTop: 'var(--s6)', textAlign: 'left' }}>{emptyStateExtra}</div>}
@@ -1490,6 +1638,7 @@ export default function CommentThread({
           })}
         </>
       )}
+      </div>
     </div>
   );
 }
@@ -1499,9 +1648,9 @@ const askExpertBtnStyle: CSSProperties = {
   // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 9/16 matches CommentRow's top-level action-pill inset
   padding: '9px 16px',
   borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for the ask-expert button)
-  border: '1px solid var(--border, #e5e5e5)',
+  border: '1px solid var(--vp-border)',
   background: 'transparent',
-  color: 'var(--accent, #111)',
+  color: 'var(--vp-accent)',
   fontSize: 12,
   fontWeight: 700,
   cursor: 'pointer',
@@ -1510,18 +1659,20 @@ const askExpertBtnStyle: CSSProperties = {
 const overlayStyle: CSSProperties = {
   position: 'fixed',
   inset: 0,
-  background: 'rgba(17,17,17,0.85)',
+  background: 'rgba(23, 23, 23, 0.55)',
   zIndex: Z.CRITICAL_MODAL,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  padding: 16,
 };
 const dialogStyle: CSSProperties = {
-  background: 'var(--card, #fff)',
-  border: '1px solid var(--border, #e5e5e5)',
-  borderRadius: 'var(--r-lg)',
-  padding: 22, // magic — intentional (between --s5 20 and --s6 24 — dialog body inset)
-  width: '90%',
-  maxWidth: 420,
-  color: 'var(--text-primary, #111)',
+  background: '#ffffff',
+  border: `1px solid ${BORDER}`,
+  borderRadius: 18,
+  padding: 24,
+  width: '100%',
+  maxWidth: 480,
+  color: TEXT,
+  boxShadow: '0 16px 48px rgba(23, 23, 23, 0.18)',
 };
