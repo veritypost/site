@@ -101,12 +101,23 @@ const RESERVED_MIN_HEIGHT = {
  */
 export default function Ad({ placement, page = 'unknown', position = 'inline', articleId = null, skipSanitize = false }) {
   const [ad, setAd] = useState(null);
+  // Wave 2 fallback ladder. `fallback` is { network, unit_id } when the
+  // RPC's primary path returned no ad_unit but the placement carries a
+  // configured fallback (ad_placements.fallback_network in
+  // {'adsense','admob','house'}). Web renders the 'adsense' branch only:
+  // 'admob' is iOS-native (HomeAdSlot); 'house' as a fallback carries no
+  // creative payload (just a unit_id, no HTML) so there's nothing for
+  // the web client to mount.
+  const [fallback, setFallback] = useState(null);
   const [impressionId, setImpressionId] = useState(null);
   const [inViewport, setInViewport] = useState(false);
   const loggedRef = useRef(false);
   const containerRef = useRef(null);
 
   const reservedHeight = RESERVED_MIN_HEIGHT[position] ?? 0;
+  const wrapStyleWithReserve = reservedHeight > 0
+    ? { ...wrapStyle, minHeight: reservedHeight }
+    : wrapStyle;
 
   // Lazy-load gate. Defer the serve fetch until the slot is within
   // ~400px of the viewport so below-fold ads don't compete with first
@@ -150,7 +161,11 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
         console.error('[ads] serve parse', err);
         return {};
       });
-      if (data?.ad_unit) setAd(data.ad_unit);
+      if (data?.ad_unit) {
+        setAd(data.ad_unit);
+      } else if (data?.fallback) {
+        setFallback(data.fallback);
+      }
     }
     fetchAd();
     return () => {
@@ -225,6 +240,25 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
       observer.disconnect();
     };
   }, [impressionId]);
+
+  // Fallback ladder render. When the primary path (pinned / programmatic
+  // / house) yielded nothing, the RPC may surface a network-fallback unit
+  // (Wave 2). Web mounts AdSense directly via AdSenseSlot — no impression
+  // beacon, because the network owns its own measurement and we get the
+  // revenue figure from their reporting, not from ad_impressions. 'admob'
+  // is iOS-only; 'house' as fallback ships only an opaque unit_id with
+  // no creative HTML, so there's nothing to mount on web for either.
+  if (!ad && fallback && fallback.network === 'adsense' && fallback.unit_id && ADSENSE_PUBLISHER_ID) {
+    return (
+      <div ref={containerRef} style={wrapStyleWithReserve}>
+        <AdSenseSlot
+          slotId={fallback.unit_id}
+          publisherId={ADSENSE_PUBLISHER_ID}
+          format="auto"
+        />
+      </div>
+    );
+  }
 
   // Pre-fetch / no-fill placeholder. The ref MUST attach here so the
   // viewport observer above can wire up before we have an ad — without
@@ -309,10 +343,6 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
   // Any unknown network value falls through to the direct/house path,
   // which is a safe default — the creative columns are populated with
   // fallback content for every unit regardless of network.
-  const wrapStyleWithReserve = reservedHeight > 0
-    ? { ...wrapStyle, minHeight: reservedHeight }
-    : wrapStyle;
-
   if (ad.ad_network === 'google_adsense' && ad.ad_network_unit_id && ADSENSE_PUBLISHER_ID) {
     return (
       <div ref={containerRef} style={wrapStyleWithReserve}>
