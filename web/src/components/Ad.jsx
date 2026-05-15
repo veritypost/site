@@ -61,6 +61,20 @@ function getDeviceType() {
 
 const ADSENSE_PUBLISHER_ID = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID || '';
 
+// CLS reserve. AdSense `<ins>` slots collapse to height 0 when no-fill,
+// and the pre-fetch placeholder would otherwise be height 0 too — both
+// shift content as the resolution swings in. Keyed off `position` so the
+// reserve matches the slot's expected creative size. `rail` is height-
+// flexible inside a sticky scrollable column (reserving wastes vertical
+// space). `sticky_footer` is fixed-position so it doesn't affect flow.
+const RESERVED_MIN_HEIGHT = {
+  header: 100,
+  in_body: 250,
+  end: 100,
+  rail: 0,
+  sticky_footer: 0,
+};
+
 // D23: tier-aware ad slot. Hidden entirely when the server-side
 // serve_ad RPC refuses (viewer tier in placement.hidden_for_tiers,
 // all units filtered out, or frequency cap hit). The ad-suppression
@@ -88,10 +102,39 @@ const ADSENSE_PUBLISHER_ID = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID || '';
 export default function Ad({ placement, page = 'unknown', position = 'inline', articleId = null, skipSanitize = false }) {
   const [ad, setAd] = useState(null);
   const [impressionId, setImpressionId] = useState(null);
+  const [inViewport, setInViewport] = useState(false);
   const loggedRef = useRef(false);
   const containerRef = useRef(null);
 
+  const reservedHeight = RESERVED_MIN_HEIGHT[position] ?? 0;
+
+  // Lazy-load gate. Defer the serve fetch until the slot is within
+  // ~400px of the viewport so below-fold ads don't compete with first
+  // paint. Header slots are typically in viewport at mount and fire
+  // immediately. Once we've decided to load, we stop observing.
   useEffect(() => {
+    if (inViewport) return;
+    const node = containerRef.current;
+    if (!node) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setInViewport(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setInViewport(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '400px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [inViewport]);
+
+  useEffect(() => {
+    if (!inViewport) return;
     let cancelled = false;
     async function fetchAd() {
       const sessionId = getSessionId();
@@ -113,7 +156,7 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
     return () => {
       cancelled = true;
     };
-  }, [placement, articleId]);
+  }, [placement, articleId, inViewport]);
 
   // Log impression once the ad has actually rendered.
   useEffect(() => {
@@ -183,7 +226,20 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
     };
   }, [impressionId]);
 
-  if (!ad) return null;
+  // Pre-fetch / no-fill placeholder. The ref MUST attach here so the
+  // viewport observer above can wire up before we have an ad — without
+  // the placeholder node the gate never fires and below-fold slots stay
+  // empty forever. minHeight reserves the slot's expected creative size
+  // so resolution doesn't shift surrounding content.
+  if (!ad) {
+    return (
+      <div
+        ref={containerRef}
+        aria-hidden="true"
+        style={reservedHeight > 0 ? { minHeight: reservedHeight } : undefined}
+      />
+    );
+  }
 
   // Scheme allowlist for ad URLs. Both click_url (anchor href) and
   // creative_url (img src) are admin-supplied via the ad_units table; an
@@ -253,9 +309,13 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
   // Any unknown network value falls through to the direct/house path,
   // which is a safe default — the creative columns are populated with
   // fallback content for every unit regardless of network.
+  const wrapStyleWithReserve = reservedHeight > 0
+    ? { ...wrapStyle, minHeight: reservedHeight }
+    : wrapStyle;
+
   if (ad.ad_network === 'google_adsense' && ad.ad_network_unit_id && ADSENSE_PUBLISHER_ID) {
     return (
-      <div ref={containerRef} style={wrapStyle}>
+      <div ref={containerRef} style={wrapStyleWithReserve}>
         {sponsoredLabel}
         <AdSenseSlot
           slotId={ad.ad_network_unit_id}
@@ -302,7 +362,7 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
       ? ad.creative_html
       : sanitizeAdHtml(ad.creative_html);
     return (
-      <div ref={containerRef} style={wrapStyle} onClick={handleClick}>
+      <div ref={containerRef} style={wrapStyleWithReserve} onClick={handleClick}>
         {sponsoredLabel}
         <iframe
           title="Sponsored"
@@ -321,7 +381,7 @@ export default function Ad({ placement, page = 'unknown', position = 'inline', a
       onClick={handleClick}
       target={safeClickUrl ? '_blank' : undefined}
       rel={safeClickUrl ? 'noopener noreferrer sponsored' : 'sponsored'}
-      style={{ ...wrapStyle, display: 'block', textDecoration: 'none', color: 'inherit' }}
+      style={{ ...wrapStyleWithReserve, display: 'block', textDecoration: 'none', color: 'inherit' }}
     >
       {sponsoredLabel}
       {safeCreativeUrl && (
@@ -349,7 +409,10 @@ const wrapStyle = {
   border: '1px solid var(--border, #e5e5e5)',
   borderRadius: 10,
   padding: '10px 12px',
-  margin: '12px auto',
+  // 16px (not 12) so the slot clears AdSense's "ads must not sit flush
+  // against content" policy regardless of whether the surrounding block
+  // declares its own bottom spacing.
+  margin: '16px auto',
   maxWidth: 728,
   textAlign: 'center',
 };
