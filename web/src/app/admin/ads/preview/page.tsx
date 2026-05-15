@@ -28,6 +28,23 @@ function surfaceFromPage(page: string): string {
 
 const TIERS = ['anon', 'free', 'verity_plus'];
 
+// Device viewport simulator. The web Ad component renders the same DOM
+// regardless of device, but CSS breakpoints and the mobile_sticky_footer
+// placement change at narrow widths — clamping the preview container to
+// each device's typical width lets admins eyeball CLS reserves and
+// mobile-specific layout without resizing the browser. The 'ios' variant
+// is a heads-up: iOS native renders via HomeAdSlot (SwiftUI), not the
+// web Ad component — same serve payload, different chrome. Showing the
+// web representation alongside the iPhone frame is the most honest
+// approximation available without a simulator embed.
+type DeviceMode = 'desktop' | 'mobile' | 'ios';
+
+const DEVICE_WIDTH: Record<DeviceMode, number | null> = {
+  desktop: null, // fluid up to container max
+  mobile: 390,
+  ios: 390,
+};
+
 function AdPreviewInner() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -40,6 +57,7 @@ function AdPreviewInner() {
   const [surface, setSurface] = useState<string>('home');
   const [tier, setTier] = useState<string>('free');
   const [articleSlug, setArticleSlug] = useState<string>('');
+  const [device, setDevice] = useState<DeviceMode>('desktop');
 
   // Preview state — incremented on each "Preview" click to force Ad remounts
   const [previewKey, setPreviewKey] = useState(0);
@@ -147,6 +165,10 @@ function AdPreviewInner() {
             </Lbl>
           )}
 
+          <Lbl label="Device">
+            <DeviceToggle value={device} onChange={setDevice} />
+          </Lbl>
+
           <Button variant="primary" onClick={handlePreview}>
             Preview
           </Button>
@@ -182,23 +204,30 @@ function AdPreviewInner() {
       {activeSurface && (
         <PageSection
           title={`Placements — ${activeSurface}`}
-          description={`${placements.length} slot${placements.length !== 1 ? 's' : ''} on this surface`}
+          description={`${placements.length} slot${placements.length !== 1 ? 's' : ''} on this surface · ${device}`}
         >
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: S[4],
-          }}>
-            {placements.map((p) => (
-              <PlacementCard
-                key={`${previewKey}-${p.name}`}
-                placementKey={p.name}
-                platform={p.platform}
-                tier={tier}
-                articleSlug={surface === 'article' ? articleSlug : ''}
-              />
-            ))}
-          </div>
+          <DeviceFrame device={device}>
+            <div style={{
+              display: 'grid',
+              // Single column on phone-width previews so each card mirrors the
+              // viewport it represents; auto-fill on desktop where horizontal
+              // space supports a multi-up grid.
+              gridTemplateColumns: device === 'desktop'
+                ? 'repeat(auto-fill, minmax(280px, 1fr))'
+                : '1fr',
+              gap: S[4],
+            }}>
+              {placements.map((p) => (
+                <PlacementCard
+                  key={`${previewKey}-${p.name}`}
+                  placementKey={p.name}
+                  platform={p.platform}
+                  tier={tier}
+                  articleSlug={surface === 'article' ? articleSlug : ''}
+                />
+              ))}
+            </div>
+          </DeviceFrame>
         </PageSection>
       )}
     </Page>
@@ -303,6 +332,110 @@ function AdSlotWithFallback({
   // _SsrAdCell's AD_SANITIZE_OPTIONS (server) or Ad.jsx's
   // AD_DOMPURIFY_CONFIG (client). Self-XSS surface only — admin-gated.
   return <Ad placement={placementKey} skipSanitize />;
+}
+
+// Segmented control. Three discrete viewport modes; treat as radio
+// buttons styled to fit alongside the form's Select inputs.
+function DeviceToggle({
+  value,
+  onChange,
+}: {
+  value: DeviceMode;
+  onChange: (next: DeviceMode) => void;
+}) {
+  const opts: { key: DeviceMode; label: string }[] = [
+    { key: 'desktop', label: 'Desktop' },
+    { key: 'mobile', label: 'Mobile' },
+    { key: 'ios', label: 'iOS' },
+  ];
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Device preview"
+      style={{
+        display: 'inline-flex',
+        border: `1px solid ${C.divider}`,
+        borderRadius: 6,
+        overflow: 'hidden',
+        background: C.bg,
+      }}
+    >
+      {opts.map((o, i) => {
+        const active = value === o.key;
+        return (
+          <button
+            key={o.key}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(o.key)}
+            style={{
+              padding: `${S[2]}px ${S[3]}px`,
+              fontSize: F.sm,
+              fontWeight: active ? 600 : 500,
+              color: active ? C.ink : C.dim,
+              background: active ? C.card : 'transparent',
+              border: 'none',
+              borderLeft: i === 0 ? 'none' : `1px solid ${C.divider}`,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Width-clamped wrapper that simulates the chosen device viewport. The
+// iOS variant additionally renders an iPhone-frame chrome (rounded
+// rectangle, gutter) plus a heads-up that native iOS renders through
+// HomeAdSlot, not the web Ad component — same serve payload, different
+// chrome. Without this caption admins might assume a passing web preview
+// implies a passing native render.
+function DeviceFrame({
+  device,
+  children,
+}: {
+  device: DeviceMode;
+  children: React.ReactNode;
+}) {
+  const width = DEVICE_WIDTH[device];
+  if (width == null) {
+    return <div>{children}</div>;
+  }
+  const isIos = device === 'ios';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: S[3] }}>
+      <div
+        aria-label={`${device} viewport preview`}
+        style={{
+          width,
+          maxWidth: '100%',
+          padding: isIos ? S[3] : 0,
+          borderRadius: isIos ? 28 : 8,
+          border: isIos ? `1px solid ${C.divider}` : `1px dashed ${C.divider}`,
+          background: isIos ? C.bg : 'transparent',
+          boxShadow: isIos ? '0 1px 2px rgba(0,0,0,0.04)' : undefined,
+          boxSizing: 'border-box',
+        }}
+      >
+        {children}
+      </div>
+      {isIos && (
+        <div style={{
+          maxWidth: 520, fontSize: F.xs, color: C.dim,
+          textAlign: 'center', lineHeight: 1.5,
+        }}>
+          iOS native renders ads via HomeAdSlot (SwiftUI), not the web Ad
+          component. The serve payload is identical; the chrome here is the
+          web representation of what iOS would receive.
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Lbl({ label, children }: { label: string; children: React.ReactNode }) {

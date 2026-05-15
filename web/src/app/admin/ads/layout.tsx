@@ -17,11 +17,15 @@ import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 type Tab = { href: string; label: string };
 
 // Order matches the spec: Overview is the default landing at /admin/ads.
+// Queue + Preview surface here so the only paths to them aren't side
+// links buried inside Placements (Wave 7 — admin consolidation).
 const TABS: Tab[] = [
   { href: '/admin/ads', label: 'Overview' },
   { href: '/admin/ads/campaigns', label: 'Campaigns' },
   { href: '/admin/ads/placements', label: 'Placements' },
   { href: '/admin/ads/units', label: 'Units' },
+  { href: '/admin/ads/queue', label: 'Queue' },
+  { href: '/admin/ads/preview', label: 'Preview' },
   { href: '/admin/ads/analytics', label: 'Analytics' },
 ];
 
