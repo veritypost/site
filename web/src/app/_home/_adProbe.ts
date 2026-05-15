@@ -33,6 +33,12 @@ export type ResolvedAd = {
   cta_text: string | null;
   advertiser_name: string | null;
   reduced: boolean;
+  // Wave 2 additions — present on every serve_ad return path. `source` is
+  // mandatory observability ('pinned'|'programmatic'|...); fallback fields
+  // are populated when source='network_fallback' for Wave 10 client mount.
+  source?: string | null;
+  fallback_network?: string | null;
+  fallback_network_unit_id?: string | null;
 };
 
 export type AdImpressionContext = {
@@ -90,8 +96,12 @@ export async function resolveAd(placementName: string): Promise<ResolvedAd | nul
     p_placement_name: placementName,
   });
   if (error) return null;
+  // Wave 2: serve_ad always returns an object (with `source`); the absence
+  // of `ad_unit_id` signals no ad served (block, no_fill, network_fallback).
   if (!data || typeof data !== 'object') return null;
-  return data as ResolvedAd;
+  const candidate = data as ResolvedAd;
+  if (!candidate.ad_unit_id) return null;
+  return candidate;
 }
 
 export async function hasActiveAd(placementName: string): Promise<boolean> {
@@ -131,6 +141,9 @@ export async function resolveAdAndLog(
   if (error) return null;
   if (!data || typeof data !== 'object') return null;
   const ad = data as ResolvedAd;
+  // Wave 2: skip impression logging when no ad served (block / no_fill /
+  // network_fallback). Wave 10 will mount the network-fallback path.
+  if (!ad.ad_unit_id) return null;
 
   // v1 bot check — return ad without logging when UA looks like a bot.
   let userAgent = '';

@@ -58,17 +58,31 @@ export async function GET(request) {
       return false;
     }
   };
-  let safeUnit = data || null;
-  if (safeUnit && typeof safeUnit === 'object') {
+  // Wave 2 — RPC now always returns an object with `source`. When no ad
+  // serves (ad_unit_id is null), the object carries fallback_network +
+  // fallback_network_unit_id for client mounting (Wave 10 AdMob/AdSense).
+  // Surface those at the top level alongside ad_unit for telemetry.
+  const rpcResult = data || null;
+  const source = (rpcResult && rpcResult.source) || 'no_fill';
+  const hasUnit = !!(rpcResult && rpcResult.ad_unit_id);
+  let safeUnit = hasUnit ? rpcResult : null;
+  if (safeUnit) {
     if (!isSafeAdUrl(safeUnit.creative_url)) safeUnit = { ...safeUnit, creative_url: null };
     if (!isSafeAdUrl(safeUnit.click_url)) safeUnit = { ...safeUnit, click_url: null };
   }
-  // D1 — Belt-and-suspenders frequency cap guard. The serve_ad() RPC is the
-  // primary enforcement layer; this server-side check is a fallback in case
-  // the RPC was deployed without cap logic. Runs only when a non-null unit is
-  // returned by the RPC (no-op on misses). Wrapped in try/catch so any DB
-  // error fails open (serves the ad) rather than failing closed — ad revenue
-  // takes priority over perfect cap enforcement.
+  const fallback =
+    !hasUnit && rpcResult && rpcResult.fallback_network && rpcResult.fallback_network !== 'none'
+      ? {
+          network: rpcResult.fallback_network,
+          unit_id: rpcResult.fallback_network_unit_id || null,
+        }
+      : null;
+
+  // D1 — Belt-and-suspenders frequency cap guard. As of 2026-05-15, the
+  // serve_ad RPC enforces caps via ad_freq_counters (trigger-maintained on
+  // ad_impressions). This server-side check is a graceful-degrade layer in
+  // case counters drift. Runs only when a non-null unit is returned. Wrapped
+  // in try/catch so any DB error fails open (serves the ad).
   if (safeUnit) {
     try {
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -78,11 +92,14 @@ export async function GET(request) {
         const { count: userCount } = await service
           .from('ad_impressions')
           .select('id', { count: 'exact', head: true })
-          .eq('ad_unit_id', safeUnit.id)
+          .eq('ad_unit_id', safeUnit.ad_unit_id)
           .eq('user_id', authUser.id)
           .gte('created_at', oneDayAgo);
         if (userCount >= safeUnit.frequency_cap_per_user) {
-          return NextResponse.json({ ad_unit: null }, { headers: { 'Cache-Control': 'no-store' } });
+          return NextResponse.json(
+            { ad_unit: null, fallback: null, source: 'no_fill' },
+            { headers: { 'Cache-Control': 'no-store' } },
+          );
         }
       }
 
@@ -91,10 +108,13 @@ export async function GET(request) {
         const { count: sessionCount } = await service
           .from('ad_impressions')
           .select('id', { count: 'exact', head: true })
-          .eq('ad_unit_id', safeUnit.id)
+          .eq('ad_unit_id', safeUnit.ad_unit_id)
           .eq('session_id', session_id);
         if (sessionCount >= safeUnit.frequency_cap_per_session) {
-          return NextResponse.json({ ad_unit: null }, { headers: { 'Cache-Control': 'no-store' } });
+          return NextResponse.json(
+            { ad_unit: null, fallback: null, source: 'no_fill' },
+            { headers: { 'Cache-Control': 'no-store' } },
+          );
         }
       }
     } catch (capErr) {
@@ -107,7 +127,7 @@ export async function GET(request) {
   // be cached by browsers or shared proxies — a cached response would serve
   // User A's ad to User B and skip per-user cap re-checks within the window.
   return NextResponse.json(
-    { ad_unit: safeUnit },
+    { ad_unit: safeUnit, fallback, source },
     {
       headers: {
         'Cache-Control': 'no-store',

@@ -95,6 +95,31 @@ const nextConfig = {
         destination: '/:slug',
         permanent: true,
       },
+      // Wave 0 redesign — legacy `/admin/ad-*` page paths consolidated under
+      // `/admin/ads/*`. API routes (`/api/admin/ad-*`) are unchanged and stay
+      // kebab-case. NOTE for Wave 7: when `ad-units` → `ad-creatives` rename
+      // lands, update `/admin/ad-units/:id` to point at `/admin/ads/creatives/:id`
+      // directly here to avoid a double-hop through `/admin/ads/units/:id`.
+      {
+        source: '/admin/ad-analytics',
+        destination: '/admin/ads/analytics',
+        permanent: true,
+      },
+      {
+        source: '/admin/ad-campaigns',
+        destination: '/admin/ads/campaigns',
+        permanent: true,
+      },
+      {
+        source: '/admin/ad-placements',
+        destination: '/admin/ads/placements',
+        permanent: true,
+      },
+      {
+        source: '/admin/ad-units/:id',
+        destination: '/admin/ads/units/:id',
+        permanent: true,
+      },
     ];
   },
   async headers() {

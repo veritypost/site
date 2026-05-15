@@ -217,7 +217,7 @@ function QueueInner() {
         title="Creative approval queue"
         subtitle="Ad units pending review before they can serve."
         actions={
-          <Button variant="ghost" onClick={() => router.push('/admin/ad-placements')}>
+          <Button variant="ghost" onClick={() => router.push('/admin/ads/placements')}>
             ← Placements
           </Button>
         }
@@ -233,7 +233,7 @@ function QueueInner() {
               title="No creatives pending review"
               description="All units are approved or rejected."
               cta={
-                <Button variant="secondary" onClick={() => router.push('/admin/ad-placements')}>
+                <Button variant="secondary" onClick={() => router.push('/admin/ads/placements')}>
                   Go to placements
                 </Button>
               }

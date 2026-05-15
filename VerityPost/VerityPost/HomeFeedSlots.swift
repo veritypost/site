@@ -56,7 +56,10 @@ struct HomeAdSlot: View {
 
     var body: some View {
         Group {
-            if let ad {
+            // Wave 2 — skip rendering when RPC signals network_fallback;
+            // Wave 10 will mount AdMob/AdSense at that source. Until then,
+            // collapse the slot gracefully (same as a no-fill).
+            if let ad, ad.source != "network_fallback" {
                 Button {
                     Task { await recordClick() }
                     if let urlStr = ad.click_url, let u = URL(string: urlStr) {
@@ -219,6 +222,12 @@ struct AdServeResponse: Decodable {
 
 /// Mirrors the ad_units columns the serve_ad RPC returns (snake_case
 /// straight from the API; consistent with EventsClient's wire shape).
+///
+/// Wave 2 fix: prior `let id: String` decoded JSON key `id` which the RPC
+/// never returns — the RPC ships `ad_unit_id`. Every decode silently failed
+/// and ads never rendered on iOS. CodingKeys now maps Swift `id` → JSON
+/// `ad_unit_id`. New optional fields `source`, `fallback_network`,
+/// `fallback_network_unit_id` ride along for Wave 10 AdMob mount.
 struct AdPayload: Decodable, Identifiable {
     let id: String
     let placement_id: String
@@ -229,6 +238,16 @@ struct AdPayload: Decodable, Identifiable {
     let alt_text: String?
     let cta_text: String?
     let advertiser_name: String?
+    let source: String?
+    let fallback_network: String?
+    let fallback_network_unit_id: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id = "ad_unit_id"
+        case placement_id, ad_format, creative_url, creative_html, click_url
+        case alt_text, cta_text, advertiser_name, source
+        case fallback_network, fallback_network_unit_id
+    }
 }
 
 struct ImpressionResponse: Decodable {
