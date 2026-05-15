@@ -1507,6 +1507,44 @@ function LayoutCanvas({
       return renderArticlePositionRow(slot, 0, 1);
     }
 
+    // WAVE 8 KINDS — top_banner, story_card, rail_card (single-cell) +
+    // square_row (5-cell). Each opens the article_cell popover (Article /
+    // Ad / Clear→Auto). Wrapped in a span-N div so the admin canvas
+    // mirrors the live HomeLayout's 12-track row claim. square_row's
+    // wrapper carries an internal repeat(5,1fr) sub-grid matching
+    // .vp-rh-square-row in styles.tsx.
+    if (kind === 'top_banner' || kind === 'story_card' || kind === 'rail_card') {
+      return (
+        <div
+          key={slot.id}
+          data-slot-kind={kind}
+          style={{ gridColumn: `span ${slot.span}`, minWidth: 0 }}
+        >
+          {renderArticlePositionRow(slot, 0, slot.position)}
+        </div>
+      );
+    }
+    if (kind === 'square_row') {
+      const capacity = slotCapacity(slot);
+      return (
+        <div
+          key={slot.id}
+          data-slot-kind={kind}
+          style={{
+            gridColumn: `span ${slot.span}`,
+            minWidth: 0,
+            display: 'grid',
+            gridTemplateColumns: `repeat(${capacity}, 1fr)`,
+            gap: 0,
+          }}
+        >
+          {Array.from({ length: capacity }, (_, i) =>
+            renderArticlePositionRow(slot, i, slot.position + i),
+          )}
+        </div>
+      );
+    }
+
     // DATA TICKER — vp-rh-ticker rail (grid-column: 1/-1 via its own CSS).
     // Clicking the sponsor cell opens the ad_placement popover; clicking
     // elsewhere opens the payload editor for the ticker items.
@@ -2006,7 +2044,18 @@ function SlotInlineEditor({
               ? 'wide_strip_inline'
               : slot.kind === 'editors_picks'
                 ? 'editors_picks_inline'
-                : 'inline';
+                // Wave 8 single-cell + 5-cell kinds. Names match the
+                // defaults baked into web/src/app/_home/slots/*.tsx so
+                // the admin pin and the renderer fall-through agree.
+                : slot.kind === 'top_banner'
+                  ? 'home_top_banner'
+                  : slot.kind === 'story_card'
+                    ? 'home_in_feed'
+                    : slot.kind === 'rail_card'
+                      ? 'home_rail'
+                      : slot.kind === 'square_row'
+                        ? 'home_bottom_row'
+                        : 'inline';
     const onHome = placements.filter((p) => p.page === 'home');
     const exact = onHome.find((p) => p.position === targetPosition);
     if (exact) return exact.name;
