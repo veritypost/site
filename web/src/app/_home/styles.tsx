@@ -212,10 +212,18 @@ export default function RhStyles() {
     }
     @media (min-width: 720px) {
       .vp-rh-grid > .vp-rh-card:nth-child(2n) { border-right: none; }
+      /* Wave 4 — incomplete trailing 2-col row: last card in col 1 with col 2
+         empty leaves a stray right border floating in whitespace. Drop it. */
+      .vp-rh-grid > .vp-rh-card:last-child:nth-child(2n+1) { border-right: none; }
     }
     @media (min-width: 1100px) {
       .vp-rh-grid > .vp-rh-card:nth-child(2n) { border-right: 1px solid var(--rh-border); }
       .vp-rh-grid > .vp-rh-card:nth-child(3n) { border-right: none; }
+      /* Wave 4 — incomplete trailing 3-col row: last card terminates the
+         visual flow at col 1 (3n+1) or col 2 (3n+2). Right border becomes a
+         stray vertical bar in empty space. */
+      .vp-rh-grid > .vp-rh-card:last-child:nth-child(3n+1),
+      .vp-rh-grid > .vp-rh-card:last-child:nth-child(3n+2) { border-right: none; }
     }
 
     /* persistent click cue on regular cards */
@@ -593,6 +601,9 @@ export default function RhStyles() {
     @media (min-width: 720px) {
       .vp-quiz-card { padding: 28px; }
     }
+    @media (min-width: 1100px) {
+      .vp-quiz-card { padding: 32px; }
+    }
 
     /* ============ LIST RAIL ============
        v2 cream-soft chrome (was always-dark island). Cream rather than
@@ -620,6 +631,9 @@ export default function RhStyles() {
     }
     @media (min-width: 720px) {
       .vp-rail-block { padding: 28px; }
+    }
+    @media (min-width: 1100px) {
+      .vp-rail-block { padding: 32px; }
     }
 
     /* ============ SECOND LEAD (feature take) ============ */
@@ -954,13 +968,19 @@ export default function RhStyles() {
     .vp-btn-rail {
       background: var(--rh-surface-soft);
       color: var(--rh-ink);
-      padding: 28px 24px;
+      padding: 24px;
       border: 1px solid var(--rh-border);
       border-radius: 18px;
       display: flex;
       flex-direction: column;
       gap: 8px;
       min-height: 220px;
+    }
+    @media (min-width: 720px) {
+      .vp-btn-rail { padding: 28px; }
+    }
+    @media (min-width: 1100px) {
+      .vp-btn-rail { padding: 32px; }
     }
     .vp-btn-rail__label {
       font-size: 10px;

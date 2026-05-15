@@ -143,7 +143,18 @@ export default async function SsrAdCell({
     position,
     articleId: articleId ?? undefined,
   });
-  if (!result?.ad?.creative_html) return null;
+  // Wave 4 — CLS guard. When nothing serves (no_fill, editorial_block, tier
+  // hidden, sanitizer-stripped-to-empty), still emit the wrapper so the
+  // home grid's `.vp-rh-card-ad` min-height reserves space. No impression
+  // beacon — nothing was served, so there's nothing to log.
+  const emptyCell = (
+    <div
+      className={wrapperClassName}
+      data-ad-id="unfilled"
+      {...(dataAttrs ?? {})}
+    />
+  );
+  if (!result?.ad?.creative_html) return emptyCell;
   const { ad, impressionId } = result;
   // Step 1: rewrite the CTA href to the click-redirect endpoint.
   // Step 2: sanitize the rewritten HTML (must be the LAST step before
@@ -156,9 +167,7 @@ export default async function SsrAdCell({
       )
     : (ad.creative_html as string);
   const html = sanitizeHtml(rewritten, AD_SANITIZE_OPTIONS);
-  // If the sanitizer stripped the creative to nothing, fail safe — don't
-  // render an empty cell that logs a viewable impression for no content.
-  if (!html.trim()) return null;
+  if (!html.trim()) return emptyCell;
 
   const adId = impressionId ?? 'unbacked';
   // Default selector uses the FIRST class in wrapperClassName so multi-
