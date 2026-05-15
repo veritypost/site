@@ -1,5 +1,7 @@
 import SwiftUI
 import UIKit
+import WebKit
+import AppTrackingTransparency
 
 // @migrated-to-permissions 2026-04-18
 // @feature-verified ads 2026-05-13
@@ -57,66 +59,103 @@ struct HomeAdSlot: View {
     var body: some View {
         Group {
             // Wave 2 — skip rendering when RPC signals network_fallback;
-            // Wave 10 will mount AdMob/AdSense at that source. Until then,
+            // Wave 6b will mount AdMob at that source. Until then,
             // collapse the slot gracefully (same as a no-fill).
             if let ad, ad.source != "network_fallback" {
-                Button {
-                    Task { await recordClick() }
-                    if let urlStr = ad.click_url, let u = URL(string: urlStr) {
-                        UIApplication.shared.open(u)
-                    }
-                } label: {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("SPONSORED")
-                            .font(.system(.caption2, design: .default, weight: .semibold))
-                            .tracking(1.6)
-                            .foregroundColor(VP.dim)
-                        if let advertiser = ad.advertiser_name, !advertiser.isEmpty {
-                            Text(advertiser)
-                                .font(.system(.callout, design: .default, weight: .semibold))
-                                .foregroundColor(VP.text)
-                                .multilineTextAlignment(.leading)
+                renderedAd(ad)
+                    .background(
+                        // Non-layout-affecting frame probe. Fires
+                        // onPreferenceChange on every scroll tick.
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: AdCellFrameKey.self,
+                                value: proxy.frame(in: .global)
+                            )
                         }
-                        if let cta = ad.cta_text ?? ad.alt_text, !cta.isEmpty {
-                            Text(cta)
-                                .font(.caption)
-                                .foregroundColor(VP.dim)
-                                .lineLimit(3)
-                                .multilineTextAlignment(.leading)
-                        }
+                    )
+                    .onPreferenceChange(AdCellFrameKey.self) { frame in
+                        handleVisibility(frame: frame)
                     }
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(VP.card)
-                    .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
-                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                }
-                .buttonStyle(.plain)
-                .background(
-                    // Non-layout-affecting frame probe. Fires
-                    // onPreferenceChange on every scroll tick.
-                    GeometryReader { proxy in
-                        Color.clear.preference(
-                            key: AdCellFrameKey.self,
-                            value: proxy.frame(in: .global)
-                        )
+                    .onDisappear {
+                        viewabilityTask?.cancel()
+                        viewabilityTask = nil
+                        visibleSince = nil
                     }
-                )
-                .onPreferenceChange(AdCellFrameKey.self) { frame in
-                    handleVisibility(frame: frame)
-                }
-                .onDisappear {
-                    viewabilityTask?.cancel()
-                    viewabilityTask = nil
-                    visibleSince = nil
-                }
             } else {
                 EmptyView()
             }
         }
         .task(id: placement + (articleId ?? "")) { await load() }
+    }
+
+    // Wave 6a — render dispatch. HTML creatives (AdSense `<ins>` blocks
+    // and any third-party network markup) route through a sandboxed
+    // WKWebView so the native side can host arbitrary publisher script
+    // without exposing the host app's cookies/storage. Text-only
+    // creatives (the historical iOS render path) stay native because
+    // wrapping a 3-line SPONSORED card in a WebView would be wasteful.
+    @ViewBuilder
+    private func renderedAd(_ ad: AdPayload) -> some View {
+        if let html = ad.creative_html, !html.isEmpty {
+            HTMLCreativeView(
+                html: html,
+                height: reservedHeight(for: placement),
+                onLinkTap: { url in
+                    Task { await recordClick() }
+                    UIApplication.shared.open(url)
+                }
+            )
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+        } else {
+            Button {
+                Task { await recordClick() }
+                if let urlStr = ad.click_url, let u = URL(string: urlStr) {
+                    UIApplication.shared.open(u)
+                }
+            } label: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("SPONSORED")
+                        .font(.system(.caption2, design: .default, weight: .semibold))
+                        .tracking(1.6)
+                        .foregroundColor(VP.dim)
+                    if let advertiser = ad.advertiser_name, !advertiser.isEmpty {
+                        Text(advertiser)
+                            .font(.system(.callout, design: .default, weight: .semibold))
+                            .foregroundColor(VP.text)
+                            .multilineTextAlignment(.leading)
+                    }
+                    if let cta = ad.cta_text ?? ad.alt_text, !cta.isEmpty {
+                        Text(cta)
+                            .font(.caption)
+                            .foregroundColor(VP.dim)
+                            .lineLimit(3)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(VP.card)
+                .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
+                .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    // Reserved slot height for HTML creatives. Mirrors the web Wave 5
+    // CLS reserves in Ad.jsx so WebView mount doesn't jolt the
+    // surrounding layout while creative script resolves. Tuned to each
+    // placement's expected creative format rather than a one-size
+    // default — header/end slots take banner-class creatives (~100pt),
+    // in-feed and mid-body take medium-rectangle-class (~250pt).
+    private func reservedHeight(for placement: String) -> CGFloat {
+        if placement == "article_in_body" { return 250 }
+        if placement.hasPrefix("ios_home_in_feed") { return 250 }
+        if placement.hasPrefix("ios_home_below_fold") { return 250 }
+        return 100
     }
 
     /// Decide whether the cell is ≥50% on-screen. If yes and we haven't
@@ -343,6 +382,132 @@ struct QuizSponsorEyebrow: View {
             await MainActor.run { hasAd = (response.ad_unit != nil) }
         } catch {
             // Self-hide on probe failure — same policy as HomeAdSlot.
+        }
+    }
+}
+
+// MARK: - HTMLCreativeView (Wave 6a)
+//
+// Sandboxed WKWebView host for HTML ad creatives. AdSense `<ins
+// class="adsbygoogle">` blocks and any third-party network markup
+// render here; the native VStack/Text fallback in HomeAdSlot stays for
+// text-only direct creatives.
+//
+// Security posture mirrors the web SsrAdCell sandbox:
+//   * `WKWebsiteDataStore.nonPersistent()` — cookies/storage scoped to
+//     this view instance, never persisted, never shared with the rest
+//     of the app or other ad slots.
+//   * `baseURL: nil` on loadHTMLString — creative origin is opaque
+//     (about:blank), so creative script cannot reach app-scoped
+//     storage or `file://` resources.
+//   * Click bridge via `decidePolicyFor navigationAction`: any
+//     .linkActivated nav is intercepted, routed through the impression
+//     beacon's click handler, opened in Safari via UIApplication, and
+//     cancelled inside the WebView (the WebView itself never navigates
+//     away from the original creative HTML).
+//
+// Height is caller-supplied. Auto-sizing via contentSize is a tempting
+// follow-up but introduces re-layout jitter when creative script
+// resizes mid-render (Wave 5 web side fixed CLS by reserving instead);
+// reserve a fixed slot height matching the web Wave 5 minHeights.
+struct HTMLCreativeView: UIViewRepresentable {
+    let html: String
+    let height: CGFloat
+    let onLinkTap: ((URL) -> Void)?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onLinkTap: onLinkTap)
+    }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .nonPersistent()
+        // Don't allow universal links to bounce into other apps via the
+        // WebView; we route taps through onLinkTap → UIApplication.open
+        // (which honors universal links at the OS level) so the
+        // decision/auditing stays in our hands.
+        config.applicationNameForUserAgent = "VerityPostAdHost"
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.navigationDelegate = context.coordinator
+        webView.scrollView.isScrollEnabled = false
+        webView.backgroundColor = .clear
+        webView.isOpaque = false
+        webView.scrollView.backgroundColor = .clear
+        webView.loadHTMLString(html, baseURL: nil)
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        // html is immutable per HomeAdSlot lifecycle (load() sets `ad`
+        // once and the View identity changes on placement/articleId).
+        // No reload needed; coordinator's onLinkTap is bound at make.
+    }
+
+    @MainActor
+    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+        webView.navigationDelegate = nil
+        webView.stopLoading()
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: WKWebView, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? UIScreen.main.bounds.width, height: height)
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        let onLinkTap: ((URL) -> Void)?
+
+        init(onLinkTap: ((URL) -> Void)?) {
+            self.onLinkTap = onLinkTap
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        ) {
+            // .other covers the initial loadHTMLString call; allow it
+            // through so the creative renders. Only .linkActivated and
+            // form submits should be hijacked to the click handler —
+            // everything else (subresource fetches, iframes filled by
+            // AdSense script) needs to load normally for the creative
+            // to display correctly.
+            switch navigationAction.navigationType {
+            case .linkActivated, .formSubmitted:
+                if let url = navigationAction.request.url {
+                    onLinkTap?(url)
+                }
+                decisionHandler(.cancel)
+            default:
+                decisionHandler(.allow)
+            }
+        }
+    }
+}
+
+// MARK: - AdTrackingConsent (Wave 6a — scaffolding, no call site)
+//
+// ATT (App Tracking Transparency) helper. Wave 6b will wire the call
+// site once the Apple Developer console walkthrough lands and
+// `NSUserTrackingUsageDescription` ships in Info.plist — without that
+// key, `requestTrackingAuthorization` returns `.denied` synchronously
+// (Apple's gate, not ours). Keeping the helper here so the call site
+// only has to import once Info.plist is in place.
+//
+// Call shape (when ready, post-onboarding, not at launch):
+//   let status = await AdTrackingConsent.requestIfNeeded()
+//   // pass status to AdMob's GADMobileAds init in Wave 6b
+//
+// Apple guidance is to defer the prompt until the value is concrete to
+// the user — first ad-supported surface, not first launch.
+enum AdTrackingConsent {
+    @MainActor
+    static func requestIfNeeded() async -> ATTrackingManager.AuthorizationStatus {
+        let current = ATTrackingManager.trackingAuthorizationStatus
+        if current != .notDetermined { return current }
+        return await withCheckedContinuation { continuation in
+            ATTrackingManager.requestTrackingAuthorization { status in
+                continuation.resume(returning: status)
+            }
         }
     }
 }
