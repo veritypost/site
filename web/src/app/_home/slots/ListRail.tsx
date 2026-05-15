@@ -42,9 +42,29 @@ export default async function ListRail({ slot, ctx }: { slot: SlotRow; ctx: Card
   const cfgCap = slot.config?.capacity;
   const cap =
     typeof cfgCap === 'number' && cfgCap > 0 && cfgCap <= 30 ? cfgCap : 5;
-  const items = [...slot.items]
+  const handPicked = [...slot.items]
     .sort((a, b) => a.position - b.position)
     .slice(0, cap);
+
+  // Wave 3: source-mode resolution. 'manual' (default) renders hand-picked
+  // home_slot_items. 'trending' substitutes ctx.trendingArticles for the
+  // article items (ads are forbidden on trending source — validated
+  // server-side in PATCH /api/admin/home/slots/[id]).
+  const source: 'manual' | 'trending' =
+    slot.config?.source === 'trending' ? 'trending' : 'manual';
+  let items = handPicked;
+  if (source === 'trending' && ctx.trendingArticles) {
+    items = ctx.trendingArticles.slice(0, cap).map((a, idx) => ({
+      id: `trending:${a.id}`,
+      slot_id: slot.id,
+      position: idx,
+      content_type: 'article' as const,
+      article_id: a.id,
+      article: a,
+      payload: {} as Record<string, unknown>,
+      ref_id: null,
+    }));
+  }
 
   // Bail early if nothing renderable. A "renderable" item is an article
   // with an attached HomeStory, or an ad with a non-empty placement.

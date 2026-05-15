@@ -9,6 +9,7 @@
 import type { LayoutRow } from './types';
 import type { Tables } from '@/types/database-helpers';
 import { renderSlot } from './slots/registry';
+import type { TrendingArticle } from './slots/_shared';
 import RhStyles from './styles';
 
 type CategoryRow = Pick<
@@ -19,10 +20,15 @@ type CategoryRow = Pick<
 export default function HomeLayout({
   layout,
   categoryById,
+  trendingArticles,
   showEmptyPlaceholders = false,
 }: {
   layout: LayoutRow;
   categoryById: Record<string, CategoryRow>;
+  // Wave 3: pre-fetched by HomeRoot when at least one list_rail slot in
+  // the layout has `config.source === 'trending'`. Threaded into the
+  // renderSlot ctx so ListRail can substitute these for hand-picked items.
+  trendingArticles?: TrendingArticle[];
   showEmptyPlaceholders?: boolean;
 }) {
   const slots = [...layout.slots].sort((a, b) => a.position - b.position);
@@ -35,7 +41,11 @@ export default function HomeLayout({
           two `<main>` per document. */}
       <div className="vp-rh-grid">
         {slots.map((s) => {
-          const node = renderSlot(s, { categoryById, showEmptyPlaceholders });
+          const node = renderSlot(s, {
+            categoryById,
+            trendingArticles,
+            showEmptyPlaceholders,
+          });
           if (!node) return null;
           // Each slot's renderer owns its own outer markup — Lead returns
           // an <article>, Cluster returns a <Fragment> of <Link> cards,

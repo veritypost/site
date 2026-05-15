@@ -623,6 +623,38 @@ export type Database = {
           },
         ]
       }
+      ad_freq_counters: {
+        Row: {
+          ad_unit_id: string
+          count: number
+          scope: string
+          scope_key: string
+          updated_at: string
+        }
+        Insert: {
+          ad_unit_id: string
+          count?: number
+          scope: string
+          scope_key: string
+          updated_at?: string
+        }
+        Update: {
+          ad_unit_id?: string
+          count?: number
+          scope?: string
+          scope_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_ad_freq_counters_ad_unit_id"
+            columns: ["ad_unit_id"]
+            isOneToOne: false
+            referencedRelation: "ad_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ad_impressions: {
         Row: {
           ad_network: string | null
@@ -766,6 +798,8 @@ export type Database = {
           description: string | null
           display_name: string
           fallback_image_url: string | null
+          fallback_network: string
+          fallback_network_unit_id: string | null
           fallback_url: string | null
           height: number | null
           hidden_for_tiers: string[]
@@ -791,6 +825,8 @@ export type Database = {
           description?: string | null
           display_name: string
           fallback_image_url?: string | null
+          fallback_network?: string
+          fallback_network_unit_id?: string | null
           fallback_url?: string | null
           height?: number | null
           hidden_for_tiers?: string[]
@@ -816,6 +852,8 @@ export type Database = {
           description?: string | null
           display_name?: string
           fallback_image_url?: string | null
+          fallback_network?: string
+          fallback_network_unit_id?: string | null
           fallback_url?: string | null
           height?: number | null
           hidden_for_tiers?: string[]
@@ -837,6 +875,87 @@ export type Database = {
           width?: number | null
         }
         Relationships: []
+      }
+      ad_pins: {
+        Row: {
+          ad_unit_id: string
+          bypass_freq_cap: boolean
+          expires_at: string | null
+          force_all_tiers: boolean
+          pinned_at: string
+          pinned_by: string | null
+          placement_id: string
+          reason: string | null
+        }
+        Insert: {
+          ad_unit_id: string
+          bypass_freq_cap?: boolean
+          expires_at?: string | null
+          force_all_tiers?: boolean
+          pinned_at?: string
+          pinned_by?: string | null
+          placement_id: string
+          reason?: string | null
+        }
+        Update: {
+          ad_unit_id?: string
+          bypass_freq_cap?: boolean
+          expires_at?: string | null
+          force_all_tiers?: boolean
+          pinned_at?: string
+          pinned_by?: string | null
+          placement_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_ad_pins_ad_unit_id"
+            columns: ["ad_unit_id"]
+            isOneToOne: false
+            referencedRelation: "ad_units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_ad_pins_pinned_by"
+            columns: ["pinned_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_ad_pins_placement_id"
+            columns: ["placement_id"]
+            isOneToOne: true
+            referencedRelation: "ad_placements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ad_target_geo: {
+        Row: {
+          ad_unit_id: string
+          country_code: string
+          mode: string
+        }
+        Insert: {
+          ad_unit_id: string
+          country_code: string
+          mode: string
+        }
+        Update: {
+          ad_unit_id?: string
+          country_code?: string
+          mode?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_ad_target_geo_ad_unit_id"
+            columns: ["ad_unit_id"]
+            isOneToOne: false
+            referencedRelation: "ad_units"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ad_targets: {
         Row: {
@@ -14248,6 +14367,25 @@ export type Database = {
           streak_current?: number | null
           username?: string | null
           verity_score?: number | null
+        }
+        Relationships: []
+      }
+      trending_stories_recent: {
+        Row: {
+          category_id: string | null
+          excerpt: string | null
+          expert_count: number | null
+          id: string | null
+          is_editors_edge: boolean | null
+          is_verified: boolean | null
+          published_at: string | null
+          reading_time_minutes: number | null
+          source_name: string | null
+          story_id: string | null
+          story_slug: string | null
+          subcategory_id: string | null
+          title: string | null
+          view_count: number | null
         }
         Relationships: []
       }

@@ -26,7 +26,9 @@ import { hasPermission, refreshAllPermissions } from '@/lib/permissions';
 import Page, { PageHeader } from '@/components/admin/Page';
 import PageSection from '@/components/admin/PageSection';
 import Button from '@/components/admin/Button';
+import DatePicker from '@/components/admin/DatePicker';
 import TextInput from '@/components/admin/TextInput';
+import AdUnitPicker, { type AdUnitPick } from '@/components/admin/ads/AdUnitPicker';
 import Spinner from '@/components/admin/Spinner';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
@@ -90,7 +92,38 @@ type PlacementOption = {
   page: string;
   position: string;
   has_active_ad_unit: boolean;
+  // Wave 3 — populated by GET /api/admin/home once that route is widened.
+  placement_id: string;
+  is_pinned: boolean;
+  pinned_ad_unit_name: string | null;
+  pinned_ad_unit_id: string | null;
 };
+
+// Wave 3 pin shape — input to POST /api/admin/ads/pins (savePin).
+type PinSaveInput = {
+  placement_id: string;
+  ad_unit_id: string;
+  expires_at: string | null;
+  force_all_tiers: boolean;
+  bypass_freq_cap: boolean;
+  reason: string;
+};
+
+// Resolved existing pin (best-effort) used to seed the PinForm. The
+// detailed fields (expires_at, force_all_tiers, bypass_freq_cap, reason,
+// ad_unit_advertiser) are only populated once GET /api/admin/home is
+// widened with full pin detail; until then they come back as null/false
+// and PinForm's useEffect re-seeds when richer data arrives.
+type ExistingPin = {
+  placement_id: string;
+  ad_unit_id: string;
+  ad_unit_name: string | null;
+  ad_unit_advertiser: string | null;
+  expires_at: string | null;
+  force_all_tiers: boolean;
+  bypass_freq_cap: boolean;
+  reason: string | null;
+} | null;
 
 // Inline-editor state. Three flavors of popover:
 //   article_cell   — cluster cell / list_rail cell / lead / etc. (the
@@ -101,7 +134,9 @@ type PlacementOption = {
 type ActiveEdit =
   | { kind: 'article_cell'; slotId: string; position: number }
   | { kind: 'ad_placement'; slotId: string; placement: string; slotKind: SlotKind }
-  | { kind: 'payload'; slotId: string };
+  | { kind: 'payload'; slotId: string }
+  // Wave 3: list_rail configuration popover (label, source, headlines, more link).
+  | { kind: 'list_rail_config'; slotId: string };
 
 const ARTICLE_KINDS: ReadonlySet<SlotKind> = new Set([
   'lead',
@@ -406,6 +441,53 @@ function HomeEditorInner() {
     } else {
       push({ message: 'Ad placed.' });
       closeEditor();
+      await fetchLayout();
+      ok = true;
+    }
+    setMutating(false);
+    return ok;
+  };
+
+  // Wave 3: pin a specific creative to the placement currently attached
+  // to this slot/position. Writes via /api/admin/ads/pins (POST). The
+  // item row at (slot_id, position) is left intact — the pin only
+  // affects serve_ad's branching, NOT slot membership.
+  const savePin = async (input: PinSaveInput): Promise<boolean> => {
+    if (mutating) return false;
+    setMutating(true);
+    const res = await fetch('/api/admin/ads/pins', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    let ok = false;
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      push({ message: `Pin failed: ${j.error ?? res.statusText}`, variant: 'danger' });
+    } else {
+      push({ message: 'Pin saved.' });
+      closeEditor();
+      await fetchLayout();
+      ok = true;
+    }
+    setMutating(false);
+    return ok;
+  };
+
+  const removePin = async (placement_id: string): Promise<boolean> => {
+    if (mutating) return false;
+    setMutating(true);
+    const res = await fetch('/api/admin/ads/pins', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ placement_id }),
+    });
+    let ok = false;
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      push({ message: `Unpin failed: ${j.error ?? res.statusText}`, variant: 'danger' });
+    } else {
+      push({ message: 'Pin removed.' });
       await fetchLayout();
       ok = true;
     }
@@ -781,14 +863,20 @@ function HomeEditorInner() {
           onClear={clearItem}
           onSpanChange={(slotId, span) => updateSlot(slotId, { span })}
           onCapacityChange={(slot, capacity) =>
-            // Merge into existing config so we don't clobber label /
-            // numbered / timestamps on rail-style slots.
-            updateSlot(slot.id, {
-              config: { ...(slot.config ?? {}), capacity },
-            })
+            // Plan v3 (H1): send {capacity} only — PATCH route does
+            // server-side merge (see /api/admin/home/slots/[id]/route.ts).
+            // The prior client-side `...(slot.config ?? {})` spread would
+            // re-clobber any keys written between fetchLayout and save
+            // with a stale snapshot.
+            updateSlot(slot.id, { config: { capacity } })
           }
           onSavePayload={savePayload}
           onToggleAdUnit={toggleAdUnit}
+          onSavePin={savePin}
+          onRemovePin={removePin}
+          onSaveListRailConfig={(slotId, config) =>
+            updateSlot(slotId, { config })
+          }
         />
       </PageSection>
 
@@ -869,6 +957,9 @@ function LayoutCanvas({
   onCapacityChange,
   onSavePayload,
   onToggleAdUnit,
+  onSavePin,
+  onRemovePin,
+  onSaveListRailConfig,
 }: {
   layout: LayoutRow;
   adStatuses: Record<string, AdStatus>;
@@ -899,6 +990,9 @@ function LayoutCanvas({
   onCapacityChange: (slot: SlotRow, capacity: number) => void;
   onSavePayload: (slot: SlotRow, payload: Record<string, unknown>) => void;
   onToggleAdUnit: (adUnitId: string, nextValue: boolean) => void;
+  onSavePin: (input: PinSaveInput) => Promise<boolean>;
+  onRemovePin: (placement_id: string) => Promise<boolean>;
+  onSaveListRailConfig: (slotId: string, config: Record<string, unknown>) => void;
 }) {
   const adsOn = layout.ads_enabled !== false;
 
@@ -930,6 +1024,9 @@ function LayoutCanvas({
     }
     if (activeEdit.kind === 'ad_placement') {
       return anchor === `placement:${activeEdit.placement}`;
+    }
+    if (activeEdit.kind === 'list_rail_config') {
+      return anchor === `${activeEdit.slotId}:0`;
     }
     return anchor === `payload:${activeEdit.slotId}`;
   };
@@ -1031,6 +1128,7 @@ function LayoutCanvas({
     minHeight = 140,
     ordinal,
     gridSpanFull = false,
+    overlay,
   }: {
     anchor: string;
     pos: number;
@@ -1039,6 +1137,7 @@ function LayoutCanvas({
     minHeight?: number;
     ordinal?: number;
     gridSpanFull?: boolean;
+    overlay?: React.ReactNode;
   }) => (
     <div
       {...cellProps(anchor, onClick, {
@@ -1061,6 +1160,7 @@ function LayoutCanvas({
       <span style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
         {label ?? `+ Add article or ad · position ${pos + 1}`}
       </span>
+      {overlay}
     </div>
   );
 
@@ -1157,6 +1257,42 @@ function LayoutCanvas({
     const isLead = slot.kind === 'lead';
     const minH = isLead ? 200 : 140;
 
+    // Wave 3: gear button overlay for list_rail's first cell so operators
+    // have a discoverable slot-level config entry (label / source / capacity
+    // / more_href). e.stopPropagation prevents the cell-level article-edit
+    // click from firing in the same gesture.
+    const listRailGear =
+      slot.kind === 'list_rail' && pos === 0 ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenEdit({ kind: 'list_rail_config', slotId: slot.id });
+          }}
+          title="Configure list"
+          aria-label="Configure list"
+          style={{
+            position: 'absolute',
+            top: S[1],
+            right: S[1],
+            width: 24,
+            height: 24,
+            padding: 0,
+            border: `1px solid ${C.divider}`,
+            borderRadius: 4,
+            background: C.bg,
+            color: C.ink,
+            cursor: 'pointer',
+            fontSize: 12,
+            lineHeight: '22px',
+            fontFamily: 'inherit',
+            zIndex: 3,
+          }}
+        >
+          ⚙
+        </button>
+      ) : null;
+
     if (!item) {
       return (
         <EmptyCell
@@ -1167,6 +1303,7 @@ function LayoutCanvas({
           onClick={onClick}
           ordinal={ordinal}
           gridSpanFull={isLead}
+          overlay={listRailGear}
         />
       );
     }
@@ -1214,6 +1351,7 @@ function LayoutCanvas({
               no creative attached
             </div>
           )}
+          {listRailGear}
         </div>
       );
     }
@@ -1229,6 +1367,7 @@ function LayoutCanvas({
           onClick={onClick}
           ordinal={ordinal}
           gridSpanFull={isLead}
+          overlay={listRailGear}
         />
       );
     }
@@ -1306,6 +1445,7 @@ function LayoutCanvas({
         <PosChip n={ordinal} />
         <span className="vp-admin-outline" style={selectionOutline(anchor)} />
         <ArticleCardInner story={story} isLead={false} />
+        {listRailGear}
       </a>
     );
   };
@@ -1321,6 +1461,9 @@ function LayoutCanvas({
     }
     if (activeEdit.kind === 'ad_placement') {
       return `${KIND_LABEL[slot.kind]} ad`;
+    }
+    if (activeEdit.kind === 'list_rail_config') {
+      return `${KIND_LABEL[slot.kind]} config`;
     }
     return `${KIND_LABEL[slot.kind]} block`;
   };
@@ -1655,6 +1798,10 @@ function LayoutCanvas({
       return `${activeEdit.slotId}:${activeEdit.position}`;
     if (activeEdit.kind === 'ad_placement')
       return `placement:${activeEdit.placement}`;
+    if (activeEdit.kind === 'list_rail_config')
+      // Anchor to the list_rail's first cell — the gear button sits inside
+      // that cell so the popover positions next to it.
+      return `${activeEdit.slotId}:0`;
     return `payload:${activeEdit.slotId}`;
   })();
 
@@ -1718,6 +1865,9 @@ function LayoutCanvas({
           onSavePayload={onSavePayload}
           onToggleAdUnit={onToggleAdUnit}
           adUnitForPlacement={adUnitForPlacement}
+          onSavePin={onSavePin}
+          onRemovePin={onRemovePin}
+          onSaveListRailConfig={onSaveListRailConfig}
         />
       )}
     </div>
@@ -1756,6 +1906,9 @@ function SlotInlineEditor({
   onSavePayload,
   onToggleAdUnit,
   adUnitForPlacement,
+  onSavePin,
+  onRemovePin,
+  onSaveListRailConfig,
 }: {
   anchorEl: HTMLDivElement | null;
   slot: SlotRow;
@@ -1787,6 +1940,9 @@ function SlotInlineEditor({
   onSavePayload: (slot: SlotRow, payload: Record<string, unknown>) => void;
   onToggleAdUnit: (adUnitId: string, nextValue: boolean) => void;
   adUnitForPlacement: (placement: string) => LocalAdUnitRow | null;
+  onSavePin: (input: PinSaveInput) => Promise<boolean>;
+  onRemovePin: (placement_id: string) => Promise<boolean>;
+  onSaveListRailConfig: (slotId: string, config: Record<string, unknown>) => void;
 }) {
   // Anchor-relative positioning. Read the tile's bounding rect once on
   // first render + on viewport resize. Falls back to a fixed top-center
@@ -1857,6 +2013,28 @@ function SlotInlineEditor({
     setMode(initialMode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEdit]);
+
+  // Wave 3: resolve the existing pin (if any) for the active ad placement
+  // from the PlacementOption row. Detailed fields (expires_at, etc.) come
+  // from a later /api/admin/home shape extension; until then they default
+  // to null/false and PinForm's useEffect re-seeds when richer data lands.
+  const existingPin: ExistingPin = useMemo(() => {
+    if (activeEdit.kind !== 'article_cell') return null;
+    const name = defaultAdPlacement;
+    if (!name) return null;
+    const p = placements.find((x) => x.name === name);
+    if (!p || !p.is_pinned) return null;
+    return {
+      placement_id: p.placement_id,
+      ad_unit_id: p.pinned_ad_unit_id ?? '',
+      ad_unit_name: p.pinned_ad_unit_name,
+      ad_unit_advertiser: null,
+      expires_at: null,
+      force_all_tiers: false,
+      bypass_freq_cap: false,
+      reason: null,
+    };
+  }, [activeEdit, defaultAdPlacement, placements]);
 
   // Position math. Prefer right-of-anchor; fall back to left or below
   // when there isn't room. Width pinned to 360.
@@ -2080,6 +2258,30 @@ function SlotInlineEditor({
                   {status}
                 </span>
               )}
+              {/* Wave 3: 📌 chip when an ad_pins row exists for this
+                  placement. Sourced from PlacementOption.is_pinned which
+                  the GET /api/admin/home shape includes post-Wave-3. */}
+              {adPlacementLabel &&
+                placements.find((p) => p.name === adPlacementLabel)?.is_pinned && (
+                  <span
+                    title={
+                      placements.find((p) => p.name === adPlacementLabel)
+                        ?.pinned_ad_unit_name ?? 'pinned'
+                    }
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      marginLeft: 4,
+                      background: '#1d4ed8',
+                      color: '#fff',
+                    }}
+                  >
+                    📌 PIN
+                  </span>
+                )}
             </>
           ) : (
             <span style={{ fontStyle: 'italic' }}>Empty — pick something</span>
@@ -2171,45 +2373,23 @@ function SlotInlineEditor({
               onAssign={onAssign}
             />
           ) : (
-            <>
-              <AdPlacementPicker
-                placements={placements}
-                value={adPlacement}
-                mutating={mutating}
-                onChange={setAdPlacement}
-                onCancel={onClose}
-                onSave={async () => {
-                  const placement = adPlacement.trim();
-                  if (!placement) return;
-                  await onPlaceAd(slot.id, activeEdit.position, placement, slot.kind);
-                }}
-              />
-              {/* "or" divider — sits between the existing-placement picker
-                  above and the inline create form below. Two coexisting
-                  paths: pick from a pre-built ad_unit + placement, OR
-                  mint a new ad_unit and place it in one click. */}
-              <div
-                aria-hidden
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: S[2],
-                  margin: `${S[3]}px 0`,
-                  color: C.dim,
-                  fontSize: F.sm,
-                }}
-              >
-                <span style={{ flex: 1, height: 1, background: C.divider }} />
-                <span>or</span>
-                <span style={{ flex: 1, height: 1, background: C.divider }} />
-              </div>
-              <InlineAdCreator
-                mutating={mutating}
-                onCreate={async (fields) => {
-                  await onCreateInlineAd(slot.id, activeEdit.position, fields);
-                }}
-              />
-            </>
+            // Ad mode: Auto vs Pin sub-tabs. Auto preserves the pre-Wave-3
+            // path (campaign rules decide), Pin writes a row to ad_pins
+            // via /api/admin/ads/pins.
+            <AdModeBody
+              slot={slot}
+              activeEdit={activeEdit}
+              placements={placements}
+              adPlacement={adPlacement}
+              setAdPlacement={setAdPlacement}
+              mutating={mutating}
+              existingPin={existingPin}
+              onClose={onClose}
+              onPlaceAd={onPlaceAd}
+              onCreateInlineAd={onCreateInlineAd}
+              onSavePin={onSavePin}
+              onRemovePin={onRemovePin}
+            />
           )}
         </div>
 
@@ -2301,7 +2481,7 @@ function SlotInlineEditor({
           {!orphan && unit?.ad_unit_id && (
             <>
               <a
-                href={`/admin/ad-units/${unit.ad_unit_id}`}
+                href={`/admin/ads/units/${unit.ad_unit_id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
@@ -2347,7 +2527,7 @@ function SlotInlineEditor({
           )}
           {orphan && (
             <a
-              href={`/admin/ad-placements`}
+              href={`/admin/ads/placements`}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -2377,6 +2557,24 @@ function SlotInlineEditor({
             slot={slot}
             mutating={mutating}
             onSave={(payload) => onSavePayload(slot, payload)}
+          />
+        </div>
+        <SlotShapeFooter />
+      </>
+    );
+  };
+
+  // ----- Variant: list_rail_config (Wave 3) -----
+  const listRailConfigVariant = () => {
+    if (activeEdit.kind !== 'list_rail_config') return null;
+    return (
+      <>
+        <Header />
+        <div style={{ padding: S[3], maxHeight: 420, overflowY: 'auto' }}>
+          <ListRailConfigEditor
+            slot={slot}
+            mutating={mutating}
+            onSave={(partial) => onSaveListRailConfig(slot.id, partial)}
           />
         </div>
         <SlotShapeFooter />
@@ -2415,8 +2613,564 @@ function SlotInlineEditor({
         {activeEdit.kind === 'article_cell' && articleVariant()}
         {activeEdit.kind === 'ad_placement' && adPlacementVariant()}
         {activeEdit.kind === 'payload' && payloadVariant()}
+        {activeEdit.kind === 'list_rail_config' && listRailConfigVariant()}
       </div>
     </>
+  );
+}
+
+// Wave 3: Auto vs Pin sub-tabs inside the ad mode of SlotInlineEditor.
+//
+// Auto = existing campaign-rules path; renders the AdPlacementPicker +
+// InlineAdCreator below it (no behavior change vs pre-Wave-3).
+// Pin = direct-sold path: writes ad_pins via /api/admin/ads/pins so
+// serve_ad's pin branch wins over campaign matching for this placement.
+type AdSubMode = 'auto' | 'pin';
+
+function AdModeBody({
+  slot,
+  activeEdit,
+  placements,
+  adPlacement,
+  setAdPlacement,
+  mutating,
+  existingPin,
+  onClose,
+  onPlaceAd,
+  onCreateInlineAd,
+  onSavePin,
+  onRemovePin,
+}: {
+  slot: SlotRow;
+  activeEdit: Extract<ActiveEdit, { kind: 'article_cell' }>;
+  placements: PlacementOption[];
+  adPlacement: string;
+  setAdPlacement: (next: string) => void;
+  mutating: boolean;
+  existingPin: ExistingPin;
+  onClose: () => void;
+  onPlaceAd: (
+    slotId: string,
+    position: number,
+    placement: string,
+    slotKind: string,
+  ) => Promise<boolean>;
+  onCreateInlineAd: (
+    slotId: string,
+    position: number,
+    fields: { ad_name: string; creative_html: string; click_url: string },
+  ) => Promise<boolean>;
+  onSavePin: (input: PinSaveInput) => Promise<boolean>;
+  onRemovePin: (placement_id: string) => Promise<boolean>;
+}) {
+  const initialSubMode: AdSubMode = existingPin ? 'pin' : 'auto';
+  const [subMode, setSubMode] = useState<AdSubMode>(initialSubMode);
+  // Reset when the editor target switches.
+  useEffect(() => {
+    setSubMode(existingPin ? 'pin' : 'auto');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEdit, existingPin?.placement_id]);
+
+  const tabBarStyle: CSSProperties = {
+    display: 'flex',
+    borderBottom: `1px solid ${C.divider}`,
+    marginBottom: S[3],
+  };
+  const tabStyle = (active: boolean): CSSProperties => ({
+    padding: `${S[2]}px ${S[3]}px`,
+    fontSize: F.sm,
+    fontWeight: active ? 700 : 500,
+    color: active ? C.ink : C.dim,
+    background: 'transparent',
+    border: 'none',
+    borderBottom: active ? `2px solid ${C.ink}` : '2px solid transparent',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+  });
+
+  return (
+    <>
+      <div role="tablist" style={tabBarStyle}>
+        <button
+          role="tab"
+          aria-selected={subMode === 'auto'}
+          onClick={() => setSubMode('auto')}
+          disabled={mutating}
+          style={tabStyle(subMode === 'auto')}
+        >
+          Auto (campaign rules)
+        </button>
+        <button
+          role="tab"
+          aria-selected={subMode === 'pin'}
+          onClick={() => setSubMode('pin')}
+          disabled={mutating}
+          style={tabStyle(subMode === 'pin')}
+        >
+          Pin specific creative
+        </button>
+      </div>
+
+      {subMode === 'auto' ? (
+        <>
+          <AdPlacementPicker
+            placements={placements}
+            value={adPlacement}
+            mutating={mutating}
+            onChange={setAdPlacement}
+            onCancel={onClose}
+            onSave={async () => {
+              const placement = adPlacement.trim();
+              if (!placement) return;
+              await onPlaceAd(
+                slot.id,
+                activeEdit.position,
+                placement,
+                slot.kind,
+              );
+            }}
+          />
+          {/* "or" divider — sits between the existing-placement picker
+              above and the inline create form below. */}
+          <div
+            aria-hidden
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: S[2],
+              margin: `${S[3]}px 0`,
+              color: C.dim,
+              fontSize: F.sm,
+            }}
+          >
+            <span style={{ flex: 1, height: 1, background: C.divider }} />
+            <span>or</span>
+            <span style={{ flex: 1, height: 1, background: C.divider }} />
+          </div>
+          <InlineAdCreator
+            mutating={mutating}
+            onCreate={async (fields) => {
+              await onCreateInlineAd(slot.id, activeEdit.position, fields);
+            }}
+          />
+        </>
+      ) : (
+        <PinForm
+          placements={placements}
+          adPlacement={adPlacement}
+          setAdPlacement={setAdPlacement}
+          existingPin={existingPin}
+          mutating={mutating}
+          activeEdit={activeEdit}
+          onCancel={onClose}
+          onSavePin={onSavePin}
+          onRemovePin={onRemovePin}
+        />
+      )}
+    </>
+  );
+}
+
+// Wave 3: PinForm — writes one ad_pins row via /api/admin/ads/pins.
+// 4 preset chips (24h / This week / 2 weeks / Custom — no Campaign-end,
+// no No-expiry), force_all_tiers toggle (default OFF), bypass_freq_cap
+// toggle (default OFF — must-fix #14), Reason textarea, two-click Remove
+// confirm with advertiser name.
+type PinUntilPreset = '24h' | 'week' | 'twoweeks' | 'custom';
+
+function PinForm({
+  placements,
+  adPlacement,
+  setAdPlacement,
+  existingPin,
+  mutating,
+  activeEdit,
+  onCancel,
+  onSavePin,
+  onRemovePin,
+}: {
+  placements: PlacementOption[];
+  adPlacement: string;
+  setAdPlacement: (s: string) => void;
+  existingPin: ExistingPin;
+  mutating: boolean;
+  activeEdit: Extract<ActiveEdit, { kind: 'article_cell' }>;
+  onCancel: () => void;
+  onSavePin: (input: PinSaveInput) => Promise<boolean>;
+  onRemovePin: (placement_id: string) => Promise<boolean>;
+}) {
+  // Map placement.name → placement_id. Built directly from the widened
+  // PlacementOption (§ 6(b)) — no @ts-expect-error needed.
+  const placementIdByName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of placements) {
+      if (p.placement_id) m.set(p.name, p.placement_id);
+    }
+    return m;
+  }, [placements]);
+
+  const toAdUnitPick = (pin: NonNullable<ExistingPin>): AdUnitPick => ({
+    id: pin.ad_unit_id,
+    name: pin.ad_unit_name ?? pin.ad_unit_id,
+    advertiser_name: pin.ad_unit_advertiser,
+    ad_format: null,
+    placement_id: pin.placement_id,
+  });
+
+  const [unit, setUnit] = useState<AdUnitPick | null>(
+    existingPin ? toAdUnitPick(existingPin) : null,
+  );
+  const [preset, setPreset] = useState<PinUntilPreset>(
+    existingPin ? (existingPin.expires_at ? 'custom' : 'week') : 'week',
+  );
+  const [customDate, setCustomDate] = useState<string>(
+    existingPin?.expires_at ?? '',
+  );
+  const [forceAllTiers, setForceAllTiers] = useState<boolean>(
+    existingPin?.force_all_tiers ?? false,
+  );
+  // Must-fix #14: default FALSE for visual parity with force_all_tiers.
+  const [bypassFreqCap, setBypassFreqCap] = useState<boolean>(
+    existingPin?.bypass_freq_cap ?? false,
+  );
+  const [reason, setReason] = useState<string>(existingPin?.reason ?? '');
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+
+  // Re-seed every form field whenever the editor target changes OR the
+  // resolved existingPin changes (e.g. operator removes pin in this same
+  // popover open and re-pins). Without this, state goes stale.
+  useEffect(() => {
+    setUnit(existingPin ? toAdUnitPick(existingPin) : null);
+    setPreset(existingPin ? (existingPin.expires_at ? 'custom' : 'week') : 'week');
+    setCustomDate(existingPin?.expires_at ?? '');
+    setForceAllTiers(existingPin?.force_all_tiers ?? false);
+    setBypassFreqCap(existingPin?.bypass_freq_cap ?? false);
+    setReason(existingPin?.reason ?? '');
+    setConfirmingRemove(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEdit, existingPin?.placement_id, existingPin?.ad_unit_id]);
+
+  const computeExpiresAt = (): string | null => {
+    const now = Date.now();
+    if (preset === '24h') return new Date(now + 24 * 60 * 60 * 1000).toISOString();
+    if (preset === 'week') return new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString();
+    if (preset === 'twoweeks') return new Date(now + 14 * 24 * 60 * 60 * 1000).toISOString();
+    if (preset === 'custom') return customDate ? new Date(customDate).toISOString() : null;
+    return null;
+  };
+
+  const presetLabel = (p: PinUntilPreset) =>
+    p === '24h'
+      ? '24h'
+      : p === 'week'
+        ? 'This week'
+        : p === 'twoweeks'
+          ? '2 weeks'
+          : 'Custom…';
+
+  const placementId =
+    unit?.placement_id ?? placementIdByName.get(adPlacement) ?? null;
+  // Defense-in-depth: require a non-empty UUID on unit.id so a partially
+  // hydrated `unit` (e.g. early existingPin stub) can't POST an empty
+  // ad_unit_id — the server rejects with 400 (UUID_RE fail).
+  const UUID_RE_LOCAL =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const canSave =
+    !mutating &&
+    !!unit &&
+    !!unit.id &&
+    UUID_RE_LOCAL.test(unit.id) &&
+    !!placementId;
+  const advertiserName =
+    existingPin?.ad_unit_advertiser ?? existingPin?.ad_unit_name ?? 'this pin';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: S[3] }}>
+      {/* Placement selector (existing) — narrows to home placements */}
+      <AdPlacementPicker
+        placements={placements}
+        value={adPlacement}
+        mutating={mutating}
+        onChange={setAdPlacement}
+        onCancel={() => {}}
+        onSave={() => {}}
+      />
+      {/* AdUnitPicker scoped to the chosen placement */}
+      <label style={{ display: 'block' }}>
+        <span style={{ fontSize: F.sm, color: C.dim, marginBottom: S[1], display: 'block' }}>
+          Creative to pin
+        </span>
+        <AdUnitPicker
+          value={unit}
+          onChange={setUnit}
+          disabled={mutating || !placementId}
+          placementId={placementId}
+        />
+      </label>
+      {/* Pin until preset chips — 4 presets only */}
+      <div>
+        <span style={{ fontSize: F.sm, color: C.dim, marginBottom: S[1], display: 'block' }}>
+          Pin until
+        </span>
+        <div style={{ display: 'flex', gap: S[1], flexWrap: 'wrap' }}>
+          {(['24h', 'week', 'twoweeks', 'custom'] as const).map((p) => (
+            <Button
+              key={p}
+              size="sm"
+              variant={preset === p ? 'primary' : 'secondary'}
+              onClick={() => setPreset(p)}
+              disabled={mutating}
+            >
+              {presetLabel(p)}
+            </Button>
+          ))}
+        </div>
+        {preset === 'custom' && (
+          <DatePicker
+            includeTime
+            value={customDate}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setCustomDate(e.target.value)
+            }
+            disabled={mutating}
+            style={{ marginTop: S[2] }}
+          />
+        )}
+      </div>
+      {/* Tier override */}
+      <label style={{ display: 'flex', alignItems: 'center', gap: S[2], fontSize: F.sm }}>
+        <input
+          type="checkbox"
+          checked={forceAllTiers}
+          onChange={(e) => setForceAllTiers(e.target.checked)}
+          disabled={mutating}
+        />
+        <span>Show to all tiers (overrides Verity sub no-ads)</span>
+      </label>
+      {/* Advanced: bypass freq cap, default OFF */}
+      <label style={{ display: 'flex', alignItems: 'center', gap: S[2], fontSize: F.sm }}>
+        <input
+          type="checkbox"
+          checked={bypassFreqCap}
+          onChange={(e) => setBypassFreqCap(e.target.checked)}
+          disabled={mutating}
+        />
+        <span>Bypass frequency cap (e.g. sales contract overrides global cap)</span>
+      </label>
+      <label style={{ display: 'block' }}>
+        <span style={{ fontSize: F.sm, color: C.dim, marginBottom: S[1], display: 'block' }}>
+          Reason (audit log)
+        </span>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={2}
+          maxLength={500}
+          style={{
+            width: '100%',
+            padding: `${S[2]}px ${S[3]}px`,
+            border: `1px solid ${C.divider}`,
+            borderRadius: 4,
+            background: C.bg,
+            color: C.ink,
+            fontFamily: 'inherit',
+            resize: 'vertical',
+          }}
+        />
+      </label>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: S[2], flexWrap: 'wrap' }}>
+        {existingPin && !confirmingRemove && (
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => setConfirmingRemove(true)}
+            disabled={mutating}
+          >
+            Remove pin
+          </Button>
+        )}
+        <Button size="sm" variant="secondary" onClick={onCancel} disabled={mutating}>
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={async () => {
+            if (!unit || !placementId) return;
+            await onSavePin({
+              placement_id: placementId,
+              ad_unit_id: unit.id,
+              expires_at: computeExpiresAt(),
+              force_all_tiers: forceAllTiers,
+              bypass_freq_cap: bypassFreqCap,
+              reason: reason.trim(),
+            });
+          }}
+          disabled={!canSave}
+        >
+          Save pin
+        </Button>
+      </div>
+      {existingPin && confirmingRemove && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: S[2],
+            padding: S[2],
+            background: C.hover,
+            borderRadius: 4,
+            fontSize: F.sm,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span>
+            Remove the pin for <b>{advertiserName}</b>? Placement will fall back
+            to programmatic.
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setConfirmingRemove(false)}
+            disabled={mutating}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={async () => {
+              await onRemovePin(existingPin.placement_id);
+              setConfirmingRemove(false);
+            }}
+            disabled={mutating}
+          >
+            Confirm remove
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Wave 3: ListRailConfigEditor — label / source (manual + trending only)
+// / capacity stepper (3-4-5) / more_href. Writes 4-key partial; server-side
+// merge handles the rest.
+type ListRailFormState = {
+  label: string;
+  source: 'manual' | 'trending';
+  capacity: 3 | 4 | 5;
+  more_href: string;
+};
+
+function ListRailConfigEditor({
+  slot,
+  mutating,
+  onSave,
+}: {
+  slot: SlotRow;
+  mutating: boolean;
+  onSave: (config: Record<string, unknown>) => void;
+}) {
+  const config = (slot.config ?? {}) as Record<string, unknown>;
+  const initialLabel =
+    typeof config.label === 'string' ? (config.label as string) : 'Trending';
+  const initialSource: ListRailFormState['source'] =
+    config.source === 'trending' ? 'trending' : 'manual';
+  const rawCapacity = config.capacity;
+  const initialCapacity: ListRailFormState['capacity'] =
+    rawCapacity === 3 || rawCapacity === 4 || rawCapacity === 5
+      ? (rawCapacity as 3 | 4 | 5)
+      : 5;
+  const initialMoreHref =
+    typeof config.more_href === 'string' ? (config.more_href as string) : '/latest';
+
+  const [label, setLabel] = useState(initialLabel);
+  const [source, setSource] = useState<ListRailFormState['source']>(initialSource);
+  const [capacity, setCapacity] = useState<ListRailFormState['capacity']>(initialCapacity);
+  const [moreHref, setMoreHref] = useState(initialMoreHref);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: S[2] }}>
+      {/* Label */}
+      <label style={{ display: 'block' }}>
+        <span style={{ fontSize: F.sm, color: C.dim, marginBottom: S[1], display: 'block' }}>
+          Label
+        </span>
+        <TextInput
+          value={label}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setLabel(e.target.value)}
+        />
+      </label>
+      {/* Source — manual + trending only */}
+      <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+        <legend style={{ fontSize: F.sm, color: C.dim, marginBottom: S[1] }}>
+          Source
+        </legend>
+        {(['manual', 'trending'] as const).map((s) => (
+          <label
+            key={s}
+            style={{ display: 'flex', alignItems: 'center', gap: S[2], fontSize: F.sm }}
+          >
+            <input
+              type="radio"
+              name="list-rail-source"
+              value={s}
+              checked={source === s}
+              onChange={() => setSource(s)}
+              disabled={mutating}
+            />
+            <span>{s === 'manual' ? 'Hand-picked stories' : 'Trending'}</span>
+          </label>
+        ))}
+      </fieldset>
+      {/* Capacity stepper */}
+      <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+        <legend style={{ fontSize: F.sm, color: C.dim, marginBottom: S[1] }}>
+          Headlines to show
+        </legend>
+        <div style={{ display: 'flex', gap: S[1] }}>
+          {([3, 4, 5] as const).map((n) => (
+            <Button
+              key={n}
+              size="sm"
+              variant={capacity === n ? 'primary' : 'secondary'}
+              onClick={() => setCapacity(n)}
+              disabled={mutating}
+            >
+              {n}
+            </Button>
+          ))}
+        </div>
+      </fieldset>
+      {/* More link */}
+      <label style={{ display: 'block' }}>
+        <span style={{ fontSize: F.sm, color: C.dim, marginBottom: S[1], display: 'block' }}>
+          "More" link URL
+        </span>
+        <TextInput
+          value={moreHref}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setMoreHref(e.target.value)}
+        />
+      </label>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: S[2] }}>
+        <Button
+          size="sm"
+          variant="primary"
+          onClick={() =>
+            onSave({
+              label,
+              source,
+              capacity,
+              more_href: moreHref || '/latest',
+            })
+          }
+          disabled={mutating}
+        >
+          Save list config
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -2635,7 +3389,7 @@ function AdPlacementPicker({
         }}
       >
         <a
-          href="/admin/ad-placements"
+          href="/admin/ads/placements"
           target="_blank"
           rel="noopener noreferrer"
           style={{

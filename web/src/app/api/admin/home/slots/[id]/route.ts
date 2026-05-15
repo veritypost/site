@@ -71,10 +71,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'config must be an object' }, { status: 400 });
     }
     // Validate config.capacity if present: positive integer, 1..30.
-    // Other config keys (label, numbered, timestamps, …) pass through
-    // unchecked — the renderers tolerate missing/unexpected values.
-    // 30 is the hard cap mirrored in the admin UI stepper and in the
-    // public slot renderers.
     const cfg = body.config as Record<string, unknown>;
     if (cfg.capacity !== undefined) {
       const cap = cfg.capacity;
@@ -90,7 +86,58 @@ export async function PATCH(
         );
       }
     }
-    update.config = body.config as never;
+    // Wave 3 (must-fix #11): forbid source='trending' when this slot has
+    // any pinned ad row. Trending source mode replaces the item list with
+    // ctx.trendingArticles wholesale, which would shove operator-pinned
+    // ads off-screen. Operators must remove the ads first.
+    if (cfg.source === 'trending') {
+      const { count, error: adErr } = await service
+        .from('home_slot_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('slot_id', id)
+        .eq('content_type', 'ad');
+      if (adErr) {
+        return NextResponse.json({ error: 'Could not validate slot' }, { status: 500 });
+      }
+      if ((count ?? 0) > 0) {
+        return NextResponse.json(
+          {
+            error:
+              'Cannot enable trending source on a slot with pinned ads — remove ad items first.',
+          },
+          { status: 400 },
+        );
+      }
+    }
+    // Wave 3 (BLOCKER #1): server-side merge of partial config into the
+    // existing row. Pre-Wave-3 the PATCH replaced the whole blob — a
+    // popover saving {label,source,capacity} would wipe {numbered,
+    // timestamps,…} written by another path. Use the Postgres `||`
+    // jsonb concat operator via RPC OR SELECT-then-merge-then-UPDATE.
+    // We choose SELECT-merge-UPDATE here because it's one extra round
+    // trip and the slot row is small. The race window narrows to the
+    // gap between SELECT and UPDATE (no transaction isolation level
+    // change needed) — last-writer-wins on overlapping keys.
+    // Plan v3 (M2): .maybeSingle() not .single() — if `id` doesn't match
+    // any row (operator pasted a stale UUID, or row was deleted under them),
+    // return 404 explicitly instead of letting the subsequent UPDATE silently
+    // match zero rows and emit a misleading 200.
+    const { data: cur, error: curErr } = await service
+      .from('home_slots')
+      .select('config')
+      .eq('id', id)
+      .maybeSingle();
+    if (curErr) {
+      return NextResponse.json({ error: 'Could not load slot' }, { status: 500 });
+    }
+    if (!cur) {
+      return NextResponse.json({ error: 'Slot not found' }, { status: 404 });
+    }
+    const existingConfig =
+      typeof cur.config === 'object' && cur.config && !Array.isArray(cur.config)
+        ? (cur.config as Record<string, unknown>)
+        : {};
+    update.config = { ...existingConfig, ...cfg } as never;
   }
 
   if (Object.keys(update).length === 0) {

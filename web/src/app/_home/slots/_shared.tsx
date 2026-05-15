@@ -23,8 +23,18 @@ export type CategoryRow = Pick<
   'id' | 'name' | 'slug' | 'color_hex' | 'parent_id' | 'sort_order'
 >;
 
+// Wave 3: trending article projection. The `trending_stories_recent`
+// view rows are coerced into HomeStory-shaped objects by HomeRoot so
+// the list_rail renderer can reuse its existing StoryLink/categoryFor
+// helpers without per-source branching.
+export type TrendingArticle = HomeStory;
+
 export type CardCtx = {
   categoryById: Record<string, CategoryRow>;
+  // Pre-fetched once by HomeRoot when at least one list_rail slot has
+  // `config.source === 'trending'`. Undefined otherwise to avoid the
+  // wasted query.
+  trendingArticles?: TrendingArticle[];
 };
 
 export function categoryFor(

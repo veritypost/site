@@ -180,12 +180,42 @@ export async function DELETE(_request, { params }) {
     .select('id, name, ad_network, ad_format, placement_id, campaign_id, approval_status')
     .eq('id', params.id)
     .maybeSingle();
+
+  // Wave 3 cascade-audit closure. ad_pins has ON DELETE CASCADE on ad_unit_id;
+  // the cascade would silently drop pin rows. Capture each pin under the
+  // deletor's identity so post-mortem can distinguish unpin from
+  // unit-decommission. Action key `ad_pin.cascaded_delete` is grep-anchored
+  // to this route + the placements counterpart. Order is SELECT → DELETE →
+  // AUDIT — audit pre-writes that beat a failed DELETE would carry phantom
+  // cascade rows for pins still alive (plan v4 N1). If ad_units/ad_placements
+  // rows are deleted via a path other than these two routes, the cascade
+  // audit row is NOT emitted; any new delete path should follow the same
+  // convention.
+  const { data: orphanedPins } = await service
+    .from('ad_pins')
+    .select(
+      'placement_id, ad_unit_id, pinned_by, pinned_at, expires_at, reason, force_all_tiers, bypass_freq_cap',
+    )
+    .eq('ad_unit_id', params.id);
+
   const { error } = await service.from('ad_units').delete().eq('id', params.id);
   if (error)
     return safeErrorResponse(NextResponse, error, {
       route: 'admin.ad_units.id',
       fallbackStatus: 400,
     });
+
+  for (const pin of orphanedPins ?? []) {
+    await recordAdminAction({
+      action: 'ad_pin.cascaded_delete',
+      targetTable: 'ad_pins',
+      targetId: pin.placement_id,
+      oldValue: pin,
+      newValue: null,
+      reason: `cascade from ad_units delete (unit_id=${params.id})`,
+    });
+  }
+
   await recordAdminAction({
     action: 'ad_unit.delete',
     targetTable: 'ad_units',

@@ -196,12 +196,27 @@ export async function GET() {
   // memory. has_active_ad_unit lets the UI gray out placements with no
   // approved + active ad_unit attached (still selectable — useful when
   // owner is queuing a placement before the ad_unit lands).
+  //
+  // Wave 3: additive fields per Plan v1 § 4(k) —
+  //   placement_id          uuid (ad_placements.id) — pin form posts by uuid
+  //   is_pinned             boolean — true if a non-expired ad_pins row
+  //                          exists for this placement
+  //   pinned_ad_unit_name   string|null — ad_units.name of the pinned unit
+  //                          (null when not pinned).
+  //   pinned_ad_unit_id     string|null — ad_units.id (uuid) of the pinned
+  //                          unit (null when not pinned). Required so the
+  //                          edit-only Save path can POST a valid UUID
+  //                          back to /api/admin/ads/pins.
   type PlacementOption = {
     name: string;
     display_name: string;
     page: string;
     position: string;
     has_active_ad_unit: boolean;
+    placement_id: string;
+    is_pinned: boolean;
+    pinned_ad_unit_name: string | null;
+    pinned_ad_unit_id: string | null;
   };
   const placements: PlacementOption[] = [];
   const { data: activePlacementRows } = await service
@@ -235,16 +250,54 @@ export async function GET() {
       approval_status: string;
     }> | null;
   };
-  for (const row of (activePlacementRows ?? []) as RawActivePlacementRow[]) {
+
+  // Wave 3: fetch non-expired pins (`expires_at IS NULL OR expires_at > now()`)
+  // for the active placement set, joined to ad_units for the display name.
+  // Service-role bypasses RLS — the layout fetch is already service-role.
+  const activeRows = (activePlacementRows ?? []) as RawActivePlacementRow[];
+  const placementIds = activeRows.map((r) => r.id);
+  const nowIso = new Date().toISOString();
+  type PinRow = {
+    placement_id: string;
+    expires_at: string | null;
+    ad_unit: { id: string; name: string | null } | null;
+  };
+  const pinByPlacementId = new Map<string, PinRow>();
+  if (placementIds.length > 0) {
+    const { data: pinRows } = await service
+      .from('ad_pins')
+      .select(
+        `
+          placement_id,
+          expires_at,
+          ad_unit:ad_units!fk_ad_pins_ad_unit_id (
+            id,
+            name
+          )
+        `,
+      )
+      .in('placement_id', placementIds)
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
+    for (const p of (pinRows ?? []) as unknown as PinRow[]) {
+      pinByPlacementId.set(p.placement_id, p);
+    }
+  }
+
+  for (const row of activeRows) {
     const hasActive = (row.ad_units ?? []).some(
       (u) => u.is_active === true && u.approval_status === 'approved',
     );
+    const pin = pinByPlacementId.get(row.id) ?? null;
     placements.push({
       name: row.name,
       display_name: row.display_name,
       page: row.page,
       position: row.position,
       has_active_ad_unit: hasActive,
+      placement_id: row.id,
+      is_pinned: pin !== null,
+      pinned_ad_unit_name: pin?.ad_unit?.name ?? null,
+      pinned_ad_unit_id: pin?.ad_unit?.id ?? null,
     });
   }
 

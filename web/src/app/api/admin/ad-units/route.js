@@ -24,10 +24,24 @@ export async function GET(request) {
   const url = new URL(request.url);
   const placementId = url.searchParams.get('placement_id');
   const campaignId = url.searchParams.get('campaign_id');
+  // Wave 3 (admin/home pin tab): title typeahead + approved/active filter
+  // for the AdUnitPicker. `q` is ILIKE'd against the unit name (10-row
+  // limit when q is present). `approved=1` + `active=1` constrain to
+  // pinnable units only.
+  const qParam = (url.searchParams.get('q') || '').trim();
+  const approvedOnly = url.searchParams.get('approved') === '1';
+  const activeOnly = url.searchParams.get('active') === '1';
+  const limitParam = parseInt(url.searchParams.get('limit') || '', 10);
+  const cap = Number.isFinite(limitParam)
+    ? Math.min(Math.max(limitParam, 1), 50)
+    : 500;
   const service = createServiceClient();
-  let q = service.from('ad_units').select('*').order('created_at', { ascending: false }).limit(500);
+  let q = service.from('ad_units').select('*').order('created_at', { ascending: false }).limit(cap);
   if (placementId) q = q.eq('placement_id', placementId);
   if (campaignId) q = q.eq('campaign_id', campaignId);
+  if (approvedOnly) q = q.eq('approval_status', 'approved');
+  if (activeOnly) q = q.eq('is_active', true);
+  if (qParam) q = q.ilike('name', `%${qParam.replace(/[%_]/g, '\\$&')}%`);
   const { data, error } = await q;
   if (error)
     return safeErrorResponse(NextResponse, error, { route: 'admin.ad_units', fallbackStatus: 400 });
