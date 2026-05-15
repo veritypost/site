@@ -35,7 +35,15 @@ export type SlotKind =
   | 'editors_picks'
   | 'data_ticker'
   | 'insight_row'
-  | 'discovery_feed';
+  | 'discovery_feed'
+  // Mock-grid kinds. Each is a thin "one article or one ad" cell sized
+  // by slot.span; the visual shape (banner-wide, horizontal main-col
+  // card, square rail card, mini bottom-row square) is determined by
+  // where the slot sits in the 12-track grid.
+  | 'top_banner'
+  | 'story_card'
+  | 'rail_card'
+  | 'square_row';
 
 export type SlotSpan = 3 | 4 | 6 | 8 | 12;
 

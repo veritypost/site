@@ -1,10 +1,15 @@
-// Single-column slot renderer for the bordered-grid home.
+// 12-column slot renderer for the bordered-grid home.
 // Slots are sorted by `position` and emitted as direct children of the
-// `vp-rh-grid` container. Slots that need to span the full row (lead,
-// ticker, insight_row, discovery_feed) declare `grid-column: 1 / -1`
-// in their own CSS rules — this layout file applies no per-slot
-// overrides. The `breaking_strip` slot kind no-ops at the component
-// level (BreakingStrip.tsx returns null); no filter needed here.
+// `vp-rh-grid` container. Each slot's outer wrapper claims a fraction
+// of the 12-track row via `grid-column: span ${slot.span}` (span ∈
+// {3,4,6,8,12}). Span 8 + Span 4 reads as a 3fr/1fr main+rail pair;
+// Span 12 fills the row. Mobile collapses to single column via a
+// media query in styles.tsx that resets grid-column on all children.
+// Legacy slot kinds whose own CSS declared `grid-column: 1 / -1`
+// (Cluster, DataTicker, InsightRow, DiscoveryFeed, SecondLead) keep
+// working — the wrapper at span=12 already gives them full width.
+// `breaking_strip` no-ops at the component level (BreakingStrip.tsx
+// returns null); no filter needed here.
 
 import type { LayoutRow } from './types';
 import type { Tables } from '@/types/database-helpers';
@@ -47,11 +52,19 @@ export default function HomeLayout({
             showEmptyPlaceholders,
           });
           if (!node) return null;
-          // Each slot's renderer owns its own outer markup — Lead returns
-          // an <article>, Cluster returns a <Fragment> of <Link> cards,
-          // ticker/insight/discovery return their own outer divs with
-          // `grid-column: 1 / -1` declared in CSS.
-          return <span key={s.id} style={{ display: 'contents' }}>{node}</span>;
+          // gridColumn from data — span 12 fills the row, span 8 is the
+          // main column, span 4 is the right rail. Mobile collapses via
+          // the `.vp-rh-grid > *` rule in styles.tsx.
+          return (
+            <div
+              key={s.id}
+              data-slot-kind={s.kind}
+              data-slot-key={s.key}
+              style={{ gridColumn: `span ${s.span}`, minWidth: 0 }}
+            >
+              {node}
+            </div>
+          );
         })}
       </div>
       <RhStyles />

@@ -71,6 +71,10 @@ const SLOT_KINDS: ReadonlySet<SlotKind> = new Set([
   'data_ticker',
   'insight_row',
   'discovery_feed',
+  'top_banner',
+  'story_card',
+  'rail_card',
+  'square_row',
 ]);
 
 // Editorial adjacency filter for home feature slots. Returns true when the

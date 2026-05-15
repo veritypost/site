@@ -21,6 +21,10 @@ import EditorsPicks from './EditorsPicks';
 import DataTicker from './DataTicker';
 import InsightRow from './InsightRow';
 import DiscoveryFeed from './DiscoveryFeed';
+import TopBanner from './TopBanner';
+import StoryCard from './StoryCard';
+import RailCard from './RailCard';
+import SquareRow from './SquareRow';
 import EmptySlot from './EmptySlot';
 
 type SlotComponent =
@@ -42,16 +46,25 @@ const REGISTRY: Record<SlotKind, SlotComponent> = {
   data_ticker: DataTicker,
   insight_row: InsightRow,
   discovery_feed: DiscoveryFeed,
+  top_banner: TopBanner,
+  story_card: StoryCard,
+  rail_card: RailCard,
+  square_row: SquareRow,
 };
 
 // Slots that source their own content (e.g. Feature reads daily_features
 // directly). They aren't driven by home_slot_items, so the empty-check
 // would falsely hide them.
+//
+// `square_row` joins this set because it always renders 5 cells —
+// missing items become styled-empty placeholders inside the component
+// rather than collapsing the row.
 const SELF_SOURCING: ReadonlySet<SlotKind> = new Set([
   'feature',
   'data_ticker',
   'insight_row',
   'discovery_feed',
+  'square_row',
 ]);
 
 function slotIsEmpty(slot: SlotRow): boolean {

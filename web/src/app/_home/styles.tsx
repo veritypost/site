@@ -75,7 +75,14 @@ export default function RhStyles() {
       font-style: italic;
     }
 
-    /* ============ GRID ============ */
+    /* ============ GRID ============
+       12-track grid drives the layout from >=720px. Slots set
+       grid-column: span N (N in {3,4,6,8,12}) on their outer element
+       to claim a fraction of the row -- span 8 fills the main column,
+       span 4 fills the right rail. Below 720px the grid collapses to
+       a single column and the .vp-rh-grid > * rule forces every slot
+       to a full row regardless of its declared span. Legacy slot kinds
+       whose CSS already declares grid-column: 1 / -1 work unchanged. */
     .vp-rh-grid {
       display: grid;
       grid-template-columns: 1fr;
@@ -84,14 +91,17 @@ export default function RhStyles() {
       margin-left: auto;
       margin-right: auto;
     }
+    @media (max-width: 719px) {
+      .vp-rh-grid > * { grid-column: 1 / -1 !important; }
+    }
     @media (min-width: 720px) {
       .vp-rh-grid {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(12, 1fr);
+        /* Dense packing lets a span-8 + span-4 pair share a row even
+           when position sort would otherwise interleave past a row. */
+        grid-auto-flow: row dense;
         border-left: 1px solid var(--rh-border);
       }
-    }
-    @media (min-width: 1100px) {
-      .vp-rh-grid { grid-template-columns: 1fr 1fr 1fr; }
     }
 
     /* Section head — mono label + optional "more" link. Grid-spans the row;
@@ -1058,6 +1068,231 @@ export default function RhStyles() {
       .vp-btn-band-wide__fig { font-size: 96px; }
       .vp-btn-band-wide__cap { font-size: 15px; }
     }
+
+    /* ============ MOCK-GRID KINDS ============
+       Wave 8 -- banner + 3fr/1fr body + bottom-squares structure. Outer
+       grid-column claim happens on the wrapper div emitted by
+       HomeLayout (style={{ gridColumn: span N }}); these classes style
+       the slot's own contents. */
+
+    /* ── top_banner (span 12) ── */
+    .vp-rh-banner {
+      border-bottom: 1px solid var(--rh-border);
+      background: var(--rh-bg);
+    }
+    .vp-rh-banner__link {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      color: inherit;
+      text-decoration: none;
+    }
+    @media (min-width: 720px) {
+      .vp-rh-banner__link { grid-template-columns: 1.4fr 1fr; }
+    }
+    .vp-rh-banner__art {
+      aspect-ratio: 16 / 9;
+      background-size: cover;
+      background-position: center;
+      background-color: var(--rh-surface-soft);
+      order: 2;
+    }
+    @media (min-width: 720px) {
+      .vp-rh-banner__art { order: 1; aspect-ratio: auto; min-height: 280px; }
+    }
+    .vp-rh-banner__body {
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      justify-content: center;
+      order: 1;
+    }
+    @media (min-width: 720px) {
+      .vp-rh-banner__body { order: 2; padding: 40px 32px; }
+    }
+    .vp-rh-banner__cat {
+      margin: 0;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--rh-accent);
+      font-weight: 600;
+    }
+    .vp-rh-banner__title {
+      margin: 0;
+      font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+      font-size: clamp(28px, 3.6vw, 44px);
+      line-height: 1.05;
+      letter-spacing: -0.025em;
+      font-weight: 400;
+      color: var(--rh-ink);
+    }
+    .vp-rh-banner__dek {
+      margin: 0;
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--rh-ink-2);
+      max-width: 56ch;
+    }
+    .vp-rh-banner--ad { padding: 12px; }
+
+    /* ── story_card (span 8 — main column) ── */
+    .vp-rh-story-card {
+      border-right: 1px solid var(--rh-border);
+      border-bottom: 1px solid var(--rh-border);
+      background: var(--rh-bg);
+    }
+    .vp-rh-story-card__link {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      padding: 20px 24px;
+      color: inherit;
+      text-decoration: none;
+    }
+    @media (min-width: 720px) {
+      .vp-rh-story-card__link {
+        grid-template-columns: 1fr 200px;
+        align-items: center;
+        gap: 24px;
+        padding: 24px 28px;
+      }
+    }
+    .vp-rh-story-card__body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .vp-rh-story-card__cat {
+      margin: 0;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--rh-accent);
+      font-weight: 600;
+    }
+    .vp-rh-story-card__title {
+      margin: 0;
+      font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+      font-size: clamp(20px, 1.8vw, 26px);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      font-weight: 400;
+      color: var(--rh-ink);
+    }
+    .vp-rh-story-card__dek {
+      margin: 0;
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--rh-ink-2);
+    }
+    .vp-rh-story-card__art {
+      aspect-ratio: 4 / 3;
+      background-size: cover;
+      background-position: center;
+      background-color: var(--rh-surface-soft);
+      border-radius: 6px;
+    }
+    @media (min-width: 720px) {
+      .vp-rh-story-card__art { aspect-ratio: 1 / 1; }
+    }
+    .vp-rh-story-card--ad { padding: 12px 24px; }
+
+    /* ── rail_card (span 4 — right rail, 1:1) ── */
+    .vp-rh-rail-card {
+      aspect-ratio: 1 / 1;
+      border-right: 1px solid var(--rh-border);
+      border-bottom: 1px solid var(--rh-border);
+      background: var(--rh-bg);
+      display: flex;
+    }
+    .vp-rh-rail-card__link {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 18px;
+      color: inherit;
+      text-decoration: none;
+    }
+    .vp-rh-rail-card__cat {
+      margin: 0;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--rh-accent);
+      font-weight: 600;
+    }
+    .vp-rh-rail-card__title {
+      margin: 0;
+      font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+      font-size: 18px;
+      line-height: 1.15;
+      letter-spacing: -0.015em;
+      font-weight: 400;
+      color: var(--rh-ink);
+    }
+    .vp-rh-rail-card--ad {
+      aspect-ratio: 1 / 1;
+      padding: 8px;
+      align-items: stretch;
+      justify-content: stretch;
+    }
+
+    /* ── square_row (span 12 — bottom 5-up squares) ── */
+    .vp-rh-square-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      border-top: 1px solid var(--rh-border);
+    }
+    @media (min-width: 720px) {
+      .vp-rh-square-row { grid-template-columns: repeat(5, 1fr); }
+    }
+    .vp-rh-square {
+      aspect-ratio: 1 / 1;
+      border-right: 1px solid var(--rh-border);
+      border-bottom: 1px solid var(--rh-border);
+      background: var(--rh-bg);
+      display: flex;
+    }
+    @media (max-width: 719px) {
+      .vp-rh-square { aspect-ratio: auto; min-height: 140px; }
+    }
+    .vp-rh-square:last-child { border-right: none; }
+    .vp-rh-square__link {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 6px;
+      padding: 14px;
+      color: inherit;
+      text-decoration: none;
+    }
+    .vp-rh-square__cat {
+      margin: 0;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--rh-accent);
+      font-weight: 600;
+    }
+    .vp-rh-square__title {
+      margin: 0;
+      font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+      font-size: 14px;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      font-weight: 400;
+      color: var(--rh-ink);
+    }
+    .vp-rh-square--ad { padding: 6px; }
+    .vp-rh-square--empty { background: var(--rh-surface-soft); }
   `;
   return <style dangerouslySetInnerHTML={{ __html: css }} />;
 }

@@ -170,6 +170,10 @@ const KIND_DEFAULT_CAPACITY: Record<SlotKind, number> = {
   data_ticker: 1,
   insight_row: 1,
   discovery_feed: 1,
+  top_banner: 1,
+  story_card: 1,
+  rail_card: 1,
+  square_row: 5,
 };
 
 // Hard cap on `config.capacity` overrides. Mirrored server-side in
@@ -199,6 +203,10 @@ const KIND_LABEL: Record<SlotKind, string> = {
   data_ticker: 'Data Ticker',
   insight_row: 'Insight Row (Sponsored)',
   discovery_feed: 'Discovery Feed (Promoted)',
+  top_banner: 'Top Banner',
+  story_card: 'Story Card',
+  rail_card: 'Rail Card',
+  square_row: 'Square Row (5 cells)',
 };
 
 const SPAN_OPTIONS: SlotSpan[] = [3, 4, 6, 8, 12];
