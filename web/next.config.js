@@ -46,20 +46,12 @@ const nextConfig = {
   },
   poweredByHeader: false,
   async redirects() {
-    // The standalone `/category/[id]` route was retired in favour of
-    // `/?cat=<slug>` filtering in the home shell. Old external links are
-    // 301'd. The `?sub=` query param can't be templated into the
-    // destination via Next.js redirect syntax (named query captures are
-    // not interpolated back), so URLs that carried a sub will land on the
-    // parent-category-filtered home and drop the sub. Acceptable for now;
-    // the destination page can re-resolve the sub from the URL once we
-    // wire that pass.
+    // /category/<slug> is a real route again as of 2026-05-16 — the
+    // page renders the same UnifiedSearch component as /search but
+    // pinned to the slug. The earlier 308 redirect to /search?topic=
+    // was reverted on owner request to keep the cleaner category
+    // URL. No redirect entry for /category/* is needed.
     return [
-      {
-        source: '/category/:slug',
-        destination: '/?cat=:slug',
-        permanent: true,
-      },
       // Owner cleanup item 2 — bookmarks concept retired. The successor
       // (Following) doesn't have a dedicated page — it lives in the
       // Sections menu on the home page. Old /bookmarks links land on

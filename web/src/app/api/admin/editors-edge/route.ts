@@ -261,7 +261,7 @@ export async function POST(request: Request) {
 
   // Bust ISR for the public surface + admin timeline.
   try {
-    revalidatePath('/directory');
+    revalidatePath('/search');
     revalidatePath('/admin/editors-edge');
   } catch (revalErr) {
     console.warn('[admin.editors_edge.create] revalidate failed:', revalErr);

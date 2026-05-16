@@ -87,6 +87,9 @@ export default async function sitemap({ id }) {
         .select('slug, updated_at, created_at')
         .not('slug', 'like', 'kids-%')
         .order('slug', { ascending: true });
+      // Category pages live at /category/<slug> (real route, not a
+      // redirect to /search). Sitemap emits the canonical category
+      // URL so crawlers index that path.
       categoryRoutes = (cats || []).map((c) => ({
         url: `${base}/category/${c.slug}`,
         lastModified: c.updated_at || c.created_at || new Date(),

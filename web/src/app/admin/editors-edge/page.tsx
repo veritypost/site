@@ -231,7 +231,7 @@ export default async function EditorsEdgeAdminPage({
             Editor&rsquo;s Edge
           </h1>
           <p style={{ marginTop: 6, color: '#475569', fontSize: 14 }}>
-            Curated picks shown at the top of each category on the /directory
+            Curated picks shown at the top of each category on the /search
             surface and the iOS Browse tab. One pick at a time per category
             (and per subcategory when set). Default window is 48 hours.
           </p>

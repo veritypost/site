@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { hasPermissionServer } from '@/lib/auth';
 import { safeErrorResponse } from '@/lib/apiErrors';
 import { runArticleSearch } from '@/lib/search/runArticleSearch';
+import { runUnifiedSearch } from '@/lib/search/runUnifiedSearch';
 import { sanitizeIlikeTerm, sanitizeWebsearchTerm } from '@/lib/search/sanitize';
 
 // GET /api/search?q=...&category=...&subcategory=...&from=...&to=...&source=...
@@ -33,7 +34,21 @@ export async function GET(request) {
   // internally — duplication is intentional and cheap.
   const qIlike = sanitizeIlikeTerm(rawQ);
   const qWebsearch = sanitizeWebsearchTerm(rawQ);
-  if (!qIlike && !qWebsearch) return NextResponse.json({ articles: [] });
+  // Detect whether the caller is on the unified (Session B) contract.
+  // Empty-q is a VALID state for the unified flow — per TODO-SEARCH
+  // locked decision 4, no-query + filters = curated browse (e.g.
+  // ?topic=climate → all active climate stories). Only the legacy
+  // path returns the early empty-articles shape.
+  const wantsUnified =
+    url.searchParams.has('unified') ||
+    url.searchParams.has('type') ||
+    url.searchParams.has('topic') ||
+    url.searchParams.has('status') ||
+    url.searchParams.has('chip') ||
+    url.searchParams.has('sort');
+  if (!qIlike && !qWebsearch && !wantsUnified) {
+    return NextResponse.json({ articles: [] });
+  }
 
   // Permission-driven tier check. For anon callers this returns false
   // and we stay on the basic title-only path.
@@ -67,6 +82,58 @@ export async function GET(request) {
   };
   const kidScope =
     url.searchParams.get('kids') === '1' || !!url.searchParams.get('kid_profile_id');
+
+  // TODO-SEARCH Session B: opt in to the unified Story + Article feed
+  // when the caller passes any of the new params (?unified, ?type,
+  // ?topic, ?status, ?chip, ?sort). Legacy callers (iOS FindView,
+  // existing /search page) that pass none of these continue to hit
+  // runArticleSearch and receive the historical `{articles, mode,
+  // ignored_filters}` shape unchanged.
+  if (wantsUnified) {
+    const typeParam = (url.searchParams.get('type') || 'all').toLowerCase();
+    const type =
+      typeParam === 'stories' || typeParam === 'articles' ? typeParam : 'all';
+    const statusParam = (url.searchParams.get('status') || '').toLowerCase();
+    const status =
+      statusParam === 'developing' || statusParam === 'updated' ? statusParam : null;
+    const chipParam = (url.searchParams.get('chip') || 'all').toLowerCase();
+    const chip = [
+      'all',
+      'today',
+      'this_week',
+      'developing',
+      'updated_recently',
+    ].includes(chipParam)
+      ? chipParam
+      : 'all';
+    const sortParam = (url.searchParams.get('sort') || 'relevance').toLowerCase();
+    const sort = ['relevance', 'recent', 'newest_article', 'most_sourced'].includes(sortParam)
+      ? sortParam
+      : 'relevance';
+
+    const unified = await runUnifiedSearch({
+      q: rawQ,
+      type,
+      topicSlug: url.searchParams.get('topic'),
+      status,
+      chip,
+      sort,
+      from: filters.from,
+      to: filters.to,
+      source: filters.source,
+      canAdvanced,
+      checkAdvancedFilterPerm,
+      kidScope,
+      supabase: createServiceClient(),
+    });
+    if (!unified.ok) {
+      return safeErrorResponse(NextResponse, unified.error, {
+        route: 'search',
+        fallbackStatus: 400,
+      });
+    }
+    return NextResponse.json(unified.value);
+  }
 
   const result = await runArticleSearch({
     q: rawQ,

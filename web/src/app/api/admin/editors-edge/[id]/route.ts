@@ -85,7 +85,7 @@ export async function DELETE(
   });
 
   try {
-    revalidatePath('/directory');
+    revalidatePath('/search');
     revalidatePath('/admin/editors-edge');
   } catch (revalErr) {
     console.warn('[admin.editors_edge.remove] revalidate failed:', revalErr);

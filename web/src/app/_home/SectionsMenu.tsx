@@ -1,12 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { BRAND_NAME } from '@/lib/brand';
-import { formatDate } from '@/lib/dates';
 import { useFocusTrap } from '@/lib/useFocusTrap';
 import { Z } from '@/lib/zIndex';
 
@@ -17,18 +16,11 @@ import {
 import { HOME_SIDEBAR_BREAKPOINT_PX, type SidebarCategory } from './Sidebar';
 
 const OVERLAY_ID = 'vp-home-sections-overlay';
-const RESULTS_LISTBOX_ID = 'vp-home-sections-search-results';
-const RESULT_OPTION_ID = (id: string) => `vp-home-sections-search-result-${id}`;
-const MONO_STACK = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
-type ArticleHit = {
-  id: string;
-  title: string | null;
-  excerpt: string | null;
-  published_at: string | null;
-  stories: { slug: string | null } | null;
-  categories: { name: string | null } | null;
-};
+// TODO-SEARCH locked decision 10: the in-overlay search was deleted
+// 2026-05-16. Sections is now a pure topic list with an out-link to
+// /search for keyword/filter search. The ArticleHit type + inline
+// /api/search caller + listbox keyboard nav were retired in Session D.
 
 const sortByOrder = (a: SidebarCategory, b: SidebarCategory) => {
   const ao = a.sort_order ?? Number.MAX_SAFE_INTEGER;
@@ -38,24 +30,16 @@ const sortByOrder = (a: SidebarCategory, b: SidebarCategory) => {
 };
 
 export default function SectionsMenu() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const activeCatSlug = searchParams?.get('cat') || null;
   const activeSubSlug = searchParams?.get('sub') || null;
   const isHomeActive = !activeCatSlug && !activeSubSlug;
 
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [categories, setCategories] = useState<SidebarCategory[] | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [results, setResults] = useState<ArticleHit[]>([]);
-  const [resultsForQuery, setResultsForQuery] = useState<string>('');
-  const [isFetching, setIsFetching] = useState(false);
-  const [highlightIndex, setHighlightIndex] = useState(-1);
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -128,89 +112,22 @@ export default function SectionsMenu() {
 
   useEffect(() => {
     if (!open) {
-      setQuery('');
       setExpanded(new Set());
-      setResults([]);
-      setResultsForQuery('');
-      setIsFetching(false);
-      setHighlightIndex(-1);
-      abortRef.current?.abort();
-      abortRef.current = null;
       return;
     }
     if (activeCatSlug) {
       const match = parents.find((p) => p.slug === activeCatSlug);
       if (match) setExpanded(new Set([match.id]));
     }
-    // Auto-focus the search input on overlay open. RAF gives the portal a
-    // tick to mount before we try to grab focus. This deliberately runs
-    // *after* useFocusTrap's initial-focus pass so the search input wins
-    // (the trap would otherwise focus the close button as the first
-    // focusable in DOM order).
-    const focusFrame = requestAnimationFrame(() => {
-      inputRef.current?.focus();
-    });
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      cancelAnimationFrame(focusFrame);
       document.body.style.overflow = prevOverflow;
     };
     // Defaults computed once at open; URL changes mid-session shouldn't
     // re-snap expansion.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, close]);
-
-  // Debounced article search against /api/search. AbortController cancels
-  // any in-flight request when the user keeps typing, matching the pattern
-  // on /search (web/src/app/search/page.tsx).
-  useEffect(() => {
-    const trimmed = query.trim();
-    if (!trimmed) {
-      // Empty query → drop back to categories tree; cancel any pending fetch.
-      abortRef.current?.abort();
-      abortRef.current = null;
-      setResults([]);
-      setResultsForQuery('');
-      setIsFetching(false);
-      setHighlightIndex(-1);
-      return;
-    }
-    const handle = window.setTimeout(() => {
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      setIsFetching(true);
-      void fetch(`/api/search?q=${encodeURIComponent(trimmed)}`, {
-        signal: controller.signal,
-      })
-        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-        .then((body: { articles?: ArticleHit[] }) => {
-          if (controller.signal.aborted) return;
-          const list = Array.isArray(body.articles) ? body.articles : [];
-          // Skip articles missing a slug — they can't be navigated to.
-          const filtered = list.filter((a) => a.stories?.slug);
-          setResults(filtered);
-          setResultsForQuery(trimmed);
-          setIsFetching(false);
-          // Default highlight to first result so Enter has something to act on.
-          setHighlightIndex(filtered.length > 0 ? 0 : -1);
-        })
-        .catch((err: unknown) => {
-          if (err instanceof DOMException && err.name === 'AbortError') return;
-          if (controller.signal.aborted) return;
-          // Surface zero results on hard error so the empty-state copy renders
-          // instead of stale results from an earlier query.
-          setResults([]);
-          setResultsForQuery(trimmed);
-          setIsFetching(false);
-          setHighlightIndex(-1);
-        });
-    }, 300);
-    return () => {
-      window.clearTimeout(handle);
-    };
-  }, [query]);
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
@@ -219,52 +136,6 @@ export default function SectionsMenu() {
       else next.add(id);
       return next;
     });
-  };
-
-  const searching = query.trim().length > 0;
-  const trimmedQuery = query.trim();
-  const settledForCurrent = resultsForQuery === trimmedQuery;
-  const showResultsListbox = searching && settledForCurrent && results.length > 0;
-  const activeOptionId =
-    showResultsListbox && highlightIndex >= 0 && highlightIndex < results.length
-      ? RESULT_OPTION_ID(results[highlightIndex].id)
-      : undefined;
-  // Live-region announcement: only fire when a fetch settles for the current
-  // query. Empty during debounce / in-flight so we don't chatter on every
-  // keystroke.
-  const liveAnnouncement = !searching
-    ? ''
-    : !settledForCurrent
-      ? ''
-      : results.length === 0
-        ? 'No results'
-        : `${results.length} ${results.length === 1 ? 'result' : 'results'}`;
-
-  const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showResultsListbox) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlightIndex((i) => Math.min(results.length - 1, (i < 0 ? -1 : i) + 1));
-      return;
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlightIndex((i) => Math.max(0, (i < 0 ? 0 : i) - 1));
-      return;
-    }
-    if (e.key === 'Enter') {
-      const idx = highlightIndex >= 0 ? highlightIndex : 0;
-      const hit = results[idx];
-      const slug = hit?.stories?.slug;
-      if (slug) {
-        e.preventDefault();
-        close();
-        router.push(`/${slug}`);
-      }
-      return;
-    }
-    // Escape bubbles to the dialog-scoped listener installed by useFocusTrap,
-    // which fires `close()` via the onEscape callback.
   };
 
   return (
@@ -286,25 +157,8 @@ export default function SectionsMenu() {
         .vp-home-sections-overlay {
           animation: vp-sections-overlay-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .vp-home-sections-search::placeholder {
-          font-family: ${serifStack};
-          font-style: italic;
-          color: ${C.dim};
-        }
-        .vp-home-sections-search:focus {
-          border-bottom-color: ${C.accent} !important;
-        }
         .vp-home-sections-close { transition: color 160ms ease-out; }
         .vp-home-sections-close:hover { color: ${C.text} !important; }
-        .vp-home-sections-result:hover {
-          background: ${C.accentSoft} !important;
-        }
-        .vp-home-sections-result mark {
-          background: ${C.accentSoft};
-          color: ${C.accentDark};
-          padding: 0 2px;
-          border-radius: 3px;
-        }
         @media (prefers-reduced-motion: reduce) {
           .vp-home-sections-overlay { animation: none; }
         }
@@ -389,254 +243,79 @@ export default function SectionsMenu() {
             </header>
 
             <div style={{ flexShrink: 0, padding: '20px 22px 0' }}>
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={onSearchKeyDown}
-                placeholder="search the record"
-                aria-label="Search the record"
-                role="combobox"
-                aria-autocomplete="list"
-                aria-controls={RESULTS_LISTBOX_ID}
-                aria-expanded={showResultsListbox}
-                aria-activedescendant={activeOptionId}
-                autoComplete="off"
-                spellCheck={false}
-                className="vp-home-sections-search"
+              {/* TODO-SEARCH locked decision 10: Sections menu is a pure
+                  topic list. Keyword search lives at /search; this link
+                  is the out-bound entry point. */}
+              <Link
+                href="/search"
+                onClick={close}
                 style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                   width: '100%',
                   height: 44,
-                  background: 'transparent',
-                  border: 'none',
                   borderBottom: `1px solid ${C.rule}`,
-                  outline: 'none',
                   fontFamily: serifStack,
-                  fontSize: 20,
-                  color: C.text,
+                  fontSize: 18,
+                  color: C.muted,
+                  fontStyle: 'italic',
+                  textDecoration: 'none',
                   padding: '0 0 10px',
                 }}
-              />
-              {/* Visually-hidden live region — fires when a fetch settles. */}
-              <span
-                aria-live="polite"
-                aria-atomic="true"
-                style={{
-                  position: 'absolute',
-                  width: 1,
-                  height: 1,
-                  overflow: 'hidden',
-                  clip: 'rect(0,0,0,0)',
-                  whiteSpace: 'nowrap',
-                }}
               >
-                {liveAnnouncement}
-              </span>
+                <span>Search the record</span>
+                <span aria-hidden style={{ fontStyle: 'normal' }}>→</span>
+              </Link>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px 60px' }}>
-              {searching ? (
-                <SearchResults
-                  listboxId={RESULTS_LISTBOX_ID}
-                  query={query}
-                  results={results}
-                  resultsForQuery={resultsForQuery}
-                  highlightIndex={highlightIndex}
-                  onHighlight={setHighlightIndex}
-                  isFetching={isFetching}
-                  onNavigate={close}
-                />
-              ) : (
-                <>
-                  {categories === null && (
-                    <div
-                      style={{
-                        fontFamily: serifStack,
-                        fontSize: 13,
-                        color: C.muted,
-                        padding: '12px 0',
-                      }}
-                    >
-                      Loading sections…
-                    </div>
-                  )}
+              {categories === null && (
+                <div
+                  style={{
+                    fontFamily: serifStack,
+                    fontSize: 13,
+                    color: C.muted,
+                    padding: '12px 0',
+                  }}
+                >
+                  Loading sections…
+                </div>
+              )}
 
-                  <FollowingRow
-                    expanded={expanded.has('__following__')}
-                    onToggle={() => toggle('__following__')}
+              <FollowingRow
+                expanded={expanded.has('__following__')}
+                onToggle={() => toggle('__following__')}
+                onNavigate={close}
+              />
+
+              <AllRow active={isHomeActive} onNavigate={close} />
+
+              <BrowseAllRow onNavigate={close} />
+
+              {parents.map((p) => {
+                const subs = subsByParent.get(p.id) ?? [];
+                const parentActive = activeCatSlug === p.slug;
+                return (
+                  <CategoryRow
+                    key={p.id}
+                    name={p.name}
+                    slug={p.slug}
+                    expanded={expanded.has(p.id)}
+                    parentActive={parentActive}
+                    activeSubSlug={parentActive ? activeSubSlug : null}
+                    subs={subs.map((s) => ({ name: s.name, slug: s.slug }))}
+                    onToggle={() => toggle(p.id)}
                     onNavigate={close}
                   />
-
-                  <AllRow active={isHomeActive} onNavigate={close} />
-
-                  {/* Stream B (directory build) — "Browse all" entry point to /directory. */}
-                  <BrowseAllRow onNavigate={close} />
-
-                  {parents.map((p) => {
-                    const subs = subsByParent.get(p.id) ?? [];
-                    const parentActive = activeCatSlug === p.slug;
-                    return (
-                      <CategoryRow
-                        key={p.id}
-                        name={p.name}
-                        slug={p.slug}
-                        expanded={expanded.has(p.id)}
-                        parentActive={parentActive}
-                        activeSubSlug={parentActive ? activeSubSlug : null}
-                        subs={subs.map((s) => ({ name: s.name, slug: s.slug }))}
-                        onToggle={() => toggle(p.id)}
-                        onNavigate={close}
-                      />
-                    );
-                  })}
-                </>
-              )}
+                );
+              })}
             </div>
           </div>
         </div>,
         document.body,
       )}
     </>
-  );
-}
-
-function SearchResults({
-  listboxId,
-  query,
-  results,
-  resultsForQuery,
-  highlightIndex,
-  onHighlight,
-  isFetching,
-  onNavigate,
-}: {
-  listboxId: string;
-  query: string;
-  results: ArticleHit[];
-  resultsForQuery: string;
-  highlightIndex: number;
-  onHighlight: (i: number) => void;
-  isFetching: boolean;
-  onNavigate: () => void;
-}) {
-  // Only show the "no matches" copy once a fetch for the current trimmed
-  // query has actually settled — otherwise the empty state would flash
-  // during the 300ms debounce window or while the request is in flight.
-  const trimmed = query.trim();
-  const settledForCurrent = resultsForQuery === trimmed;
-  if (!settledForCurrent) {
-    return null;
-  }
-  if (results.length === 0) {
-    return (
-      <p
-        style={{
-          fontFamily: serifStack,
-          fontStyle: 'italic',
-          fontSize: 15,
-          color: C.muted,
-          margin: '8px 0 0',
-        }}
-      >
-        Nothing in the record matches that.
-      </p>
-    );
-  }
-  return (
-    <div
-      id={listboxId}
-      role="listbox"
-      aria-label="Search results"
-      aria-busy={isFetching}
-      style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 4 }}
-    >
-      {results.map((a, idx) => {
-        const slug = a.stories?.slug;
-        if (!slug) return null;
-        const categoryName = a.categories?.name ?? '';
-        const dateStr = a.published_at ? formatDate(a.published_at) : '';
-        const sep = categoryName && dateStr ? ' · ' : '';
-        const isHighlighted = idx === highlightIndex;
-        return (
-          <Link
-            key={a.id}
-            id={RESULT_OPTION_ID(a.id)}
-            role="option"
-            aria-selected={isHighlighted}
-            href={`/${slug}`}
-            prefetch={false}
-            onClick={onNavigate}
-            onMouseEnter={() => onHighlight(idx)}
-            className="vp-home-sections-result"
-            style={{
-              display: 'block',
-              textDecoration: 'none',
-              color: 'inherit',
-              background: isHighlighted ? C.accentSoft : 'transparent',
-              padding: '12px 16px',
-              margin: '0 -16px',
-              borderRadius: 4,
-              transition: 'background 120ms ease',
-            }}
-          >
-            <h3
-              style={{
-                // Source Serif 4 explicit (was inheriting serifStack which
-                // falls through to Georgia). Ensures the same family as
-                // UpNextSheet + NextStoryFooter card titles.
-                fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
-                fontSize: 16,
-                fontWeight: 500,
-                color: C.text,
-                lineHeight: 1.3,
-                letterSpacing: '-0.01em',
-                margin: 0,
-              }}
-            >
-              {a.title}
-            </h3>
-            {a.excerpt && (
-              <p
-                style={{
-                  // v2 — sans 13, muted; line-clamp 2 keeps rows scannable.
-                  fontFamily:
-                    'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
-                  fontSize: 13,
-                  color: C.muted,
-                  lineHeight: 1.4,
-                  marginTop: 5,
-                  marginBottom: 0,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }}
-              >
-                {a.excerpt}
-              </p>
-            )}
-            {(categoryName || dateStr) && (
-              <div
-                style={{
-                  fontFamily: MONO_STACK,
-                  fontSize: 10,
-                  color: C.dim,
-                  marginTop: 8,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  lineHeight: 1.5,
-                }}
-              >
-                {categoryName}
-                {sep}
-                {dateStr}
-              </div>
-            )}
-          </Link>
-        );
-      })}
-    </div>
   );
 }
 
@@ -860,7 +539,7 @@ function BrowseAllRow({ onNavigate }: { onNavigate: () => void }) {
   return (
     <div style={{ borderBottom: `1px solid ${C.rule}` }}>
       <Link
-        href="/directory"
+        href="/search"
         onClick={onNavigate}
         style={{
           display: 'block',
