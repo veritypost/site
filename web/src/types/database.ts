@@ -15439,6 +15439,7 @@ export type Database = {
         Args: {
           p_article_id?: string
           p_placement_name: string
+          p_preview_tier?: string
           p_session_id?: string
           p_user_id?: string
         }

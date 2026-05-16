@@ -3,13 +3,15 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { v2LiveGuard } from '@/lib/featureFlags';
+import { hasPermissionServer } from '@/lib/auth';
 import { safeErrorResponse } from '@/lib/apiErrors';
 
 // GET /api/ads/serve?placement=NAME&article_id=...&session_id=...&preview_tier=...
 // Anon-friendly. Returns { ad_unit: {...} } or { ad_unit: null }.
-// preview_tier is accepted but currently unused by the RPC; it is wired here
-// so the admin preview tool can pass it and the RPC can start consuming it
-// when the DB function is updated to accept p_preview_tier.
+// preview_tier is forwarded to the serve_ad RPC's p_preview_tier override
+// only when the caller has admin.ads.view — anon and non-admin sessions
+// have it dropped silently so it can't be used to spoof tier-gated cap
+// halving / hidden-tier filtering.
 export async function GET(request) {
   const blocked = await v2LiveGuard();
   if (blocked) return blocked;
@@ -17,10 +19,7 @@ export async function GET(request) {
   const placement = url.searchParams.get('placement');
   const article_id = url.searchParams.get('article_id') || null;
   const session_id = url.searchParams.get('session_id') || null;
-  // preview_tier — admin preview tool passes this to simulate a specific tier.
-  // Not yet forwarded to the RPC; logged here for future RPC wiring.
-  // eslint-disable-next-line no-unused-vars
-  const preview_tier = url.searchParams.get('preview_tier') || null;
+  const preview_tier_raw = url.searchParams.get('preview_tier') || null;
   if (!placement) return NextResponse.json({ error: 'placement required' }, { status: 400 });
 
   const supabase = await createClient();
@@ -28,12 +27,21 @@ export async function GET(request) {
     data: { user: authUser },
   } = await supabase.auth.getUser();
 
+  // Gate the tier-override to admin callers. hasPermissionServer returns
+  // false for anon and for users without the perm, so the param is dropped
+  // silently rather than 4xx-ing — the public ad pipeline must keep working.
+  let preview_tier = null;
+  if (preview_tier_raw && (await hasPermissionServer('admin.ads.view', supabase))) {
+    preview_tier = preview_tier_raw;
+  }
+
   const service = createServiceClient();
   const { data, error } = await service.rpc('serve_ad', {
     p_placement_name: placement,
     p_user_id: authUser?.id || null,
     p_article_id: article_id,
     p_session_id: session_id,
+    p_preview_tier: preview_tier,
   });
   if (error)
     return safeErrorResponse(NextResponse, error, { route: 'ads.serve', fallbackStatus: 400 });

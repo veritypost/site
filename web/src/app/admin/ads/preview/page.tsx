@@ -179,11 +179,12 @@ function AdPreviewInner() {
           background: C.card, border: `1px solid ${C.divider}`,
           fontSize: F.xs, color: C.dim, lineHeight: 1.6,
         }}>
-          Preview shows ads as they appear for your current admin session.
-          Per-tier simulation is available when the serve_ad RPC supports a
-          tier-override parameter (<code>p_preview_tier</code>). Until then,
-          the <code>preview_tier={tier}</code> param is passed to the route but
-          the RPC uses your session&apos;s actual tier.
+          Preview simulates each tier&apos;s ad render. The{' '}
+          <code>preview_tier={tier}</code> URL param is forwarded to the
+          serve_ad RPC&apos;s <code>p_preview_tier</code> override (gated to
+          admin callers in <code>/api/ads/serve</code>) so hidden-for-tier
+          filtering and reduced-cap halving reflect the selected tier rather
+          than your own.
         </div>
 
         <div role="note" style={{
