@@ -107,6 +107,8 @@ Future Projects/*.html
 # --- Supabase local state --------------------------------------------------
 supabase/.temp/
 supabase/.branches/
+web/supabase/.temp/
+web/supabase/.branches/
 
 # --- Test output -----------------------------------------------------------
 playwright-report/

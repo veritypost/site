@@ -485,8 +485,9 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
             style={{
               maxWidth: 1280,
               margin: '0 auto',
-              padding: '32px 16px 24px',
+              padding: '56px 16px 32px',
               borderTop: '1px solid var(--vp-border)',
+              background: 'var(--vp-bg)',
             }}
           >
             {/* v2 burgundy token migration — hover affordance for legal

@@ -1,15 +1,17 @@
 // @migrated-to-permissions 2026-04-18
 // @feature-verified search 2026-04-18
-'use client';
 import { Suspense } from 'react';
 import UnifiedSearch from '@/components/search/UnifiedSearch';
+import { getTopicCategories } from '@/lib/search/getTopicCategories';
 
-// TODO-SEARCH Session D — unified /search is the only surface.
-// The legacy SearchPageContent + NEXT_PUBLIC_SEARCH_UNIFIED flag were
-// retired 2026-05-16. /category/<slug> 301s here via next.config.js;
-// inbound SectionsMenu/admin/sitemap links all repoint at /search.
+// /search is the unified browse surface. The page wrapper is a server
+// component that fetches the topic list once per request so the filter
+// rail never renders dead links and never flashes empty during hydration.
+// UnifiedSearch itself stays a client component (URL-state, useEffect,
+// interactive filtering); the topics list is handed to it as a prop.
 
-export default function SearchPage() {
+export default async function SearchPage() {
+  const topics = await getTopicCategories();
   return (
     <Suspense
       fallback={
@@ -57,7 +59,7 @@ export default function SearchPage() {
         </div>
       }
     >
-      <UnifiedSearch />
+      <UnifiedSearch topics={topics} />
     </Suspense>
   );
 }

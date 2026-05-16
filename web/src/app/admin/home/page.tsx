@@ -1858,6 +1858,17 @@ function LayoutCanvas({
     .filter((s) => s.kind !== 'breaking_strip')
     .sort((a, b) => a.position - b.position);
 
+  // Partition into top / main / rail / bottom — same rule HomeLayout
+  // uses. span-12 slots become top/bottom anchored by their position
+  // relative to the main column, span >= 6 → main, span < 6 → rail.
+  const mainSlots = orderedSlots.filter((s) => s.span !== 12 && s.span >= 6);
+  const railSlots = orderedSlots.filter((s) => s.span !== 12 && s.span < 6);
+  const fullWidth = orderedSlots.filter((s) => s.span === 12);
+  const firstMainPos = mainSlots[0]?.position ?? Infinity;
+  const lastMainPos = mainSlots[mainSlots.length - 1]?.position ?? -Infinity;
+  const topSlots = fullWidth.filter((s) => s.position < firstMainPos);
+  const bottomSlots = fullWidth.filter((s) => s.position > lastMainPos);
+
   return (
     <div style={{ position: 'relative' }}>
       <RhStyles />
@@ -1865,21 +1876,37 @@ function LayoutCanvas({
         style={{
           padding: S[3],
           border: `1px solid ${C.divider}`,
-          background: '#fff',
+          background: 'var(--vp-bg)',
           maxWidth: '100%',
         }}
       >
-        {/* Visually mirror the public home (web/src/app/page.tsx →
-            _home/HomeLayout.tsx). Cells emit straight into vp-rh-grid so
-            the 3-col cluster grid, full-width lead with timeline aside,
-            and ad-style rows (ticker / insight / discovery) all sit in
-            the same place they do at /. Admin-only chrome is limited to
-            the tiny `[N]` PosChip + the red selection outline on click.
-            No section headers, no ordinal column. */}
+        {/* Visually mirror the public home — same partitioning as
+            web/src/app/_home/HomeLayout.tsx: full-width top band,
+            2-col body (main left + rail right, independent vertical
+            stacks), full-width bottom band. Cells reuse the same
+            vp-rh-* class hooks so the rail chrome, hero chrome,
+            and story divider all render identically to /. */}
         <div className="vp-rh" style={{ width: '100%' }}>
-          <main className="vp-rh-grid">
-            {orderedSlots.map((slot) => renderSlot(slot))}
-          </main>
+          <div className="vp-rh-grid">
+            {topSlots.length > 0 && (
+              <div className="vp-rh-grid__top">
+                {topSlots.map((slot) => renderSlot(slot))}
+              </div>
+            )}
+            <div className="vp-rh-body">
+              <div className="vp-rh-body__main">
+                {mainSlots.map((slot) => renderSlot(slot))}
+              </div>
+              <div className="vp-rh-body__rail">
+                {railSlots.map((slot) => renderSlot(slot))}
+              </div>
+            </div>
+            {bottomSlots.length > 0 && (
+              <div className="vp-rh-grid__bottom">
+                {bottomSlots.map((slot) => renderSlot(slot))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

@@ -164,6 +164,7 @@ enum VP {
     static let burgundySoft   = Color(hex: "f4e6e2")
     static let burgundyBorder = Color(hex: "ded8ce")
     static let burgundyBorderSoft = Color(hex: "eee8df")
+    static let burgundyBg = Color(hex: "f7f4ef")
     static let burgundySurfaceSoft = Color(hex: "fbf7ef")
     static let burgundyQuizBorder = Color(hex: "e4cdb8")
     static let burgundyTextMuted = Color(hex: "66615a")

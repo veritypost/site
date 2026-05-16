@@ -18,7 +18,6 @@ const SANS = 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", 
 interface ArticleEngagementZoneProps {
   articleId: string;
   articleCategoryId?: string | null;
-  articleCategoryName?: string | null;
   hasQuiz: boolean;
   initialPassed: boolean;
   currentUserId?: string | null;
@@ -29,7 +28,6 @@ interface ArticleEngagementZoneProps {
 export default function ArticleEngagementZone({
   articleId,
   articleCategoryId,
-  articleCategoryName,
   hasQuiz,
   initialPassed,
   currentUserId,
@@ -161,20 +159,6 @@ export default function ArticleEngagementZone({
               quizPassed={true}
               justRevealed={justPassedThisSession}
             />
-            {articleCategoryId && articleCategoryName ? (
-              <div style={{
-                marginTop: 24, paddingTop: 16,
-                borderTop: '1px solid var(--vp-border)',
-                fontSize: 13, color: 'var(--vp-text-soft)', textAlign: 'center',
-              }}>
-                <a
-                  href={`/leaderboard?cat=${articleCategoryId}`}
-                  style={{ color: 'inherit', textDecoration: 'none', fontWeight: 600 }}
-                >
-                  See {articleCategoryName} leaderboard →
-                </a>
-              </div>
-            ) : null}
           </div>
         </>
       ) : null}

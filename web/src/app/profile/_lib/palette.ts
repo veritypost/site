@@ -9,15 +9,18 @@
 // + tier ramps + semantic states), large tap targets, dark-mode native.
 
 export const C = {
-  // Surfaces
-  bg: 'var(--p-bg)',
-  surface: 'var(--p-surface)',
-  surfaceRaised: 'var(--p-surface-raised)',
-  surfaceSunken: 'var(--p-surface-sunken)',
+  // Surfaces — owner call 2026-05-16: re-skin to the editorial vp-*
+  // palette so /profile lives on the same cream canvas + white cards
+  // as the home and article. Keys stay the same; only the CSS vars
+  // they alias change.
+  bg: 'var(--vp-bg)',
+  surface: 'var(--vp-surface)',
+  surfaceRaised: 'var(--vp-surface)',
+  surfaceSunken: 'var(--vp-surface-soft)',
   // Lines
-  border: 'var(--p-border)',
-  borderStrong: 'var(--p-border-strong)',
-  divider: 'var(--p-divider)',
+  border: 'var(--vp-border-soft)',
+  borderStrong: 'var(--vp-border)',
+  divider: 'var(--vp-border-soft)',
   // Ink
   ink: 'var(--p-ink)',
   inkSoft: 'var(--p-ink-soft)',
@@ -57,20 +60,21 @@ export const C = {
 // TIER_C is intentionally undefined. Consumers that previously read it
 // were updated to render the tier name in `C.inkMuted` only.
 
-// Spacing — 4px base, 8px grid. Larger than admin (where S[1]=4, S[4]=16);
-// here the same keys exist but base default is wider for the consumer surface.
+// Spacing — bumped 2026-05-16 so the cream canvas around each card
+// reads as breathing room, not as adjacency. Same key shape, larger
+// values from S[3] upward.
 export const S = {
   0: 0,
-  1: 4,
-  2: 8,
-  3: 12,
-  4: 16,
-  5: 20,
-  6: 24,
-  7: 32,
-  8: 40,
-  9: 56,
-  10: 72,
+  1: 6,
+  2: 12,
+  3: 16,
+  4: 24,
+  5: 28,
+  6: 36,
+  7: 44,
+  8: 56,
+  9: 72,
+  10: 96,
 } as const;
 
 // Type scale. Base 15 (vs admin 13) — denser feels good in admin grids,
@@ -89,18 +93,22 @@ export const F = {
 
 // Radii. Cards 14, pills 999, inputs 10. Avoiding too-soft rounding —
 // editorial tone wants definition, not bubbliness.
+// Radii bumped 2026-05-16 to match the home + article rail-card
+// chrome family (18 / 20 / 28px). Editorial-with-presence, not
+// bubble-ware.
 export const R = {
-  sm: 6,
-  md: 10,
-  lg: 14,
-  xl: 20,
+  sm: 8,
+  md: 14,
+  lg: 18,
+  xl: 24,
   pill: 999,
 } as const;
 
-// Shadows. One ambient + one elevated. Used sparingly.
+// Shadows tuned to the same soft warm drop the home rails use so
+// /profile cards lift off the cream canvas instead of sitting flush.
 export const SH = {
-  ambient: '0 1px 2px rgba(15,15,15,0.04), 0 1px 3px rgba(15,15,15,0.06)',
-  elevated: '0 4px 12px rgba(15,15,15,0.06), 0 2px 4px rgba(15,15,15,0.05)',
+  ambient: '0 6px 18px rgba(20, 16, 12, 0.04)',
+  elevated: '0 18px 48px rgba(20, 16, 12, 0.06)',
   ring: `0 0 0 3px ${C.ring}`,
 } as const;
 

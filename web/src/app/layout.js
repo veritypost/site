@@ -152,7 +152,6 @@ export default async function RootLayout({ children }) {
         style={{
           margin: 0,
           padding: 0,
-          background: 'var(--p-bg)',
           color: 'var(--p-ink)',
           fontFamily:
             'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',

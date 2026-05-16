@@ -41,6 +41,15 @@
  *      [[PREDICT]]) emit into body for native iOS Deep dive
  *      rendering. Web/adult readers see markers transformed inline
  *      by render-body.ts. Other prompts unchanged.
+ *   7. Owner-locked headline + summary rewrite (2026-05-16):
+ *      HEADLINE_PROMPT, KIDS_HEADLINE_PROMPT, TWEENS_HEADLINE_PROMPT
+ *      all updated to enforce: (a) headline = what happened +
+ *      story-arc anchor, ~10 words (adult), ~8 (kids), ~9 (tweens);
+ *      (b) summary = single ~30-word sentence tied to the article;
+ *      (c) explicit anti-clickbait ban list (curiosity gaps,
+ *      withheld key facts, rhetorical questions, list-bait, tease
+ *      colons, reaction framing, hype adjectives). Owner: "nothing
+ *      here can be seen as clickbaitable."
  *
  * HEADLINE_PROMPT emits one JSON {title, summary} per snapshot L649-653.
  * Body generation is a separate canonical step owned by Phase 3;
@@ -1016,55 +1025,78 @@ speak. Mugshot descriptions or appearance commentary.`,
 export const HEADLINE_PROMPT: string = `Generate a headline and summary for this news article.
 
 HEADLINE RULES:
-- Maximum 10 words. Aim for 6-8.
+- 8–14 words. Aim for 10.
+- WHAT HAPPENED + STORY-ARC ANCHOR. The headline names today's
+  specific development AND anchors it to the standing story it
+  belongs to. The reader should know both "this is the Trump–Xi
+  summit story" AND "this is what happened today" from the
+  headline alone. Never a bare topic ("Trump's 2026 China visit"),
+  never a hyper-specific snapshot stripped of the arc.
+    GOOD: "Trump and Xi wrap two-day China summit with no Taiwan deal"
+    GOOD: "Long Island Rail Road strike strands 300,000 commuters"
+    GOOD: "FDA replaces top drug and vaccine regulators after commissioner exits"
+    BAD (topic only): "Trump's 2026 China visit"
+    BAD (clickbait):  "You won't believe what Trump said to Xi"
+    BAD (vague):      "Cassidy faces tough race"
 - State the fact. No tease, no question, no suspense.
 - Active voice. Subject-verb-object. Every word earns its place.
-- No clickbait. No colon-splitter headlines ("Iran: What the latest strike means").
+- NO CLICKBAIT — UNDER ANY FORM. Specifically banned:
+    - Curiosity gaps ("Here's why...", "What happened next will surprise you")
+    - Withholding the key fact ("Cassidy just did something his party won't forget")
+    - Rhetorical questions ("Can Cassidy survive?")
+    - List-bait ("5 things to know about the Trump–Xi summit")
+    - Tease colons ("Iran: What the latest strike means")
+    - Reaction framing ("Internet erupts after FDA shake-up")
+    - Hype adjectives (banned list applies to headlines: sweeping, landmark,
+      controversial, stunning, dramatic, unprecedented, groundbreaking, historic,
+      shocking, alarming, massive, huge, enormous, game-changing, revolutionary,
+      breakthrough)
+  The reader has paid attention to Verity Post precisely because we do not
+  tease. Every headline is the news, stated.
 - No opinion adjectives. Present tense for current events.
-- NO daily percentage moves or stock prices in headlines. These age immediately. Use the cause, not the number.
-  BAD: "Nvidia Falls 1.3% on Export Ban News" (7 words but wrong content)
-  GOOD: "Commerce Dept Formalizes China AI Chip Ban" (7 words)
+- NO daily percentage moves or stock prices in headlines. These age immediately.
+  Use the cause, not the number.
+    BAD: "Nvidia Falls 1.3% on Export Ban News"
+    GOOD: "Commerce Dept Formalizes China AI Chip Ban"
 - Cut every unnecessary word. "The" is almost always unnecessary. "Of" can often be cut.
 
-SUMMARY RULES — LENGTH SCALES WITH ARTICLE LENGTH:
+SUMMARY RULES — ~30 WORDS, TIED TO THE ARTICLE:
 
-The summary is a deck — it sits above the article and gives
-a skimmer the additional facts they need beyond the headline.
-The summary also renders on the home and category cards, where
-it has to fit a 320px mobile viewport without clamping or
-truncation, so the bound below is tight on purpose.
+The summary sits between the headline and the article body and
+renders on the home and category cards. It is a plain,
+factual restatement of what today's article delivers beyond the
+headline — not a tease, not a hook, not a question. A reader who
+reads only the headline + summary should walk away knowing the
+core facts of the story.
 
-LENGTH: 1–2 sentences, 18–22 words (target ≈120 characters).
-Fixed target. The summary call runs in parallel with the body,
-so it cannot observe the body's actual length — a consistent
-short deck is honest about that constraint.
+LENGTH: ~30 words. Doesn't have to be exact — anywhere from
+roughly 20 to 40 words is fine if the sentence reads naturally.
+One sentence is the default; a short second sentence is OK if
+the first would feel jammed. Don't pad and don't amputate to
+hit a number.
 
-Hard ceiling: 25 words / 160 characters. The summary never
-crosses this — past it the home card has to clamp.
-Hard floor: 12 words. A one-clause summary is too thin.
+Hard ceiling: 45 words. Hard floor: 18 words.
 
 CONTENT RULES:
-- The summary must NOT restate the headline or the article's
-  first paragraph.
-- The summary must contain DIFFERENT FACTS from the headline.
-  If the headline says the score and the winner, the summary
-  must NOT repeat the score and the winner. Instead, add the
-  key stat, the streak, the historical context, or the
-  secondary development a skimmer of headline + summary would
-  want to know.
-- Open with one additional fact NOT in the headline; layer in
+- The summary is TIED TO THE ARTICLE — it summarizes today's
+  development. Same facts, plain prose, no editorial framing.
+- The summary must NOT restate the headline word-for-word.
+  Add the secondary facts a skimmer needs: who else is involved,
+  what comes next, what number anchors it, what the historical
+  parallel is.
+- Open with one additional fact NOT already in the headline; layer
   the most important secondary details after that.
-- Same language rules as headlines — no editorial language,
+- NO CLICKBAIT in the summary — same ban list as headlines.
+  No "here's why," no questions, no teasers, no withholding key
+  facts to drive a click. Verity Post readers click because they
+  trust the headline + summary deliver the news straight.
+- Same language rules as the article body — no editorial language,
   no opinion adjectives, no in-line outlet attribution.
 
 ANTI-REPETITION CHECK — THIS IS CRITICAL:
 1. Read your headline. List every fact in it.
 2. Read your summary. If ANY fact from the headline appears
-   in the summary — even rephrased — rewrite the summary.
-   "UCLA defeats South Carolina 79-51" in the headline means
-   the summary CANNOT say "UCLA defeated South Carolina 79-51."
-   The summary should instead mention the win streak, the
-   key performer, the historical drought, or the margin record.
+   in the summary verbatim, rewrite the summary.
 3. Read the article's first two sentences. If more than 5 words
    in sequence match your summary, rewrite with different info.
 
@@ -1302,32 +1334,40 @@ VOICE:
 - Active voice always. No passive constructions.
 
 HEADLINE RULES:
-- Maximum 8 words. Aim for 5-7.
-- State the most surprising or interesting fact. Not the politics, not the procedure — the thing that makes a kid lean forward.
+- 6–10 words. Aim for 8.
+- WHAT HAPPENED + STORY-ARC ANCHOR. The headline names today's
+  development AND ties it to the standing story. Never a bare
+  topic, never a hyper-specific snapshot without the arc.
+- State the most concrete fact. Not the politics, not the procedure — the thing that makes a kid lean forward.
 - Active voice. Subject-verb-object.
+- NO CLICKBAIT. No teases ("Find out what happened next"), no
+  questions, no withholding, no hype words. The kid gets the
+  news in the headline.
 - No idioms or wordplay a kid would miss.
 - Present tense.
 
-SUMMARY RULES — TIGHT, FIXED-LENGTH DECK:
+SUMMARY RULES — ~30 WORDS, TIED TO THE ARTICLE:
 
-The summary sits above the article and also renders on home
-and category cards. To never clamp or truncate on a 320px
-mobile viewport, the deck stays short. A kid who reads the
-summary should still want to read the article.
+The summary sits between the headline and the article body and
+renders on the home and category cards. A kid who reads the
+summary should know what today's update is — not be teased into
+clicking.
 
-LENGTH: 1–2 sentences, 18–22 words (target ≈120 characters).
-Fixed target. The summary call runs in parallel with the body,
-so it cannot observe the body's actual length — a consistent
-short deck is honest about that constraint.
+LENGTH: ~30 words. Doesn't have to be exact — roughly 20 to 40
+words is fine if the sentence reads naturally in kid voice.
+One sentence is the default; a short second sentence is OK.
+Don't pad and don't amputate to hit a number.
 
-Hard ceiling: 25 words / 160 characters. Hard floor: 12 words.
+Hard ceiling: 45 words. Hard floor: 18 words.
 
 CONTENT RULES:
-- Short sentences in 7–9 voice. One idea per sentence.
-- Connect to the kid's world. "That's like every school in
-  your state closing at once."
+- Short, kid-voice phrasing. One idea per clause.
+- Connect to the kid's world only when it genuinely fits ("That's
+  like every school in your state closing at once.").
 - Different facts than the headline. The summary must NOT
   restate the headline.
+- NO CLICKBAIT — same ban as headlines. No tease, no question,
+  no withheld key fact.
 - No editorial language. No outlet names inline.
 
 OUTPUT FORMAT:
@@ -1345,23 +1385,29 @@ VOICE:
 - Conveys why the news matters without telling the reader what to think.
 
 HEADLINE RULES:
-- Maximum 9 words. Aim for 6-8.
+- 7–12 words. Aim for 9.
+- WHAT HAPPENED + STORY-ARC ANCHOR. The headline names today's
+  development AND ties it to the standing story. Never a bare
+  topic, never a hyper-specific snapshot without the arc.
 - State the fact. Active voice. Subject-verb-object.
-- No clickbait, no rhetorical questions.
+- NO CLICKBAIT — UNDER ANY FORM. No teases, no rhetorical
+  questions, no curiosity gaps, no "here's why," no withheld
+  key fact, no hype adjectives (sweeping, dramatic, etc.). The
+  reader gets the news in the headline.
 - Present tense for current events.
 
-SUMMARY RULES — TIGHT, FIXED-LENGTH DECK:
+SUMMARY RULES — ~30 WORDS, TIED TO THE ARTICLE:
 
-The summary sits above the article and also renders on home
-and category cards. To never clamp or truncate on a 320px
-mobile viewport, the deck stays short.
+The summary sits between the headline and the article body and
+renders on the home and category cards. A reader who reads only
+the headline + summary should walk away with the core facts.
 
-LENGTH: 1–2 sentences, 18–22 words (target ≈120 characters).
-Fixed target. The summary call runs in parallel with the body,
-so it cannot observe the body's actual length — a consistent
-short deck is honest about that constraint.
+LENGTH: ~30 words. Doesn't have to be exact — roughly 20 to 40
+words is fine if the sentence reads naturally. One sentence is
+the default; a short second sentence is OK. Don't pad and don't
+amputate to hit a number.
 
-Hard ceiling: 25 words / 160 characters. Hard floor: 12 words.
+Hard ceiling: 45 words. Hard floor: 18 words.
 
 CONTENT RULES:
 - Different facts than the headline. The summary must NOT
@@ -1370,6 +1416,7 @@ CONTENT RULES:
   tween-relatable connection (school, family, money, gaming,
   sports) is genuinely there, layer it in — don't force it
   if it isn't.
+- NO CLICKBAIT — same ban as headlines.
 - No editorial language. No outlet names inline.
 
 OUTPUT FORMAT:

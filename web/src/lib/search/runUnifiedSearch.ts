@@ -13,7 +13,14 @@ import { runStorySearch, type StorySearchSort, type StorySearchStatus } from './
 // existing permission resolver (topic/date/source).
 
 export type ResultType = 'all' | 'stories' | 'articles';
-export type SortMode = 'relevance' | 'recent' | 'newest_article' | 'most_sourced';
+export type SortMode =
+  | 'relevance'
+  | 'recent'
+  | 'newest_article'
+  | 'most_sourced'
+  | 'just_broke'
+  | 'resurfacing'
+  | 'long_arcs';
 export type Chip = 'all' | 'today' | 'this_week' | 'developing' | 'updated_recently';
 
 export interface UnifiedSearchInput {
@@ -39,10 +46,13 @@ export interface StoryResultRow {
   title: string | null;
   lifecycle_status: 'developing' | 'resolved' | null;
   published_at: string | null;
+  first_seen_at: string | null;
   last_observed_at: string | null;
   article_count: number;
+  earliest_article_at: string | null;
   latest_article_at: string | null;
   has_recent_comments: boolean;
+  comment_count: number;
   topic: { id: string | null; slug?: string | null; name?: string | null } | null;
 }
 
@@ -194,10 +204,13 @@ export async function runUnifiedSearch(
     title: s.title,
     lifecycle_status: s.lifecycle_status,
     published_at: s.published_at,
+    first_seen_at: s.first_seen_at,
     last_observed_at: s.last_observed_at,
     article_count: s.article_count,
+    earliest_article_at: s.earliest_article_at,
     latest_article_at: s.latest_article_at,
     has_recent_comments: s.has_recent_comments,
+    comment_count: s.comment_count,
     topic: s.ai_category_id
       ? {
           id: s.ai_category_id,
@@ -227,18 +240,22 @@ export async function runUnifiedSearch(
     }
   );
 
-  // Interleave: sort=relevance keeps story-first then article-first
-  // ordering as runArticleSearch + runStorySearch already shaped it.
-  // sort=recent merges by latest_article_at (stories) / published_at
-  // (articles); sort=newest_article uses pub timestamps directly.
+  // Interleave: most sorts merge stories+articles by a timestamp; a
+  // few (resurfacing / long_arcs / most_sourced) leave the story-side
+  // order as runStorySearch already shaped it and append articles.
   const combined: UnifiedResultRow[] = [];
-  if (sort === 'recent' || sort === 'newest_article') {
+  if (sort === 'recent' || sort === 'newest_article' || sort === 'just_broke') {
     const all: Array<{ ts: number; row: UnifiedResultRow }> = [];
     for (const s of storyRows) {
-      const t =
-        sort === 'recent'
-          ? Date.parse(s.latest_article_at || s.last_observed_at || s.published_at || '') || 0
-          : Date.parse(s.latest_article_at || s.published_at || '') || 0;
+      let t = 0;
+      if (sort === 'recent') {
+        t = Date.parse(s.latest_article_at || s.last_observed_at || s.published_at || '') || 0;
+      } else if (sort === 'newest_article') {
+        t = Date.parse(s.latest_article_at || s.published_at || '') || 0;
+      } else {
+        // just_broke: when the story was first sighted on Verity.
+        t = Date.parse(s.first_seen_at || s.published_at || '') || 0;
+      }
       all.push({ ts: t, row: s });
     }
     for (const a of articleRows) {
@@ -247,6 +264,8 @@ export async function runUnifiedSearch(
     all.sort((x, y) => y.ts - x.ts);
     for (const item of all) combined.push(item.row);
   } else {
+    // relevance / most_sourced / resurfacing / long_arcs all preserve
+    // the story-side ordering runStorySearch already computed.
     combined.push(...storyRows, ...articleRows);
   }
 
@@ -263,8 +282,18 @@ export async function runUnifiedSearch(
   for (const s of storyRows) {
     if (s.topic?.id) facets.topic[s.topic.id] = (facets.topic[s.topic.id] || 0) + 1;
     if (s.lifecycle_status === 'developing') facets.status.developing += 1;
-    if (s.last_observed_at && now - Date.parse(s.last_observed_at) < 7 * DAY_MS) {
-      facets.status.updated += 1;
+    // Story-side date facets use `last_observed_at` so they line up
+    // with the actual chip-date filter (which also reads
+    // `last_observed_at`). Otherwise a "Today" chip can show N stories
+    // while `facets.date.today` reads 0.
+    const sObserved = s.last_observed_at ? Date.parse(s.last_observed_at) : 0;
+    if (sObserved) {
+      const age = now - sObserved;
+      if (age < DAY_MS) facets.date.today += 1;
+      if (age < 7 * DAY_MS) facets.date.this_week += 1;
+      if (age < 30 * DAY_MS) facets.date.this_month += 1;
+      if (age < 365 * DAY_MS) facets.date.this_year += 1;
+      if (age < 7 * DAY_MS) facets.status.updated += 1;
     }
   }
   for (const a of articleRows) {

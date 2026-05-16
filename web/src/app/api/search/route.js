@@ -106,10 +106,23 @@ export async function GET(request) {
     ].includes(chipParam)
       ? chipParam
       : 'all';
-    const sortParam = (url.searchParams.get('sort') || 'relevance').toLowerCase();
-    const sort = ['relevance', 'recent', 'newest_article', 'most_sourced'].includes(sortParam)
+    // 'relevance' was retired from the UI (the option silently sorted by
+    // date — see UnifiedSearch SORT_OPTIONS). It stays in the allowlist
+    // for inbound-URL back-compat and is coerced to 'recent', which is
+    // the new default and what the lib already produced for 'relevance'.
+    const sortParam = (url.searchParams.get('sort') || 'recent').toLowerCase();
+    const allowedSort = [
+      'relevance',
+      'recent',
+      'newest_article',
+      'most_sourced',
+      'just_broke',
+      'resurfacing',
+      'long_arcs',
+    ].includes(sortParam)
       ? sortParam
-      : 'relevance';
+      : 'recent';
+    const sort = allowedSort === 'relevance' ? 'recent' : allowedSort;
 
     const unified = await runUnifiedSearch({
       q: rawQ,

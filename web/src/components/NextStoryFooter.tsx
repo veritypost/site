@@ -19,14 +19,14 @@ const SERIF = '"Source Serif 4", var(--font-source-serif), Georgia, serif';
 export default function NextStoryFooter({ category, nearbyStories }: NextStoryFooterProps) {
   if (!(nearbyStories.length > 0 && category)) {
     return (
-      <footer style={{ marginTop: 40 }}>
+      <footer style={{ marginTop: 64, marginBottom: 64 }}>
         <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px' }} />
       </footer>
     );
   }
 
   return (
-    <footer style={{ marginTop: 40 }}>
+    <footer style={{ marginTop: 64, marginBottom: 64 }}>
       {/* Hover affordance for the story-title links. Inline styles can't
           do :hover, so a tiny scoped <style> block carries it. */}
       <style>{`
@@ -39,7 +39,7 @@ export default function NextStoryFooter({ category, nearbyStories }: NextStoryFo
             background: SURFACE_SOFT,
             border: `1px solid ${QUIZ_BORDER}`,
             borderRadius: 18,
-            padding: '20px 24px',
+            padding: '28px 32px',
           }}
         >
           <p

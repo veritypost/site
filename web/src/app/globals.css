@@ -160,6 +160,7 @@
   --vp-accent: #8b0f16;
   --vp-accent-dark: #64090e;
   --vp-accent-soft: #f4e6e2;
+  --vp-bg: #f7f4ef;
   --vp-surface: #ffffff;
   --vp-surface-soft: #fbf7ef;
   --vp-border: #ded8ce;
@@ -465,6 +466,7 @@
   --vp-accent: #8b0f16;
   --vp-accent-dark: #64090e;
   --vp-accent-soft: #f4e6e2;
+  --vp-bg: #f7f4ef;
   --vp-surface: #ffffff;
   --vp-surface-soft: #fbf7ef;
   --vp-border: #ded8ce;
@@ -601,6 +603,11 @@ textarea::placeholder {
 }
 body {
   overflow-x: hidden;
+  /* Editorial surfaces (home, article, reader, etc.) sit on the warm
+     cream canvas so the global footer + any margin space outside the
+     page wrapper reads as one continuous editorial surface. Pages
+     that need a different bg (admin, settings) override locally. */
+  background: var(--vp-bg);
 }
 .vp-skip-link {
   position: absolute;
@@ -644,10 +651,14 @@ body {
   display: block;
 }
 
-/* Profile: stat grid + stat value — base (desktop) */
+/* Profile: stat grid + stat value — base (desktop). Locked to 4
+   equal columns so the four stat tiles (Quizzes / Comments /
+   Followers / Following) always sit on a single row regardless of
+   detail-column width, instead of wrapping the last tile into row
+   2 and crowding the next section's heading. */
 .redesign-stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .redesign-stat-value {
   font-size: 36px;
@@ -868,6 +879,13 @@ body {
   background: var(--p-border);
 }
 
+/* Article reader sits on the warm parchment canvas from the v2 burgundy
+   redesign — full-bleed so the editorial tone reads as one surface, not a
+   white sheet floating on the page. */
+[data-reader-tabs] {
+  background: var(--vp-bg);
+  min-height: 100vh;
+}
 [data-reader-tabstrip] { display: none; }
 [data-reader-body] {
   display: block;
@@ -900,10 +918,10 @@ body {
 @media (min-width: 1180px) {
   [data-reader-body] {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
-    column-gap: 32px;
-    max-width: 1080px;
-    padding: 0 40px;
+    grid-template-columns: minmax(0, 680px) 300px;
+    column-gap: 64px;
+    max-width: 1180px;
+    padding: 0 32px;
   }
   [data-reader-main] { min-width: 0; }
   [data-reader-panel="timeline"] {
@@ -911,8 +929,11 @@ body {
     position: sticky;
     top: calc(var(--vp-top-bar-h, 56px) + 24px);
     align-self: start;
-    max-height: calc(100vh - var(--vp-top-bar-h, 56px) - 24px);
-    overflow-y: auto;
+    /* Owner call 2026-05-16: rail should not be internally
+       scrollable. Drop the max-height + overflow so the rail just
+       sits there as one static block. */
+    max-height: none;
+    overflow-y: visible;
   }
   [data-reader-panel="timeline"] > section:first-child { margin-top: 0; }
   /* Align Quiz + Discussion to the article body column on desktop.
@@ -994,4 +1015,95 @@ body {
   [data-reader-tabs][data-active-tab="article"] [data-reader-panel]:not([data-reader-panel="article"]) { display: none; }
   [data-reader-tabs][data-active-tab="timeline"] [data-reader-panel]:not([data-reader-panel="timeline"]) { display: none; }
   [data-reader-tabs][data-active-tab="engagement"] [data-reader-panel]:not([data-reader-panel="engagement"]) { display: none; }
+}
+
+/* ─────────── /v2 grid debug overlay ─────────── */
+/* Dotted black outline + numbered kind+role label on every slot wrapper
+   inside the /v2 sandbox. Scoped via `.v2-grid-debug` so the live home
+   at `/` is unaffected. Every slot kind in the current layout
+   (top_banner, story_card, rail_card, list_rail, square_row) accepts
+   both article and ad content_types — so each label reads
+   "n · KIND · story or ad". Counter resets at the grid root so
+   numbering starts at 1. */
+.v2-grid-debug .vp-rh-grid { counter-reset: slot; }
+.v2-grid-debug [data-slot-kind] {
+  outline: 2px dotted #000;
+  outline-offset: -2px;
+  position: relative;
+  min-height: 56px;
+  counter-increment: slot;
+}
+.v2-grid-debug [data-slot-kind]::before {
+  content: counter(slot) " · " attr(data-slot-kind) " · story or ad";
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: #000;
+  padding: 4px 6px;
+  border-radius: 0;
+  pointer-events: none;
+}
+/* Hero override — pos-20 story_card is the page lead, so label it as
+   `hero card` rather than the generic `story_card` so the debug
+   overlay matches how editors think about the slot. */
+.v2-grid-debug [data-slot-key="hero"]::before {
+  content: counter(slot) " · hero card · story or ad";
+}
+
+/* Rail-card outline override — the inner .vp-rh-rail-card is
+   trimmed 5% on each side, so the dotted outline + label belong on
+   the trimmed card rather than the full-width grid wrapper. */
+.v2-grid-debug [data-slot-kind="rail_card"] {
+  outline: 0;
+}
+.v2-grid-debug [data-slot-kind="rail_card"]::before {
+  display: none;
+}
+.v2-grid-debug [data-slot-kind="rail_card"] .vp-rh-rail-card {
+  outline: 2px dotted #000;
+  outline-offset: -2px;
+  position: relative;
+}
+.v2-grid-debug [data-slot-kind="rail_card"] .vp-rh-rail-card::after {
+  content: counter(slot) " · rail_card · story or ad";
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: #000;
+  padding: 4px 6px;
+  pointer-events: none;
+}
+/* The square_row slot internally renders 5 cells — outline + number
+   each cell as n.m so the bottom row reads as 5 distinct boxes
+   matching the mock. Sub-counter is independent of the slot counter. */
+.v2-grid-debug [data-slot-kind="square_row"] { counter-reset: square; }
+.v2-grid-debug [data-slot-kind="square_row"] > * > * {
+  outline: 2px dotted #000;
+  outline-offset: -2px;
+  position: relative;
+  counter-increment: square;
+}
+.v2-grid-debug [data-slot-kind="square_row"] > * > *::before {
+  content: counter(slot) "." counter(square) " · square · story or ad";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 3;
+  font: 700 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fff;
+  background: #000;
+  padding: 3px 5px;
+  pointer-events: none;
 }

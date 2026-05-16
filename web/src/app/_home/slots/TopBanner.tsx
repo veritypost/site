@@ -11,11 +11,13 @@ import { type CardCtx, categoryFor, storyHref } from './_shared';
 export default function TopBanner({ slot, ctx }: { slot: SlotRow; ctx: CardCtx }) {
   const item = slot.items[0];
   if (!item) return null;
+  const thin = (slot.config as { thin?: boolean } | null)?.thin === true;
+  const thinClass = thin ? ' vp-rh-banner--thin' : '';
 
   if (item.content_type === 'ad') {
     const placement = (item.payload?.placement as string) || 'home_top_banner';
     return (
-      <section className="vp-rh-banner vp-rh-banner--ad">
+      <section className={`vp-rh-banner vp-rh-banner--ad${thinClass}`}>
         <Ad placement={placement} page="home" position="header" />
       </section>
     );
@@ -25,17 +27,9 @@ export default function TopBanner({ slot, ctx }: { slot: SlotRow; ctx: CardCtx }
   if (!story) return null;
   const href = storyHref(story);
   const cat = categoryFor(story, ctx);
-  const cover = story.cover_image_url;
 
   const inner = (
     <>
-      {cover && (
-        <div
-          className="vp-rh-banner__art"
-          style={{ backgroundImage: `url("${cover}")` }}
-          aria-hidden="true"
-        />
-      )}
       <div className="vp-rh-banner__body">
         {cat?.name && <p className="vp-rh-banner__cat">{cat.name}</p>}
         <h2 className="vp-rh-banner__title">{story.title}</h2>
@@ -45,7 +39,7 @@ export default function TopBanner({ slot, ctx }: { slot: SlotRow; ctx: CardCtx }
   );
 
   return (
-    <section className="vp-rh-banner">
+    <section className={`vp-rh-banner${thinClass}`}>
       {href ? (
         <Link href={href} className="vp-rh-banner__link">{inner}</Link>
       ) : (

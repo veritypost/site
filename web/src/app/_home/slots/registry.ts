@@ -69,6 +69,15 @@ const SELF_SOURCING: ReadonlySet<SlotKind> = new Set([
 
 function slotIsEmpty(slot: SlotRow): boolean {
   if (SELF_SOURCING.has(slot.kind)) return false;
+  // Rail card configured as a list (most_read / most_discussed /
+  // recent_updates / most_active_timelines) self-sources its rows
+  // from analytics tables — its items[] is intentionally empty.
+  if (
+    slot.kind === 'rail_card' &&
+    (slot.config as { variant?: string } | null)?.variant === 'list'
+  ) {
+    return false;
+  }
   // Engagement may be a quiz payload (question + options). Treat any
   // non-article item with a non-empty payload as "filled."
   if (slot.kind === 'engagement') {

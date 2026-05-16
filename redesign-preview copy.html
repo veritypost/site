@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Verity Post — Mobile Hybrid Home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f4ef;
+  --canvas:#e7e2d8;
+  --surface:#fff;
+  --surface-soft:#fbf7ef;
+  --ink:#171717;
+  --muted:#66615a;
+  --soft:#8b8378;
+  --border:#ded8ce;
+  --border-soft:#eee8df;
+  --accent:#8b0f16;
+  --accent-dark:#64090e;
+  --accent-soft:#f4e6e2;
+  --headline:Georgia,"Times New Roman",serif;
+  --ui:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+}
+
+*{box-sizing:border-box}
+
+html{background:var(--canvas)}
+
+body{
+  margin:0 auto;
+  max-width:430px;
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--ui);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  box-shadow:0 0 70px rgba(20,16,12,.18);
+  padding-bottom:76px;
+}
+
+a{color:inherit;text-decoration:none}
+button,input{font:inherit}
+
+.topbar{
+  position:sticky;
+  top:0;
+  z-index:80;
+  height:56px;
+  display:grid;
+  grid-template-columns:38px 1fr 38px;
+  align-items:center;
+  gap:10px;
+  padding:0 14px;
+  background:rgba(247,244,239,.96);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border-soft);
+}
+
+.icon-btn{
+  width:36px;
+  height:36px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:var(--surface);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--muted);
+  font-weight:700;
+  cursor:pointer;
+}
+
+.logo{
+  font-family:var(--headline);
+  font-size:22px;
+  letter-spacing:.045em;
+  text-align:center;
+  font-weight:400;
+}
+
+.profile-dot{
+  width:36px;
+  height:36px;
+  border-radius:999px;
+  background:var(--accent);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:var(--headline);
+  font-size:16px;
+}
+
+.subnav{
+  position:sticky;
+  top:56px;
+  z-index:70;
+  display:flex;
+  gap:0;
+  overflow-x:auto;
+  white-space:nowrap;
+  background:rgba(247,244,239,.98);
+  border-bottom:1px solid var(--border-soft);
+  backdrop-filter:blur(10px);
+  scrollbar-width:none;
+}
+
+.subnav::-webkit-scrollbar{display:none}
+
+.subnav a{
+  padding:13px 14px 12px;
+  font-size:13px;
+  font-weight:700;
+  color:var(--muted);
+  border-bottom:2px solid transparent;
+  flex-shrink:0;
+}
+
+.subnav a.active{
+  color:var(--ink);
+  border-bottom-color:var(--accent);
+}
+
+.shell{
+  padding:16px 14px 26px;
+}
+
+.brandline{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:2px 0 12px;
+}
+
+.tagline{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--accent);
+  font-weight:600;
+}
+
+.stage{
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--soft);
+  border:1px solid var(--border-soft);
+  background:#fff;
+  border-radius:999px;
+  padding:5px 8px;
+  white-space:nowrap;
+}
+
+.changed{
+  background:#fff;
+  border:1px solid var(--border-soft);
+  border-radius:16px;
+  padding:13px 14px;
+  margin-bottom:14px;
+  box-shadow:0 4px 14px rgba(20,16,12,.025);
+}
+
+.changed__label{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--accent);
+  font-weight:600;
+  margin-bottom:8px;
+}
+
+.changed__item{
+  font-size:13px;
+  color:var(--muted);
+  line-height:1.35;
+  margin:0 0 7px;
+}
+
+.changed__item:last-child{margin-bottom:0}
+
+.changed__time{
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--soft);
+  margin-right:6px;
+  font-weight:600;
+}
+
+.main-discussion{
+  background:linear-gradient(180deg,#fff 0%,#fbf7ef 100%);
+  border:1px solid var(--border);
+  border-radius:22px;
+  padding:18px;
+  margin-bottom:14px;
+  box-shadow:0 14px 34px rgba(20,16,12,.07);
+}
+
+.eyebrow{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--accent);
+  font-weight:600;
+}
+
+.main-title{
+  margin:8px 0 10px;
+  font-family:var(--headline);
+  font-size:34px;
+  line-height:.98;
+  letter-spacing:-.04em;
+  font-weight:400;
+}
+
+.deck{
+  font-size:15px;
+  line-height:1.5;
+  color:var(--muted);
+  margin:0;
+}
+
+.change{
+  margin:12px 0 0;
+  padding-left:10px;
+  border-left:2px solid var(--accent);
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.42;
+}
+
+.prompt{
+  margin:14px 0 0;
+  padding:13px;
+  border:1px solid var(--border-soft);
+  border-radius:14px;
+  background:#fff;
+}
+
+.prompt__label{
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--accent);
+  font-weight:600;
+  margin-bottom:5px;
+}
+
+.prompt__text{
+  font-family:var(--headline);
+  font-size:18px;
+  line-height:1.2;
+  letter-spacing:-.015em;
+  font-style:italic;
+  margin:0;
+}
+
+.signals{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  margin-top:12px;
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--soft);
+}
+
+.signals span{
+  background:#fff;
+  border:1px solid var(--border-soft);
+  border-radius:999px;
+  padding:3px 7px;
+}
+
+.signals .hot{
+  color:var(--accent);
+  background:var(--accent-soft);
+  border-color:var(--accent);
+  font-weight:600;
+}
+
+.primary{
+  margin-top:13px;
+  width:100%;
+  border:0;
+  background:var(--accent);
+  color:white;
+  border-radius:11px;
+  padding:13px 14px;
+  font-size:13px;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.composer{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:15px;
+  margin:14px 0;
+  box-shadow:0 8px 24px rgba(20,16,12,.04);
+}
+
+.composer__top{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+  margin-bottom:11px;
+}
+
+.composer h2{
+  margin:4px 0 0;
+  font-family:var(--headline);
+  font-size:25px;
+  line-height:1;
+  letter-spacing:-.025em;
+  font-weight:400;
+}
+
+.badge{
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--accent);
+  background:var(--accent-soft);
+  border:1px solid var(--accent);
+  border-radius:999px;
+  padding:5px 8px;
+  white-space:nowrap;
+  font-weight:600;
+}
+
+.input-row{
+  display:grid;
+  grid-template-columns:38px minmax(0,1fr);
+  gap:10px;
+  align-items:center;
+  background:var(--surface-soft);
+  border:1px solid var(--border-soft);
+  border-radius:15px;
+  padding:11px;
+}
+
+.mini-avatar{
+  width:38px;
+  height:38px;
+  border-radius:50%;
+  background:var(--accent);
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:var(--headline);
+  font-size:17px;
+}
+
+.fake-input{
+  min-height:40px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:white;
+  display:flex;
+  align-items:center;
+  padding:0 12px;
+  color:var(--soft);
+  font-size:13px;
+}
+
+.lane-strip{
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  padding:11px 1px 2px;
+  scrollbar-width:none;
+}
+
+.lane-strip::-webkit-scrollbar{display:none}
+
+.lane{
+  min-width:118px;
+  border:1px solid var(--border-soft);
+  background:white;
+  border-radius:13px;
+  padding:10px;
+  flex-shrink:0;
+}
+
+.lane strong{
+  display:block;
+  font-size:12px;
+  margin-bottom:4px;
+}
+
+.lane span{
+  display:block;
+  font-size:11px;
+  line-height:1.25;
+  color:var(--soft);
+}
+
+.lane small{
+  display:inline-block;
+  margin-top:8px;
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--accent);
+  font-weight:600;
+}
+
+.lane.coming{opacity:.7}
+.lane.coming small{color:var(--soft)}
+
+.feed-tabs{
+  position:sticky;
+  top:104px;
+  z-index:60;
+  display:flex;
+  overflow-x:auto;
+  gap:0;
+  white-space:nowrap;
+  background:rgba(247,244,239,.98);
+  border-bottom:1px solid var(--border);
+  margin:16px -14px 0;
+  padding:0 14px;
+  backdrop-filter:blur(10px);
+  scrollbar-width:none;
+}
+
+.feed-tabs::-webkit-scrollbar{display:none}
+
+.feed-tabs button{
+  border:0;
+  background:transparent;
+  padding:13px 13px 12px;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:800;
+  border-bottom:2px solid transparent;
+  cursor:pointer;
+  flex-shrink:0;
+}
+
+.feed-tabs button.active{
+  color:var(--ink);
+  border-bottom-color:var(--accent);
+}
+
+.feed-tabs .count{
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--soft);
+  font-weight:500;
+  margin-left:4px;
+}
+
+.future-note{
+  display:grid;
+  grid-template-columns:38px minmax(0,1fr);
+  gap:10px;
+  background:white;
+  border:1px dashed var(--border);
+  border-radius:15px;
+  padding:12px;
+  margin:14px 0 0;
+}
+
+.future-avatar{
+  width:38px;
+  height:38px;
+  border-radius:50%;
+  background:#2f2b28;
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:var(--headline);
+  font-size:16px;
+}
+
+.future-note h3{
+  margin:0 0 4px;
+  font-family:var(--headline);
+  font-size:18px;
+  line-height:1.1;
+  letter-spacing:-.02em;
+  font-weight:400;
+}
+
+.future-note p{
+  margin:0;
+  font-size:12.5px;
+  line-height:1.38;
+  color:var(--muted);
+}
+
+.feed-item{
+  padding:17px 0;
+  border-bottom:1px solid var(--border-soft);
+}
+
+.feed-kicker{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px;
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  color:var(--soft);
+  margin-bottom:7px;
+}
+
+.type{
+  color:var(--accent);
+  background:var(--accent-soft);
+  border:1px solid var(--accent);
+  border-radius:999px;
+  padding:2px 7px;
+  font-weight:600;
+}
+
+.feed-title{
+  margin:0 0 6px;
+  font-family:var(--headline);
+  font-size:22px;
+  line-height:1.08;
+  letter-spacing:-.025em;
+  font-weight:400;
+}
+
+.feed-summary{
+  margin:0;
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.48;
+}
+
+.feed-actions{
+  display:flex;
+  gap:8px;
+  margin-top:11px;
+  flex-wrap:wrap;
+}
+
+.action-primary{
+  background:var(--accent);
+  color:white;
+  border-radius:9px;
+  padding:9px 11px;
+  font-size:12px;
+  font-weight:800;
+}
+
+.action-secondary{
+  border:1px solid var(--border);
+  background:white;
+  color:var(--muted);
+  border-radius:9px;
+  padding:8px 10px;
+  font-size:12px;
+  font-weight:700;
+}
+
+.rail-section{margin-top:22px}
+
+.rail-card{
+  background:white;
+  border:1px solid var(--border-soft);
+  border-radius:17px;
+  padding:15px;
+  margin-bottom:12px;
+}
+
+.rail-card.soft{
+  background:var(--surface-soft);
+  border-color:var(--border);
+}
+
+.rail-label{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--accent);
+  font-weight:600;
+  margin-bottom:9px;
+}
+
+.rail-card h3{
+  margin:0 0 7px;
+  font-family:var(--headline);
+  font-size:20px;
+  line-height:1.1;
+  letter-spacing:-.02em;
+  font-weight:400;
+}
+
+.rail-card p{
+  margin:0;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.45;
+}
+
+.rail-row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:9px 0;
+  border-top:1px solid var(--border-soft);
+  font-size:13px;
+  line-height:1.35;
+}
+
+.rail-row:first-of-type{
+  border-top:0;
+  padding-top:0;
+}
+
+.rail-row span:last-child{
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--soft);
+  white-space:nowrap;
+}
+
+.question{
+  padding:9px 0;
+  border-top:1px solid var(--border-soft);
+  font-family:var(--headline);
+  font-size:15px;
+  line-height:1.3;
+  font-style:italic;
+}
+
+.question:first-of-type{
+  border-top:0;
+  padding-top:0;
+}
+
+.question:before{
+  content:"?";
+  font-family:var(--mono);
+  font-style:normal;
+  color:var(--accent);
+  font-weight:700;
+  margin-right:6px;
+}
+
+.sponsor{
+  background:white;
+  border:1px solid var(--border-soft);
+  border-radius:14px;
+  padding:13px;
+  color:var(--muted);
+  font-size:12.5px;
+  line-height:1.4;
+}
+
+.sponsor .rail-label{
+  color:var(--soft);
+  margin-bottom:5px;
+}
+
+.sponsor-policy{
+  font-size:11px;
+  color:var(--soft);
+  border-top:1px solid var(--border-soft);
+  margin-top:9px;
+  padding-top:9px;
+}
+
+.bottom-nav{
+  position:fixed;
+  left:50%;
+  transform:translateX(-50%);
+  bottom:0;
+  z-index:90;
+  width:100%;
+  max-width:430px;
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  background:rgba(247,244,239,.98);
+  backdrop-filter:blur(14px);
+  border-top:1px solid var(--border);
+}
+
+.bottom-nav a{
+  padding:9px 0 8px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+  font-size:10px;
+  font-weight:800;
+  color:var(--soft);
+}
+
+.bottom-nav a.active{color:var(--accent)}
+
+.bottom-nav .glyph{
+  font-size:18px;
+  line-height:1;
+}
+
+.bottom-nav .post{
+  margin-top:-18px;
+  width:52px;
+  height:52px;
+  border-radius:50%;
+  background:var(--accent);
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:26px;
+  box-shadow:0 8px 24px rgba(139,15,22,.28);
+}
+</style>
+</head>
+
+<body>
+
+<header class="topbar">
+  <button class="icon-btn" aria-label="Open menu">☰</button>
+  <a class="logo" href="#">Verity Post</a>
+  <a class="profile-dot" href="#">C</a>
+</header>
+
+<nav class="subnav" aria-label="Sections">
+  <a href="#" class="active">Board</a>
+  <a href="#">Latest</a>
+  <a href="#">Topics</a>
+  <a href="#">Browse</a>
+  <a href="#">Standards</a>
+</nav>
+
+<main class="shell">
+  <div class="brandline">
+    <div class="tagline">Read first. Then talk.</div>
+    <div class="stage">Reader posts opening</div>
+  </div>
+
+  <section class="changed" aria-label="What changed today">
+    <div class="changed__label">What changed today</div>
+    <p class="changed__item"><span class="changed__time">12:42 PM</span> Aid package narrowed from 8 provisions to 6</p>
+    <p class="changed__item"><span class="changed__time">11:18 AM</span> Court added emergency hearing for Thursday</p>
+    <p class="changed__item"><span class="changed__time">10:05 AM</span> Inflation data shifted rate-cut expectations</p>
+  </section>
+
+  <article class="main-discussion">
+    <div class="eyebrow">Today’s main discussion · Politics</div>
+    <h1 class="main-title">Senate panel narrows aid package after third day of closed-door talks</h1>
+    <p class="deck">Leaders agreed to drop two provisions and trim funding by roughly a third, putting the bill on track for a procedural vote later this week.</p>
+    <p class="change">Changed today: negotiators removed two funding provisions and cut the package by roughly one third.</p>
+
+    <div class="prompt">
+      <div class="prompt__label">The prompt</div>
+      <p class="prompt__text">Are the cuts temporary or structural?</p>
+    </div>
+
+    <div class="signals">
+      <span class="hot">38 comments today</span>
+      <span>214 readers passed</span>
+      <span>Last active 6m</span>
+      <span>7 story updates</span>
+    </div>
+
+    <button class="primary">Read to unlock discussion →</button>
+  </article>
+
+  <section class="composer" aria-label="Add to the board">
+    <div class="composer__top">
+      <div>
+        <div class="eyebrow">Add to the board</div>
+        <h2>What are you adding?</h2>
+      </div>
+      <span class="badge">Launch lanes</span>
+    </div>
+
+    <div class="input-row">
+      <div class="mini-avatar">C</div>
+      <div class="fake-input">Ask, add context, or submit...</div>
+    </div>
+
+    <div class="lane-strip" aria-label="Posting lanes">
+      <div class="lane"><strong>Question</strong><span>Ask what needs explaining.</span><small>Open</small></div>
+      <div class="lane"><strong>Context</strong><span>Add background after reading.</span><small>Open</small></div>
+      <div class="lane"><strong>Firsthand</strong><span>Share direct experience.</span><small>Open</small></div>
+      <div class="lane"><strong>Link</strong><span>Submit a story or doc.</span><small>Beta</small></div>
+      <div class="lane coming"><strong>Media</strong><span>Images, clips, GIFs.</span><small>Coming</small></div>
+      <div class="lane coming"><strong>Analysis</strong><span>Write a take after reading.</span><small>Coming</small></div>
+    </div>
+  </section>
+
+  <nav class="feed-tabs" aria-label="Feed filters">
+    <button class="active">Board <span class="count">24</span></button>
+    <button>Active <span class="count">7</span></button>
+    <button>Questions <span class="count">12</span></button>
+    <button>Links <span class="count">Beta</span></button>
+    <button>Media <span class="count">Soon</span></button>
+  </nav>
+
+  <section class="future-note">
+    <div class="future-avatar">R</div>
+    <div>
+      <h3>Reader posts will use this same feed</h3>
+      <p>Questions, links, context, videos, images, and GIFs will slot into the board without changing the layout.</p>
+    </div>
+  </section>
+
+  <section aria-label="Today’s board feed">
+    <article class="feed-item">
+      <div class="feed-kicker"><span class="type">Debate</span><span>Business</span></div>
+      <h2 class="feed-title">Private-credit disclosure rule tightens after late addition to draft</h2>
+      <p class="feed-summary">The proposed rule would require quarterly reporting on fund leverage and concentration, addressing concerns regulators raised after several large funds restructured.</p>
+      <div class="signals"><span class="hot">12 comments today</span><span>91 readers passed</span><span>Last active 14m</span></div>
+      <div class="feed-actions"><a class="action-primary" href="#">Read to unlock</a><a class="action-secondary" href="#">Story history</a></div>
+    </article>
+
+    <article class="feed-item">
+      <div class="feed-kicker"><span class="type">Question</span><span>Science</span></div>
+      <h2 class="feed-title">Heat anomaly enters third month as researchers question model persistence</h2>
+      <p class="feed-summary">Researchers say the duration of the pattern matters more than the temperature peak because models did not predict this regime lasting through spring.</p>
+      <div class="signals"><span class="hot">8 comments today</span><span>67 readers passed</span><span>Expert reply</span></div>
+      <div class="feed-actions"><a class="action-primary" href="#">Read to unlock</a></div>
+    </article>
+
+    <article class="feed-item">
+      <div class="feed-kicker"><span class="type">Reader question</span><span>Open now</span></div>
+      <h2 class="feed-title">What does the sunset clause actually require Congress to do next year?</h2>
+      <p class="feed-summary">Attached to the Senate aid package story. Readers can answer after completing the story check.</p>
+      <div class="signals"><span>4 answers pending</span><span>Attached to main story</span></div>
+    </article>
+
+    <article class="feed-item">
+      <div class="feed-kicker"><span class="type">Firsthand</span><span>Health</span></div>
+      <h2 class="feed-title">Medicare rule change expands coverage for outpatient mental health</h2>
+      <p class="feed-summary">The change removes a prior-authorization requirement providers cited as a barrier to access. The firsthand lane is open for providers and patients.</p>
+      <div class="signals"><span class="hot">6 comments today</span><span>42 readers passed</span><span>Firsthand lane open</span></div>
+      <div class="feed-actions"><a class="action-primary" href="#">Read to add</a></div>
+    </article>
+
+    <article class="feed-item">
+      <div class="feed-kicker"><span class="type">Link submission</span><span>Beta</span></div>
+      <h2 class="feed-title">Submit a link, document, clip, or local tip for the board</h2>
+      <p class="feed-summary">At launch, submissions go into review. As trusted readers emerge, posts can appear directly in topic feeds.</p>
+      <div class="signals"><span>Beta lane</span><span>Review before public</span><span>Attach to story or topic</span></div>
+    </article>
+  </section>
+
+  <section class="rail-section" aria-label="Board support sections">
+    <div class="rail-card soft">
+      <div class="rail-label">How posting works</div>
+      <h3>Structured now. Open later.</h3>
+      <p>Readers can ask questions, add context, and share firsthand experience. Link, media, GIF, and analysis posts use this same board layout when they open.</p>
+    </div>
+
+    <div class="rail-card">
+      <div class="rail-label">Open questions</div>
+      <div class="question">Is the aid cut permanent?</div>
+      <div class="question">Which programs were removed?</div>
+      <div class="question">What happens if the vote fails?</div>
+    </div>
+
+    <div class="rail-card">
+      <div class="rail-label">Most active stories</div>
+      <div class="rail-row"><span>Senate aid package</span><span>+2 today</span></div>
+      <div class="rail-row"><span>Private-credit disclosure</span><span>active</span></div>
+      <div class="rail-row"><span>Heat anomaly</span><span>expert reply</span></div>
+    </div>
+
+    <div class="sponsor">
+      <div class="rail-label">Sponsored</div>
+      Mock sponsor unit — restrained, labeled, and outside the discussion flow.
+      <div class="sponsor-policy">Sponsors do not influence editorial coverage.</div>
+    </div>
+  </section>
+</main>
+
+<nav class="bottom-nav" aria-label="Primary">
+  <a href="#" class="active"><span class="glyph">⌂</span>Home</a>
+  <a href="#"><span class="glyph">◴</span>Latest</a>
+  <a href="#"><span class="post">+</span>Post</a>
+  <a href="#"><span class="glyph">⌕</span>Browse</a>
+  <a href="#"><span class="glyph">◐</span>Profile</a>
+</nav>
+
+</body>
+</html>

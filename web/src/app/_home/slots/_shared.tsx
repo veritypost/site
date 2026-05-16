@@ -29,12 +29,40 @@ export type CategoryRow = Pick<
 // helpers without per-source branching.
 export type TrendingArticle = HomeStory;
 
+// Compact timeline event shape used by the hero card's "How we got
+// here" rail. Mirrors the `timelines` table — only the fields the
+// hero strip actually shows. `isToday` is precomputed server-side so
+// the renderer can highlight today's entry without a date check
+// during render.
+export type HeroTimelineEvent = {
+  id: string;
+  event_label: string | null;
+  event_date: string | null;
+  event_body: string | null;
+  isToday: boolean;
+};
+
+// Meta strip + change-note + footer copy for the hero card. All
+// precomputed server-side so the StoryCard renderer stays a pure
+// presentation layer.
+export type HeroMeta = {
+  lifecycleLabel: string | null; // e.g. "DEVELOPING" — null when not flagged
+  timelineCount: number;
+  sourcesCount: number;
+  lastChangedRelative: string | null; // e.g. "18m ago"
+  changeNote: string | null; // today's most-recent event_body, when dated today
+};
+
 export type CardCtx = {
   categoryById: Record<string, CategoryRow>;
   // Pre-fetched once by HomeRoot when at least one list_rail slot has
   // `config.source === 'trending'`. Undefined otherwise to avoid the
   // wasted query.
   trendingArticles?: TrendingArticle[];
+  // Pre-fetched once by HomeRoot for the hero story_card slot (config.
+  // variant='hero'). Rendered to the right of the hero headline + dek.
+  heroTimeline?: HeroTimelineEvent[];
+  heroMeta?: HeroMeta;
 };
 
 export function categoryFor(

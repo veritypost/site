@@ -346,7 +346,7 @@ struct StoryDetailView: View {
             readingProgressRibbon
             mainContent
         }
-        .background(VP.bg)
+        .background(VP.burgundyBg)
         .background(
             GeometryReader { proxy in
                 Color.clear
@@ -608,7 +608,7 @@ struct StoryDetailView: View {
                     .frame(width: 300)
             }
             .padding(.trailing, 16)
-            .background(VP.bg)
+            .background(VP.burgundyBg)
         } else {
             articleScrollView
         }
@@ -698,7 +698,7 @@ struct StoryDetailView: View {
                     triggerQuizPassMoment(scrollProxy: proxy)
                 }
             }
-            .background(VP.bg)
+            .background(VP.burgundyBg)
         }
     }
 
@@ -718,7 +718,7 @@ struct StoryDetailView: View {
                 timelineLockedPrompt
             }
         }
-        .background(VP.bg)
+        .background(VP.burgundyBg)
     }
 
     // MARK: - Anon Discussion tab gate (Story Task 18)
@@ -826,7 +826,7 @@ struct StoryDetailView: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(VP.rule).frame(height: 1)
         }
-        .background(VP.bg)
+        .background(VP.burgundyBg)
     }
 
     // MARK: - Story content
@@ -936,14 +936,6 @@ struct StoryDetailView: View {
             HomeAdSlot(placement: "article_end", page: "article", articleId: story.id)
                 .padding(.top, 24)
 
-            // Quiz Gate Brand — make the moat visible at the end of every
-            // article. Spec/12_QUIZ_GATE_BRAND.md: "always visible" CTA
-            // describing the gate. Mirrors the web /story[slug] flow.
-            // Anonymous: nudge to sign-in. Logged-in but not passed:
-            // switch to Discussion tab (where the quiz player lives).
-            // Already passed: skip — don't ask them to do it again.
-            passToCommentCTA
-
             Spacer().frame(height: 80)
         }
         // Match web's article body measure (web ArticleSurface caps at
@@ -958,68 +950,6 @@ struct StoryDetailView: View {
         // and the rail-mode width math all resolve to one source.
         .frame(maxWidth: VP.LayoutBreak.readingColumn)
         .frame(maxWidth: .infinity, alignment: .center)
-    }
-
-    @ViewBuilder private var passToCommentCTA: some View {
-        let quizRequired = SettingsService.shared.commentBool("quiz_required")
-        if quizRequired && !userPassedQuiz {
-            // v2 mid-body teaser — mirrors web MidBodyQuizTeaser.tsx.
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("COMPREHENSION CHECK")
-                        .font(.system(.caption2, design: .monospaced, weight: .medium))
-                        .tracking(1.0)
-                        .foregroundColor(Self.quizAccent)
-                    Text("5 questions before discussion opens")
-                        .font(.system(size: 16, weight: .regular, design: .serif))
-                        .foregroundColor(VP.text)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("Pass to join the conversation")
-                        .font(.subheadline)
-                        .foregroundColor(Self.quizTextMuted)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                if auth.isLoggedIn {
-                    Button {
-                        activeTab = .discussion
-                    } label: {
-                        Text("Start quiz →")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 10)
-                            .background(Self.quizAccent)
-                            .clipShape(RoundedRectangle(cornerRadius: 999))
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    Button {
-                        showRegistrationSheet = true
-                    } label: {
-                        Text("Create free account →")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 10)
-                            .background(Self.quizAccent)
-                            .clipShape(RoundedRectangle(cornerRadius: 999))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Self.quizSurfaceSoft)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Self.quizCardBorder, lineWidth: 1)
-            )
-            .padding(.horizontal, 20)
-            .padding(.top, 28)
-        }
     }
 
     // MARK: - TTS controls (D17, Verity+ only)
@@ -1474,9 +1404,6 @@ struct StoryDetailView: View {
                     .font(.system(.caption2, design: .monospaced, weight: .medium))
                     .tracking(1.2)
                     .foregroundColor(Self.quizAccent)
-                // Voice unified with the Article-tab `passToCommentCTA` per
-                // adversary review — single phrase across both entry points
-                // so readers don't see two flavors of the same mechanic.
                 Text("How well did you follow the story?")
                     .font(.system(size: 22, weight: .regular, design: .serif))
                     .foregroundColor(VP.text)
@@ -3372,7 +3299,7 @@ struct StoryDetailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .background(VP.bg)
+            .background(VP.burgundyBg)
             .navigationTitle("Up next")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -10,7 +10,11 @@ export default function RhStyles() {
        var(--rh-*) references throughout this stylesheet keep working;
        only the values below change. */
     .vp-rh {
-      --rh-bg: var(--vp-surface);
+      /* Owner call: cards should NOT contrast against the canvas —
+         everything reads as one continuous cream surface. --rh-bg
+         (used by every card body) and the page wrapper both map to
+         var(--vp-bg). */
+      --rh-bg: var(--vp-bg);
       --rh-ink: var(--vp-ink);
       --rh-ink-2: var(--vp-text-muted);
       --rh-ink-3: var(--vp-text-soft);
@@ -20,7 +24,7 @@ export default function RhStyles() {
       --rh-border: var(--vp-border);
       --rh-border-soft: var(--vp-border-soft);
       --rh-surface-soft: var(--vp-surface-soft);
-      background: var(--rh-bg);
+      background: var(--vp-bg);
       color: var(--rh-ink);
       min-height: 100vh;
     }
@@ -29,7 +33,7 @@ export default function RhStyles() {
        choice after the v2 migration; home should match. */
     @media (prefers-color-scheme: dark) {
       .vp-rh {
-        --rh-bg: var(--vp-surface);
+        --rh-bg: var(--vp-bg);
         --rh-ink: var(--vp-ink);
         --rh-ink-2: var(--vp-text-muted);
         --rh-ink-3: var(--vp-text-soft);
@@ -83,25 +87,449 @@ export default function RhStyles() {
        a single column and the .vp-rh-grid > * rule forces every slot
        to a full row regardless of its declared span. Legacy slot kinds
        whose CSS already declares grid-column: 1 / -1 work unchanged. */
+    /* Pill search bar at the top of the home grid. White surface on
+       the cream canvas, soft warm shadow, rounded pill chrome. Owner
+       call 2026-05-16. */
+    .vp-rh-search {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      max-width: 720px;
+      margin: 8px auto 4px;
+      padding: 12px 20px;
+      background: var(--vp-surface);
+      border: 1px solid var(--vp-border);
+      border-radius: 999px;
+      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
+      box-sizing: border-box;
+    }
+    .vp-rh-search__icon { color: var(--vp-text-soft); flex-shrink: 0; }
+    .vp-rh-search__input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      outline: none;
+      background: transparent;
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px;
+      color: var(--vp-ink);
+    }
+    .vp-rh-search__input::placeholder { color: var(--vp-text-soft); }
+    .vp-rh-search:focus-within {
+      border-color: var(--vp-accent);
+      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04), 0 0 0 3px var(--vp-accent-soft);
+    }
+    .vp-rh-search-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 720px;
+      margin: 8px auto 4px;
+    }
+    .vp-rh-search-wrap .vp-rh-search { margin: 0; max-width: none; }
+    /* Live-search dropdown — sits flush under the search pill,
+       matches its width, rounded chrome, soft warm shadow. */
+    .vp-rh-search-results {
+      margin-top: 8px;
+      background: var(--vp-surface);
+      border: 1px solid var(--vp-border);
+      border-radius: 18px;
+      box-shadow: 0 18px 48px rgba(20, 16, 12, 0.08);
+      max-height: 480px;
+      overflow-y: auto;
+    }
+    .vp-rh-search-results__empty {
+      margin: 0;
+      padding: 16px 20px;
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      color: var(--vp-text-soft);
+    }
+    .vp-rh-search-results__list {
+      list-style: none;
+      margin: 0;
+      padding: 6px;
+    }
+    .vp-rh-search-results__item { margin: 0; }
+    .vp-rh-search-results__link {
+      display: block;
+      padding: 10px 14px;
+      border-radius: 12px;
+      text-decoration: none;
+      color: var(--vp-ink);
+      transition: background 0.12s;
+    }
+    .vp-rh-search-results__link:hover {
+      background: var(--vp-accent-soft);
+    }
+    .vp-rh-search-results__kicker {
+      display: block;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--vp-accent);
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .vp-rh-search-results__title {
+      display: block;
+      font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+      font-size: 15px;
+      line-height: 1.2;
+      color: var(--vp-ink);
+    }
+    .vp-rh-search-results__dek {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-top: 4px;
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      color: var(--vp-text-muted);
+    }
+    .vp-rh-search-results__seeall {
+      display: block;
+      width: 100%;
+      padding: 12px 18px;
+      border: 0;
+      border-top: 1px solid var(--vp-border-soft);
+      background: transparent;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--vp-accent);
+      cursor: pointer;
+      text-align: left;
+    }
+    .vp-rh-search-results__seeall:hover {
+      background: var(--vp-accent-soft);
+    }
+
+    /* Two-band masthead browse nav.
+       Band 1 = the taxonomy spine: 20 top-level categories typeset as
+       quiet Plex Sans text links (NOT pills, NOT serif — research
+       panel converged: serif reserved for editorial body content,
+       all-caps mono reserved for kicker meta, Plex Sans 13/500 with
+       slight tracking reads as wayfinding furniture).
+       Band 2 = cross-cutting filters (Today / Most discussed / etc.)
+       in IBM Plex Mono 11px caps — visually demoted vs categories
+       because they are lenses applied to a destination, not
+       destinations themselves. */
+    /* Unified masthead block — search pill, catbar, subcatbar, and
+       filter strip all share one white surface with a single soft
+       border + rounded corners. Internal hairlines separate the
+       bands so it reads as one masthead module instead of four
+       disconnected bars on cream. */
+    .vp-rh-masthead {
+      width: 100%;
+      max-width: 1408px;
+      margin: 8px auto 0;
+      background: var(--vp-surface);
+      border: 1px solid var(--vp-border-soft);
+      border-radius: 22px;
+      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
+      /* No overflow: hidden — the catbar's hover flyouts need to
+         escape below the masthead. Rounded corners still trim the
+         filled background via border-radius alone. */
+      position: relative;
+      z-index: 5;
+    }
+    .vp-rh-masthead .vp-rh-search-wrap {
+      max-width: none;
+      margin: 0;
+    }
+    .vp-rh-masthead .vp-rh-search {
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      border-bottom: 1px solid var(--vp-border-soft);
+      max-width: none;
+      margin: 0;
+      padding: 14px 20px;
+      background: transparent;
+    }
+    .vp-rh-masthead .vp-rh-search:focus-within {
+      border-color: transparent;
+      border-bottom-color: var(--vp-accent);
+      box-shadow: none;
+    }
+    .vp-rh-catbar {
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      background: transparent;
+      border-top: 0;
+      border-bottom: 1px solid var(--vp-border-soft);
+    }
+    .vp-rh-catbar__inner {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      padding: 12px 24px;
+      /* overflow-x: clip allows overflow-y: visible (auto/scroll on
+         one axis forces the other to clip in CSS spec). Hover flyouts
+         can now escape downward without being clipped. Long category
+         lists overflow horizontally with no scrollbar — flex-wrap on
+         narrow viewports handles the wrap. */
+      overflow-x: clip;
+      overflow-y: visible;
+      white-space: nowrap;
+    }
+    @media (max-width: 720px) {
+      .vp-rh-catbar__inner {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        gap: 18px;
+        padding: 10px 16px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+      }
+      .vp-rh-catbar__inner::-webkit-scrollbar { display: none; }
+    }
+    .vp-rh-catbar__link {
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--vp-ink);
+      text-decoration: none;
+      flex-shrink: 0;
+      position: relative;
+      padding-bottom: 4px;
+      transition: color 0.12s;
+    }
+    .vp-rh-catbar__link:hover { color: var(--vp-accent); }
+    .vp-rh-catbar__link[aria-current="page"] {
+      font-weight: 600;
+      color: var(--vp-ink);
+    }
+    .vp-rh-catbar__link[aria-current="page"]::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 2px;
+      background: var(--vp-accent);
+    }
+    .vp-rh-catbar__link--home {
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--vp-text-soft);
+      padding-right: 12px;
+      border-right: 1px solid var(--vp-border-soft);
+    }
+    .vp-rh-catbar__link--home:hover { color: var(--vp-accent); }
+    /* Subcategory rail — only renders when an active topic is in
+       the URL. Shows the active category's subcategories so the
+       reader who clicked "Politics" sees Congress / Supreme Court /
+       White House / Elections without leaving the page. */
+    .vp-rh-subcatbar {
+      width: 100%;
+      max-width: 1408px;
+      margin: 0 auto;
+      background: var(--vp-surface);
+      border-bottom: 1px solid var(--vp-border-soft);
+    }
+    .vp-rh-subcatbar__inner {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 10px 24px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      white-space: nowrap;
+    }
+    .vp-rh-subcatbar__inner::-webkit-scrollbar { display: none; }
+    /* All-subs variant on the home — flex-wrap into multiple rows
+       grouped by parent. Each group reads: parent name kicker +
+       subs after it; thin divider between groups. */
+    .vp-rh-subcatbar__inner--wrap {
+      flex-wrap: wrap;
+      overflow-x: visible;
+      white-space: normal;
+      gap: 4px 14px;
+      padding: 10px 20px;
+    }
+    .vp-rh-subcat-group {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .vp-rh-subcat-group__head {
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--vp-text-soft);
+    }
+    .vp-rh-subcat-group__sep {
+      display: inline-block;
+      width: 1px;
+      height: 12px;
+      background: var(--vp-border);
+      align-self: center;
+      margin: 0 4px;
+    }
+    .vp-rh-subcatbar__link {
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--vp-text-muted);
+      text-decoration: none;
+      flex-shrink: 0;
+      transition: color 0.12s;
+    }
+    .vp-rh-subcatbar__link:hover { color: var(--vp-accent); }
+    .vp-rh-subcatbar__link[aria-current="page"] {
+      color: var(--vp-accent);
+      font-weight: 500;
+    }
+    /* Filter strip — mono caps, smaller than categories, visually
+       distinct as "lenses" rather than destinations. */
+    .vp-rh-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      align-items: center;
+      justify-content: center;
+      max-width: 1408px;
+      margin: 0 auto;
+      padding: 12px 24px;
+    }
+    .vp-rh-masthead .vp-rh-filters {
+      max-width: none;
+      margin: 0;
+      padding: 10px 24px;
+    }
+    @media (max-width: 720px) {
+      .vp-rh-filters {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        justify-content: flex-start;
+        gap: 14px;
+        padding: 10px 16px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+      }
+      .vp-rh-filters::-webkit-scrollbar { display: none; }
+      .vp-rh-masthead .vp-rh-filters { padding: 10px 16px; }
+    }
+    .vp-rh-masthead .vp-rh-subcatbar {
+      max-width: none;
+      margin: 0;
+    }
+    .vp-rh-filter {
+      display: inline-flex;
+      align-items: center;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--vp-text-soft);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color 0.12s;
+    }
+    .vp-rh-filter:hover { color: var(--vp-accent); }
+    .vp-rh-filter[aria-current="page"] {
+      color: var(--vp-accent);
+    }
+    .vp-rh-filter__sep {
+      display: inline-block;
+      width: 1px;
+      height: 14px;
+      background: var(--vp-border);
+      margin: 0 2px;
+    }
+
+    /* New layout shape — full-width top band, 2-col body (main left +
+       rail right, independent vertical stacks), full-width bottom band.
+       Replaces the previous 12-col paired-row grid so rail-card
+       spacing doesn't lock to story-card heights and vice versa. */
     .vp-rh-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
       max-width: 1440px;
       margin-left: auto;
       margin-right: auto;
+      padding: 16px;
+      box-sizing: border-box;
     }
-    @media (max-width: 719px) {
-      .vp-rh-grid > * { grid-column: 1 / -1 !important; }
+    @media (max-width: 599px) {
+      .vp-rh-grid { padding: 12px; gap: 16px; }
     }
-    @media (min-width: 720px) {
-      .vp-rh-grid {
-        grid-template-columns: repeat(12, 1fr);
-        /* Dense packing lets a span-8 + span-4 pair share a row even
-           when position sort would otherwise interleave past a row. */
-        grid-auto-flow: row dense;
-        border-left: 1px solid var(--rh-border);
+    /* Body wraps the main + rail columns. Mobile collapses both
+       columns into a single feed and reorders slots by their
+       position via the order property + the --slot-order custom
+       variable set on each wrapper. Desktop keeps the two-column
+       flex layout so main and rail flow independently. */
+    .vp-rh-body {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .vp-rh-body__main,
+    .vp-rh-body__rail {
+      display: contents;
+    }
+    .vp-rh-body .vp-rh-slot {
+      order: var(--slot-order, 0);
+    }
+    @media (min-width: 900px) {
+      .vp-rh-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 32px;
       }
+      .vp-rh-body__main {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        min-width: 0;
+      }
+      .vp-rh-body__rail {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        min-width: 0;
+      }
+      .vp-rh-body .vp-rh-slot { order: 0; }
+      /* Hero gets a tiny gap before the first story card so its
+         shadow doesn't crowd the next headline. */
+      .vp-rh-body__main > .vp-rh-slot:has(.vp-rh-story-card--hero) {
+        margin-bottom: 24px;
+      }
+    }
+    /* Rail cards are capped at 320px max-width inside a 360px rail
+       column. Right-align each slot wrapper on desktop so the rail
+       cards' right edge sits flush with the right edge of the top
+       banner (which spans the full grid width). Stretch on mobile
+       since rails fill the body width there. */
+    .vp-rh-body__rail > .vp-rh-slot {
+      display: flex;
+      justify-content: flex-end;
+    }
+    @media (max-width: 899px) {
+      .vp-rh-body__rail > .vp-rh-slot { justify-content: stretch; }
+    }
+    .vp-rh-grid__top,
+    .vp-rh-grid__bottom {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
     }
 
     /* Section head — mono label + optional "more" link. Grid-spans the row;
@@ -618,16 +1046,38 @@ export default function RhStyles() {
     /* ============ LIST RAIL ============
        v2 cream-soft chrome (was always-dark island). Cream rather than
        white so the rail reads as its own surface against the white cards. */
+    /* List-rail (trending/most-read) — same rounded chrome family
+       as .vp-rh-rail-card so all right-rail modules read as one
+       set. */
+    /* Trending list_rail — same white surface chrome as rail cards. */
     .vp-rail-block {
-      background: var(--rh-surface-soft);
+      background: var(--vp-surface);
       color: var(--rh-ink);
-      padding: 24px;
+      padding: 14px 16px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
-      border: 1px solid var(--rh-border);
+      gap: 8px;
+      width: 100%;
+      max-width: 320px;
+      height: 211px;
+      min-height: 211px;
+      max-height: 211px;
+      box-sizing: border-box;
+      margin: 0;
+      border: 1px solid var(--rh-border-soft);
       border-radius: 18px;
-      min-height: 220px;
+      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    @media (max-width: 899px) {
+      .vp-rail-block {
+        max-width: 100%;
+        height: auto;
+        min-height: 0;
+        max-height: none;
+        background: transparent;
+      }
     }
     .vp-rail__title {
       margin: 0;
@@ -1076,9 +1526,18 @@ export default function RhStyles() {
        the slot's own contents. */
 
     /* ── top_banner (span 12) ── */
+    /* Top banner — rounded chrome on the cream canvas (matches the
+       hero + rail family). 1px warm border, 28px corner radius,
+       soft drop shadow. Stretches full width of its container so
+       it aligns with the body grid edges. */
     .vp-rh-banner {
-      border-bottom: 1px solid var(--rh-border);
-      background: var(--rh-bg);
+      background: transparent;
+      border: 1px solid var(--rh-border);
+      border-radius: 28px;
+      box-shadow: 0 18px 48px rgba(20, 16, 12, 0.06);
+      margin: 0;
+      overflow: hidden;
+      box-sizing: border-box;
     }
     .vp-rh-banner__link {
       display: grid;
@@ -1139,11 +1598,59 @@ export default function RhStyles() {
     }
     .vp-rh-banner--ad { padding: 12px; }
 
-    /* ── story_card (span 8 — main column) ── */
+    /* Thin variant — top-of-page ad strip (configurable as story or
+       ad). Sized like a standard leaderboard / billboard ad so it
+       reads as inventory above the hero rather than as editorial
+       content. Capped height + overflow hidden keeps everything
+       inside the strip even if an article gets routed in here. */
+    .vp-rh-banner--thin {
+      max-height: 120px;
+      overflow: hidden;
+    }
+    .vp-rh-banner--thin .vp-rh-banner__link {
+      grid-template-columns: 1fr;
+      align-items: center;
+    }
+    .vp-rh-banner--thin .vp-rh-banner__body {
+      padding: 12px 20px;
+      gap: 4px;
+    }
+    @media (min-width: 720px) {
+      .vp-rh-banner--thin .vp-rh-banner__body { padding: 14px 28px; }
+    }
+    .vp-rh-banner--thin .vp-rh-banner__title {
+      font-size: clamp(15px, 1.4vw, 18px);
+      line-height: 1.2;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .vp-rh-banner--thin .vp-rh-banner__dek {
+      font-size: 12px;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .vp-rh-banner--thin .vp-rh-banner__cat { font-size: 10px; }
+
+    /* ── story_card (span 8 — main column) ──
+       Content-driven height with a hairline divider on desktop;
+       rounded chrome on mobile so the merged feed reads as a
+       uniform stack. */
     .vp-rh-story-card {
-      border-right: 1px solid var(--rh-border);
-      border-bottom: 1px solid var(--rh-border);
-      background: var(--rh-bg);
+      background: transparent;
+      border-bottom: 1px solid var(--rh-border-soft);
+    }
+    .vp-rh-story-card--hero { border-bottom: 0; }
+    @media (max-width: 899px) {
+      .vp-rh-story-card:not(.vp-rh-story-card--hero) {
+        border: 1px solid var(--rh-border);
+        border-radius: 18px;
+        box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
+        overflow: hidden;
+      }
     }
     .vp-rh-story-card__link {
       display: grid;
@@ -1155,7 +1662,7 @@ export default function RhStyles() {
     }
     @media (min-width: 720px) {
       .vp-rh-story-card__link {
-        grid-template-columns: 1fr 200px;
+        grid-template-columns: 1fr;
         align-items: center;
         gap: 24px;
         padding: 24px 28px;
@@ -1199,28 +1706,290 @@ export default function RhStyles() {
     }
     .vp-rh-story-card--ad { padding: 12px 24px; }
 
-    /* ── rail_card (span 4 — right rail, 1:1) ── */
-    .vp-rh-rail-card {
-      aspect-ratio: 1 / 1;
-      border-right: 1px solid var(--rh-border);
-      border-bottom: 1px solid var(--rh-border);
-      background: var(--rh-bg);
+    /* Hero variant — driven by slot.config.variant='hero'. Used by pos 20
+       to give the first story card a taller, larger-type treatment so it
+       reads as the lead of the page. At >=900px the link becomes a
+       2-column grid: headline + dek on the left, timeline strip on
+       the right. Below that breakpoint the timeline stacks under the
+       dek so the headline still wins the viewport.
+       The cluster chrome (cream gradient + accent-tinted border +
+       soft elevation + 28px radius) mirrors the lead-cluster module
+       in redesign-preview.html so the hero reads as a distinct
+       cluster rather than just a larger row. */
+    .vp-rh-story-card--hero {
+      border: 1px solid var(--rh-border);
+      border-radius: 28px;
+      /* White → ivory gradient matching the .lead-cluster treatment
+         in redesign-preview.html. Lifts the hero off the cream
+         canvas so the lead reads as the page's spotlight. Mobile
+         drops the gradient so the hero sits cream-on-cream like the
+         rest of the merged feed. */
+      background: linear-gradient(180deg, var(--vp-surface) 0%, var(--vp-surface-soft) 100%);
+      box-shadow: 0 18px 48px rgba(20, 16, 12, 0.06);
+      overflow: hidden;
+      margin: 0;
+    }
+    @media (max-width: 899px) {
+      .vp-rh-story-card--hero { background: transparent; }
+    }
+    .vp-rh-story-card--hero .vp-rh-story-card__link {
+      padding: 28px;
+      gap: 16px;
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+    .vp-rh-story-card--hero .vp-rh-story-card__title {
+      font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+      font-size: clamp(28px, 3.4vw, 44px);
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      font-weight: 400;
+    }
+    .vp-rh-story-card--hero .vp-rh-story-card__dek {
+      font-size: 16px;
+      max-width: 60ch;
+    }
+    @media (min-width: 720px) {
+      .vp-rh-story-card--hero .vp-rh-story-card__link { padding: 36px; }
+    }
+    @media (min-width: 900px) {
+      .vp-rh-story-card--hero .vp-rh-story-card__link {
+        grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+        gap: 32px;
+        align-items: center;
+      }
+    }
+
+    /* Meta strip directly under the dek — "DEVELOPING · N timeline
+       entries · M sources · Last changed Xm ago". Lifecycle label is
+       accent-red mono caps so it reads as a status badge; the rest is
+       muted mono. Separators are middle dots. */
+    .vp-rh-hero-meta {
+      margin: 0;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      color: var(--rh-ink-3);
       display: flex;
+      flex-wrap: wrap;
+      gap: 6px 8px;
+      align-items: baseline;
+    }
+    .vp-rh-hero-meta__seg { display: inline-flex; gap: 8px; align-items: baseline; }
+    .vp-rh-hero-meta__sep { opacity: 0.5; }
+    .vp-rh-hero-meta__lifecycle {
+      color: var(--rh-accent);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    /* "Changed today: ..." note — only renders when there's a same-day
+       timeline event. Border-left accent + muted prose, matching the
+       lead__change treatment in redesign-preview.html. */
+    .vp-rh-hero-change {
+      margin: 8px 0 0;
+      padding: 2px 0 2px 10px;
+      border-left: 2px solid var(--rh-accent);
+      font-size: 14px;
+      line-height: 1.45;
+      color: var(--rh-ink-2);
+      max-width: 60ch;
+    }
+    .vp-rh-hero-change__lede {
+      font-weight: 600;
+      color: var(--rh-ink);
+    }
+
+    /* "How we got here" rail — compact chronology to the right of the
+       hero headline + dek. Each event has a dot + connector line on
+       the left, a mono date label above the heading, and an optional
+       body line below. Today's entry uses the accent color with a
+       larger ring around its dot. Modeled after .tl-event in
+       redesign-preview.html. */
+    .vp-rh-hero-timeline {
+      border-left: 1px solid var(--rh-border-soft);
+      padding-left: 20px;
+    }
+    /* Mobile: hide the hero timeline — it stacks under the dek and
+       eats most of the viewport. Readers see the full timeline once
+       they tap into the article. */
+    @media (max-width: 899px) {
+      .vp-rh-hero-timeline { display: none; }
+    }
+    .vp-rh-hero-timeline__label {
+      margin: 0 0 4px;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--rh-accent);
+    }
+    .vp-rh-hero-timeline__count {
+      margin: 0 0 16px;
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      color: var(--rh-ink-3);
+    }
+    .vp-rh-hero-timeline__list {
+      display: block;
+    }
+    .vp-rh-tl-event {
+      position: relative;
+      padding: 0 0 14px 18px;
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--rh-ink);
+      display: block;
+    }
+    .vp-rh-tl-event::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 5px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--rh-ink-3);
+    }
+    .vp-rh-tl-event::after {
+      content: "";
+      position: absolute;
+      left: 3.5px;
+      top: 13px;
+      bottom: -2px;
+      width: 1px;
+      background: var(--rh-border);
+    }
+    .vp-rh-tl-event:last-child::after { display: none; }
+    /* "Today" event treatment — boxed card with accent border and
+       soft accent fill, mirroring the article-page TimelineSection
+       NOW_EVENT_STYLE. The card pulls back into the spine with a
+       negative margin so the halo dot sits where the regular row
+       dots would. Connector line under the box is suppressed because
+       it shouldn't visually continue through the boxed pill. */
+    .vp-rh-tl-event--now {
+      margin-left: -12px;
+      padding: 12px 14px;
+      border: 1px solid var(--rh-accent);
+      border-radius: 14px;
+      background: var(--rh-accent-soft);
+      color: var(--rh-accent-dark);
+      font-weight: 500;
+    }
+    .vp-rh-tl-event--now::before {
+      left: 7px;
+      top: 17px;
+      background: var(--rh-accent);
+      box-shadow: 0 0 0 3px var(--rh-accent-soft);
+    }
+    .vp-rh-tl-event--now::after { display: none; }
+    .vp-rh-tl-event__date {
+      display: block;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--rh-ink-3);
+      margin-bottom: 2px;
+    }
+    .vp-rh-tl-event--now .vp-rh-tl-event__date {
+      color: var(--rh-accent);
+      padding-left: 14px;
+    }
+    .vp-rh-tl-event__head { display: block; font-weight: 600; color: var(--rh-ink); }
+    .vp-rh-tl-event--now .vp-rh-tl-event__head {
+      color: var(--rh-accent-dark);
+      padding-left: 14px;
+    }
+    .vp-rh-tl-event__sub {
+      display: block;
+      margin-top: 2px;
+      font-weight: 400;
+      color: var(--rh-ink-2);
+    }
+    .vp-rh-tl-event--now .vp-rh-tl-event__sub {
+      color: var(--rh-accent-dark);
+      padding-left: 14px;
+    }
+
+    /* Non-hero story cards flow naturally in the main column —
+       content-driven height, separated by 24px column gap and a
+       hairline bottom border. */
+
+    /* ── rail_card (span 4 — right rail, 1:1) ── */
+    /* Owner call 2026-05-16: drop the aspect-ratio 1/1 square so the
+       row height is driven by the story_card content next to it.
+       The square was making every story+rail row ~400px tall — a
+       lot of whitespace inside the story_card. Pair height now
+       matches slot 13's compact rhythm.
+       Second call 2026-05-16: rail_card should NOT stretch to match
+       the adjacent story_card — it sits at its natural content
+       height (align-self: start) and the empty space below it in
+       the grid row stays blank. Same applies to .vp-rail-block. */
+    /* Rail card — rounded chrome on the cream canvas: 1px warm
+       border, 18px corner radius, soft shadow, padded body. Outer
+       margin gives consistent vertical rhythm between consecutive
+       rail cards. */
+    /* Rail card — fixed 320 × 211 footprint with rounded chrome on
+       every breakpoint. White surface matching .rail-card in
+       redesign-preview.html so the rail cards lift off the cream
+       canvas. Stretches to fill the body width on mobile. */
+    .vp-rh-rail-card {
+      background: var(--vp-surface);
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 320px;
+      height: 211px;
+      min-height: 211px;
+      max-height: 211px;
+      box-sizing: border-box;
+      margin: 0;
+      border: 1px solid var(--rh-border-soft);
+      border-radius: 18px;
+      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    @media (max-width: 899px) {
+      .vp-rh-rail-card {
+        max-width: 100%;
+        height: auto;
+        min-height: 0;
+        max-height: none;
+        background: transparent;
+      }
+    }
+    /* align-self goes on the grid item itself — the slot wrapper
+       emitted by HomeLayout — not the inner card. */
+    .vp-rh-grid > [data-slot-kind="rail_card"],
+    .vp-rh-grid > [data-slot-kind="list_rail"] {
+      align-self: start;
     }
     .vp-rh-rail-card__link {
       flex: 1;
       display: flex;
       flex-direction: column;
-      justify-content: flex-end;
+      justify-content: flex-start;
       gap: 8px;
-      padding: 18px;
+      padding: 14px 16px;
       color: inherit;
       text-decoration: none;
+      box-sizing: border-box;
+    }
+    @media (max-width: 899px) {
+      .vp-rh-rail-card__link {
+        padding: 24px 28px;
+        gap: 8px;
+      }
     }
     .vp-rh-rail-card__cat {
       margin: 0;
       font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 10px;
+      font-size: 9px;
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--rh-accent);
@@ -1229,40 +1998,131 @@ export default function RhStyles() {
     .vp-rh-rail-card__title {
       margin: 0;
       font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
-      font-size: 18px;
-      line-height: 1.15;
-      letter-spacing: -0.015em;
+      font-size: 14px;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
       font-weight: 400;
       color: var(--rh-ink);
+      /* Clamp to at most 4 lines so the headline always fits inside
+         the 211px card height; longer titles wrap and trail with an
+         ellipsis instead of extending past the rail. */
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+      word-break: normal;
+    }
+    /* Dek is hidden by default — the desktop rail card is a compact
+       320 × 211 cell with no room for a summary. Mobile re-enables
+       it so the rail reads like a horizontal story card. */
+    .vp-rh-rail-card__dek { display: none; }
+    @media (max-width: 899px) {
+      .vp-rh-rail-card__dek {
+        display: block;
+        margin: 0;
+        font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+        color: var(--rh-ink-2);
+      }
+      .vp-rh-rail-card__title {
+        font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+        font-size: clamp(20px, 1.8vw, 26px);
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        -webkit-line-clamp: 3;
+      }
     }
     .vp-rh-rail-card--ad {
-      aspect-ratio: 1 / 1;
       padding: 8px;
       align-items: stretch;
       justify-content: stretch;
     }
 
+    /* List variant — same chrome as the single-article rail.
+       Content-driven height so it sits in the same rhythm as the
+       horizontal story cards. */
+    .vp-rh-rail-card--list {
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      padding: 18px 20px;
+      gap: 10px;
+    }
+    .vp-rh-rail-card__list-label {
+      margin: 0;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--rh-accent);
+      font-weight: 600;
+    }
+    .vp-rh-rail-card__list-rows {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .vp-rh-rail-card__list-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: baseline;
+      padding: 7px 0;
+      border-top: 1px solid var(--rh-border-soft);
+    }
+    .vp-rh-rail-card__list-row:first-child { border-top: 0; padding-top: 2px; }
+    .vp-rh-rail-card__list-title {
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      line-height: 1.25;
+      color: var(--rh-ink);
+      text-decoration: none;
+      font-weight: 500;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+    }
+    .vp-rh-rail-card__list-badge {
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      color: var(--rh-ink-3);
+      white-space: nowrap;
+    }
+
     /* ── square_row (span 12 — bottom 5-up squares) ── */
+    /* Square row reads as the same cream canvas as the rest of
+       the home — each cell is a card with the same rounded chrome
+       as the rails. Drops the seam-style borders that made the
+       footer look like a separate slab. */
     .vp-rh-square-row {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 0;
-      border-top: 1px solid var(--rh-border);
+      gap: 16px;
+      background: transparent;
     }
     @media (min-width: 720px) {
       .vp-rh-square-row { grid-template-columns: repeat(5, 1fr); }
     }
     .vp-rh-square {
       aspect-ratio: 1 / 1;
-      border-right: 1px solid var(--rh-border);
-      border-bottom: 1px solid var(--rh-border);
-      background: var(--rh-bg);
+      background: transparent;
+      border: 1px solid var(--rh-border);
+      border-radius: 18px;
+      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
       display: flex;
+      overflow: hidden;
     }
-    @media (max-width: 719px) {
-      .vp-rh-square { aspect-ratio: auto; min-height: 140px; }
+    @media (max-width: 899px) {
+      .vp-rh-square { aspect-ratio: auto; min-height: 0; }
     }
-    .vp-rh-square:last-child { border-right: none; }
     .vp-rh-square__link {
       flex: 1;
       display: flex;

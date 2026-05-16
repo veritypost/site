@@ -9,27 +9,7 @@ import type { Tables } from '@/types/database-helpers';
 import { fetchLayoutBySlug, fetchLiveLayout } from './data';
 import HomeLayout from './HomeLayout';
 import type { TrendingArticle } from './slots/_shared';
-import type { HomeStory, LayoutRow, SlotItem, SlotKind } from './types';
 import RhStyles from './styles';
-
-// Slot kinds that consume the auto-source pool when their items[] is
-// empty. Each kind takes a specific number of pool articles:
-//   top_banner / story_card / rail_card → 1 each
-//   square_row → up to 5
-// Other kinds (lead, cluster, list_rail, data_ticker, etc.) either
-// have their own sourcing or are admin-pinned via /admin/home.
-const POOL_CONSUMERS: ReadonlySet<SlotKind> = new Set([
-  'top_banner',
-  'story_card',
-  'rail_card',
-  'square_row',
-]);
-
-function poolNeedFor(kind: SlotKind): number {
-  if (kind === 'square_row') return 5;
-  if (POOL_CONSUMERS.has(kind)) return 1;
-  return 0;
-}
 
 type CategoryRow = Pick<
   Tables<'categories'>,
@@ -48,12 +28,35 @@ type TrendingViewRow = {
   category_id: string | null;
 };
 
+export type HomeFilter = {
+  chip?: string;
+  sort?: string;
+  topic?: string;
+  type?: string;
+  q?: string;
+  from?: string;
+  to?: string;
+};
+
 export default async function HomeRoot({
   previewSlug,
+  filter,
 }: {
   previewSlug?: string;
+  filter?: HomeFilter;
 } = {}) {
   const service = createServiceClient();
+  const activeFilter =
+    filter &&
+    (filter.chip ||
+      filter.sort ||
+      filter.topic ||
+      filter.type ||
+      filter.q ||
+      filter.from ||
+      filter.to)
+      ? filter
+      : null;
 
   const [layout, catsRes] = await Promise.all([
     previewSlug
@@ -123,53 +126,221 @@ export default async function HomeRoot({
       }));
   }
 
-  // Wave 8 — auto-source pool. Mock-grid slot kinds (top_banner /
-  // story_card / rail_card / square_row) ship without admin pinning
-  // for now; fill their empty items[] with recent published articles
-  // so the live page is content-populated until /admin/home grows
-  // popovers for these kinds (follow-up wave). Pool size = sum of
-  // each empty new-kind slot's poolNeedFor() — only fetch what we
-  // actually need.
-  const poolNeed = layout.slots.reduce(
-    (acc, s) => acc + (s.items.length === 0 ? poolNeedFor(s.kind) : 0),
-    0,
-  );
+  // Auto-pool fill was removed 2026-05-16 — owner editorial flow now
+  // requires every slot's article to be pinned via /admin/home. Empty
+  // slots stay empty rather than silently showing a recent article
+  // the editor didn't choose. Re-enable here only if a future demo
+  // page needs auto-fill again.
   let filledLayout = layout;
-  if (poolNeed > 0) {
-    const { data: poolRows } = await service
+
+  // Filter mode — when chip/topic/sort/type is active, the editorial
+  // slot layout STAYS (hero + story cards + rail cards + squares)
+  // but the article references inside hero/story_card/square slots
+  // get swapped for articles matching the filter, oldest pinned slot
+  // first. Rail cards (single + list variants), banner, and other
+  // self-sourcing slots keep their existing content so the page
+  // shape is identical to the home — only the article content rotates.
+  // This is what powers /politics, /technology, /?today, etc.
+  if (activeFilter) {
+    const slugToId = new Map(cats.map((c) => [c.slug, c.id] as const));
+    let q = service
       .from('articles')
       .select(
         'id, title, stories(slug, lifecycle_status), excerpt, category_id, story_id, is_breaking, is_developing, published_at, updated_at, cover_image_url, cover_image_alt, ad_eligible, sensitivity_tags',
       )
       .eq('status', 'published')
-      .neq('ad_eligible', false)
-      .order('published_at', { ascending: false })
-      .limit(poolNeed);
-    const pool = ((poolRows as HomeStory[] | null) ?? []).filter(
+      .is('deleted_at', null);
+
+    const now = Date.now();
+    const day = 86400000;
+    if (activeFilter.chip === 'today')
+      q = q.gte('published_at', new Date(now - day).toISOString());
+    else if (activeFilter.chip === 'this_week')
+      q = q.gte('published_at', new Date(now - 7 * day).toISOString());
+    else if (activeFilter.chip === 'updated_recently')
+      q = q.gte('updated_at', new Date(now - 7 * day).toISOString());
+
+    if (activeFilter.topic) {
+      const catId = slugToId.get(activeFilter.topic);
+      if (catId) q = q.eq('category_id', catId);
+    }
+
+    if (activeFilter.chip === 'developing') {
+      q = q.eq('is_developing', true);
+    }
+    // Date range — owner-supplied `from`/`to` cap published_at on
+    // both ends. Useful for "show me everything in this category
+    // between Apr 1 and Apr 14". Bare YYYY-MM-DD strings work
+    // because Postgres coerces.
+    if (activeFilter.from) {
+      q = q.gte('published_at', activeFilter.from);
+    }
+    if (activeFilter.to) {
+      q = q.lte('published_at', activeFilter.to);
+    }
+    // Free-text — title ILIKE so the in-page search submits land on
+    // /?q=foo and the home feed shows matching articles. Cheap
+    // server-side fallback before any tsvector wiring lands.
+    if (activeFilter.q) {
+      const safe = activeFilter.q.replace(/[%_]/g, ' ').trim();
+      if (safe) q = q.ilike('title', `%${safe}%`);
+    }
+
+    const orderCol =
+      activeFilter.sort === 'newest_article' ? 'published_at' : 'updated_at';
+    q = q.order(orderCol, { ascending: false }).limit(60);
+
+    const { data: feedRows } = await q;
+    const feed = ((feedRows as import('./types').HomeStory[] | null) ?? []).filter(
       (a) => !!a.stories?.slug,
     );
-    let poolIndex = 0;
-    const filledSlots = layout.slots.map((s) => {
-      if (s.items.length > 0) return s;
-      const need = poolNeedFor(s.kind);
-      if (need === 0) return s;
-      const take = pool.slice(poolIndex, poolIndex + need);
-      poolIndex += take.length;
-      if (take.length === 0) return s;
-      // Synthetic items mirroring the home_slot_items shape. `id` uses
-      // a deterministic prefix (`pool-`) so React keys are stable
-      // across renders and won't collide with real item ids.
-      const synthItems: SlotItem[] = take.map((art, i) => ({
-        id: `pool-${s.id}-${i}`,
-        position: i,
-        content_type: 'article',
-        article: art,
-        ref_id: null,
-        payload: {},
-      }));
-      return { ...s, items: synthItems };
+
+    // Walk the existing slots in position order. For every story_card
+    // slot (hero + regular) and every square_row inner cell, replace
+    // its items with the NEXT unique feed entry. Once the feed is
+    // exhausted, remaining slots blank out — we don't cycle, so a
+    // category with 3 articles doesn't repeat those 3 across 30 slots.
+    let feedIdx = 0;
+    const nextArticle = () => {
+      if (feedIdx >= feed.length) return null;
+      const a = feed[feedIdx];
+      feedIdx += 1;
+      return a;
+    };
+    const swappedSlots = layout.slots.map((s) => {
+      if (s.kind === 'story_card') {
+        const article = nextArticle();
+        if (!article) return { ...s, items: [] };
+        return {
+          ...s,
+          items: [
+            {
+              id: `filter-${s.id}`,
+              position: 0,
+              content_type: 'article' as const,
+              article,
+              ref_id: null,
+              payload: {},
+            },
+          ],
+        };
+      }
+      if (s.kind === 'square_row') {
+        const cap = Array.isArray(s.items) ? s.items.length || 5 : 5;
+        const newItems = Array.from({ length: cap }, (_, i) => {
+          const article = nextArticle();
+          return article
+            ? {
+                id: `filter-${s.id}-${i}`,
+                position: i,
+                content_type: 'article' as const,
+                article,
+                ref_id: null,
+                payload: {},
+              }
+            : null;
+        }).filter((it): it is NonNullable<typeof it> => it !== null);
+        return { ...s, items: newItems };
+      }
+      return s;
     });
-    filledLayout = { ...layout, slots: filledSlots } satisfies LayoutRow;
+    filledLayout = { ...layout, slots: swappedSlots };
+  }
+
+  // Hero timeline + meta strip. The "How we got here" rail shows the
+  // top-5 most relevant events; the meta strip below the dek shows
+  // lifecycle status, total timeline + sources counts, relative
+  // last-changed time, and (when today) the most recent event's body
+  // as a "Changed today" note. All values are precomputed server-side
+  // so the renderer stays purely presentational.
+  const heroSlot = filledLayout.slots.find(
+    (s) =>
+      s.kind === 'story_card' &&
+      (s.config as { variant?: string } | null)?.variant === 'hero',
+  );
+  const heroArticle = heroSlot?.items[0]?.article ?? null;
+  const heroStoryId = heroArticle?.story_id ?? null;
+  const heroArticleId = heroArticle?.id ?? null;
+
+  let heroTimeline:
+    | import('./slots/_shared').HeroTimelineEvent[]
+    | undefined;
+  let heroMeta: import('./slots/_shared').HeroMeta | undefined;
+
+  if (heroStoryId) {
+    type TlRow = {
+      id: string;
+      event_label: string | null;
+      event_date: string | null;
+      event_body: string | null;
+    };
+    const [tlRes, tlCountRes, srcCountRes, storyRes, latestRes] =
+      await Promise.all([
+        service
+          .from('timelines')
+          .select('id, event_label, event_date, event_body')
+          .eq('story_id', heroStoryId)
+          .order('sort_order', { ascending: true, nullsFirst: false })
+          .order('event_date', { ascending: false })
+          .limit(5),
+        service
+          .from('timelines')
+          .select('id', { count: 'exact', head: true })
+          .eq('story_id', heroStoryId),
+        heroArticleId
+          ? service
+              .from('article_sources')
+              .select('id', { count: 'exact', head: true })
+              .eq('article_id', heroArticleId)
+          : Promise.resolve({ count: 0 } as { count: number | null }),
+        service
+          .from('stories')
+          .select('lifecycle_status, updated_at')
+          .eq('id', heroStoryId)
+          .maybeSingle<{ lifecycle_status: string | null; updated_at: string | null }>(),
+        // Separate "most recent event" lookup. Can't reuse tlRes because
+        // that sorts by sort_order asc (mock-grid display order), which
+        // returns the oldest event first — not the freshest.
+        service
+          .from('timelines')
+          .select('event_date, event_body')
+          .eq('story_id', heroStoryId)
+          .not('event_date', 'is', null)
+          .order('event_date', { ascending: false })
+          .limit(1)
+          .maybeSingle<{ event_date: string | null; event_body: string | null }>(),
+      ]);
+
+    const tlRaw = ((tlRes.data ?? []) as TlRow[]);
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const isToday = (iso: string | null) =>
+      !!iso && iso.slice(0, 10) === todayKey;
+
+    heroTimeline = tlRaw.map((r) => ({
+      id: r.id,
+      event_label: r.event_label,
+      event_date: r.event_date,
+      event_body: r.event_body,
+      isToday: isToday(r.event_date),
+    }));
+
+    const lastTs =
+      latestRes.data?.event_date ?? storyRes.data?.updated_at ?? null;
+    const lifecycle = storyRes.data?.lifecycle_status ?? null;
+    const lifecycleLabel =
+      lifecycle && lifecycle !== 'closed' ? lifecycle.toUpperCase() : null;
+    // "Changed today" body — only when the freshest event is dated today.
+    const todaysChange = isToday(latestRes.data?.event_date ?? null)
+      ? latestRes.data?.event_body ?? null
+      : null;
+
+    heroMeta = {
+      lifecycleLabel,
+      timelineCount: tlCountRes.count ?? tlRaw.length,
+      sourcesCount: srcCountRes.count ?? 0,
+      lastChangedRelative: lastTs ? relativeTime(lastTs) : null,
+      changeNote: todaysChange,
+    };
   }
 
   return (
@@ -177,6 +348,28 @@ export default async function HomeRoot({
       layout={filledLayout}
       categoryById={categoryById}
       trendingArticles={trendingArticles}
+      heroTimeline={heroTimeline}
+      heroMeta={heroMeta}
+      activeTopic={activeFilter?.topic}
+      activeChip={activeFilter?.chip ?? activeFilter?.sort ?? activeFilter?.type}
+      activeQ={activeFilter?.q}
     />
   );
+}
+
+// Bucketed relative-time formatter for the hero "Last changed Xm ago"
+// strip. Server-rendered so the string is stable across hydration.
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return '';
+  const secs = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  return `${weeks}w ago`;
 }

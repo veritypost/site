@@ -1,25 +1,22 @@
-'use client';
 import { Suspense } from 'react';
-import { useParams } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import UnifiedSearch from '@/components/search/UnifiedSearch';
+import { getTopicCategories } from '@/lib/search/getTopicCategories';
 
 // /category/<slug> renders the same unified browse UI as /search with
-// the topic pre-applied. The legacy DirectoryShell-style category
-// page (formerly ~358 LOC of bespoke fetching + sort + rendering) was
-// retired 2026-05-16 in favor of this thin wrapper so both browse
-// surfaces share one codepath. Layout.tsx still owns per-category
-// metadata (title / OG / robots) for SEO.
+// the topic pre-applied. Server-wrapped so the topic list lands in the
+// initial HTML (no flicker) and so unknown slugs get a real 404 instead
+// of an empty results page. Layout.tsx still owns per-category metadata.
 
-export default function CategoryPage() {
+export default async function CategoryPage({ params }) {
+  const slug = params?.id;
+  const topics = await getTopicCategories();
+  const match = topics.find((t) => t.slug === slug);
+  if (!match) notFound();
+
   return (
     <Suspense fallback={null}>
-      <CategoryPageInner />
+      <UnifiedSearch topics={topics} initialTopic={slug} />
     </Suspense>
   );
-}
-
-function CategoryPageInner() {
-  const { id } = useParams();
-  const slug = Array.isArray(id) ? id[0] : id;
-  return <UnifiedSearch initialTopic={slug} />;
 }

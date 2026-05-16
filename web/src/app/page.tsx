@@ -10,6 +10,49 @@ import HomeRoot from './_home/HomeRoot';
 // Note: route is implicitly dynamic via root layout's `headers()` call
 // (CSP nonce). No explicit `force-dynamic` needed here.
 
-export default async function HomePage() {
-  return <HomeRoot />;
+// Filter URLs are clean — `/?today`, `/?this_week`, `/?developing`,
+// `/?updated_recently`, `/?most_discussed`, `/?most_recent_comments`,
+// `/?most_viewed`, `/?questions`, `/?newest_article`, plus
+// `/?topic=politics` for categories. The chip/sort/type keys exist
+// in the searchParams as presence-only (empty string), and HomeRoot
+// reads any of them.
+type SearchParams = Record<string, string | undefined>;
+
+const CHIP_KEYS = new Set([
+  'today',
+  'this_week',
+  'developing',
+  'updated_recently',
+]);
+const SORT_KEYS = new Set([
+  'most_discussed',
+  'most_recent_comments',
+  'most_viewed',
+  'newest_article',
+]);
+const TYPE_KEYS = new Set(['questions']);
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<SearchParams> | SearchParams;
+}) {
+  const params = (await Promise.resolve(searchParams)) ?? {};
+  const keys = Object.keys(params);
+  const chip = keys.find((k) => CHIP_KEYS.has(k));
+  const sort = keys.find((k) => SORT_KEYS.has(k));
+  const type = keys.find((k) => TYPE_KEYS.has(k));
+  return (
+    <HomeRoot
+      filter={{
+        chip,
+        sort,
+        type,
+        topic: params.topic,
+        q: params.q,
+        from: params.from,
+        to: params.to,
+      }}
+    />
+  );
 }

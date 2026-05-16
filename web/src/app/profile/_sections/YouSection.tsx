@@ -38,7 +38,7 @@ export function YouSection({ user, perms }: Props) {
     is_expert?: boolean | null;
   };
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: S[5], fontFamily: FONT.sans }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: S[7], fontFamily: FONT.sans }}>
       <section>
         <h2 style={sectionHeading}>Your numbers</h2>
         {/* Verity Score leads — the metric that defines the product gets hero size */}
@@ -80,20 +80,16 @@ export function YouSection({ user, perms }: Props) {
         </div>
       </section>
 
-      <section>
-        <h2 style={sectionHeading}>Polish your profile</h2>
-        {/* T341 — replaced the outbound nudge cards (/, /messages,
-            /expert-queue, /profile/family) with profile-internal
-            CTAs. The old set drove users OUT of the profile experience
-            mid-edit; the new set keeps them inside the rail-shell so they
-            can finish what they came here to do. Outbound nudges (read
-            today's articles etc.) move into a separate empty-state card —
-            out of scope for this fix; queued as a follow-up. */}
+      <section style={{ position: 'relative', clear: 'both' }}>
+        {/* T341 — profile-internal CTAs (Avatar, Bio, Privacy +
+            optional expert / family). Heading removed 2026-05-16
+            per owner — the cards speak for themselves. */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
             gap: S[5],
+            position: 'relative',
           }}
         >
           <ActionCard
@@ -137,7 +133,7 @@ const sectionHeading: React.CSSProperties = {
   fontWeight: 600,
   color: C.ink,
   margin: 0,
-  marginBottom: S[3],
+  marginBottom: S[4],
   letterSpacing: '-0.02em',
 };
 

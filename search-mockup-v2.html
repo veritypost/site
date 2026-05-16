@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verity Post — Browse/Search Prototype</title>
+  <style>
+    :root {
+      --ink: #161616;
+      --muted: #6e6a64;
+      --paper: #f6f1e8;
+      --paper-2: #fffaf0;
+      --card: #fffdf8;
+      --line: #ddd2c2;
+      --line-dark: #b8aa96;
+      --red: #9f1d20;
+      --red-dark: #6f1115;
+      --blue: #26384d;
+      --green: #2f5d46;
+      --gold: #8b6f35;
+      --lav: #66587b;
+      --shadow: 0 18px 50px rgba(31, 25, 16, .09);
+      --radius: 22px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --serif: Georgia, "Times New Roman", serif;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(159, 29, 32, .08), transparent 34rem),
+        linear-gradient(180deg, var(--paper), #eee5d8 65%, #e8dece);
+      font-family: var(--sans);
+    }
+
+    button, input { font: inherit; }
+
+    .top-strip {
+      height: 5px;
+      background: linear-gradient(90deg, var(--red), #d7b56d, var(--blue));
+    }
+
+    .shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 0 28px 44px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 230px 1fr auto;
+      gap: 28px;
+      align-items: center;
+      padding: 24px 0 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1.5px solid var(--ink);
+      border-radius: 50%;
+      font-family: var(--serif);
+      font-weight: 800;
+      font-size: 22px;
+      background: var(--paper-2);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-family: var(--serif);
+      font-size: 28px;
+      letter-spacing: -.04em;
+      line-height: .95;
+    }
+
+    .brand small {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .nav {
+      display: flex;
+      gap: 7px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      border: 1px solid transparent;
+      padding: 8px 11px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .nav a.active,
+    .nav a:hover {
+      color: var(--ink);
+      border-color: var(--line-dark);
+      background: rgba(255,255,255,.45);
+    }
+
+    .account {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+      font-family: var(--mono);
+    }
+
+    .read-score {
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line-dark);
+      background: var(--paper-2);
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 26px;
+      padding: 36px 0 24px;
+      align-items: end;
+    }
+
+    .hero h2 {
+      margin: 0;
+      max-width: 940px;
+      font-family: var(--serif);
+      font-size: clamp(42px, 6vw, 82px);
+      line-height: .86;
+      letter-spacing: -.06em;
+    }
+
+    .hero p {
+      max-width: 790px;
+      margin: 18px 0 0;
+      color: #514b43;
+      font-size: 18px;
+      line-height: 1.45;
+    }
+
+    .principles {
+      display: grid;
+      gap: 10px;
+      padding: 18px;
+      background: rgba(255,253,248,.65);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .principle {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding-bottom: 10px;
+      border-bottom: 1px dotted var(--line-dark);
+    }
+
+    .principle:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .num {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--ink);
+      color: var(--paper-2);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .principle strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 13px;
+    }
+
+    .principle span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .search-zone {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      padding: 16px 0 18px;
+      background: linear-gradient(180deg, rgba(246,241,232,.98), rgba(246,241,232,.9));
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(184, 170, 150, .35);
+    }
+
+    .search-card {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 76px;
+      padding: 10px 10px 10px 22px;
+      border: 1.5px solid var(--ink);
+      border-radius: 28px;
+      background: var(--card);
+      box-shadow: 0 16px 35px rgba(25, 19, 12, .08);
+    }
+
+    .search-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .12em;
+      color: var(--red);
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+
+    .input-wrap {
+      display: grid;
+      gap: 3px;
+    }
+
+    #searchInput {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--ink);
+      font-size: clamp(22px, 3.2vw, 36px);
+      font-family: var(--serif);
+      letter-spacing: -.04em;
+    }
+
+    #searchInput::placeholder { color: #a89d91; }
+
+    .search-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn {
+      border: 1px solid var(--ink);
+      border-radius: 999px;
+      padding: 13px 17px;
+      background: var(--ink);
+      color: var(--paper-2);
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 13px;
+      transition: transform .18s ease, background .18s ease, color .18s ease;
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+
+    .btn.secondary {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--line-dark);
+    }
+
+    .btn.red { background: var(--red); border-color: var(--red); }
+
+    .mobile-filter-btn { display: none; }
+
+    .suggestions {
+      display: none;
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      top: calc(100% + 10px);
+      padding: 16px;
+      background: var(--card);
+      border: 1px solid var(--line-dark);
+      border-radius: 24px;
+      box-shadow: 0 24px 60px rgba(22,22,22,.16);
+      z-index: 30;
+    }
+
+    .suggestions.open { display: block; }
+
+    .suggestion-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    .suggestion-col h4 {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .suggestion-item {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 11px 12px;
+      margin-bottom: 8px;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fffaf3;
+      cursor: pointer;
+    }
+
+    .suggestion-item:hover {
+      border-color: var(--ink);
+      background: #fff6e7;
+    }
+
+    .suggestion-item strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .suggestion-item span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .kbd {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      border: 1px solid var(--line-dark);
+      border-radius: 7px;
+      padding: 3px 6px;
+      white-space: nowrap;
+    }
+
+    .quick-queries {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .chip {
+      border: 1px solid var(--line-dark);
+      border-radius: 999px;
+      padding: 8px 11px;
+      background: rgba(255,253,248,.6);
+      color: #3d3933;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .chip.active,
+    .chip:hover {
+      border-color: var(--ink);
+      background: var(--ink);
+      color: var(--paper-2);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr) 340px;
+      gap: 24px;
+      padding-top: 24px;
+    }
+
+    .panel {
+      background: rgba(255,253,248,.72);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .filters {
+      position: sticky;
+      top: 118px;
+      align-self: start;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      padding: 18px 18px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-header h3 {
+      margin: 0;
+      font-family: var(--serif);
+      font-size: 22px;
+      letter-spacing: -.04em;
+    }
+
+    .panel-header small {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+    }
+
+    .filter-body {
+      padding: 14px 18px 18px;
+    }
+
+    .filter-group {
+      padding: 14px 0;
+      border-bottom: 1px dotted var(--line-dark);
+    }
+
+    .filter-group:last-child { border-bottom: 0; }
+
+    .filter-group h4 {
+      margin: 0 0 10px;
+      color: #3f3932;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    label.check {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      margin: 9px 0;
+      color: #3d3933;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    label.check input { accent-color: var(--red); }
+
+    .microcopy {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      margin-top: 10px;
+    }
+
+    .results {
+      display: grid;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .results-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 18px;
+      padding: 4px 2px 0;
+    }
+
+    .results-top h3 {
+      margin: 0;
+      font-family: var(--serif);
+      font-size: 32px;
+      letter-spacing: -.05em;
+      line-height: 1;
+    }
+
+    .results-top p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .sort {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    select {
+      border: 1px solid var(--line-dark);
+      border-radius: 999px;
+      padding: 9px 28px 9px 10px;
+      background: var(--paper-2);
+      color: var(--ink);
+      font-size: 12px;
+      outline: 0;
+    }
+
+    .story-spotlight {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 190px;
+      gap: 24px;
+      padding: 22px;
+      overflow: hidden;
+      border: 1.5px solid var(--ink);
+      border-radius: 30px;
+      background:
+        linear-gradient(135deg, rgba(255,253,248,.94), rgba(255,248,231,.9)),
+        repeating-linear-gradient(90deg, transparent, transparent 17px, rgba(159,29,32,.05) 18px);
+      box-shadow: 0 24px 70px rgba(22, 22, 22, .12);
+    }
+
+    .story-spotlight::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 8px;
+      background: var(--red);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      gap: 7px;
+      align-items: center;
+      margin-bottom: 10px;
+      color: var(--red);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+
+    .story-spotlight h2 {
+      margin: 0;
+      max-width: 740px;
+      font-family: var(--serif);
+      font-size: clamp(31px, 4vw, 52px);
+      line-height: .92;
+      letter-spacing: -.055em;
+    }
+
+    .story-spotlight p {
+      margin: 13px 0 0;
+      max-width: 720px;
+      color: #3f3932;
+      font-size: 17px;
+      line-height: 1.45;
+    }
+
+    .spot-actions {
+      display: flex;
+      gap: 9px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .timeline-mini {
+      display: grid;
+      align-content: center;
+      gap: 10px;
+      border-left: 1px solid var(--line-dark);
+      padding-left: 18px;
+    }
+
+    .timeline-mini h4 {
+      margin: 0 0 3px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .t-node {
+      position: relative;
+      padding-left: 18px;
+      color: #4c453d;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .t-node::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 4px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 0 4px rgba(159,29,32,.1);
+    }
+
+    .section {
+      overflow: hidden;
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      padding: 15px 18px;
+      background: rgba(255,250,240,.68);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section-title h3 {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      margin: 0;
+      font-size: 14px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-family: var(--mono);
+    }
+
+    .section-title span.count {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .result-list { padding: 4px 0; }
+
+    .result-card {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) auto;
+      gap: 16px;
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,253,248,.38);
+    }
+
+    .result-card:last-child { border-bottom: 0; }
+
+    .type-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: fit-content;
+      height: fit-content;
+      padding: 7px 9px;
+      border-radius: 999px;
+      color: var(--paper-2);
+      background: var(--blue);
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .type-pill.story { background: var(--red); }
+    .type-pill.article { background: var(--blue); }
+    .type-pill.discussion { background: var(--green); }
+    .type-pill.question { background: var(--lav); }
+    .type-pill.media { background: var(--gold); }
+    .type-pill.topic { background: #4d4a45; }
+
+    .result-content h4 {
+      margin: 0;
+      font-family: var(--serif);
+      font-size: 23px;
+      line-height: 1.05;
+      letter-spacing: -.035em;
+    }
+
+    .result-content p {
+      margin: 8px 0 0;
+      color: #4a453f;
+      line-height: 1.42;
+      font-size: 14.5px;
+    }
+
+    .meta {
+      display: flex;
+      gap: 9px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .meta b { color: #2f2b27; }
+
+    .result-side {
+      display: grid;
+      align-content: center;
+      justify-items: end;
+      gap: 6px;
+      min-width: 110px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      text-align: right;
+    }
+
+    .read-gate {
+      border: 1px solid rgba(47, 93, 70, .35);
+      border-radius: 999px;
+      padding: 6px 8px;
+      color: var(--green);
+      background: rgba(47, 93, 70, .06);
+      font-weight: 800;
+    }
+
+    .media-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .media-card {
+      min-height: 160px;
+      display: grid;
+      align-content: end;
+      padding: 13px;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      color: #fff;
+      background:
+        linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.74)),
+        linear-gradient(135deg, #243247, #a02a2e 48%, #d5b46f);
+    }
+
+    .media-card:nth-child(2) { background: linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.74)), linear-gradient(135deg, #2f5d46, #26384d 56%, #d8c6a3); }
+    .media-card:nth-child(3) { background: linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.74)), linear-gradient(135deg, #5b4b72, #1e1e1e 56%, #8b6f35); }
+
+    .media-card h4 {
+      margin: 0;
+      font-family: var(--serif);
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .media-card p {
+      margin: 7px 0 0;
+      font-size: 12px;
+      line-height: 1.3;
+      color: rgba(255,255,255,.84);
+    }
+
+    .right-rail {
+      display: grid;
+      gap: 18px;
+      align-self: start;
+      position: sticky;
+      top: 118px;
+    }
+
+    .entity-card { overflow: hidden; }
+
+    .entity-hero {
+      padding: 20px;
+      background:
+        linear-gradient(135deg, rgba(22,22,22,.92), rgba(31, 45, 61, .9)),
+        repeating-linear-gradient(45deg, transparent, transparent 12px, rgba(255,255,255,.06) 13px);
+      color: var(--paper-2);
+    }
+
+    .entity-hero small {
+      font-family: var(--mono);
+      letter-spacing: .11em;
+      text-transform: uppercase;
+      color: #decfb8;
+      font-size: 10px;
+    }
+
+    .entity-hero h3 {
+      margin: 8px 0 0;
+      font-family: var(--serif);
+      font-size: 34px;
+      letter-spacing: -.055em;
+      line-height: .95;
+    }
+
+    .entity-body { padding: 16px 18px 18px; }
+
+    .entity-body p {
+      margin: 0 0 14px;
+      color: #4d463d;
+      line-height: 1.45;
+      font-size: 13.5px;
+    }
+
+    .entity-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .stat {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: #fffaf3;
+    }
+
+    .stat strong {
+      display: block;
+      font-family: var(--serif);
+      font-size: 25px;
+      letter-spacing: -.04em;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .topic-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 16px 18px 18px;
+    }
+
+    .topic-cloud .chip {
+      font-size: 12px;
+      padding: 7px 9px;
+    }
+
+    .source-note {
+      padding: 16px 18px 18px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .source-note strong {
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+
+    .no-results {
+      display: none;
+      padding: 28px;
+      border: 1.5px dashed var(--line-dark);
+      border-radius: 30px;
+      background: rgba(255,253,248,.72);
+      text-align: center;
+    }
+
+    .no-results.open { display: block; }
+
+    .no-results h2 {
+      margin: 0;
+      font-family: var(--serif);
+      font-size: 44px;
+      line-height: .9;
+      letter-spacing: -.05em;
+    }
+
+    .no-results p {
+      max-width: 660px;
+      margin: 14px auto 0;
+      color: #4d463d;
+      line-height: 1.45;
+    }
+
+    .no-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .mobile-filter-sheet {
+      display: none;
+      position: fixed;
+      inset: auto 0 0;
+      z-index: 60;
+      max-height: 82vh;
+      overflow: auto;
+      padding: 12px;
+      background: var(--paper-2);
+      border-radius: 28px 28px 0 0;
+      box-shadow: 0 -18px 55px rgba(0,0,0,.28);
+      transform: translateY(105%);
+      transition: transform .25s ease;
+    }
+
+    .mobile-filter-sheet.open { transform: translateY(0); }
+
+    .scrim {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(0,0,0,.35);
+    }
+
+    .scrim.open { display: block; }
+
+    .close-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 8px 0;
+    }
+
+    .close-row strong {
+      font-family: var(--serif);
+      font-size: 24px;
+    }
+
+    .close-btn {
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--line-dark);
+      border-radius: 50%;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    @media (max-width: 1180px) {
+      .layout { grid-template-columns: 240px minmax(0, 1fr); }
+      .right-rail { display: none; }
+      .hero { grid-template-columns: 1fr; }
+      .principles { grid-template-columns: repeat(3, 1fr); }
+      .principle { border-bottom: 0; padding-bottom: 0; }
+    }
+
+    @media (max-width: 860px) {
+      .shell { padding: 0 14px 36px; }
+      header {
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+      }
+      .brand h1 { font-size: 24px; }
+      .nav { display: none; }
+      .account { font-size: 11px; }
+      .hero { padding: 28px 0 18px; }
+      .hero h2 { font-size: 49px; }
+      .hero p { font-size: 15px; }
+      .principles { display: none; }
+      .search-zone { padding: 12px 0; }
+      .search-card {
+        grid-template-columns: 1fr;
+        gap: 11px;
+        padding: 14px;
+        border-radius: 24px;
+      }
+      #searchInput { font-size: 28px; }
+      .search-actions { justify-content: space-between; }
+      .mobile-filter-btn { display: inline-flex; }
+      .suggestions { left: 0; right: 0; top: calc(100% + 8px); }
+      .suggestion-grid { grid-template-columns: 1fr; }
+      .layout { grid-template-columns: 1fr; padding-top: 16px; }
+      .filters { display: none; }
+      .results-top { align-items: start; flex-direction: column; gap: 8px; }
+      .story-spotlight { grid-template-columns: 1fr; padding: 18px; border-radius: 24px; }
+      .timeline-mini { border-left: 0; border-top: 1px solid var(--line-dark); padding-left: 0; padding-top: 15px; }
+      .result-card {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 16px;
+      }
+      .result-side { justify-items: start; text-align: left; min-width: 0; }
+      .media-grid { grid-template-columns: 1fr; }
+      .mobile-filter-sheet { display: block; }
+      .quick-queries { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 3px; }
+      .chip { white-space: nowrap; }
+    }
+
+    @media (max-width: 500px) {
+      .hero h2 { font-size: 43px; }
+      .result-content h4 { font-size: 21px; }
+      .story-spotlight h2 { font-size: 35px; }
+      .btn { padding: 12px 14px; }
+      .search-actions { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-strip"></div>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <div class="brand-mark">V</div>
+        <div>
+          <h1>Verity Post</h1>
+          <small>Read first. Discuss after.</small>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Primary">
+        <a class="active" href="#">Browse</a>
+        <a href="#">Politics</a>
+        <a href="#">Business</a>
+        <a href="#">Sports</a>
+        <a href="#">Technology</a>
+        <a href="#">World</a>
+        <a href="#">Questions</a>
+      </nav>
+      <div class="account">
+        <span class="read-score">82% read-score</span>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <h2>Search should feel like a map of the news, not a pile of links.</h2>
+        <p>This prototype makes Browse/Search story-first: active living stories sit above articles, discussions, reader questions, links, media, and topics. AI can help behind the curtain, but the interface stays source-linked and user-controlled.</p>
+      </div>
+      <aside class="principles" aria-label="Search principles">
+        <div class="principle">
+          <div class="num">01</div>
+          <div><strong>Story first</strong><span>Search finds the ongoing situation before it lists isolated updates.</span></div>
+        </div>
+        <div class="principle">
+          <div class="num">02</div>
+          <div><strong>Typed results</strong><span>Every card says what it is: story, article, discussion, question, media, or topic.</span></div>
+        </div>
+        <div class="principle">
+          <div class="num">03</div>
+          <div><strong>No dead ends</strong><span>Failed searches become questions, link submissions, or coverage requests.</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="search-zone">
+      <div class="search-card">
+        <div class="input-wrap">
+          <div class="search-label">Browse / Search the story graph</div>
+          <input id="searchInput" value="Patriots" autocomplete="off" aria-label="Search" placeholder="Search stories, topics, people, questions…" />
+        </div>
+        <div class="search-actions">
+          <button class="btn secondary mobile-filter-btn" id="openFilters">Filters</button>
+          <button class="btn secondary" id="clearBtn">Clear</button>
+          <button class="btn red" id="searchBtn">Search</button>
+        </div>
+        <div class="suggestions" id="suggestions">
+          <div class="suggestion-grid">
+            <div class="suggestion-col">
+              <h4>Story matches</h4>
+              <button class="suggestion-item" data-query="Patriots"><span><strong>Patriots 2026 season</strong><span>Story · NFL · 14 updates</span></span><span class="kbd">↵</span></button>
+              <button class="suggestion-item" data-query="Senate aid package"><span><strong>Senate aid package</strong><span>Story · Politics · live vote watch</span></span><span class="kbd">↵</span></button>
+            </div>
+            <div class="suggestion-col">
+              <h4>Topics/entities</h4>
+              <button class="suggestion-item" data-query="NFL"><span><strong>NFL</strong><span>Topic · teams, rules, games</span></span><span class="kbd">Tab</span></button>
+              <button class="suggestion-item" data-query="private credit"><span><strong>Private credit</strong><span>Topic · finance explainer</span></span><span class="kbd">Tab</span></button>
+            </div>
+            <div class="suggestion-col">
+              <h4>Reader actions</h4>
+              <button class="suggestion-item" data-query="what is private credit"><span><strong>Ask a question</strong><span>Turn a failed search into a community prompt</span></span><span class="kbd">?</span></button>
+              <button class="suggestion-item" data-query="submit source link"><span><strong>Submit a source link</strong><span>Bring a credible link into a story queue</span></span><span class="kbd">+</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="quick-queries" aria-label="Demo searches">
+        <button class="chip active" data-query="Patriots">Patriots</button>
+        <button class="chip" data-query="NFL">NFL</button>
+        <button class="chip" data-query="private credit">private credit</button>
+        <button class="chip" data-query="Senate aid package">Senate aid package</button>
+        <button class="chip" data-query="moon cheese hearings">No-results demo</button>
+      </div>
+    </section>
+
+    <main class="layout">
+      <aside class="panel filters">
+        <div class="panel-header">
+          <h3>Refine</h3>
+          <small>facets</small>
+        </div>
+        <div class="filter-body">
+          <div class="filter-group">
+            <h4>Content type</h4>
+            <label class="check"><input type="checkbox" checked /> Stories</label>
+            <label class="check"><input type="checkbox" checked /> Articles</label>
+            <label class="check"><input type="checkbox" checked /> Discussions</label>
+            <label class="check"><input type="checkbox" checked /> Questions</label>
+            <label class="check"><input type="checkbox" checked /> Media</label>
+            <label class="check"><input type="checkbox" checked /> Topics</label>
+          </div>
+          <div class="filter-group">
+            <h4>Freshness</h4>
+            <label class="check"><input type="radio" name="fresh" checked /> Latest + relevant</label>
+            <label class="check"><input type="radio" name="fresh" /> Past 24 hours</label>
+            <label class="check"><input type="radio" name="fresh" /> Past week</label>
+            <label class="check"><input type="radio" name="fresh" /> All time</label>
+          </div>
+          <div class="filter-group">
+            <h4>Source layer</h4>
+            <label class="check"><input type="checkbox" checked /> Verity updates</label>
+            <label class="check"><input type="checkbox" checked /> Reader questions</label>
+            <label class="check"><input type="checkbox" /> External links only</label>
+            <p class="microcopy">The product should never hide the difference between editorial content and reader-submitted material.</p>
+          </div>
+        </div>
+      </aside>
+
+      <section class="results" id="results"></section>
+
+      <aside class="right-rail">
+        <section class="panel entity-card">
+          <div class="entity-hero">
+            <small>Entity / topic hub</small>
+            <h3 id="entityTitle">Patriots</h3>
+          </div>
+          <div class="entity-body">
+            <p id="entityDesc">A structured hub for the New England Patriots: active stories, game updates, injuries, reader questions, and related NFL topics.</p>
+            <div class="entity-stats">
+              <div class="stat"><strong id="statStories">3</strong><span>active stories</span></div>
+              <div class="stat"><strong id="statPosts">28</strong><span>reader posts</span></div>
+            </div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <h3>Related map</h3>
+            <small>teaches IA</small>
+          </div>
+          <div class="topic-cloud" id="topicCloud"></div>
+        </section>
+        <section class="panel">
+          <div class="source-note">
+            <strong>Trust behavior</strong>
+            Search can use AI invisibly for grouping, typo tolerance, and dedupe. But visible results stay labeled, linked, and separable by source/type.
+          </div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <div class="scrim" id="scrim"></div>
+  <section class="mobile-filter-sheet" id="mobileSheet" aria-label="Mobile filters">
+    <div class="close-row">
+      <strong>Filters</strong>
+      <button class="close-btn" id="closeFilters">×</button>
+    </div>
+    <div class="filter-body">
+      <div class="filter-group">
+        <h4>Content type</h4>
+        <label class="check"><input type="checkbox" checked /> Stories</label>
+        <label class="check"><input type="checkbox" checked /> Articles</label>
+        <label class="check"><input type="checkbox" checked /> Discussions</label>
+        <label class="check"><input type="checkbox" checked /> Questions</label>
+        <label class="check"><input type="checkbox" checked /> Media</label>
+      </div>
+      <div class="filter-group">
+        <h4>Freshness</h4>
+        <label class="check"><input type="radio" name="mobileFresh" checked /> Latest + relevant</label>
+        <label class="check"><input type="radio" name="mobileFresh" /> Past 24 hours</label>
+        <label class="check"><input type="radio" name="mobileFresh" /> Past week</label>
+      </div>
+      <button class="btn red" style="width:100%;margin-top:8px" id="applyFilters">Apply filters</button>
+    </div>
+  </section>
+
+  <script>
+    const DATA = {
+      "patriots": {
+        entity: {
+          title: "Patriots",
+          desc: "A structured hub for the New England Patriots: active stories, game updates, injuries, reader questions, and related NFL topics.",
+          stats: [3, 28],
+          topics: ["NFL", "AFC East", "New England", "Schedule", "Injuries", "Draft"]
+        },
+        spotlight: {
+          kicker: "Best match · Living story",
+          title: "Patriots 2026 season",
+          desc: "The story page collects every short update, injury note, game result, and verified reader question tied to the Patriots' season.",
+          nodes: ["Latest roster note posted 22m ago", "Reader Q: playoff odds updated", "Week-by-week timeline available"]
+        },
+        sections: [
+          { title: "Articles", icon: "◻", items: [
+            card("article", "Patriots add depth at offensive line before minicamp", "A 400-word update focused on the roster move, why it matters, and what changes before camp.", "Verity Sports", "38m ago", "Quiz required to discuss"),
+            card("article", "Injury tracker: two starters limited in practice", "A short factual update with timeline links to earlier injuries and staff comments.", "Verity Sports", "2h ago", "6 source links"),
+            card("article", "How the Patriots' cap room changed this week", "Numbers-first explainer with a clear source trail and no speculation beyond stated ranges.", "Verity Business/Sports", "Yesterday", "By the numbers")
+          ]},
+          { title: "Discussions", icon: "◇", items: [
+            card("discussion", "Are the Patriots actually better, or just healthier?", "Discussion unlocked by readers who passed the article quiz. Top replies are sorted by citation quality, not raw popularity.", "Reader discussion", "118 comments", "Read-gated"),
+            card("question", "Which games changed the playoff math the most?", "A reader question linked to three timeline nodes and two Verity updates.", "Asked by @gridironmath", "9 answers", "Needs context")
+          ]},
+          { title: "Media", icon: "▣", media: ["Depth chart visual", "Practice clip context", "Cap-room chart"] },
+          { title: "Topics", icon: "⌁", items: [
+            card("topic", "NFL", "The league-level topic hub with teams, rules, injuries, schedule, and related active stories.", "Topic", "Updated daily", "Follow"),
+            card("topic", "AFC East", "Related entities: Bills, Dolphins, Jets, Patriots, standings, injuries, and rivalry stories.", "Topic", "6 active stories", "Map view")
+          ]}
+        ]
+      },
+      "nfl": {
+        entity: {
+          title: "NFL",
+          desc: "A topic hub that groups teams, league rules, injuries, schedule changes, reader questions, and media into one browsable map.",
+          stats: [12, 146],
+          topics: ["Patriots", "Draft", "Schedule", "Rules", "Injuries", "Super Bowl", "AFC", "NFC"]
+        },
+        spotlight: {
+          kicker: "Topic hub · Sports graph",
+          title: "NFL: teams, rules, games, and active storylines",
+          desc: "A broad search should teach the structure: league hub first, then team stories, rule updates, reader questions, and media.",
+          nodes: ["League calendar anchored at top", "Team entities nested underneath", "Questions grouped by story"]
+        },
+        sections: [
+          { title: "Stories", icon: "◆", items: [
+            card("story", "NFL rule changes for 2026", "Ongoing story tracking proposals, votes, implementation dates, and reactions from teams.", "Living story", "11 updates", "Follow"),
+            card("story", "NFL draft board and team needs", "A story spine that connects prospect profiles, trades, needs, and team-specific updates.", "Living story", "24 updates", "Timeline")
+          ]},
+          { title: "Articles", icon: "◻", items: [
+            card("article", "Owners approve one kickoff adjustment", "Short update with the rule text, vote count, and what changes for special teams.", "Verity Sports", "1h ago", "Sources linked"),
+            card("article", "Schedule release: what changed for prime-time games", "A compact update about scheduling changes with links to team entity pages.", "Verity Sports", "4h ago", "Explainer")
+          ]},
+          { title: "Questions", icon: "?", items: [
+            card("question", "Why do rule votes need owner approval?", "Reader question converted into a concise explainer and attached to the rule-change story.", "Asked by @ruleswatch", "14 answers", "Answered"),
+            card("discussion", "Which team had the best offseason?", "Community debate attached to the NFL offseason hub, separated from editorial updates.", "Reader discussion", "332 comments", "Read-gated")
+          ]},
+          { title: "Media", icon: "▣", media: ["Rule change diagram", "Draft board visual", "Team map"] }
+        ]
+      },
+      "private credit": {
+        entity: {
+          title: "Private credit",
+          desc: "A finance topic page that explains the market, tracks companies and regulators, and separates factual updates from reader analysis.",
+          stats: [5, 43],
+          topics: ["Finance", "Debt", "Private equity", "Banks", "SEC", "Risk", "Explainers"]
+        },
+        spotlight: {
+          kicker: "Best match · Explainer story",
+          title: "Private credit market: what changed and why it matters",
+          desc: "This living story starts with a plain-English explainer, then tracks companies, funds, regulators, defaults, and policy concerns over time.",
+          nodes: ["Definition card shown before articles", "Regulator comments linked", "Risk questions separated from hype"]
+        },
+        sections: [
+          { title: "Stories", icon: "◆", items: [
+            card("story", "Private credit market pressure", "Ongoing coverage of rising defaults, lender exposure, and regulator warnings.", "Living story", "18 updates", "Follow"),
+            card("story", "Banks and nonbank lending", "Tracks how banks, private funds, and borrowers interact in the credit market.", "Living story", "7 updates", "Context")
+          ]},
+          { title: "Articles", icon: "◻", items: [
+            card("article", "What private credit is, in five facts", "A short definition-first update for readers who searched the topic cold.", "Verity Business", "Updated today", "Beginner friendly"),
+            card("article", "Regulators ask funds for more disclosure", "A factual update with source documents and a timeline of prior warnings.", "Verity Business", "3h ago", "Primary source")
+          ]},
+          { title: "Reader questions", icon: "?", items: [
+            card("question", "Is private credit the same as private equity?", "The interface surfaces this as a question because the query suggests confusion, not just news intent.", "Asked by @financeplain", "21 answers", "Answered"),
+            card("question", "Can normal investors buy private credit?", "A reader question attached to the explainer story, with risk notes and source links.", "Asked by @yieldhunter", "7 answers", "Needs citation")
+          ]},
+          { title: "Media", icon: "▣", media: ["Market growth chart", "Debt structure visual", "Regulator timeline"] }
+        ]
+      },
+      "senate aid package": {
+        entity: {
+          title: "Senate aid package",
+          desc: "A live political story hub that tracks bill text, amendments, votes, agencies affected, and reader questions about eligibility.",
+          stats: [1, 67],
+          topics: ["Senate", "Appropriations", "White House", "Ukraine", "Disaster aid", "Bill text", "Vote count"]
+        },
+        spotlight: {
+          kicker: "Best match · Live legislative story",
+          title: "Senate aid package vote and amendment tracker",
+          desc: "The result opens as a living story with current status, latest update, bill text links, and a timeline of negotiations.",
+          nodes: ["Latest vote count updated 12m ago", "Amendment list grouped by issue", "Coverage request queue open"]
+        },
+        sections: [
+          { title: "Articles", icon: "◻", items: [
+            card("article", "Senators release revised aid package before procedural vote", "A factual update on what changed, who is backing it, and what happens next.", "Verity Politics", "12m ago", "Live"),
+            card("article", "What is in the aid package? Four categories to know", "A structured breakdown of funding buckets, agencies, and eligibility notes.", "Verity Politics", "1h ago", "Explainer"),
+            card("article", "Timeline: how the package changed over two weeks", "Connects each major negotiation step to article updates and source documents.", "Verity Politics", "Yesterday", "Timeline")
+          ]},
+          { title: "Discussions and questions", icon: "◇", items: [
+            card("question", "Does the bill include disaster aid or only foreign aid?", "A reader question that can become a coverage request if the current article does not answer it.", "Asked by @policyreader", "18 answers", "High demand"),
+            card("discussion", "Which amendment is most likely to pass?", "Discussion visible after the comprehension quiz, with speculation separated from sourced facts.", "Reader discussion", "204 comments", "Read-gated")
+          ]},
+          { title: "Submitted links", icon: "+", items: [
+            card("discussion", "Senate committee bill text PDF", "Reader-submitted primary-source link awaiting editorial attachment to the story timeline.", "Submitted by @civicdoc", "Primary source", "Queue"),
+            card("discussion", "Agency memo on implementation timeline", "A link post grouped under source material instead of mixed with articles.", "Submitted link", "2 comments", "Verify")
+          ]},
+          { title: "Media", icon: "▣", media: ["Vote count board", "Aid categories chart", "Floor speech clip"] }
+        ]
+      }
+    };
+
+    function card(type, title, desc, source, time, badge) {
+      return { type, title, desc, source, time, badge };
+    }
+
+    const results = document.getElementById('results');
+    const input = document.getElementById('searchInput');
+    const suggestions = document.getElementById('suggestions');
+    const entityTitle = document.getElementById('entityTitle');
+    const entityDesc = document.getElementById('entityDesc');
+    const statStories = document.getElementById('statStories');
+    const statPosts = document.getElementById('statPosts');
+    const topicCloud = document.getElementById('topicCloud');
+    const chips = document.querySelectorAll('.chip[data-query]');
+
+    function normalize(q) {
+      const lower = q.trim().toLowerCase();
+      if (lower.includes('patriot')) return 'patriots';
+      if (lower === 'nfl' || lower.includes('football league')) return 'nfl';
+      if (lower.includes('private credit') || lower.includes('what is private credit')) return 'private credit';
+      if (lower.includes('senate') && lower.includes('aid')) return 'senate aid package';
+      return lower;
+    }
+
+    function render(query) {
+      const key = normalize(query || input.value);
+      input.value = query || input.value;
+      chips.forEach(chip => chip.classList.toggle('active', normalize(chip.dataset.query) === key));
+      const data = DATA[key];
+      suggestions.classList.remove('open');
+
+      if (!data) {
+        entityTitle.textContent = 'Coverage gap';
+        entityDesc.textContent = 'No exact match yet. This is where failed searches become reader questions, source submissions, or coverage requests.';
+        statStories.textContent = '0';
+        statPosts.textContent = '0';
+        topicCloud.innerHTML = ['Politics', 'Business', 'Sports', 'World', 'Technology'].map(t => `<button class="chip" data-query="${t}">${t}</button>`).join('');
+        results.innerHTML = `
+          <div class="results-top">
+            <div><h3>No exact results</h3><p>Search looked across stories, articles, questions, discussions, links, media, and topics.</p></div>
+          </div>
+          <section class="no-results open">
+            <div class="eyebrow">No dead ends</div>
+            <h2>Nothing found for &ldquo;${escapeHTML(input.value || 'your search')}.&rdquo;</h2>
+            <p>Instead of dumping you at a blank page, Verity Post should convert this into a useful action: ask the community, submit a source link, or request editorial coverage.</p>
+            <div class="no-actions">
+              <button class="btn red">Ask this as a reader question</button>
+              <button class="btn secondary">Suggest a story</button>
+              <button class="btn secondary">Submit a source link</button>
+            </div>
+          </section>
+        `;
+        return;
+      }
+
+      entityTitle.textContent = data.entity.title;
+      entityDesc.textContent = data.entity.desc;
+      statStories.textContent = data.entity.stats[0];
+      statPosts.textContent = data.entity.stats[1];
+      topicCloud.innerHTML = data.entity.topics.map(t => `<button class="chip" data-query="${t}">${t}</button>`).join('');
+
+      results.innerHTML = `
+        <div class="results-top">
+          <div>
+            <h3>Results for &ldquo;${escapeHTML(input.value)}&rdquo;</h3>
+            <p>Grouped by meaning, not dumped as one noisy list.</p>
+          </div>
+          <label class="sort">Sort <select><option>Best story match</option><option>Newest first</option><option>Most discussed</option><option>Source-first</option></select></label>
+        </div>
+        ${renderSpotlight(data.spotlight)}
+        ${data.sections.map(renderSection).join('')}
+      `;
+    }
+
+    function renderSpotlight(s) {
+      return `
+        <section class="story-spotlight">
+          <div>
+            <div class="eyebrow">${escapeHTML(s.kicker)}</div>
+            <h2>${escapeHTML(s.title)}</h2>
+            <p>${escapeHTML(s.desc)}</p>
+            <div class="spot-actions">
+              <button class="btn red">Open story hub</button>
+              <button class="btn secondary">View timeline</button>
+              <button class="btn secondary">Follow topic</button>
+            </div>
+          </div>
+          <aside class="timeline-mini">
+            <h4>Why this appears first</h4>
+            ${s.nodes.map(n => `<div class="t-node">${escapeHTML(n)}</div>`).join('')}
+          </aside>
+        </section>
+      `;
+    }
+
+    function renderSection(section) {
+      if (section.media) {
+        return `
+          <section class="panel section">
+            <div class="section-title"><h3>${escapeHTML(section.title)}</h3><span class="count">${section.media.length} results</span></div>
+            <div class="media-grid">
+              ${section.media.map((m) => `<article class="media-card"><span class="type-pill media">Media</span><h4>${escapeHTML(m)}</h4><p>Thumbnail-style card with caption, source, and context link.</p></article>`).join('')}
+            </div>
+          </section>
+        `;
+      }
+      return `
+        <section class="panel section">
+          <div class="section-title"><h3>${escapeHTML(section.title)}</h3><span class="count">${section.items.length} results</span></div>
+          <div class="result-list">
+            ${section.items.map(renderCard).join('')}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderCard(item) {
+      const label = item.type === 'discussion' ? 'Discuss' : item.type;
+      return `
+        <article class="result-card">
+          <span class="type-pill ${item.type}">${escapeHTML(label)}</span>
+          <div class="result-content">
+            <h4>${escapeHTML(item.title)}</h4>
+            <p>${escapeHTML(item.desc)}</p>
+            <div class="meta"><span><b>${escapeHTML(item.source)}</b></span><span>${escapeHTML(item.time)}</span></div>
+          </div>
+          <div class="result-side">
+            <span class="read-gate">${escapeHTML(item.badge)}</span>
+            <span>source-linked</span>
+          </div>
+        </article>
+      `;
+    }
+
+    function escapeHTML(str) {
+      return String(str).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    }
+
+    document.getElementById('searchBtn').addEventListener('click', () => render(input.value));
+    document.getElementById('clearBtn').addEventListener('click', () => { input.value = ''; suggestions.classList.add('open'); input.focus(); });
+
+    input.addEventListener('focus', () => suggestions.classList.add('open'));
+    input.addEventListener('input', () => suggestions.classList.add('open'));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') render(input.value);
+      if (e.key === 'Escape') suggestions.classList.remove('open');
+    });
+
+    document.querySelectorAll('[data-query]').forEach(el => {
+      el.addEventListener('click', () => render(el.dataset.query));
+    });
+
+    document.addEventListener('click', (e) => {
+      const searchCard = document.querySelector('.search-card');
+      if (!searchCard.contains(e.target)) suggestions.classList.remove('open');
+    });
+
+    const mobileSheet = document.getElementById('mobileSheet');
+    const scrim = document.getElementById('scrim');
+    function openSheet() { mobileSheet.classList.add('open'); scrim.classList.add('open'); }
+    function closeSheet() { mobileSheet.classList.remove('open'); scrim.classList.remove('open'); }
+    document.getElementById('openFilters').addEventListener('click', openSheet);
+    document.getElementById('closeFilters').addEventListener('click', closeSheet);
+    document.getElementById('applyFilters').addEventListener('click', closeSheet);
+    scrim.addEventListener('click', closeSheet);
+
+    render('Patriots');
+  </script>
+</body>
+</html>

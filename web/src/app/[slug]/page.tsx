@@ -23,7 +23,6 @@ import { incrementViewCount } from '@/lib/counters';
 import { getAnonReadCount } from '@/lib/anonReadCounter';
 import { RegistrationWallProvider } from '@/components/RegistrationWall';
 import ArticleSurface from '@/components/article/ArticleSurface';
-import MidBodyQuizTeaser from '@/components/article/MidBodyQuizTeaser';
 import ArticleReaderTabs from '@/components/article/ArticleReaderTabs';
 import TimelineSection from '@/components/article/TimelineSection';
 import SourcesSection from '@/components/article/SourcesSection';
@@ -35,6 +34,7 @@ import StoryArticlePicker from '@/components/article/StoryArticlePicker';
 import AnonArticleCtaBanner from '@/components/article/AnonArticleCtaBanner';
 import ArticleFetchFailed from './_ArticleFetchFailed';
 import NextStoryFooter from '@/components/NextStoryFooter';
+import RelatedStories from '@/components/article/RelatedStories';
 import Ad from '@/components/Ad';
 
 export const dynamic = 'force-dynamic';
@@ -114,7 +114,29 @@ export async function generateMetadata({
   params: { slug: string };
 }): Promise<Metadata> {
   const found = await fetchBySlug(params.slug);
-  if (!found) return { title: 'Article not found · Verity Post' };
+  if (!found) {
+    // Slug isn't an article — check if it's a category short-link
+    // (`/politics`, `/congress`, etc.). If so, return category-aware
+    // metadata so the tab title reads "Politics · Verity Post" instead
+    // of "Article not found".
+    const service = createServiceClient();
+    const { data: cat } = await service
+      .from('categories')
+      .select('name, slug')
+      .eq('slug', params.slug)
+      .is('deleted_at', null)
+      .maybeSingle<{ name: string; slug: string }>();
+    if (cat) {
+      return {
+        // Layout title template appends " · Verity Post"; just return
+        // the section name so we don't double-suffix.
+        title: cat.name,
+        description: `${cat.name} coverage on Verity Post.`,
+        alternates: { canonical: `/${cat.slug}` },
+      };
+    }
+    return { title: 'Article not found · Verity Post' };
+  }
 
   const publishedArticle = found.articles.find((a) => a.status === 'published' && a.published_at !== null);
   if (!publishedArticle) return { title: 'Article not found · Verity Post' };
@@ -174,8 +196,27 @@ export default async function ArticleSlugPage({
   params: { slug: string };
   searchParams: { a?: string };
 }) {
-  const found = await fetchBySlug(params.slug);
-  if (!found) notFound();
+  // Category short-link — `/politics`, `/world`, etc. resolve to a
+  // filtered home view before falling through to the article lookup
+  // so owners can ship clean category URLs without a /category prefix.
+  // Article slugs win when a slug exists in both tables (articles are
+  // editorial content; categories are routing aliases).
+  const article404 = await fetchBySlug(params.slug);
+  if (!article404) {
+    const catService = createServiceClient();
+    const { data: cat } = await catService
+      .from('categories')
+      .select('slug')
+      .eq('slug', params.slug)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (cat) {
+      const HomeRoot = (await import('../_home/HomeRoot')).default;
+      return <HomeRoot filter={{ topic: params.slug }} />;
+    }
+    notFound();
+  }
+  const found = article404;
 
   const { story, articles } = found;
   const defaultArticle =
@@ -262,13 +303,13 @@ export default async function ArticleSlugPage({
           article.category_id
             ? service
                 .from('articles')
-                .select('id, title, excerpt, story_id, stories!articles_story_id_fkey(slug)')
+                .select('id, title, excerpt, story_id, published_at, stories!articles_story_id_fkey(slug)')
                 .eq('category_id', article.category_id)
                 .eq('status', 'published')
                 .is('deleted_at', null)
                 .neq('story_id', story.id)
                 .order('published_at', { ascending: false })
-                .limit(3)
+                .limit(8)
             : Promise.resolve({ data: [], error: null }),
         ]),
       };
@@ -305,13 +346,29 @@ export default async function ArticleSlugPage({
   const sources = sourcesResult.data ?? [];
   const timeline = timelineResult.data ?? [];
   const category = categoryResult.error ? null : (categoryResult.data as { name: string; slug: string } | null);
-  type NearbyRow = { id: string; title: string; excerpt: string | null; story_id: string | null; stories: { slug: string } | null };
+  type NearbyRow = {
+    id: string;
+    title: string;
+    excerpt: string | null;
+    story_id: string | null;
+    published_at: string | null;
+    stories: { slug: string } | null;
+  };
   const nearbyRows: NearbyRow[] = nearbyStoriesResult.error
     ? []
     : ((nearbyStoriesResult.data ?? []) as NearbyRow[]).filter((r) => r.stories?.slug);
-  const nearbyStories: { slug: string; title: string }[] = nearbyRows.map((r) => ({
+  const nearbyStories: { slug: string; title: string }[] = nearbyRows
+    .slice(0, 3)
+    .map((r) => ({ slug: r.stories!.slug, title: r.title }));
+  // Related stories rail (right column of the article reader). Same
+  // category, most recent first, excludes the current story. Sits
+  // alongside the story timeline on desktop ≥1180px so readers can
+  // jump to adjacent coverage without scrolling to the page foot.
+  const relatedStories = nearbyRows.slice(0, 5).map((r) => ({
     slug: r.stories!.slug,
     title: r.title,
+    excerpt: r.excerpt,
+    published_at: r.published_at,
   }));
   if (article.status !== 'published' && !canEdit) redirect(`/${story.slug}`);
 
@@ -405,22 +462,15 @@ export default async function ArticleSlugPage({
                 the same scroll, not in a side rail they often miss.
                 Logo-driven rows with click-to-expand headlines. */}
             <SourcesSection sources={!isAnon ? sources : []} showTease={false} articleCountReached={articleCountReached} />
-            {/* End-of-body quiz teaser. Renders only for non-COPPA published
-                articles that have a quiz the viewer hasn't passed yet. On
-                mobile the engagement zone lives behind a tab, so this gives
-                readers an in-flow signal that there's a quiz waiting; on
-                desktop it sits just above the engagement zone as a smooth-
-                scroll bridge. */}
-            {!isCoppa && hasQuiz && !initialPassed && (article.status === 'published' || canEdit || isOwnerModeViewer) && (
-              <MidBodyQuizTeaser hasQuiz={hasQuiz} quizPassed={initialPassed} />
-            )}
-            {/* AnonArticleCtaBanner removed — the locked quiz card in the
-                engagement zone is the single signup nudge for anon. */}
           </>
         }
         timelineSlot={
           <>
             <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} storyTitle={story.title} showTease={false} articleCountReached={articleCountReached} currentArticleId={article.id} />
+            {/* Related stories — auto-fetched same-category, recent
+                first. Sits between the timeline and the article_rail
+                ad so readers can jump to adjacent coverage. */}
+            <RelatedStories stories={relatedStories} categoryName={category?.name} />
             {/* article_rail: sticky right-rail on desktop ≥1180px (globals.css:828);
                 tabbed inside the Timeline panel on mobile/tablet (display:none under
                 the default Article tab — wasted serve calls on <1180px viewports). */}
@@ -484,7 +534,6 @@ export default async function ArticleSlugPage({
               key={article.id}
               articleId={article.id}
               articleCategoryId={article.category_id}
-              articleCategoryName={category?.name ?? null}
               hasQuiz={hasQuiz}
               initialPassed={initialPassed}
               currentUserId={user?.id ?? null}

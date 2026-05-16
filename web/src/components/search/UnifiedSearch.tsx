@@ -17,7 +17,13 @@ import { formatDate } from '@/lib/dates';
 type ResultType = 'all' | 'stories' | 'articles';
 type Chip = 'all' | 'today' | 'this_week' | 'developing' | 'updated_recently';
 type Status = '' | 'developing' | 'updated';
-type Sort = 'relevance' | 'recent' | 'newest_article' | 'most_sourced';
+type Sort =
+  | 'recent'
+  | 'newest_article'
+  | 'most_sourced'
+  | 'just_broke'
+  | 'resurfacing'
+  | 'long_arcs';
 
 interface StoryRow {
   type: 'story';
@@ -30,6 +36,7 @@ interface StoryRow {
   article_count: number;
   latest_article_at: string | null;
   has_recent_comments: boolean;
+  comment_count?: number;
   topic: { id: string | null; slug?: string | null; name?: string | null } | null;
 }
 
@@ -56,15 +63,6 @@ interface SearchResponse {
   ignored_filters?: string[];
 }
 
-const TOPICS: { slug: string; label: string }[] = [
-  { slug: 'business', label: 'Business' },
-  { slug: 'politics', label: 'Politics' },
-  { slug: 'world', label: 'World' },
-  { slug: 'science', label: 'Science' },
-  { slug: 'climate', label: 'Climate' },
-  { slug: 'health', label: 'Health' },
-];
-
 const CHIPS: { id: Chip; label: string }[] = [
   { id: 'all', label: 'All results' },
   { id: 'today', label: 'Today' },
@@ -74,9 +72,11 @@ const CHIPS: { id: Chip; label: string }[] = [
 ];
 
 const SORT_OPTIONS: { id: Sort; label: string }[] = [
-  { id: 'relevance', label: 'Most relevant' },
   { id: 'recent', label: 'Recently updated' },
+  { id: 'just_broke', label: 'Just broke' },
   { id: 'newest_article', label: 'Newest article' },
+  { id: 'resurfacing', label: 'Resurfacing' },
+  { id: 'long_arcs', label: 'Long arcs' },
   { id: 'most_sourced', label: 'Most sourced' },
 ];
 
@@ -106,20 +106,39 @@ function dateOptionToFrom(opt: string): string | null {
   }
 }
 
+type Topic = { slug: string; label: string };
+
 export default function UnifiedSearch({
   initialTopic,
-}: { initialTopic?: string } = {}) {
-  usePageViewTrack('search');
+  topics,
+}: { initialTopic?: string; topics?: Topic[] } = {}) {
   const router = useRouter();
   const pathname = usePathname();
+  usePageViewTrack(
+    pathname && pathname.startsWith('/category') ? 'category' : 'search',
+  );
   const sp = useSearchParams();
+  const topicList: Topic[] = topics ?? [];
 
   const [q, setQ] = useState<string>(sp.get('q') || '');
   const [type, setType] = useState<ResultType>((sp.get('type') as ResultType) || 'all');
   const [topic, setTopic] = useState<string>(sp.get('topic') || initialTopic || '');
   const [status, setStatus] = useState<Status>((sp.get('status') as Status) || '');
   const [chip, setChip] = useState<Chip>((sp.get('chip') as Chip) || 'all');
-  const [sort, setSort] = useState<Sort>((sp.get('sort') as Sort) || 'relevance');
+  const [sort, setSort] = useState<Sort>(() => {
+    const raw = sp.get('sort');
+    if (
+      raw === 'recent' ||
+      raw === 'newest_article' ||
+      raw === 'most_sourced' ||
+      raw === 'just_broke' ||
+      raw === 'resurfacing' ||
+      raw === 'long_arcs'
+    ) {
+      return raw;
+    }
+    return 'recent';
+  });
   const [dateOpt, setDateOpt] = useState<string>(sp.get('date') || '');
 
   const [results, setResults] = useState<ResultRow[]>([]);
@@ -135,7 +154,7 @@ export default function UnifiedSearch({
     if (topic) p.set('topic', topic);
     if (status) p.set('status', status);
     if (chip !== 'all') p.set('chip', chip);
-    if (sort !== 'relevance') p.set('sort', sort);
+    if (sort !== 'recent') p.set('sort', sort);
     const from = dateOptionToFrom(dateOpt);
     if (from) p.set('from', from);
     return p;
@@ -152,7 +171,7 @@ export default function UnifiedSearch({
     if (topic && topic !== initialTopic) p.set('topic', topic);
     if (status) p.set('status', status);
     if (chip !== 'all') p.set('chip', chip);
-    if (sort !== 'relevance') p.set('sort', sort);
+    if (sort !== 'recent') p.set('sort', sort);
     if (dateOpt) p.set('date', dateOpt);
     const qs = p.toString();
     router.replace((pathname || '/search') + (qs ? `?${qs}` : ''), {
@@ -280,7 +299,7 @@ export default function UnifiedSearch({
             label="Topic"
             options={[
               { id: '', label: 'All topics' },
-              ...TOPICS.map((t) => ({ id: t.slug, label: t.label })),
+              ...topicList.map((t) => ({ id: t.slug, label: t.label })),
             ]}
             value={topic}
             onChange={setTopic}
@@ -346,7 +365,7 @@ export default function UnifiedSearch({
         <aside className="vp-search-rail" aria-label="Related">
           <RailCard title="Start here">
             <ul className="vp-rail-list">
-              {TOPICS.slice(0, 5).map((t) => (
+              {topicList.slice(0, 5).map((t) => (
                 <li key={t.slug}>
                   <Link
                     href={`/search?topic=${t.slug}`}
@@ -392,6 +411,7 @@ export default function UnifiedSearch({
           topic={topic}
           status={status}
           dateOpt={dateOpt}
+          topics={topicList}
           onTopic={setTopic}
           onStatus={(v) => setStatus(v as Status)}
           onDate={setDateOpt}
@@ -468,10 +488,20 @@ function StoryResultRow({ row }: { row: StoryRow }) {
         <h3 className="vp-result-title">{row.title || '(untitled)'}</h3>
         <div className="vp-result-footer">
           <span>{row.article_count} article{row.article_count === 1 ? '' : 's'}</span>
-          {row.latest_article_at && (
+          {typeof row.comment_count === 'number' && row.comment_count > 0 && (
             <>
               <span aria-hidden> · </span>
-              <span>Latest {formatDate(row.latest_article_at)}</span>
+              <span>
+                {row.comment_count} comment{row.comment_count === 1 ? '' : 's'}
+              </span>
+            </>
+          )}
+          {(row.last_observed_at || row.latest_article_at) && (
+            <>
+              <span aria-hidden> · </span>
+              <span>
+                Updated {formatDate(row.last_observed_at || row.latest_article_at!)}
+              </span>
             </>
           )}
         </div>
@@ -538,6 +568,7 @@ function FilterSheet({
   topic,
   status,
   dateOpt,
+  topics,
   onTopic,
   onStatus,
   onDate,
@@ -549,6 +580,7 @@ function FilterSheet({
   topic: string;
   status: Status;
   dateOpt: string;
+  topics: Topic[];
   onTopic: (v: string) => void;
   onStatus: (v: string) => void;
   onDate: (v: string) => void;
@@ -579,7 +611,7 @@ function FilterSheet({
             label="Topic"
             options={[
               { id: '', label: 'All topics' },
-              ...TOPICS.map((t) => ({ id: t.slug, label: t.label })),
+              ...topics.map((t) => ({ id: t.slug, label: t.label })),
             ]}
             value={topic}
             onChange={onTopic}
@@ -713,7 +745,7 @@ const styles = `
   gap: 24px;
   align-items: start;
 }
-.vp-search-filters { position: sticky; top: 16px; }
+.vp-search-filters { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; padding-right: 4px; }
 .vp-filter-group {
   border: none;
   padding: 0;
@@ -779,13 +811,19 @@ const styles = `
   letter-spacing: 0;
   font-weight: 400;
 }
-.vp-search-list { list-style: none; padding: 0; margin: 0; }
+.vp-search-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
 .vp-result-row {
-  border-bottom: 1px solid var(--vp-border-soft);
+  background: var(--vp-surface);
+  border: 1px solid var(--vp-border-soft);
+  border-radius: 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.vp-result-row:hover {
+  border-color: var(--vp-border);
 }
 .vp-result-link {
   display: block;
-  padding: 16px 0;
+  padding: 16px 18px;
   color: var(--vp-ink);
   text-decoration: none;
 }
@@ -875,7 +913,7 @@ const styles = `
   line-height: 1.55;
   margin: 0;
 }
-.vp-search-rail { position: sticky; top: 16px; }
+.vp-search-rail { position: sticky; top: 16px; margin-top: 36px; }
 .vp-rail-card {
   border: 1px solid var(--vp-border-soft);
   border-radius: 14px;

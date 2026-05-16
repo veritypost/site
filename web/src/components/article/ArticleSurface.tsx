@@ -59,13 +59,10 @@ const PAGE_STYLE: React.CSSProperties = {
 };
 
 const TITLE_STYLE: React.CSSProperties = {
-  // v2: editorial regular weight (400), bigger 52px desktop, tighter tracking.
-  // Mobile scales naturally via the 680px max-width container + viewport
-  // width — at <640px the parent padding collapses and 52px is still legible
-  // on iPhone-class viewports. If mobile pressure shows up in QA, add a
-  // matchMedia-driven override; not needed for first ship.
+  // v2 mock: clamp(36px,4.2vw,52px) — scales with viewport so iPhone-class
+  // widths drop to 36px instead of crowding at 52px against the 18px gutter.
   fontFamily: SERIF,
-  fontSize: 52,
+  fontSize: 'clamp(36px, 4.2vw, 52px)',
   fontWeight: 400,
   lineHeight: 1.0,
   letterSpacing: '-0.04em',
@@ -80,12 +77,13 @@ const SUBTITLE_STYLE: React.CSSProperties = {
   // typographic register.
   fontFamily: SANS,
   fontSize: 19,
-  lineHeight: 1.5,
+  lineHeight: 1.55,
   fontStyle: 'normal',
   fontWeight: 400,
   // eslint-disable-next-line no-restricted-syntax -- 24px chosen to match v2 mock; equals --s6 but kept literal for parity with TimelineSection
   margin: '0 0 24px',
   color: TEXT_MUTED,
+  maxWidth: '62ch',
 };
 
 const BYLINE_ROW_STYLE: React.CSSProperties = {

@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verity Post — Browse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Match the live home page tokens — same theme, same vocabulary */
+    :root {
+      --vp-accent: #8b0f16;
+      --vp-accent-dark: #64090e;
+      --vp-accent-soft: #f4e6e2;
+      --vp-bg: #f7f4ef;
+      --vp-surface: #ffffff;
+      --vp-surface-soft: #fbf7ef;
+      --vp-border: #ded8ce;
+      --vp-border-soft: #eee8df;
+      --vp-ink: #171717;
+      --vp-ink-2: #3a3631;
+      --vp-text-muted: #66615a;
+      --vp-text-soft: #8a8379;
+      --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--vp-ink); background: var(--vp-bg);
+      font-family: var(--font-sans);
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; background: none; border: 0; padding: 0; color: inherit; }
+
+    .shell { max-width: 1280px; margin: 0 auto; padding: 0 24px 80px; }
+
+    /* Body grid — same shape as home: main column + 360px right rail at >= 900px */
+    .body-grid { display: block; }
+    @media (min-width: 900px) {
+      .body-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 32px;
+        align-items: start;
+      }
+      .body-rail {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        position: sticky;
+        top: 16px;
+      }
+      .body-rail > * { align-self: flex-end; }
+    }
+    @media (max-width: 899px) {
+      .body-rail { display: flex; flex-direction: column; gap: 16px; margin-top: 18px; }
+    }
+
+    /* Right rail card — matches home's .vp-rh-rail-card */
+    .rail-card {
+      background: var(--vp-surface);
+      width: 100%;
+      max-width: 320px;
+      border: 1px solid var(--vp-border-soft);
+      border-radius: 18px;
+      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
+      padding: 14px 16px;
+      box-sizing: border-box;
+    }
+    @media (max-width: 899px) {
+      .rail-card { max-width: 100%; }
+    }
+    .rail-card h4 {
+      margin: 0 0 10px;
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--vp-accent); font-weight: 600;
+    }
+    .rail-card .row {
+      display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center;
+      padding: 7px 0; border-bottom: 1px solid var(--vp-border-soft);
+    }
+    .rail-card .row:last-child { border-bottom: 0; }
+    .rail-card .row .n {
+      font-family: var(--font-serif); font-size: 18px;
+      color: var(--vp-text-soft); font-weight: 500; letter-spacing: -.02em; text-align: right;
+    }
+    .rail-card .row .t {
+      font-size: 13.5px; color: var(--vp-ink); font-weight: 500; line-height: 1.3;
+    }
+    .rail-card .row .m {
+      font-family: var(--font-mono); font-size: 10px;
+      text-transform: uppercase; letter-spacing: .06em; color: var(--vp-text-muted);
+      white-space: nowrap;
+    }
+    .rail-card .topic-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 0; border-bottom: 1px solid var(--vp-border-soft);
+      font-size: 13px; color: var(--vp-ink-2); cursor: pointer;
+    }
+    .rail-card .topic-row:last-child { border-bottom: 0; }
+    .rail-card .topic-row .c {
+      font-family: var(--font-mono); font-size: 10px; color: var(--vp-text-muted);
+    }
+
+    /* Header — same shape as home page chrome */
+    header {
+      display: flex; align-items: center; justify-content: space-between; gap: 20px;
+      padding: 20px 0 16px;
+      border-bottom: 1px solid var(--vp-border-soft);
+    }
+    .wordmark {
+      font-family: var(--font-serif); font-size: 24px; letter-spacing: -.02em; font-weight: 500;
+    }
+    nav { display: flex; gap: 22px; }
+    nav a {
+      color: var(--vp-text-muted); text-decoration: none;
+      font-size: 13px; font-weight: 500;
+    }
+    nav a.active, nav a:hover { color: var(--vp-ink); }
+
+    /* Quiet top — just search, chips, sort */
+    .controls { padding: 22px 0 14px; }
+    .search { position: relative; margin-bottom: 14px; }
+    .search input {
+      width: 100%; padding: 12px 16px 12px 44px;
+      font-size: 15px; color: var(--vp-ink);
+      background: var(--vp-surface); border: 1px solid var(--vp-border); border-radius: 10px;
+      outline: 0;
+    }
+    .search input::placeholder { color: var(--vp-text-soft); }
+    .search svg {
+      position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+      width: 16px; height: 16px; color: var(--vp-text-muted);
+    }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
+    .chip {
+      border: 1px solid var(--vp-border); border-radius: 999px;
+      padding: 6px 12px; font-size: 12.5px; font-weight: 500;
+      color: var(--vp-text-muted); background: transparent; white-space: nowrap;
+    }
+    .chip:hover { border-color: var(--vp-text-muted); color: var(--vp-ink); }
+    .chip.on { background: var(--vp-ink); color: var(--vp-bg); border-color: var(--vp-ink); }
+    .sort-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 6px 2px 14px;
+      font-family: var(--font-mono); font-size: 11px;
+      text-transform: uppercase; letter-spacing: .08em; color: var(--vp-text-muted);
+      border-bottom: 1px solid var(--vp-border-soft);
+    }
+    .sort-row select {
+      font-family: var(--font-sans); font-size: 12.5px;
+      text-transform: none; letter-spacing: 0;
+      padding: 5px 8px; border: 1px solid var(--vp-border); border-radius: 8px;
+      background: var(--vp-surface); color: var(--vp-ink); cursor: pointer;
+    }
+
+    /* HERO SPOTLIGHT — matches home page's hero treatment:
+       28px radius, white→ivory gradient, accent-tinted border, soft elevation */
+    .hero-cluster {
+      margin-top: 18px; margin-bottom: 8px;
+      padding: 28px 32px;
+      border: 1px solid var(--vp-border);
+      border-radius: 28px;
+      background:
+        linear-gradient(180deg, var(--vp-surface), var(--vp-surface-soft));
+      box-shadow: 0 14px 36px rgba(31, 25, 16, .06);
+      display: grid; grid-template-columns: 1fr 180px; gap: 28px; align-items: center;
+    }
+    .hero-cluster .cat {
+      margin: 0 0 10px;
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--vp-accent); font-weight: 600;
+    }
+    .hero-cluster h2 {
+      margin: 0; font-family: var(--font-serif);
+      font-size: clamp(28px, 4vw, 40px); line-height: 1.05;
+      letter-spacing: -.03em; font-weight: 400; color: var(--vp-ink);
+    }
+    .hero-cluster p {
+      margin: 14px 0 0; color: var(--vp-ink-2);
+      font-size: 15px; line-height: 1.5; max-width: 64ch;
+    }
+    .hero-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+    .btn {
+      border: 1px solid var(--vp-ink); border-radius: 999px;
+      background: var(--vp-ink); color: var(--vp-bg);
+      padding: 9px 16px; font-size: 13px; font-weight: 600;
+    }
+    .btn.secondary {
+      background: transparent; color: var(--vp-ink); border-color: var(--vp-border);
+    }
+    .btn.accent { background: var(--vp-accent); border-color: var(--vp-accent); color: var(--vp-surface); }
+    .hero-stat {
+      border-left: 1px solid var(--vp-border);
+      padding-left: 22px;
+      display: grid; align-content: center; gap: 14px;
+      color: var(--vp-text-muted); font-family: var(--font-mono); font-size: 10px;
+      text-transform: uppercase; letter-spacing: .08em;
+    }
+    .hero-stat strong {
+      display: block; color: var(--vp-ink);
+      font-family: var(--font-serif); font-size: 30px; line-height: .9;
+      letter-spacing: -.025em; font-weight: 500; text-transform: none;
+    }
+
+    /* FEED — hairline-divided rows (matches home story cards: transparent bg + bottom border) */
+    .feed { display: flex; flex-direction: column; margin-top: 22px; }
+    .feed-item {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px;
+      padding: 22px 0;
+      border-bottom: 1px solid var(--vp-border-soft);
+    }
+    .feed-item:last-child { border-bottom: 0; }
+
+    .feed-body { min-width: 0; }
+    .kicker {
+      margin: 0 0 6px;
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--vp-accent); font-weight: 600;
+    }
+    .kicker .anchor-prefix { color: var(--vp-text-muted); font-weight: 500; margin-left: 8px; }
+    .kicker .story-link {
+      color: var(--vp-ink); text-decoration: none;
+      text-transform: none; letter-spacing: 0;
+      font-family: var(--font-sans); font-size: 12.5px; font-weight: 600;
+      border-bottom: 1px solid var(--vp-border); padding-bottom: 1px;
+    }
+    .kicker .story-link:hover { color: var(--vp-accent); border-bottom-color: var(--vp-accent); }
+    .feed-item h3 {
+      margin: 0 0 8px; font-family: var(--font-serif); font-weight: 400;
+      font-size: clamp(20px, 1.8vw, 24px); line-height: 1.15; letter-spacing: -.02em;
+      color: var(--vp-ink);
+    }
+    .feed-item .dek {
+      margin: 0; color: var(--vp-ink-2); font-size: 14px; line-height: 1.5; max-width: 64ch;
+    }
+    .feed-item .snip {
+      font-family: var(--font-serif); font-size: 16px; line-height: 1.45;
+      color: var(--vp-ink); margin: 0;
+    }
+    .meta {
+      margin-top: 12px; font-family: var(--font-mono);
+      font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
+      color: var(--vp-text-muted);
+    }
+    .meta b { color: var(--vp-ink); font-weight: 600; }
+    .meta .sep { margin: 0 8px; color: var(--vp-border); }
+
+    .feed-side {
+      display: grid; align-content: center; justify-items: end;
+      gap: 8px; min-width: 100px;
+    }
+    .feed-side .ts {
+      font-family: var(--font-mono); font-size: 10.5px;
+      text-transform: uppercase; letter-spacing: .08em; color: var(--vp-text-muted);
+    }
+    .feed-side .ts.fresh { color: var(--vp-accent); font-weight: 600; }
+    .feed-side .read-gate {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: .06em; text-transform: uppercase; font-weight: 600;
+      padding: 4px 10px; border-radius: 999px;
+      color: var(--vp-ink); background: var(--vp-surface-soft);
+      border: 1px solid var(--vp-border-soft);
+    }
+
+    /* Mini-card embedded in the feed — quieter than the hero, still distinct */
+    .mini {
+      padding: 18px 22px;
+      background: var(--vp-surface);
+      border: 1px solid var(--vp-border-soft);
+      border-radius: 16px;
+      margin: 4px 0;
+    }
+    .mini h4 {
+      margin: 0 0 10px;
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--vp-accent); font-weight: 600;
+    }
+    .mini .row {
+      display: grid; grid-template-columns: 24px 1fr auto; gap: 12px; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid var(--vp-border-soft);
+    }
+    .mini .row:last-child { border-bottom: 0; }
+    .mini .row .n {
+      font-family: var(--font-serif); font-size: 20px;
+      color: var(--vp-text-soft); font-weight: 500; letter-spacing: -.02em; text-align: right;
+    }
+    .mini .row .t {
+      font-size: 14px; color: var(--vp-ink); font-weight: 500; line-height: 1.3;
+    }
+    .mini .row .m {
+      font-family: var(--font-mono); font-size: 10px;
+      text-transform: uppercase; letter-spacing: .06em; color: var(--vp-text-muted);
+    }
+
+    @media (max-width: 720px) {
+      .shell { padding: 0 16px 60px; }
+      nav { gap: 16px; }
+      .hero-cluster { grid-template-columns: 1fr; padding: 22px 22px; border-radius: 22px; }
+      .hero-stat { grid-template-columns: 1fr 1fr; border-left: 0; border-top: 1px solid var(--vp-border); padding-left: 0; padding-top: 16px; }
+      .feed-item { grid-template-columns: 1fr; gap: 10px; }
+      .feed-side { justify-items: start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+
+    <header>
+      <div class="wordmark">Verity Post</div>
+      <nav>
+        <a class="active" href="#">Browse</a>
+        <a href="#">Following</a>
+        <a href="#">Categories</a>
+      </nav>
+    </header>
+
+    <div class="controls">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.65" y2="16.65"/></svg>
+        <input type="search" placeholder="Search stories, articles, comments, or people" />
+      </div>
+      <div class="chips">
+        <button class="chip on">All</button>
+        <button class="chip">Stories</button>
+        <button class="chip">Articles</button>
+        <button class="chip">Questions</button>
+        <button class="chip">Adding context</button>
+        <button class="chip">Different takes</button>
+      </div>
+      <div class="sort-row">
+        <span>128 items</span>
+        <label>Sort
+          <select>
+            <option>Most active first</option>
+            <option>Newest first</option>
+            <option>Resurfacing</option>
+            <option>Long arcs</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="body-grid">
+      <div class="body-main">
+
+    <!-- HERO CLUSTER — same chrome as the home page's lead story -->
+    <section class="hero-cluster">
+      <div>
+        <p class="cat">Story · Politics · World</p>
+        <h2>Pentagon withdraws 5,000 troops from Germany over Iran dispute</h2>
+        <p>Six articles from four outlets, first reported by Reuters yesterday. Three open reader questions about the procedural authority.</p>
+        <div class="hero-actions">
+          <button class="btn accent">Open story</button>
+          <button class="btn secondary">View timeline</button>
+          <button class="btn secondary">Follow</button>
+        </div>
+      </div>
+      <aside class="hero-stat">
+        <div><strong>42</strong>live story paths</div>
+        <div><strong>8</strong>need context</div>
+      </aside>
+    </section>
+
+    <section class="feed" aria-label="Feed">
+
+      <article class="feed-item">
+        <div class="feed-body">
+          <p class="kicker">Question <span class="anchor-prefix">on</span> <a class="story-link" href="#">Pentagon Germany Iran dispute</a></p>
+          <h3>Did anyone catch the statute the administration is citing for the emergency stay?</h3>
+          <p class="snip">Bloomberg referenced "EO 14034" but I can't find that in the registry. Curious whether one of you reads regulatory orders for a living.</p>
+          <div class="meta">
+            <b>Marcus T</b><span class="sep">·</span>5 replies<span class="sep">·</span>top response from Sarah K (defense analyst, verified)
+          </div>
+        </div>
+        <div class="feed-side">
+          <span class="ts fresh">22m ago</span>
+          <span class="read-gate">Open question</span>
+        </div>
+      </article>
+
+      <article class="feed-item">
+        <div class="feed-body">
+          <p class="kicker">Article <span class="anchor-prefix">part of</span> <a class="story-link" href="#">Pentagon Germany Iran dispute</a></p>
+          <h3>Justice Department signals fast-track challenge to election-reform trigger laws</h3>
+          <p class="dek">Filing names two airbases in Mali by their specific designations — a detail the wire copies dropped.</p>
+          <div class="meta">
+            <b>Verity News</b><span class="sep">·</span>4-min read<span class="sep">·</span>14 readers in discussion
+          </div>
+        </div>
+        <div class="feed-side">
+          <span class="ts fresh">2h ago</span>
+          <span class="read-gate">Quiz to discuss</span>
+        </div>
+      </article>
+
+      <article class="feed-item">
+        <div class="feed-body">
+          <p class="kicker">Adding context <span class="anchor-prefix">on</span> <a class="story-link" href="#">UK two-party system collapse</a></p>
+          <p class="snip">I'm on the ground in Birmingham — the AP version under-counts the Reform vote in the West Midlands. Local polling has them at 17%, not the 11% the wire ran with.</p>
+          <div class="meta">
+            <b>Reema J</b><span class="sep">·</span>2 replies<span class="sep">·</span>added to story's ground-context timeline
+          </div>
+        </div>
+        <div class="feed-side">
+          <span class="ts fresh">53m ago</span>
+        </div>
+      </article>
+
+      <article class="feed-item">
+        <div class="feed-body">
+          <p class="kicker">Article <span class="anchor-prefix">part of</span> <a class="story-link" href="#">Vision Pro 2 details</a></p>
+          <h3>Vision Pro 2 keeps EyeSight, but smaller and dimmer</h3>
+          <p class="dek">A new article today after a five-week quiet period on this story. Three articles total since first sighting.</p>
+          <div class="meta">
+            <b>Verity Tech</b><span class="sep">·</span>3-min read<span class="sep">·</span>resurfacing
+          </div>
+        </div>
+        <div class="feed-side">
+          <span class="ts">4h ago</span>
+          <span class="read-gate">Quiz to discuss</span>
+        </div>
+      </article>
+
+      <article class="feed-item">
+        <div class="feed-body">
+          <p class="kicker">A different take <span class="anchor-prefix">on</span> <a class="story-link" href="#">Pentagon Germany Iran dispute</a></p>
+          <p class="snip">Calling this a Trump-Iran dispute oversells the linkage. The Pentagon decision tree predates the framework by three months — this story is being told backwards.</p>
+          <div class="meta">
+            <b>Diane T</b><span class="sep">·</span>7 replies<span class="sep">·</span>32 helpful replies in the thread
+          </div>
+        </div>
+        <div class="feed-side">
+          <span class="ts">yesterday</span>
+        </div>
+      </article>
+
+      <article class="feed-item">
+        <div class="feed-body">
+          <p class="kicker">Story <span class="anchor-prefix">·</span> Politics · Justice</p>
+          <h3>FBI searches Virginia Senate leader's office in corruption probe</h3>
+          <p class="dek">Two articles published today. No reader discussion yet — the conversation hasn't started.</p>
+          <div class="meta">
+            <b>2 articles</b><span class="sep">·</span>new today
+          </div>
+        </div>
+        <div class="feed-side">
+          <span class="ts fresh">new</span>
+          <span class="read-gate">Be first</span>
+        </div>
+      </article>
+
+      <article class="feed-item">
+        <div class="feed-body">
+          <p class="kicker">Question <span class="anchor-prefix">on</span> <a class="story-link" href="#">UK two-party system collapse</a></p>
+          <h3>If Reform splits the right-of-center vote, do the maths actually favor Labour or the Lib Dems?</h3>
+          <p class="snip">Depends on whether you read the constituency-level swing or the national poll. Two of the articles in this story disagree with each other.</p>
+          <div class="meta">
+            <b>Anand K</b><span class="sep">·</span>6 replies<span class="sep">·</span>3 expert replies from a political scientist
+          </div>
+        </div>
+        <div class="feed-side">
+          <span class="ts">yesterday</span>
+          <span class="read-gate">3 expert replies</span>
+        </div>
+      </article>
+
+    </section>
+
+      </div>
+
+      <!-- RIGHT RAIL — matches home page's rail card chrome -->
+      <aside class="body-rail" aria-label="Sidebar">
+        <section class="rail-card">
+          <h4>Most active stories</h4>
+          <div class="row">
+            <div class="n">01</div>
+            <div>
+              <div class="t">Pentagon Germany Iran dispute</div>
+              <div class="m">87 commenters · 6 articles</div>
+            </div>
+            <div class="m">2h</div>
+          </div>
+          <div class="row">
+            <div class="n">02</div>
+            <div>
+              <div class="t">UK two-party system collapse</div>
+              <div class="m">340 commenters · 11 articles</div>
+            </div>
+            <div class="m">1d</div>
+          </div>
+          <div class="row">
+            <div class="n">03</div>
+            <div>
+              <div class="t">Vision Pro 2 details</div>
+              <div class="m">48 commenters · resurfaced</div>
+            </div>
+            <div class="m">today</div>
+          </div>
+        </section>
+
+        <section class="rail-card">
+          <h4>Open questions awaiting answers</h4>
+          <div class="row">
+            <div class="n">?</div>
+            <div>
+              <div class="t">EO 14034 — anyone read the actual order?</div>
+              <div class="m">on Pentagon Germany · 5 replies</div>
+            </div>
+            <div class="m">Marcus T</div>
+          </div>
+          <div class="row">
+            <div class="n">?</div>
+            <div>
+              <div class="t">Reform vote in West Midlands — polling source?</div>
+              <div class="m">on UK parties · 2 replies</div>
+            </div>
+            <div class="m">Reema J</div>
+          </div>
+          <div class="row">
+            <div class="n">?</div>
+            <div>
+              <div class="t">Vision Pro 2 weight vs original?</div>
+              <div class="m">on Vision Pro · 1 reply</div>
+            </div>
+            <div class="m">Anand K</div>
+          </div>
+        </section>
+
+        <section class="rail-card">
+          <h4>Browse by topic</h4>
+          <div class="topic-row"><span>Politics · Elections</span><span class="c">7</span></div>
+          <div class="topic-row"><span>Sports · NFL</span><span class="c">9</span></div>
+          <div class="topic-row"><span>Technology · AI</span><span class="c">8</span></div>
+          <div class="topic-row"><span>Local · Austin</span><span class="c">3</span></div>
+        </section>
+      </aside>
+
+    </div>
+
+  </div>
+</body>
+</html>
