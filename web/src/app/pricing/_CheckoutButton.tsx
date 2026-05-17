@@ -76,9 +76,9 @@ export function CheckoutButton({
           fontWeight: 600,
           letterSpacing: '-0.005em',
           cursor: loading ? 'wait' : 'pointer',
-          background: highlight ? 'var(--p-ink, #0a0a0a)' : 'transparent',
-          color: highlight ? '#fff' : 'var(--p-ink, #0a0a0a)',
-          border: '1px solid var(--p-ink, #0a0a0a)',
+          background: highlight ? 'var(--vp-ink)' : 'transparent',
+          color: highlight ? '#fff' : 'var(--vp-ink)',
+          border: '1px solid var(--vp-ink)',
           borderRadius: 10,
           opacity: loading ? 0.7 : 1,
         }}

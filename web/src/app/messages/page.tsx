@@ -820,7 +820,7 @@ function MessagesPageInner() {
               height: 28,
               width: 120,
               borderRadius: 6,
-              background: '#f0f0f0',
+              background: 'var(--vp-border-soft)',
               animation: 'vp-pulse 1.2s ease-in-out infinite',
             }}
           />
@@ -832,7 +832,7 @@ function MessagesPageInner() {
               display: 'flex',
               gap: 12,
               padding: '14px 16px',
-              borderBottom: '1px solid #f0f0f0',
+              borderBottom: '1px solid var(--vp-border-soft)',
               alignItems: 'center',
             }}
           >
@@ -841,7 +841,7 @@ function MessagesPageInner() {
                 width: 40,
                 height: 40,
                 borderRadius: '50%',
-                background: '#f0f0f0',
+                background: 'var(--vp-border-soft)',
                 flexShrink: 0,
                 animation: `vp-pulse 1.2s ease-in-out ${i * 0.15}s infinite`,
               }}
@@ -852,7 +852,7 @@ function MessagesPageInner() {
                   height: 14,
                   width: '55%',
                   borderRadius: 4,
-                  background: '#f0f0f0',
+                  background: 'var(--vp-border-soft)',
                   marginBottom: 6,
                   animation: `vp-pulse 1.2s ease-in-out ${i * 0.15}s infinite`,
                 }}
@@ -862,7 +862,7 @@ function MessagesPageInner() {
                   height: 12,
                   width: '80%',
                   borderRadius: 4,
-                  background: '#f0f0f0',
+                  background: 'var(--vp-border-soft)',
                   animation: `vp-pulse 1.2s ease-in-out ${i * 0.15}s infinite`,
                 }}
               />
@@ -906,7 +906,7 @@ function MessagesPageInner() {
 
   const btnSolid: CSSProperties = {
     padding: '8px 16px',
-    background: '#111',
+    background: 'var(--vp-ink)',
     color: '#fff',
     border: 'none',
     borderRadius: 8,
@@ -939,8 +939,8 @@ function MessagesPageInner() {
             aria-modal="true"
             aria-labelledby="dm-paywall-title"
             style={{
-              background: '#fff',
-              border: '1px solid #e5e5e5',
+              background: 'var(--vp-surface)',
+              border: '1px solid var(--vp-border)',
               borderRadius: 16,
               padding: '32px 28px',
               maxWidth: 420,
@@ -965,7 +965,7 @@ function MessagesPageInner() {
                 border: 'none',
                 fontSize: 22,
                 lineHeight: 1,
-                color: '#666',
+                color: 'var(--vp-text-muted)',
                 cursor: 'pointer',
                 borderRadius: 8,
               }}
@@ -974,11 +974,11 @@ function MessagesPageInner() {
             </button>
             <div
               id="dm-paywall-title"
-              style={{ fontSize: 20, fontWeight: 600, marginBottom: 10, color: '#111' }}
+              style={{ fontSize: 20, fontWeight: 600, marginBottom: 10, color: 'var(--vp-ink)' }}
             >
               Direct messages are a paid feature
             </div>
-            <div style={{ fontSize: 14, color: '#666', marginBottom: 18, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 14, color: 'var(--vp-text-muted)', marginBottom: 18, lineHeight: 1.5 }}>
               Start conversations with experts, authors, and other readers — included on Verity and
               up.
             </div>
@@ -987,8 +987,8 @@ function MessagesPageInner() {
                 Pricing is hardcoded; no live fetch in scope here. */}
             <div
               style={{
-                background: '#f7f7f7',
-                border: '1px solid #e5e5e5',
+                background: 'var(--vp-surface-soft)',
+                border: '1px solid var(--vp-border)',
                 borderRadius: 12,
                 padding: '14px 16px',
                 marginBottom: 18,
@@ -1003,15 +1003,15 @@ function MessagesPageInner() {
                   marginBottom: 8,
                 }}
               >
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>Verity</span>
-                <span style={{ fontSize: 13, color: '#666' }}>{FALLBACK_VERITY_MONTHLY.formatted}/mo</span>
+                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--vp-ink)' }}>Verity</span>
+                <span style={{ fontSize: 13, color: 'var(--vp-text-muted)' }}>{FALLBACK_VERITY_MONTHLY.formatted}/mo</span>
               </div>
               <ul
                 style={{
                   margin: 0,
                   paddingLeft: 18,
                   fontSize: 13,
-                  color: '#444',
+                  color: 'var(--vp-text-muted)',
                   lineHeight: 1.6,
                 }}
               >
@@ -1027,7 +1027,7 @@ function MessagesPageInner() {
                   display: 'inline-block',
                   padding: '12px 24px',
                   borderRadius: 10,
-                  background: '#111',
+                  background: 'var(--vp-ink)',
                   color: '#fff',
                   fontSize: 14,
                   fontWeight: 600,
@@ -1041,7 +1041,7 @@ function MessagesPageInner() {
                 style={{
                   display: 'inline-block',
                   padding: '10px 20px',
-                  color: '#666',
+                  color: 'var(--vp-text-muted)',
                   fontSize: 13,
                   fontWeight: 600,
                   textDecoration: 'none',
@@ -1059,8 +1059,8 @@ function MessagesPageInner() {
           margin: '0 auto',
           display: 'flex',
           height: 'calc(100vh - 68px)',
-          borderLeft: '1px solid #e5e5e5',
-          borderRight: '1px solid #e5e5e5',
+          borderLeft: '1px solid var(--vp-border)',
+          borderRight: '1px solid var(--vp-border)',
         }}
       >
         {/* Conversation list (iMessage left panel) */}
@@ -1068,7 +1068,7 @@ function MessagesPageInner() {
           style={{
             width: selected ? 0 : '100%',
             maxWidth: 320,
-            borderRight: '1px solid #e5e5e5',
+            borderRight: '1px solid var(--vp-border)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -1076,7 +1076,7 @@ function MessagesPageInner() {
             flexShrink: 0,
           }}
         >
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid #e5e5e5' }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--vp-border)' }}>
             <div
               style={{
                 display: 'flex',
@@ -1085,18 +1085,18 @@ function MessagesPageInner() {
                 marginBottom: 10,
               }}
             >
-              <h1 style={{ fontSize: 28, fontWeight: 600, color: '#111', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.15 }}>Messages</h1>
+              <h1 style={{ fontSize: 28, fontWeight: 600, color: 'var(--vp-ink)', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.15 }}>Messages</h1>
               <button
                 onClick={() => setShowSearch(true)}
                 style={{
                   padding: '6px 12px',
                   borderRadius: 16,
-                  border: '1px solid #e5e5e5',
-                  background: '#f7f7f7',
+                  border: '1px solid var(--vp-border)',
+                  background: 'var(--vp-surface-soft)',
                   cursor: 'pointer',
                   fontSize: 12,
                   fontWeight: 600,
-                  color: '#111',
+                  color: 'var(--vp-ink)',
                   minHeight: 44,
                 }}
               >
@@ -1107,14 +1107,14 @@ function MessagesPageInner() {
 
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {conversations.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '32px 20px', color: '#666' }}>
+              <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--vp-text-muted)' }}>
                 {/* T143 — hook the empty inbox toward Ask-an-Expert
                     discovery. The Ask-an-Expert UI lives inline in
                     article comment threads (CommentThread.tsx), so the
                     discovery CTA points at the article browse surface
                     where users encounter it. New-message search remains
                     available below as a secondary action. */}
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#111', marginBottom: 6 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--vp-ink)', marginBottom: 6 }}>
                   No conversations yet
                 </div>
                 <div style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 16 }}>
@@ -1124,7 +1124,7 @@ function MessagesPageInner() {
                   onClick={() => setShowSearch(true)}
                   style={{
                     padding: '10px 18px',
-                    background: '#111',
+                    background: 'var(--vp-ink)',
                     color: '#fff',
                     border: 'none',
                     borderRadius: 8,
@@ -1151,8 +1151,8 @@ function MessagesPageInner() {
                     gap: 12,
                     padding: '12px 16px',
                     cursor: 'pointer',
-                    background: selected === c.id ? '#f7f7f7' : '#fff',
-                    borderBottom: '1px solid #f0f0f0',
+                    background: selected === c.id ? 'var(--vp-surface-soft)' : 'var(--vp-surface)',
+                    borderBottom: '1px solid var(--vp-border-soft)',
                   }}
                 >
                   <div
@@ -1182,7 +1182,7 @@ function MessagesPageInner() {
                       }}
                     >
                       <span
-                        style={{ fontSize: 14, fontWeight: isUnread ? 700 : 600, color: '#111' }}
+                        style={{ fontSize: 14, fontWeight: isUnread ? 700 : 600, color: 'var(--vp-ink)' }}
                       >
                         {c.otherUser?.username || c.title || 'Conversation'}
                       </span>
@@ -1194,7 +1194,7 @@ function MessagesPageInner() {
                               fontSize: 11,
                               fontWeight: 600,
                               color: '#fff',
-                              background: '#111',
+                              background: 'var(--vp-ink)',
                               borderRadius: 999,
                               padding: '1px 7px',
                               minWidth: 18,
@@ -1204,7 +1204,7 @@ function MessagesPageInner() {
                             {unread}
                           </span>
                         )}
-                        <span style={{ fontSize: 11, color: 'var(--p-ink-muted, #999)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                        <span style={{ fontSize: 11, color: 'var(--vp-text-soft)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                           {formatTime(c.last_message_at)}
                         </span>
                       </div>
@@ -1212,7 +1212,7 @@ function MessagesPageInner() {
                     <div
                       style={{
                         fontSize: 12,
-                        color: isUnread ? '#111' : '#666',
+                        color: isUnread ? 'var(--vp-ink)' : 'var(--vp-text-muted)',
                         fontWeight: isUnread ? 600 : 400,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -1234,7 +1234,7 @@ function MessagesPageInner() {
           <div
             style={{
               padding: '12px 16px',
-              borderBottom: '1px solid #e5e5e5',
+              borderBottom: '1px solid var(--vp-border)',
               display: 'flex',
               alignItems: 'center',
               gap: 10,
@@ -1248,7 +1248,7 @@ function MessagesPageInner() {
                   border: 'none',
                   fontSize: 14,
                   cursor: 'pointer',
-                  color: '#111',
+                  color: 'var(--vp-ink)',
                   padding: 0,
                   fontWeight: 600,
                   minHeight: 44,
@@ -1276,7 +1276,7 @@ function MessagesPageInner() {
                 >
                   {(currentConvo.otherUser?.username || '?').charAt(0).toUpperCase()}
                 </div>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>
+                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--vp-ink)' }}>
                   {currentConvo.otherUser?.username || 'Conversation'}
                 </span>
                 {/* R13-C5 Fix 2: overflow menu (block / report). Positioned
@@ -1290,11 +1290,11 @@ function MessagesPageInner() {
                     style={{
                       padding: '10px',
                       borderRadius: 8,
-                      border: '1px solid #e5e5e5',
-                      background: '#fff',
+                      border: '1px solid var(--vp-border)',
+                      background: 'var(--vp-surface)',
                       fontSize: 14,
                       fontWeight: 600,
-                      color: '#111',
+                      color: 'var(--vp-ink)',
                       cursor: 'pointer',
                       lineHeight: 1,
                       minHeight: 44,
@@ -1311,10 +1311,10 @@ function MessagesPageInner() {
                         top: '100%',
                         marginTop: 6,
                         minWidth: 160,
-                        background: '#fff',
-                        border: '1px solid #e5e5e5',
+                        background: 'var(--vp-surface)',
+                        border: '1px solid var(--vp-border)',
                         borderRadius: 10,
-                        boxShadow: '0 6px 24px rgba(0,0,0,0.08)',
+                        boxShadow: '0 6px 24px var(--vp-shadow-md)',
                         zIndex: 20,
                       }}
                     >
@@ -1330,7 +1330,7 @@ function MessagesPageInner() {
                           background: 'transparent',
                           border: 'none',
                           fontSize: 13,
-                          color: '#111',
+                          color: 'var(--vp-ink)',
                           cursor: blocking ? 'default' : 'pointer',
                           opacity: blocking ? 0.5 : 1,
                         }}
@@ -1358,9 +1358,9 @@ function MessagesPageInner() {
                           background: 'transparent',
                           border: 'none',
                           fontSize: 13,
-                          color: '#111',
+                          color: 'var(--vp-ink)',
                           cursor: 'pointer',
-                          borderTop: '1px solid #f0f0f0',
+                          borderTop: '1px solid var(--vp-border-soft)',
                         }}
                       >
                         Report user
@@ -1370,7 +1370,7 @@ function MessagesPageInner() {
                 </div>
               </div>
             ) : (
-              <span style={{ fontSize: 14, color: '#999' }}>Select a conversation</span>
+              <span style={{ fontSize: 14, color: 'var(--vp-text-soft)' }}>Select a conversation</span>
             )}
           </div>
 
@@ -1396,7 +1396,7 @@ function MessagesPageInner() {
                 aria-labelledby="dm-report-title"
                 onClick={(e) => e.stopPropagation()}
                 style={{
-                  background: '#fff',
+                  background: 'var(--vp-surface)',
                   borderRadius: 12,
                   padding: 18,
                   width: '100%',
@@ -1406,11 +1406,11 @@ function MessagesPageInner() {
               >
                 <div
                   id="dm-report-title"
-                  style={{ fontSize: 15, fontWeight: 600, color: '#111', marginBottom: 8 }}
+                  style={{ fontSize: 15, fontWeight: 600, color: 'var(--vp-ink)', marginBottom: 8 }}
                 >
                   Report this user
                 </div>
-                <div style={{ fontSize: 12, color: '#666', marginBottom: 10, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 12, color: 'var(--vp-text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
                   Tell us briefly what&rsquo;s wrong. A moderator will review.
                 </div>
                 <textarea
@@ -1423,9 +1423,9 @@ function MessagesPageInner() {
                     width: '100%',
                     padding: 10,
                     borderRadius: 8,
-                    border: '1px solid #e5e5e5',
-                    background: '#f7f7f7',
-                    color: '#111',
+                    border: '1px solid var(--vp-border)',
+                    background: 'var(--vp-surface-soft)',
+                    color: 'var(--vp-ink)',
                     fontSize: 13,
                     fontFamily: 'inherit',
                     outline: 'none',
@@ -1442,10 +1442,10 @@ function MessagesPageInner() {
                     style={{
                       padding: '8px 14px',
                       borderRadius: 8,
-                      border: '1px solid #e5e5e5',
+                      border: '1px solid var(--vp-border)',
                       background: 'transparent',
                       fontSize: 13,
-                      color: '#666',
+                      color: 'var(--vp-text-muted)',
                       cursor: 'pointer',
                     }}
                   >
@@ -1458,7 +1458,7 @@ function MessagesPageInner() {
                       padding: '8px 14px',
                       borderRadius: 8,
                       border: 'none',
-                      background: reportReason.trim() && !submittingReport ? '#111' : '#ccc',
+                      background: reportReason.trim() && !submittingReport ? 'var(--vp-ink)' : 'var(--vp-border)',
                       color: '#fff',
                       fontSize: 13,
                       fontWeight: 600,
@@ -1481,7 +1481,7 @@ function MessagesPageInner() {
               display: 'flex',
               flexDirection: 'column',
               gap: 10,
-              background: '#fafafa',
+              background: 'var(--vp-bg)',
             }}
           >
             {msgsLoading && (
@@ -1497,7 +1497,7 @@ function MessagesPageInner() {
                         width: `${isOwn ? 45 : 60}%`,
                         maxWidth: 280,
                         borderRadius: 14,
-                        background: '#f0f0f0',
+                        background: 'var(--vp-border-soft)',
                         animation: `vp-pulse 1.2s ease-in-out ${i * 0.12}s infinite`,
                       }}
                     />
@@ -1506,7 +1506,7 @@ function MessagesPageInner() {
               </div>
             )}
             {!msgsLoading && messages.length === 0 && selected && (
-              <div style={{ textAlign: 'center', color: '#999', fontSize: 13, padding: 40 }}>
+              <div style={{ textAlign: 'center', color: 'var(--vp-text-soft)', fontSize: 13, padding: 40 }}>
                 Say hi. They&apos;ll see your first message when they open the chat.
               </div>
             )}
@@ -1540,7 +1540,7 @@ function MessagesPageInner() {
                           fontWeight: 600,
                           letterSpacing: '0.1em',
                           textTransform: 'uppercase',
-                          color: 'var(--p-ink-muted, #999)',
+                          color: 'var(--vp-text-soft)',
                           marginBottom: 2,
                           marginLeft: 4,
                         }}
@@ -1553,12 +1553,12 @@ function MessagesPageInner() {
                         maxWidth: '75%',
                         padding: '10px 14px',
                         borderRadius: 14,
-                        background: isMe ? '#111' : '#fff',
-                        color: isMe ? '#fff' : '#111',
+                        background: isMe ? 'var(--vp-ink)' : 'var(--vp-surface)',
+                        color: isMe ? 'var(--vp-surface)' : 'var(--vp-ink)',
                         fontSize: 16,
                         lineHeight: 1.6,
                         letterSpacing: '-0.005em',
-                        border: isMe ? 'none' : '1px solid #e5e5e5',
+                        border: isMe ? 'none' : '1px solid var(--vp-border)',
                       }}
                     >
                       {m.body}
@@ -1569,7 +1569,7 @@ function MessagesPageInner() {
                         fontWeight: 600,
                         letterSpacing: '0.1em',
                         textTransform: 'uppercase',
-                        color: 'var(--p-ink-muted, #bbb)',
+                        color: 'var(--vp-text-soft)',
                         marginTop: 2,
                         marginLeft: 4,
                         marginRight: 4,
@@ -1581,7 +1581,7 @@ function MessagesPageInner() {
                       <span
                         style={{
                           fontSize: 10,
-                          color: '#999',
+                          color: 'var(--vp-text-soft)',
                           marginTop: 1,
                           marginRight: 4,
                           fontWeight: 600,
@@ -1602,10 +1602,10 @@ function MessagesPageInner() {
             <div
               style={{
                 padding: '10px 16px',
-                borderTop: '1px solid #e5e5e5',
+                borderTop: '1px solid var(--vp-border)',
                 display: 'flex',
                 gap: 8,
-                background: '#fff',
+                background: 'var(--vp-surface)',
               }}
             >
               <input
@@ -1623,11 +1623,11 @@ function MessagesPageInner() {
                 style={{
                   flex: 1,
                   padding: '10px 14px',
-                  border: '1px solid #e5e5e5',
+                  border: '1px solid var(--vp-border)',
                   borderRadius: 10,
                   fontSize: 14,
-                  color: '#111',
-                  background: dmLocked ? '#eee' : '#f7f7f7',
+                  color: 'var(--vp-ink)',
+                  background: dmLocked ? 'var(--vp-border-soft)' : 'var(--vp-surface-soft)',
                   outline: 'none',
                 }}
               />
@@ -1638,7 +1638,7 @@ function MessagesPageInner() {
                   padding: '8px 16px',
                   borderRadius: 8,
                   border: 'none',
-                  background: input.trim() && !dmLocked && !sending ? '#111' : '#ccc',
+                  background: input.trim() && !dmLocked && !sending ? 'var(--vp-ink)' : 'var(--vp-border)',
                   color: '#fff',
                   fontSize: 13,
                   fontWeight: 600,
@@ -1684,7 +1684,7 @@ function MessagesPageInner() {
               width: '100%',
               maxWidth: 400,
               margin: '0 16px',
-              background: '#fff',
+              background: 'var(--vp-surface)',
               borderRadius: 16,
               overflow: 'hidden',
               maxHeight: '80vh',
@@ -1692,7 +1692,7 @@ function MessagesPageInner() {
               flexDirection: 'column',
             }}
           >
-            <div style={{ padding: '16px', borderBottom: '1px solid #e5e5e5' }}>
+            <div style={{ padding: '16px', borderBottom: '1px solid var(--vp-border)' }}>
               <div
                 style={{
                   display: 'flex',
@@ -1703,7 +1703,7 @@ function MessagesPageInner() {
               >
                 <span
                   id="messages-new-title"
-                  style={{ fontSize: 16, fontWeight: 600, color: '#111' }}
+                  style={{ fontSize: 16, fontWeight: 600, color: 'var(--vp-ink)' }}
                 >
                   New message
                 </span>
@@ -1718,7 +1718,7 @@ function MessagesPageInner() {
                     background: 'none',
                     border: 'none',
                     fontSize: 14,
-                    color: '#111',
+                    color: 'var(--vp-ink)',
                     cursor: 'pointer',
                     fontWeight: 600,
                     minHeight: 44,
@@ -1733,12 +1733,12 @@ function MessagesPageInner() {
                   alignItems: 'center',
                   gap: 8,
                   padding: '8px 12px',
-                  background: '#f7f7f7',
+                  background: 'var(--vp-surface-soft)',
                   borderRadius: 10,
                   marginBottom: 8,
                 }}
               >
-                <span style={{ color: '#999', fontSize: 14 }}>To:</span>
+                <span style={{ color: 'var(--vp-text-soft)', fontSize: 14 }}>To:</span>
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -1750,7 +1750,7 @@ function MessagesPageInner() {
                     border: 'none',
                     background: 'transparent',
                     fontSize: 14,
-                    color: '#111',
+                    color: 'var(--vp-ink)',
                     outline: 'none',
                   }}
                 />
@@ -1766,8 +1766,8 @@ function MessagesPageInner() {
                       border: 'none',
                       fontSize: 11,
                       fontWeight: 500,
-                      background: roleFilter === r ? '#111' : '#f0f0f0',
-                      color: roleFilter === r ? '#fff' : '#666',
+                      background: roleFilter === r ? 'var(--vp-ink)' : 'var(--vp-surface-soft)',
+                      color: roleFilter === r ? 'var(--vp-surface)' : 'var(--vp-text-muted)',
                       cursor: 'pointer',
                       whiteSpace: 'nowrap',
                       textTransform: 'capitalize',
@@ -1781,17 +1781,17 @@ function MessagesPageInner() {
             </div>
             <div style={{ flex: 1, overflowY: 'auto', maxHeight: 300 }}>
               {searching && (
-                <div style={{ padding: 20, textAlign: 'center', color: '#999', fontSize: 13 }}>
+                <div style={{ padding: 20, textAlign: 'center', color: 'var(--vp-text-soft)', fontSize: 13 }}>
                   Searching...
                 </div>
               )}
               {!searching && searchError && (
-                <div style={{ padding: 20, textAlign: 'center', color: '#c00', fontSize: 13 }}>
+                <div style={{ padding: 20, textAlign: 'center', color: 'var(--danger)', fontSize: 13 }}>
                   {searchError}
                 </div>
               )}
               {!searching && !searchError && searchQuery && searchResults.length === 0 && (
-                <div style={{ padding: 20, textAlign: 'center', color: '#999', fontSize: 13 }}>
+                <div style={{ padding: 20, textAlign: 'center', color: 'var(--vp-text-soft)', fontSize: 13 }}>
                   No users found.
                 </div>
               )}
@@ -1807,7 +1807,7 @@ function MessagesPageInner() {
                     cursor: starting ? 'default' : 'pointer',
                     opacity: starting ? 0.5 : 1,
                     pointerEvents: starting ? 'none' : 'auto',
-                    borderBottom: '1px solid #f0f0f0',
+                    borderBottom: '1px solid var(--vp-border-soft)',
                   }}
                 >
                   <div
@@ -1828,8 +1828,8 @@ function MessagesPageInner() {
                     {(u.username || '?').charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>{u.username}</div>
-                    <div style={{ fontSize: 11, color: '#999' }}>{u.verity_score || 0} VP</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--vp-ink)' }}>{u.username}</div>
+                    <div style={{ fontSize: 11, color: 'var(--vp-text-soft)' }}>{u.verity_score || 0} VP</div>
                   </div>
                 </div>
               ))}

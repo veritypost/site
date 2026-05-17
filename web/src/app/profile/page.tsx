@@ -25,8 +25,8 @@ function ProfileFallback() {
           width: 32,
           height: 32,
           borderRadius: '50%',
-          border: '3px solid #e5e5e5',
-          borderTopColor: '#111',
+          border: '3px solid var(--vp-border-soft)',
+          borderTopColor: 'var(--vp-ink)',
           animation: 'vpSpin 0.75s linear infinite',
         }}
       />

@@ -498,7 +498,7 @@ function pillStyle(active: boolean, size: 'md' | 'sm' = 'md'): React.CSSProperti
     padding: `${padY}px ${padX}px`,
     borderRadius: 14,
     border: `1px solid ${active ? C.accent : C.border}`,
-    background: active ? 'rgba(11,92,255,0.08)' : 'transparent',
+    background: active ? C.accentSoft : 'transparent',
     color: active ? C.accent : C.inkMuted,
     fontSize: F.xs,
     fontWeight: 500,

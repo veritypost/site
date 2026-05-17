@@ -21,16 +21,18 @@ export const C = {
   border: 'var(--vp-border-soft)',
   borderStrong: 'var(--vp-border)',
   divider: 'var(--vp-border-soft)',
-  // Ink
-  ink: 'var(--p-ink)',
-  inkSoft: 'var(--p-ink-soft)',
-  inkMuted: 'var(--p-ink-muted)',
-  inkDim: 'var(--p-ink-dim)',
-  inkFaint: 'var(--p-ink-faint)',
+  // Ink — swapped to editorial --vp-* tokens so dark-mode profile cards
+  // flip to the warm-dark palette (matches home + article), not the
+  // admin slate-grey palette. Semantic state tokens below stay on --p-*.
+  ink: 'var(--vp-ink)',
+  inkSoft: 'var(--vp-text-muted)',
+  inkMuted: 'var(--vp-text-muted)',
+  inkDim: 'var(--vp-text-soft)',
+  inkFaint: 'var(--vp-text-soft)',
   // Brand accent — Verity ink-blue. Used sparingly: focus rings, primary CTA,
   // active tab underline. Not for body text or large fills.
-  accent: 'var(--p-accent)',
-  accentSoft: 'var(--p-accent-soft)',
+  accent: 'var(--vp-accent)',
+  accentSoft: 'var(--vp-accent-soft)',
   accentInk: 'var(--p-accent-ink)',
   // Semantics
   success: 'var(--p-success)',

@@ -217,7 +217,7 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
               borderRadius: 10,
               background: 'var(--warn-bg)',
               border: '1px solid var(--warn-border)',
-              color: '#78350f',
+              color: 'var(--warn-text)',
               fontSize: 13,
               marginBottom: 16,
               lineHeight: 1.5,

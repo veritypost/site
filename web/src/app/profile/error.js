@@ -9,8 +9,8 @@ export default function Error({ reset }) {
         onClick={() => reset()}
         style={{
           padding: '8px 16px',
-          background: '#111111',
-          color: '#fff',
+          background: 'var(--vp-ink)',
+          color: 'var(--vp-surface)',
           border: 'none',
           borderRadius: '8px',
           cursor: 'pointer',
