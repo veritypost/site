@@ -3,13 +3,30 @@ import UIKit
 
 enum VP {
     // === Legacy tokens ===
-    // Mirror site/src/app/globals.css. Used by ~24 Swift files that have
-    // not been migrated to the redesign palette. New views should reach
-    // for the redesign tokens below (VP.brand, VP.ink, VP.surfaceRaised,
-    // etc.) and only fall back to these where a v1.1 sweep hasn't landed.
-    static let bg = Color(UIColor.systemBackground)
+    // Mirror web/src/app/globals.css `--vp-*` editorial palette. Used by
+    // ~24 Swift files that have not been migrated to the redesign palette.
+    // New views should reach for the redesign tokens below (VP.brand,
+    // VP.ink, VP.surfaceRaised, etc.) and only fall back to these where a
+    // v1.1 sweep hasn't landed.
+    //
+    // 2026-05-17: `VP.bg` / `VP.border` flipped from `systemBackground` /
+    // `separator` to the editorial cream/burgundy-tinted hexes for
+    // exact-pixel parity with web. `VP.text` / `VP.strong` / `VP.accent`
+    // remain `UIColor.label` on purpose — they are consumed as
+    // pure-black/pure-white tone (button fills, text inverted on burgundy)
+    // and changing them would break those callsites. The editorial accent
+    // lives under `VP.burgundy*` / `VP.accentDark` / `VP.accentSoft`.
+    static let bg = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x14/255.0, green: 0x11/255.0, blue: 0x0d/255.0, alpha: 1)  // #14110d
+            : UIColor(red: 0xf7/255.0, green: 0xf4/255.0, blue: 0xef/255.0, alpha: 1)  // #f7f4ef
+    })
     static let card = Color(UIColor.secondarySystemBackground)
-    static let border = Color(UIColor.separator)
+    static let border = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x2e/255.0, green: 0x2a/255.0, blue: 0x23/255.0, alpha: 1)  // #2e2a23
+            : UIColor(red: 0xde/255.0, green: 0xd8/255.0, blue: 0xce/255.0, alpha: 1)  // #ded8ce
+    })
     static let rule = Color(UIColor.separator)
     static let strong = Color(UIColor.label)
     static let text = Color(UIColor.label)
@@ -17,6 +34,34 @@ enum VP {
     static let dim = Color(UIColor.secondaryLabel)
     static let muted = Color(UIColor.tertiaryLabel)
     static let accent = Color(UIColor.label)
+    // Web `--vp-text-muted` / `--vp-text-soft`. Distinct from `VP.muted` /
+    // `VP.soft` (which are system tertiary/secondary label) — these are
+    // the editorial palette muted ramps used by article body chrome,
+    // bylines, captions.
+    static let textMuted = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0xb8/255.0, green: 0xb1/255.0, blue: 0xa4/255.0, alpha: 1)  // #b8b1a4
+            : UIColor(red: 0x66/255.0, green: 0x61/255.0, blue: 0x5a/255.0, alpha: 1)  // #66615a
+    })
+    static let textSoft = Color(UIColor { tc in
+        // Light + dark both #8a8379 per web tokens.
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x8a/255.0, green: 0x83/255.0, blue: 0x79/255.0, alpha: 1)
+            : UIColor(red: 0x8a/255.0, green: 0x83/255.0, blue: 0x79/255.0, alpha: 1)
+    })
+    // Editorial accent ramp. `VP.accent` stays label-tone (see note above);
+    // these are the burgundy hexes from web `--vp-accent-dark` /
+    // `--vp-accent-soft`. The full-tone burgundy lives at `VP.burgundy`.
+    static let accentDark = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x8b/255.0, green: 0x0f/255.0, blue: 0x16/255.0, alpha: 1)  // #8b0f16
+            : UIColor(red: 0x64/255.0, green: 0x09/255.0, blue: 0x0e/255.0, alpha: 1)  // #64090e
+    })
+    static let accentSoft = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x3a/255.0, green: 0x1c/255.0, blue: 0x1c/255.0, alpha: 1)  // #3a1c1c
+            : UIColor(red: 0xf4/255.0, green: 0xe6/255.0, blue: 0xe2/255.0, alpha: 1)  // #f4e6e2
+    })
     // Q-D4 (2026-05-12) — semantic colors are DYNAMIC. Light mode uses the
     // deeper hexes that clear WCAG AA on tinted `*Soft` backgrounds; dark
     // mode flips to the brighter web-dark counterparts (mirroring
@@ -112,8 +157,16 @@ enum VP {
     /// Focus-ring tint — 30% brand. Use via .vpShadowRing() on focused controls.
     static let ring      = Color(red: 11.0 / 255, green: 92.0 / 255, blue: 255.0 / 255, opacity: 0.30)
 
-    // Ink ramp (5 levels of neutral text emphasis)
-    static let ink       = Color(UIColor.label)
+    // Ink ramp (5 levels of neutral text emphasis). `ink` mirrors the web
+    // `--vp-ink` editorial hexes (warm near-black on cream, warm bone on
+    // burgundy-tinted dark) so headlines/body copy hit pixel parity with
+    // the web article surface. `inkSoft` / `inkMuted` / `inkDim` /
+    // `inkFaint` continue to track the system label ramp underneath.
+    static let ink = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0xf5/255.0, green: 0xf0/255.0, blue: 0xe7/255.0, alpha: 1)  // #f5f0e7
+            : UIColor(red: 0x17/255.0, green: 0x17/255.0, blue: 0x17/255.0, alpha: 1)  // #171717
+    })
     static let inkSoft = Color(UIColor { tc in
         tc.userInterfaceStyle == .dark
             ? UIColor(red: 0xe4/255.0, green: 0xe4/255.0, blue: 0xe7/255.0, alpha: 1)
@@ -127,19 +180,45 @@ enum VP {
     })
     static let inkFaint  = Color(UIColor.tertiaryLabel)
 
-    // Surface ramp (depth via lightness, not shadow)
+    // Surface ramp — exact mirror of web `--vp-bg` / `--vp-surface` /
+    // `--vp-surface-soft`. Light = cream `#f7f4ef`, raised cards = pure
+    // `#ffffff`, sunken/secondary surfaces = warm `#fbf7ef`. Dark inverts
+    // to `#14110d` page / `#1c1814` raised / `#221e18` sunken.
     static let surface = Color(UIColor { tc in
         tc.userInterfaceStyle == .dark
-            ? UIColor(red: 0x11/255.0, green: 0x11/255.0, blue: 0x13/255.0, alpha: 1)
-            : UIColor(red: 0xfa/255.0, green: 0xfa/255.0, blue: 0xfa/255.0, alpha: 1)
+            ? UIColor(red: 0x1c/255.0, green: 0x18/255.0, blue: 0x14/255.0, alpha: 1)  // #1c1814 (web --vp-surface)
+            : UIColor(red: 0xff/255.0, green: 0xff/255.0, blue: 0xff/255.0, alpha: 1)  // #ffffff
     })
-    static let surfaceRaised = Color(UIColor.systemBackground)
-    static let surfaceSunken = Color(UIColor.secondarySystemBackground)
+    static let surfaceRaised = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x1c/255.0, green: 0x18/255.0, blue: 0x14/255.0, alpha: 1)  // #1c1814
+            : UIColor(red: 0xff/255.0, green: 0xff/255.0, blue: 0xff/255.0, alpha: 1)  // #ffffff
+    })
+    static let surfaceSunken = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x22/255.0, green: 0x1e/255.0, blue: 0x18/255.0, alpha: 1)  // #221e18 (web --vp-surface-soft)
+            : UIColor(red: 0xfb/255.0, green: 0xf7/255.0, blue: 0xef/255.0, alpha: 1)  // #fbf7ef
+    })
 
-    // Lines (3 grades — soft for cards, strong for outlined controls, divider for inter-row)
-    static let borderSoft   = Color(UIColor.separator)
-    static let borderStrong = Color(UIColor.separator)
-    static let divider      = Color(UIColor.separator)
+    // Lines — mirror web `--vp-border` (strong) / `--vp-border-soft` (soft).
+    // `divider` is an alias of `borderSoft` for inter-row separators where
+    // the soft tone fits the editorial chrome better than the system
+    // hairline.
+    static let borderSoft = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x25/255.0, green: 0x21/255.0, blue: 0x1b/255.0, alpha: 1)  // #25211b
+            : UIColor(red: 0xee/255.0, green: 0xe8/255.0, blue: 0xdf/255.0, alpha: 1)  // #eee8df
+    })
+    static let borderStrong = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x2e/255.0, green: 0x2a/255.0, blue: 0x23/255.0, alpha: 1)  // #2e2a23
+            : UIColor(red: 0xde/255.0, green: 0xd8/255.0, blue: 0xce/255.0, alpha: 1)  // #ded8ce
+    })
+    static let divider = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x25/255.0, green: 0x21/255.0, blue: 0x1b/255.0, alpha: 1)  // #25211b
+            : UIColor(red: 0xee/255.0, green: 0xe8/255.0, blue: 0xdf/255.0, alpha: 1)  // #eee8df
+    })
 
     // Soft semantic backgrounds (use with full-tone text from existing semantics)
     static let successSoft = Color(hex: "dcfce7")
@@ -155,20 +234,76 @@ enum VP {
     static let expertColor = Color(hex: "16a34a")
 
     // v2 burgundy editorial palette — mirrors the --vp-* CSS tokens in
-    // web/src/app/globals.css. Locked-light: stays burgundy in both light
-    // and dark UIInterfaceStyle (same call the article + home web
-    // migrations made). Add new v2 iOS surfaces by reaching for these,
-    // not by re-hardcoding hex literals.
-    static let burgundy       = Color(hex: "8b0f16")
-    static let burgundyDark   = Color(hex: "64090e")
-    static let burgundySoft   = Color(hex: "f4e6e2")
-    static let burgundyBorder = Color(hex: "ded8ce")
-    static let burgundyBorderSoft = Color(hex: "eee8df")
-    static let burgundyBg = Color(hex: "f7f4ef")
-    static let burgundySurfaceSoft = Color(hex: "fbf7ef")
+    // web/src/app/globals.css. 2026-05-17 flipped to DYNAMIC light/dark
+    // for pixel parity with web `--vp-accent` (`#8b0f16` light / `#c4252e`
+    // dark), `--vp-accent-dark` (`#64090e` / `#8b0f16`), and
+    // `--vp-accent-soft` (`#f4e6e2` / `#3a1c1c`). Surfaces flip the same
+    // way. Add new v2 iOS surfaces by reaching for these, not by
+    // re-hardcoding hex literals.
+    static let burgundy = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0xc4/255.0, green: 0x25/255.0, blue: 0x2e/255.0, alpha: 1)  // #c4252e
+            : UIColor(red: 0x8b/255.0, green: 0x0f/255.0, blue: 0x16/255.0, alpha: 1)  // #8b0f16
+    })
+    static let burgundyDark = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x8b/255.0, green: 0x0f/255.0, blue: 0x16/255.0, alpha: 1)  // #8b0f16
+            : UIColor(red: 0x64/255.0, green: 0x09/255.0, blue: 0x0e/255.0, alpha: 1)  // #64090e
+    })
+    static let burgundySoft = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x3a/255.0, green: 0x1c/255.0, blue: 0x1c/255.0, alpha: 1)  // #3a1c1c
+            : UIColor(red: 0xf4/255.0, green: 0xe6/255.0, blue: 0xe2/255.0, alpha: 1)  // #f4e6e2
+    })
+    static let burgundyBorder = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x2e/255.0, green: 0x2a/255.0, blue: 0x23/255.0, alpha: 1)  // #2e2a23
+            : UIColor(red: 0xde/255.0, green: 0xd8/255.0, blue: 0xce/255.0, alpha: 1)  // #ded8ce
+    })
+    static let burgundyBorderSoft = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x25/255.0, green: 0x21/255.0, blue: 0x1b/255.0, alpha: 1)  // #25211b
+            : UIColor(red: 0xee/255.0, green: 0xe8/255.0, blue: 0xdf/255.0, alpha: 1)  // #eee8df
+    })
+    static let burgundyBg = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x14/255.0, green: 0x11/255.0, blue: 0x0d/255.0, alpha: 1)  // #14110d
+            : UIColor(red: 0xf7/255.0, green: 0xf4/255.0, blue: 0xef/255.0, alpha: 1)  // #f7f4ef
+    })
+    static let burgundySurfaceSoft = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0x22/255.0, green: 0x1e/255.0, blue: 0x18/255.0, alpha: 1)  // #221e18
+            : UIColor(red: 0xfb/255.0, green: 0xf7/255.0, blue: 0xef/255.0, alpha: 1)  // #fbf7ef
+    })
+    // No web counterpart — kept light-only (quiz-specific accent). Leaving
+    // as a static hex pending a dedicated dark-mode quiz pass.
     static let burgundyQuizBorder = Color(hex: "e4cdb8")
-    static let burgundyTextMuted = Color(hex: "66615a")
-    static let burgundyTextSoft = Color(hex: "8a8379")
+    // Editorial muted ramps. Aliased to the new `VP.textMuted` / `VP.textSoft`
+    // tokens above; existing callsites continue to compile.
+    static let burgundyTextMuted = textMuted
+    static let burgundyTextSoft = textSoft
+
+    // Editorial shadow color tokens — mirror web `--vp-shadow-sm/md/lg`.
+    // Used by `.vpShadowAmbient()` / `.vpShadowElevated()` / `.vpShadowLg()`
+    // so depth tracks the editorial palette in dark mode (deeper opacity
+    // on near-black surfaces) instead of the same warm-tint shadow as
+    // light mode. RGB base on light = `rgba(20,16,12,...)` (`#14100c`),
+    // on dark = pure black at higher opacity.
+    static let shadowSm = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0, green: 0, blue: 0, alpha: 0.45)
+            : UIColor(red: 20/255.0, green: 16/255.0, blue: 12/255.0, alpha: 0.04)
+    })
+    static let shadowMd = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0, green: 0, blue: 0, alpha: 0.55)
+            : UIColor(red: 20/255.0, green: 16/255.0, blue: 12/255.0, alpha: 0.06)
+    })
+    static let shadowLg = Color(UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor(red: 0, green: 0, blue: 0, alpha: 0.65)
+            : UIColor(red: 20/255.0, green: 16/255.0, blue: 12/255.0, alpha: 0.08)
+    })
 
     // Section A — comment-tag chip colors. Mirror the hex literals on
     // the web side (CommentRow.tsx → TAG_META). 'context' reuses
@@ -243,15 +378,24 @@ extension View {
     /// render pass; stacked on every card in a ScrollView the cost compounds.
     /// One pass tuned for "subtle depth on white" reads ~95% the same as the
     /// two-stack web reference and keeps frame time honest on older devices.
+    /// Uses `VP.shadowMd` so the shadow tint follows the editorial palette
+    /// (warm `rgba(20,16,12,...)` on light, deeper black opacity on dark).
     func vpShadowAmbient() -> some View {
-        self.shadow(color: Color.black.opacity(0.06), radius: 2, x: 0, y: 1)
+        self.shadow(color: VP.shadowMd, radius: 2, x: 0, y: 1)
     }
 
     /// Elevated shadow for floating controls (sheets, popovers). Single-pass
     /// for the same reason as ambient — sheet/popover surfaces are smaller
     /// and fewer per screen, but the principle holds.
     func vpShadowElevated() -> some View {
-        self.shadow(color: Color.black.opacity(0.10), radius: 8, x: 0, y: 3)
+        self.shadow(color: VP.shadowLg, radius: 8, x: 0, y: 3)
+    }
+
+    /// Largest editorial shadow tier — mirrors web `--vp-shadow-lg`. Use
+    /// for the highest-elevation floating surfaces (full-screen modals,
+    /// pinned sticky bars over a scrolling article).
+    func vpShadowLg() -> some View {
+        self.shadow(color: VP.shadowLg, radius: 16, x: 0, y: 6)
     }
 
     /// Focus ring overlay. Use as a strokeBorder on the *outside* of the
