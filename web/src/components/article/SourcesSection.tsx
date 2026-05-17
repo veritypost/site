@@ -106,6 +106,7 @@ export default function SourcesSection({
 
   return (
     <section
+      onMouseLeave={() => setOpenIdx(null)}
       style={{
         marginTop: 32,
         padding: 0,
@@ -152,9 +153,7 @@ export default function SourcesSection({
               aria-expanded={isOpen}
               aria-label={`Show headline from ${label}`}
               onMouseEnter={() => setOpenIdx(i)}
-              onMouseLeave={() => setOpenIdx((cur) => (cur === i ? null : cur))}
               onFocus={() => setOpenIdx(i)}
-              onBlur={() => setOpenIdx((cur) => (cur === i ? null : cur))}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
