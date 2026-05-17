@@ -279,18 +279,13 @@ export default function RhStyles() {
       overflow-y: visible;
       white-space: nowrap;
     }
+    /* On mobile the masthead's inline catbar is replaced by the
+       top-bar Sections dropdown (NavWrapper → SectionsMenu). Hide the
+       inline strip below 720px so the masthead is just search +
+       filters, and the dropdown owns category nav on phones. */
     @media (max-width: 720px) {
-      .vp-rh-catbar__inner {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        overflow-y: hidden;
-        white-space: nowrap;
-        gap: 18px;
-        padding: 10px 16px;
-        scrollbar-width: none;
-        -webkit-overflow-scrolling: touch;
-      }
-      .vp-rh-catbar__inner::-webkit-scrollbar { display: none; }
+      .vp-rh-catbar,
+      .vp-rh-subcatbar { display: none; }
     }
     .vp-rh-catbar__link {
       font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;

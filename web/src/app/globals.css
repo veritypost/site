@@ -598,7 +598,11 @@ textarea::placeholder {
   color: var(--muted);
 }
 *:focus-visible {
-  outline: 2px solid var(--text);
+  /* Site body is locked to the cream canvas in both modes; --text flips
+     to near-white under dark scheme, which renders an invisible outline
+     on cream. Use the editorial ink token (light-locked) so the focus
+     ring is always legible against the page bg. */
+  outline: 2px solid var(--vp-ink);
   outline-offset: 2px;
 }
 body {

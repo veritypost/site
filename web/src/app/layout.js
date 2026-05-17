@@ -119,10 +119,11 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
-  ],
+  // Site body is locked to the cream editorial canvas in both color
+  // schemes (--vp-bg = #f7f4ef). theme-color must match so iOS Safari's
+  // top chrome doesn't render a black bar above a cream page in dark
+  // mode. Admin/settings can override per-route if they need to flip.
+  themeColor: '#f7f4ef',
 };
 
 export default async function RootLayout({ children }) {
