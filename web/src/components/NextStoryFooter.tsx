@@ -19,21 +19,42 @@ const SERIF = '"Source Serif 4", var(--font-source-serif), Georgia, serif';
 export default function NextStoryFooter({ category, nearbyStories }: NextStoryFooterProps) {
   if (!(nearbyStories.length > 0 && category)) {
     return (
-      <footer style={{ marginTop: 64, marginBottom: 64 }}>
-        <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px' }} />
+      <footer className="vp-next-story-footer" style={{ marginTop: 64, marginBottom: 64 }}>
+        <div className="vp-next-story-footer__inner" />
       </footer>
     );
   }
 
   return (
-    <footer style={{ marginTop: 64, marginBottom: 64 }}>
+    <footer className="vp-next-story-footer" style={{ marginTop: 64, marginBottom: 64 }}>
       {/* Hover affordance for the story-title links. Inline styles can't
-          do :hover, so a tiny scoped <style> block carries it. */}
+          do :hover, so a tiny scoped <style> block carries it. The
+          chrome below mirrors [data-reader-engagement] so the panel's
+          left edge sits exactly under the article body's left edge
+          on desktop (≥1180px); on narrower viewports it centers at
+          680px like the rest of the reader. */}
       <style>{`
         .vp-next-story-link { color: ${TEXT}; transition: color 120ms ease; }
         .vp-next-story-link:hover { color: ${ACCENT}; }
+        .vp-next-story-footer__inner {
+          max-width: 680px;
+          margin: 0 auto;
+          padding: 0 20px;
+        }
+        @media (min-width: 1180px) {
+          .vp-next-story-footer__inner {
+            display: grid;
+            grid-template-columns: minmax(0, 680px) 300px;
+            column-gap: 64px;
+            max-width: 1180px;
+            padding: 0 32px;
+          }
+          .vp-next-story-footer__inner > * {
+            grid-column: 1;
+          }
+        }
       `}</style>
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 20px' }}>
+      <div className="vp-next-story-footer__inner">
         <section
           style={{
             background: SURFACE_SOFT,
