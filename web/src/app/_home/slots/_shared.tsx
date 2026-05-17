@@ -74,10 +74,9 @@ export function categoryFor(
 }
 
 export function storyHref(story: HomeStory): string | null {
-  // Canonical article URL is `/{slug}`. The legacy `/story/{slug}` shape
-  // is kept alive as a 301 in next.config.js for old bookmarks + iOS
-  // share URLs (iOS app still emits the legacy shape until the next
-  // release — see Stage 2 follow-up).
+  // Canonical article URL is `/{slug}`. Old `/story/{slug}` bookmarks
+  // and iOS legacy share URLs are caught by the 308 permanent redirect
+  // in next.config.js, so producers always emit the short shape.
   return story.stories?.slug ? `/${story.stories.slug}` : null;
 }
 
