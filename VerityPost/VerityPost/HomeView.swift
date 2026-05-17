@@ -46,6 +46,19 @@ struct HomeView: View {
     @State private var canSearch: Bool = false
     // Sections sheet — grid icon in top bar opens HomeSectionsSheet.
     @State private var showSectionsMenu = false
+    // Compact-width inline masthead (mirrors web mobile vp-rh-masthead).
+    // State lives here so loadData() can read it; HomeMasthead binds in.
+    // Regular width (iPad) keeps the legacy `topBar` + modal sheet path
+    // untouched per owner ask 2026-05-17.
+    @State private var homeFilter = HomeFilter()
+    // Anon "Sign in" pill in the inline masthead pushes the signup view.
+    // Wrapped in a NavigationLink hidden trigger so we can fire from a
+    // button action inside HomeMasthead without restructuring auth flow.
+    @State private var showSignupPush = false
+    // Inline masthead search pill pushes FindView. Owner ask 2026-05-17:
+    // search is being reworked separately, so route through FindView for
+    // now rather than over-investing on an inline dropdown.
+    @State private var showFindPush = false
     // "New since last visit" pill — tracks when home was last opened.
     @State private var lastVisitDate: Date? = nil
     // Theme preference — shares storage with SettingsView's Appearance row
@@ -177,7 +190,22 @@ struct HomeView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                topBar
+                // Compact (iPhone): inline masthead mirrors web mobile.
+                // Regular (iPad): keep legacy `topBar` + modal sheet path
+                // untouched — owner explicitly deferred iPad in this pass.
+                if hSize == .compact {
+                    HomeMasthead(
+                        categories: categories,
+                        filter: $homeFilter,
+                        vpTheme: $vpTheme,
+                        onTapSearch: { showFindPush = true },
+                        onSignIn: { showSignupPush = true },
+                        onSignOut: { Task { await auth.logout() } }
+                    )
+                    .environmentObject(auth)
+                } else {
+                    topBar
+                }
                 ScrollView {
                     VStack(spacing: 0) {
                         // Breaking strip — narrow, top of feed. Renders only
@@ -328,6 +356,24 @@ struct HomeView: View {
             if showRegistrationWall {
                 registrationWallOverlay
             }
+
+            // Hidden push triggers for the inline masthead. Wrapping these
+            // as zero-frame NavigationLinks (vs a NavigationDestination
+            // bound to a Bool item) keeps the navigation type-safe and
+            // reuses the same NavigationStack that hosts NavigationLink<Story>.
+            NavigationLink(isActive: $showFindPush) {
+                FindView().environmentObject(auth)
+            } label: { EmptyView() }
+            .frame(width: 0, height: 0)
+            .opacity(0)
+            .accessibilityHidden(true)
+
+            NavigationLink(isActive: $showSignupPush) {
+                SignupView().environmentObject(auth)
+            } label: { EmptyView() }
+            .frame(width: 0, height: 0)
+            .opacity(0)
+            .accessibilityHidden(true)
         }
         .background(
             GeometryReader { proxy in
@@ -350,6 +396,16 @@ struct HomeView: View {
             refreshTask?.cancel()
             refreshTask = Task { await loadData() }
             _ = await refreshTask?.value
+        }
+        .task(id: homeFilter) {
+            // Reload the feed when the inline masthead filter changes.
+            // First render is handled by the unconditional `.task` above;
+            // this branch skips the redundant first fire by short-circuiting
+            // when nothing meaningful has been requested yet (categories
+            // not loaded → topic slug can't resolve anyway).
+            guard !categories.isEmpty else { return }
+            refreshTask?.cancel()
+            refreshTask = Task { await loadData() }
         }
         .task(id: perms.changeToken) {
             guard perms.isLoaded else { return }
@@ -754,15 +810,71 @@ struct HomeView: View {
 
         do {
             let todayStartIso = HomeView.loadDataISOFmt.string(from: today.startUtc)
+            _ = todayStartIso // currently unused below; kept so the filter block can splice time-window where clauses without re-importing the formatter
 
-            async let storiesReq: [Story] = client.from("articles")
+            // Filter-aware base query. The inline masthead (compact width)
+            // writes into `homeFilter`; regular width never mutates it so
+            // this collapses to the legacy unfiltered query on iPad.
+            var q = client.from("articles")
                 .select("*, ad_eligible, sensitivity_tags, stories(slug)")
                 .eq("status", value: "published")
                 .eq("browse_only", value: false)
-                .order("published_at", ascending: false)
-                .limit(12)
-                .execute()
-                .value
+
+            // Topic filter: resolve slug → category row, then constrain
+            // by category_id or subcategory_id depending on depth.
+            if let topicSlug = homeFilter.topicSlug,
+               let cat = categories.first(where: { $0.slug == topicSlug }) {
+                let col = cat.categoryId == nil ? "category_id" : "subcategory_id"
+                q = q.eq(col, value: cat.id)
+            }
+
+            // Time-window / lifecycle chips.
+            switch homeFilter.chip {
+            case "today":
+                q = q.gte("published_at", value: todayStartIso)
+            case "this_week":
+                let weekAgo = Date().addingTimeInterval(-7 * 86400)
+                q = q.gte("published_at", value: HomeView.loadDataISOFmt.string(from: weekAgo))
+            case "developing":
+                q = q.eq("is_developing", value: true)
+            case "updated_recently":
+                let dayAgo = Date().addingTimeInterval(-24 * 3600)
+                q = q.gte("published_at", value: HomeView.loadDataISOFmt.string(from: dayAgo))
+            case "newest_article":
+                break // sort branch covers this
+            default:
+                break
+            }
+
+            // Sort branch. Engagement-sort columns are best-effort —
+            // missing columns fall back to published_at ordering.
+            let storiesReq: [Story]
+            switch homeFilter.sort {
+            case "most_viewed":
+                storiesReq = try await q
+                    .order("view_count", ascending: false)
+                    .limit(12)
+                    .execute()
+                    .value
+            case "most_discussed":
+                storiesReq = try await q
+                    .order("comment_count", ascending: false)
+                    .limit(12)
+                    .execute()
+                    .value
+            case "most_recent_comments":
+                storiesReq = try await q
+                    .order("last_commented_at", ascending: false)
+                    .limit(12)
+                    .execute()
+                    .value
+            default:
+                storiesReq = try await q
+                    .order("published_at", ascending: false)
+                    .limit(12)
+                    .execute()
+                    .value
+            }
 
             // Dedicated breaking query — runs independently of the top-of-feed
             // so a breaking story always surfaces above the masthead.
@@ -788,7 +900,7 @@ struct HomeView: View {
                 .execute()
                 .value
 
-            let rawAll = try await storiesReq
+            let rawAll = storiesReq
             let breakingFirstAll = try await breakingReq.first
             let cats = try await catsReq
             let topRowsAll = (try? await topStoriesReq) ?? []
@@ -808,10 +920,13 @@ struct HomeView: View {
                 return !HomeView.isHomeBlocked(a)
             }
 
-            // If top_stories has pinned rows, use them in position order.
-            // Otherwise fall back to hero_pick_for_date sort on today’s articles.
+            // If top_stories has pinned rows, use them in position order
+            // — but only when the masthead filter is in its default "All"
+            // state. The moment a topic/chip/sort is active, the pinned
+            // homepage row no longer represents the reader's request, so
+            // the filtered server result wins.
             let ranked: [Story]
-            if topRows.isEmpty {
+            if topRows.isEmpty || !homeFilter.isAll {
                 ranked = raw.sorted { a, b in
                     let aHero = (a.heroPickForDate == today.isoDate) ? 1 : 0
                     let bHero = (b.heroPickForDate == today.isoDate) ? 1 : 0
