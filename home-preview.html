@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Verity Post — Home (current live layout)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+  /* Palette + fonts mirror web/src/app/globals.css + _home/styles.tsx */
+  :root{
+    --vp-bg:#f7f4ef;
+    --vp-surface:#ffffff;
+    --vp-surface-soft:#fbf7ef;
+    --vp-ink:#171717;
+    --vp-text-muted:#66615a;
+    --vp-text-soft:#8a8379;
+    --vp-border:#ded8ce;
+    --vp-border-soft:#eee8df;
+    --vp-accent:#8b0f16;
+    --vp-accent-dark:#64090e;
+    --vp-accent-soft:#f4e6e2;
+    --vp-shadow-sm:rgba(20,16,12,0.06);
+    --vp-shadow-lg:rgba(20,16,12,0.12);
+    --font-ui:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --font-serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+    --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--vp-bg);color:var(--vp-ink);font-family:var(--font-ui);-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+
+  /* Site header (mirrors NavWrapper / global header) */
+  .site-hdr{position:sticky;top:0;z-index:50;background:rgba(247,244,239,0.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--vp-border-soft)}
+  .site-hdr__inner{max-width:1408px;margin:0 auto;padding:14px 24px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:20px}
+  .site-hdr__nav{display:flex;gap:24px;font-size:13px;color:var(--vp-text-muted);font-weight:500}
+  .site-hdr__nav a:hover{color:var(--vp-accent)}
+  .site-hdr__logo{font-family:var(--font-serif);font-size:26px;letter-spacing:0.04em;text-align:center;font-weight:600;color:var(--vp-ink)}
+  .site-hdr__utils{display:flex;justify-content:flex-end;gap:14px;align-items:center;font-size:13px;color:var(--vp-text-muted)}
+  .site-hdr__profile{display:inline-flex;align-items:center;gap:8px;padding:5px 12px 5px 5px;border:1px solid var(--vp-border);border-radius:999px;background:var(--vp-surface)}
+  .site-hdr__avatar{width:26px;height:26px;border-radius:50%;background:var(--vp-accent);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-size:13px;font-weight:600}
+
+  /* .vp-rh-grid wrapper */
+  .grid{display:flex;flex-direction:column;gap:24px;max-width:1440px;margin:0 auto;padding:16px;box-sizing:border-box}
+
+  /* ============ MASTHEAD: search + catbar + filters ============ */
+  .masthead{width:100%;background:var(--vp-surface);border:1px solid var(--vp-border-soft);border-radius:22px;box-shadow:0 6px 18px var(--vp-shadow-sm);margin-top:8px;position:relative;z-index:5}
+  .masthead__search{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--vp-border-soft)}
+  .masthead__search-icon{color:var(--vp-text-soft)}
+  .masthead__search-input{flex:1;border:0;outline:none;background:transparent;font-family:var(--font-ui);font-size:14px;color:var(--vp-ink)}
+  .masthead__search-input::placeholder{color:var(--vp-text-soft)}
+  .masthead__catbar{border-bottom:1px solid var(--vp-border-soft)}
+  .masthead__catbar-inner{display:flex;align-items:center;gap:28px;padding:12px 24px;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+  .masthead__catbar-inner::-webkit-scrollbar{display:none}
+  .catlink{font-family:var(--font-ui);font-size:13px;font-weight:500;letter-spacing:0.04em;color:var(--vp-ink);position:relative;padding-bottom:4px;flex-shrink:0}
+  .catlink:hover{color:var(--vp-accent)}
+  .catlink--cur{font-weight:600}
+  .catlink--cur::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--vp-accent)}
+  .catlink--all{font-family:var(--font-mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--vp-text-soft);padding-right:12px;border-right:1px solid var(--vp-border-soft)}
+  .masthead__filters{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 14px;padding:10px 24px}
+  .filterlink{font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--vp-text-soft);white-space:nowrap}
+  .filterlink:hover{color:var(--vp-accent)}
+  .filterlink--cur{color:var(--vp-accent)}
+  .filtersep{display:inline-block;width:1px;height:14px;background:var(--vp-border);margin:0 2px}
+
+  /* ============ Top band (full-width banner slot) ============ */
+  .top-band{display:flex;flex-direction:column;gap:24px}
+  .banner{background:var(--vp-bg);border:1px solid var(--vp-border-soft);border-radius:18px;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .banner__label{font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--vp-accent);font-weight:600}
+  .banner__body{font-family:var(--font-ui);font-size:14px;color:var(--vp-text-muted)}
+  .banner__cta{font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--vp-accent)}
+
+  /* ============ Body: 2-col grid (main + 360px rail) ============ */
+  .body{display:flex;flex-direction:column;gap:16px}
+  @media (min-width:900px){
+    .body{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:32px}
+    .body__main, .body__rail{display:flex;flex-direction:column;min-width:0}
+    .body__main{gap:24px}
+    .body__rail{gap:24px}
+  }
+
+  /* ─────── Story card (hero + regular) ─────── */
+  .card{background:var(--vp-bg);border:1px solid var(--vp-border-soft);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+  .card--hero{padding:32px;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:32px;align-items:start}
+  @media (max-width:899px){.card--hero{grid-template-columns:1fr;padding:24px;gap:20px}}
+  .kicker{font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--vp-accent);font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .kicker .sep{color:var(--vp-text-soft);font-weight:400}
+  .kicker .lifecycle{background:var(--vp-accent-soft);color:var(--vp-accent-dark);padding:2px 8px;border-radius:4px;font-weight:700}
+  .card__hed{margin:0;font-family:var(--font-serif);font-weight:600;line-height:1.05;letter-spacing:-0.018em;color:var(--vp-ink)}
+  .card--hero .card__hed{font-size:clamp(36px,4vw,52px)}
+  .card__hed{font-size:24px}
+  .card__dek{margin:0;font-family:var(--font-serif);font-size:17px;line-height:1.45;color:var(--vp-text-muted)}
+  .card--hero .card__dek{font-size:19px}
+  .card__meta{display:flex;flex-wrap:wrap;gap:12px;font-family:var(--font-mono);font-size:11px;letter-spacing:0.04em;color:var(--vp-text-soft);padding-top:8px;border-top:1px dashed var(--vp-border-soft)}
+  .card__meta .dev{color:var(--vp-accent);font-weight:600}
+  .card__change{margin:0;font-family:var(--font-ui);font-size:13px;color:var(--vp-text-muted);font-style:italic;border-left:2px solid var(--vp-accent);padding-left:12px}
+
+  /* Hero timeline strip on the right side of hero */
+  .hero-tl{background:var(--vp-surface);border:1px solid var(--vp-border-soft);border-radius:14px;padding:16px}
+  .hero-tl__label{font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--vp-text-soft);margin-bottom:10px}
+  .tl-event{padding:8px 0;border-top:1px solid var(--vp-border-soft);font-family:var(--font-ui);font-size:13px;line-height:1.35;color:var(--vp-text-muted)}
+  .tl-event:first-of-type{border-top:0}
+  .tl-event__date{display:inline-block;width:54px;font-family:var(--font-mono);font-size:10px;letter-spacing:0.04em;color:var(--vp-text-soft);text-transform:uppercase}
+  .tl-event--now{color:var(--vp-ink);font-weight:500}
+  .tl-event--now .tl-event__date{color:var(--vp-accent)}
+
+  /* ─────── Rail card (single + list variants) ─────── */
+  .rail-card{width:100%;max-width:320px;align-self:flex-end;background:var(--vp-bg);border:1px solid var(--vp-border-soft);border-radius:18px;padding:18px}
+  @media (max-width:899px){.rail-card{max-width:none;align-self:stretch}}
+  .rail-card__label{font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--vp-accent);margin-bottom:10px}
+  .rail-card__hed{margin:0 0 6px;font-family:var(--font-serif);font-size:20px;font-weight:600;line-height:1.15;letter-spacing:-0.015em;color:var(--vp-ink)}
+  .rail-card__sub{margin:0;font-family:var(--font-ui);font-size:12px;color:var(--vp-text-soft)}
+  .rail-card__body{margin:6px 0 0;font-family:var(--font-serif);font-size:14px;line-height:1.4;color:var(--vp-text-muted)}
+  .rail-list{margin:0;padding:0;list-style:none;counter-reset:rl}
+  .rail-list li{counter-increment:rl;display:grid;grid-template-columns:20px 1fr;gap:8px;padding:9px 0;border-top:1px solid var(--vp-border-soft);font-family:var(--font-ui);font-size:13px;line-height:1.3;color:var(--vp-ink)}
+  .rail-list li:first-of-type{border-top:0}
+  .rail-list li::before{content:counter(rl,decimal-leading-zero);font-family:var(--font-mono);font-size:10px;color:var(--vp-accent);font-weight:600;letter-spacing:0.04em;padding-top:2px}
+
+  /* ─────── Square row (5 cells) ─────── */
+  .square-row{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+  @media (max-width:1100px){.square-row{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:720px){.square-row{grid-template-columns:repeat(2,1fr)}}
+  .square{aspect-ratio:1/1;background:var(--vp-bg);border:1px solid var(--vp-border-soft);border-radius:14px;padding:14px;display:flex;flex-direction:column;justify-content:space-between}
+  .square__kicker{font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--vp-accent);font-weight:600}
+  .square__hed{margin:0;font-family:var(--font-serif);font-size:15px;line-height:1.15;letter-spacing:-0.015em;color:var(--vp-ink);font-weight:600}
+  .square__meta{font-family:var(--font-mono);font-size:10px;color:var(--vp-text-soft);letter-spacing:0.04em}
+
+  /* Annotation chip showing this is the live shape */
+  .annot{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--vp-text-soft);padding:3px 8px;border:1px dashed var(--vp-border);border-radius:999px;background:var(--vp-surface)}
+
+  /* ─────────────── Research-informed search/filter additions ───────────────
+     Mockup of: search-with-suggestions, advanced-filter drawer (date / tags /
+     authors / sort / region), active-filter chip strip, results-header (count
+     + sort + save-search). Inline ARIA hints in source. */
+
+  /* Enlarge masthead search and add suggestions panel */
+  .masthead__search{position:relative;padding:18px 22px}
+  .masthead__search-input{font-size:15px}
+  .masthead__search-kbd{font-family:var(--font-mono);font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--vp-text-soft);border:1px solid var(--vp-border);padding:3px 7px;border-radius:6px;background:var(--vp-surface-soft)}
+  .suggest{position:absolute;left:18px;right:18px;top:calc(100% - 2px);background:var(--vp-surface);border:1px solid var(--vp-border);border-radius:18px;box-shadow:0 18px 48px var(--vp-shadow-lg);overflow:hidden;z-index:6}
+  .suggest__group{padding:10px 0;border-top:1px solid var(--vp-border-soft)}
+  .suggest__group:first-child{border-top:0}
+  .suggest__label{font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--vp-text-soft);padding:0 18px 6px}
+  .suggest__row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 18px;font-family:var(--font-ui);font-size:13px;color:var(--vp-ink)}
+  .suggest__row:hover{background:var(--vp-accent-soft);color:var(--vp-accent-dark)}
+  .suggest__row .ic{width:16px;height:16px;color:var(--vp-text-soft)}
+  .suggest__row .meta{font-family:var(--font-mono);font-size:10px;color:var(--vp-text-soft);letter-spacing:0.04em}
+  .suggest__row em{font-style:normal;background:var(--vp-accent-soft);color:var(--vp-accent-dark);padding:0 2px;border-radius:3px}
+
+</style>
+</head>
+<body>
+
+<!-- Site header (matches NavWrapper) -->
+<header class="site-hdr">
+  <div class="site-hdr__inner">
+    <nav class="site-hdr__nav" aria-label="Sections">
+      <a href="#">Latest</a>
+      <a href="#">Discuss</a>
+      <a href="#">Timelines</a>
+      <a href="#">Topics</a>
+      <a href="#">Browse</a>
+    </nav>
+    <a class="site-hdr__logo" href="/">Verity Post</a>
+    <div class="site-hdr__utils">
+      <div class="site-hdr__profile">
+        <span class="site-hdr__avatar">C</span>
+        Cliff
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- ─────────── MASTHEAD: search + catbar + filters ─────────── -->
+  <div class="masthead">
+    <!-- Search w/ live-suggestions dropdown.
+         ARIA: input is type=search + role=searchbox + aria-label;
+         suggestions container is role=listbox with grouped role=option rows;
+         debounce-on-keystroke (~300ms) handled in app code (mocked here). -->
+    <div class="masthead__search">
+      <svg class="masthead__search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input
+        class="masthead__search-input"
+        type="search"
+        role="searchbox"
+        aria-label="Search Verity Post"
+        aria-controls="vp-suggest"
+        aria-expanded="false"
+        aria-autocomplete="list"
+        placeholder="Search stories, sources, authors, tags, timelines…"
+      />
+      <span class="masthead__search-kbd" aria-hidden="true">⌘ K</span>
+
+      <!-- Suggestions panel (hidden until user types) -->
+      <div class="suggest" id="vp-suggest" role="listbox" aria-label="Search suggestions" hidden>
+        <div class="suggest__group">
+          <div class="suggest__label">Top match</div>
+          <div class="suggest__row" role="option" aria-selected="true">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h10M4 19h16"/></svg>
+            <span>Two-year heat record falls again as Pacific anomaly persists into a third month</span>
+            <span class="meta">Science · Today</span>
+          </div>
+        </div>
+        <div class="suggest__group">
+          <div class="suggest__label">Stories</div>
+          <div class="suggest__row" role="option">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <span>Heat-record anomaly <em>(timeline · 9 events)</em></span>
+            <span class="meta">Story</span>
+          </div>
+          <div class="suggest__row" role="option">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <span>Pacific marine heatwave research</span>
+            <span class="meta">Story · 5 events</span>
+          </div>
+        </div>
+        <div class="suggest__group">
+          <div class="suggest__label">Topics &amp; tags</div>
+          <div class="suggest__row" role="option">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+            <span>Climate</span>
+            <span class="meta">Topic · 1,284 articles</span>
+          </div>
+          <div class="suggest__row" role="option">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>
+            <span>climate-models</span>
+            <span class="meta">Tag · 162 articles</span>
+          </div>
+        </div>
+        <div class="suggest__group">
+          <div class="suggest__label">Authors</div>
+          <div class="suggest__row" role="option">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+            <span>Maya Reyes</span>
+            <span class="meta">Author · 47 articles</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <nav class="masthead__catbar" aria-label="Browse categories">
+      <div class="masthead__catbar-inner">
+        <a class="catlink catlink--all catlink--cur" href="/" aria-current="page">All</a>
+        <a class="catlink" href="#">Politics</a>
+        <a class="catlink" href="#">Business</a>
+        <a class="catlink" href="#">World</a>
+        <a class="catlink" href="#">Science</a>
+        <a class="catlink" href="#">Technology</a>
+        <a class="catlink" href="#">Health</a>
+        <a class="catlink" href="#">Energy</a>
+        <a class="catlink" href="#">Education</a>
+        <a class="catlink" href="#">Justice</a>
+        <a class="catlink" href="#">Markets</a>
+        <a class="catlink" href="#">Climate</a>
+        <a class="catlink" href="#">Defense</a>
+        <a class="catlink" href="#">Culture</a>
+      </div>
+    </nav>
+    <nav class="masthead__filters" aria-label="Quick filters">
+      <a class="filterlink" href="/?today">Today</a>
+      <a class="filterlink" href="/?this_week">This week</a>
+      <a class="filterlink" href="/?developing">Developing</a>
+      <a class="filterlink" href="/?updated_recently">Recent updates</a>
+      <a class="filterlink" href="/?newest_article">Recently posted</a>
+      <span class="filtersep" aria-hidden="true"></span>
+      <a class="filterlink" href="/?most_discussed">Most discussed</a>
+      <a class="filterlink" href="/?most_recent_comments">Most recent comments</a>
+      <a class="filterlink" href="/?most_viewed">Most viewed</a>
+      <a class="filterlink" href="/?questions">Questions</a>
+    </nav>
+
+  </div>
+
+  <!-- ─────────── TOP BAND (full-width banner slot) ─────────── -->
+  <div class="top-band">
+    <div class="banner">
+      <div>
+        <div class="banner__label">Top banner · pos 10</div>
+        <div class="banner__body">Curated promo or breaking strip — editor-pinned via /admin/home.</div>
+      </div>
+      <a class="banner__cta" href="#">Open →</a>
+    </div>
+  </div>
+
+  <!-- ─────────── BODY: main + rail ─────────── -->
+  <div class="body">
+
+    <div class="body__main">
+
+      <!-- HERO story_card (variant: hero) -->
+      <article class="card card--hero">
+        <div>
+          <div class="kicker">
+            <span class="lifecycle">DEVELOPING</span>
+            <span>Politics</span><span class="sep">·</span><span>Senate aid package</span>
+          </div>
+          <h2 class="card__hed">Senate panel narrows aid package after a third day of closed-door talks</h2>
+          <p class="card__dek">Leaders on both sides agreed to drop two of the original eight provisions and trim funding by roughly a third, putting the bill on track for a procedural vote later this week.</p>
+          <p class="card__change">Changed today: negotiators removed two funding provisions and cut the package by roughly one third.</p>
+          <div class="card__meta">
+            <span class="dev">Developing</span>
+            <span>7 timeline events</span>
+            <span>4 sources</span>
+            <span>Last changed 18m ago</span>
+          </div>
+        </div>
+        <aside class="hero-tl" aria-label="How we got here">
+          <div class="hero-tl__label">How we got here</div>
+          <div class="tl-event"><span class="tl-event__date">Mar 12</span> White House releases initial $42B funding request</div>
+          <div class="tl-event"><span class="tl-event__date">Apr 04</span> House version passes with bipartisan amendments</div>
+          <div class="tl-event"><span class="tl-event__date">May 09</span> Senate committee opens closed-door negotiation</div>
+          <div class="tl-event tl-event--now"><span class="tl-event__date">Today</span> Panel narrows package — this article</div>
+        </aside>
+      </article>
+
+      <!-- Regular story_card -->
+      <article class="card">
+        <div class="kicker"><span>Business</span><span class="sep">·</span><span>Markets</span><span class="sep">·</span><span>9:42 AM</span></div>
+        <h3 class="card__hed">Regulators move to tighten disclosure rules for private credit funds</h3>
+        <p class="card__dek">The proposed rule would require quarterly reporting on fund leverage and concentration, addressing concerns regulators raised after several large funds restructured in late 2025.</p>
+        <div class="card__meta">
+          <span>Updated 42m ago</span>
+          <span>5 sources</span>
+          <span>Timeline: 4 events</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="kicker"><span>World</span><span class="sep">·</span><span>Europe</span><span class="sep">·</span><span>Updated</span></div>
+        <h3 class="card__hed">EU finance ministers approve provisional framework for cross-border tax enforcement</h3>
+        <p class="card__dek">The deal closes a loophole used by twelve member states, but enforcement begins in 2027 and three holdouts have already signaled they will seek carve-outs during the implementation phase.</p>
+        <div class="card__meta">
+          <span>Updated 2h ago</span>
+          <span>6 sources</span>
+          <span>Timeline: 11 events</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="kicker"><span>Science</span><span class="sep">·</span><span>Climate</span><span class="sep">·</span><span>Today</span></div>
+        <h3 class="card__hed">Two-year heat record falls again as Pacific anomaly persists into a third month</h3>
+        <p class="card__dek">Researchers tracking the pattern said the persistence itself is more notable than the temperature peak, because models had not predicted a regime this long lasting through the spring transition.</p>
+        <div class="card__meta">
+          <span>Published 4h ago</span>
+          <span>3 sources</span>
+          <span>Timeline: 9 events</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="kicker"><span>Politics</span><span class="sep">·</span><span>Judiciary</span><span class="sep">·</span><span>11:18 AM</span></div>
+        <h3 class="card__hed">Appeals court schedules emergency hearing on agency rulemaking authority</h3>
+        <p class="card__dek">A coalition of state attorneys general filed last week to halt enforcement until the underlying statute is reviewed, a request the court agreed to consider on an accelerated calendar.</p>
+        <div class="card__meta">
+          <span>Updated 1h ago</span>
+          <span>4 sources</span>
+          <span>Timeline: 6 events</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="kicker"><span>Energy</span><span class="sep">·</span><span>Grid</span><span class="sep">·</span><span>May 11</span></div>
+        <h3 class="card__hed">Three Midwest states approve shared compact for regional grid coordination</h3>
+        <p class="card__dek">The agreement creates a joint operating body for transmission planning across PJM and MISO seams, the first formal coordination since the 2024 winter reliability failures.</p>
+        <div class="card__meta">
+          <span>Updated yesterday</span>
+          <span>5 sources</span>
+          <span>Timeline: 8 events</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="kicker"><span>Technology</span><span class="sep">·</span><span>AI safety</span><span class="sep">·</span><span>7:04 AM</span></div>
+        <h3 class="card__hed">Federal hearings on AI safety draw bipartisan calls for evaluation standards</h3>
+        <p class="card__dek">Witnesses from three research institutes and two model developers agreed on the need for pre-release evaluation, while splitting on whether the standards should be statutory.</p>
+        <div class="card__meta">
+          <span>Updated 6h ago</span>
+          <span>3 sources</span>
+          <span>Timeline: 5 events</span>
+        </div>
+      </article>
+
+    </div>
+
+    <div class="body__rail">
+
+      <!-- Single rail card (manual story) -->
+      <aside class="rail-card">
+        <div class="rail-card__label">Editor's pick</div>
+        <h3 class="rail-card__hed">What changes in the new draft</h3>
+        <p class="rail-card__sub">Senate aid package · 4 min read</p>
+        <p class="rail-card__body">A side-by-side of the eight original provisions and the six that survived this morning's closed-door session.</p>
+      </aside>
+
+      <!-- list_rail (trending) -->
+      <aside class="rail-card">
+        <div class="rail-card__label">Trending</div>
+        <ol class="rail-list">
+          <li>Private-credit disclosure rule tightens after years of lobbying</li>
+          <li>Cross-border tax framework clears EU committee</li>
+          <li>Heat anomaly enters third month, breaking model predictions</li>
+          <li>Appeals court fast-tracks agency authority case</li>
+          <li>Federal AI safety hearings open with bipartisan witnesses</li>
+        </ol>
+      </aside>
+
+      <!-- Promo / banner-style rail -->
+      <aside class="rail-card">
+        <div class="rail-card__label">Ad · slot pos 25</div>
+        <h3 class="rail-card__hed">Editor-pinned promo placeholder</h3>
+        <p class="rail-card__body">Rail slots cap at 320px wide and right-align to the rail column. Editor swaps content via /admin/home.</p>
+      </aside>
+
+      <!-- list_rail (most read) -->
+      <aside class="rail-card">
+        <div class="rail-card__label">Most read · this week</div>
+        <ol class="rail-list">
+          <li>Senate panel narrows aid package after a third day of closed-door talks</li>
+          <li>Two-year heat record falls again as Pacific anomaly persists</li>
+          <li>Regulators move to tighten disclosure rules for private credit funds</li>
+          <li>Three Midwest states approve shared compact for regional grid coordination</li>
+          <li>EU finance ministers approve provisional cross-border tax framework</li>
+        </ol>
+      </aside>
+
+      <aside class="rail-card">
+        <div class="rail-card__label">Ad · slot pos 35</div>
+        <h3 class="rail-card__hed">Sponsored slot placeholder</h3>
+        <p class="rail-card__body">Rail card body. Editor-pinned via /admin/home.</p>
+      </aside>
+
+    </div>
+  </div>
+
+  <!-- ─────────── BOTTOM BAND: 5 squares ─────────── -->
+  <div class="square-row">
+    <div class="square">
+      <div>
+        <div class="square__kicker">Politics</div>
+        <h4 class="square__hed">House panel adds amendment on agency oversight</h4>
+      </div>
+      <div class="square__meta">Updated 32m</div>
+    </div>
+    <div class="square">
+      <div>
+        <div class="square__kicker">Markets</div>
+        <h4 class="square__hed">Treasury yields ease ahead of Fed minutes release</h4>
+      </div>
+      <div class="square__meta">Updated 1h</div>
+    </div>
+    <div class="square">
+      <div>
+        <div class="square__kicker">Health</div>
+        <h4 class="square__hed">CDC updates seasonal advisory after regional uptick</h4>
+      </div>
+      <div class="square__meta">Updated 2h</div>
+    </div>
+    <div class="square">
+      <div>
+        <div class="square__kicker">Education</div>
+        <h4 class="square__hed">State board adopts revised history framework</h4>
+      </div>
+      <div class="square__meta">Yesterday</div>
+    </div>
+    <div class="square">
+      <div>
+        <div class="square__kicker">Defense</div>
+        <h4 class="square__hed">Joint exercises scheduled across three Pacific nations</h4>
+      </div>
+      <div class="square__meta">Yesterday</div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;padding:18px 0 0">
+    <span class="annot">Live shape · /</span>
+    <span class="annot">Slot-driven via /admin/home</span>
+    <span class="annot">Body: main + 360px rail</span>
+    <span class="annot">Cards share canvas color (one continuous cream)</span>
+  </div>
+
+</div>
+
+<script>
+  // Search suggestions: show only when the input has text + focus,
+  // hide on blur (with a delay so option clicks still register), on
+  // Escape, or when the input goes empty.
+  (function () {
+    var input = document.querySelector('.masthead__search-input');
+    var panel = document.getElementById('vp-suggest');
+    if (!input || !panel) return;
+
+    function show() {
+      panel.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+    }
+    function hide() {
+      panel.hidden = true;
+      input.setAttribute('aria-expanded', 'false');
+    }
+    function sync() {
+      if (input.value.trim().length > 0 && document.activeElement === input) show();
+      else hide();
+    }
+
+    input.addEventListener('input', sync);
+    input.addEventListener('focus', sync);
+    input.addEventListener('blur', function () {
+      // Delay so option mousedown can fire before the panel hides.
+      setTimeout(hide, 120);
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        input.value = '';
+        hide();
+      }
+    });
+  })();
+</script>
+
+</body>
+</html>

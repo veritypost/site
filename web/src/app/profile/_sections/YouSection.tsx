@@ -80,10 +80,13 @@ export function YouSection({ user, perms }: Props) {
         </div>
       </section>
 
-      <section style={{ position: 'relative', clear: 'both' }}>
+      <section style={{ position: 'relative', clear: 'both', marginTop: S[7] }}>
         {/* T341 — profile-internal CTAs (Avatar, Bio, Privacy +
             optional expert / family). Heading removed 2026-05-16
-            per owner — the cards speak for themselves. */}
+            per owner — the cards speak for themselves. Owner call
+            2026-05-17: extra marginTop separates this block from the
+            Your-numbers section above (the flex parent's gap alone
+            felt cramped). */}
         <div
           style={{
             display: 'grid',
