@@ -30,12 +30,12 @@ export const metadata: Metadata = {
 };
 
 const C = {
-  bg: 'var(--bg)',
-  card: 'var(--card)',
-  border: 'var(--border)',
-  text: 'var(--text)',
-  dim: 'var(--dim)',
-  accent: 'var(--accent)',
+  bg: 'var(--vp-bg)',
+  card: 'var(--vp-surface)',
+  border: 'var(--vp-border)',
+  text: 'var(--vp-ink)',
+  dim: 'var(--vp-text-muted)',
+  accent: 'var(--vp-accent)',
   highlight: 'var(--hover)',
 };
 

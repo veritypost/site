@@ -92,7 +92,7 @@ export default function ThemeToggle() {
         border: 'none',
         borderRadius: 999,
         background: 'transparent',
-        color: 'var(--text)',
+        color: 'var(--vp-ink)',
         cursor: 'pointer',
         padding: 0,
         marginRight: -8,

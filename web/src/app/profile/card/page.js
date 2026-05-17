@@ -56,7 +56,7 @@ export default function MyCardPage() {
 
   if (state === 'loading') {
     return (
-      <div style={{ padding: 48, textAlign: 'center', color: 'var(--dim)', fontSize: 13 }}>
+      <div style={{ padding: 48, textAlign: 'center', color: 'var(--vp-text-muted)', fontSize: 13 }}>
         Loading your card...
       </div>
     );
@@ -66,11 +66,11 @@ export default function MyCardPage() {
     return (
       <div style={{ maxWidth: 480, margin: '0 auto', padding: '48px 16px', textAlign: 'center' }}>
         <h1
-          style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: '0 0 8px' }}
+          style={{ fontSize: 22, fontWeight: 700, color: 'var(--vp-ink)', margin: '0 0 8px' }}
         >
           Profile Card
         </h1>
-        <p style={{ fontSize: 14, color: 'var(--dim)', margin: '0 0 20px' }}>
+        <p style={{ fontSize: 14, color: 'var(--vp-text-muted)', margin: '0 0 20px' }}>
           Shareable profile cards are a Verity Plus feature.
         </p>
         <a
@@ -79,7 +79,7 @@ export default function MyCardPage() {
             display: 'inline-block',
             padding: '10px 18px',
             borderRadius: 10,
-            background: 'var(--accent)',
+            background: 'var(--vp-accent)',
             color: '#fff',
             fontSize: 13,
             fontWeight: 600,
@@ -89,7 +89,7 @@ export default function MyCardPage() {
           View plans
         </a>
         <div style={{ marginTop: 14 }}>
-          <a href="/profile" style={{ fontSize: 12, color: 'var(--dim)', textDecoration: 'none' }}>
+          <a href="/profile" style={{ fontSize: 12, color: 'var(--vp-text-muted)', textDecoration: 'none' }}>
             Back to profile
           </a>
         </div>
@@ -101,11 +101,11 @@ export default function MyCardPage() {
     return (
       <div style={{ maxWidth: 480, margin: '0 auto', padding: '48px 16px', textAlign: 'center' }}>
         <h1
-          style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', margin: '0 0 8px' }}
+          style={{ fontSize: 22, fontWeight: 700, color: 'var(--vp-ink)', margin: '0 0 8px' }}
         >
           Set a username first
         </h1>
-        <p style={{ fontSize: 14, color: 'var(--dim)', margin: '0 0 20px' }}>
+        <p style={{ fontSize: 14, color: 'var(--vp-text-muted)', margin: '0 0 20px' }}>
           Your card lives at a public URL that uses your username.
         </p>
         <a
@@ -114,7 +114,7 @@ export default function MyCardPage() {
             display: 'inline-block',
             padding: '10px 18px',
             borderRadius: 10,
-            background: 'var(--accent)',
+            background: 'var(--vp-accent)',
             color: '#fff',
             fontSize: 13,
             fontWeight: 600,
@@ -125,7 +125,7 @@ export default function MyCardPage() {
         </a>
         <button
           onClick={() => router.refresh()}
-          style={{ marginTop: 12, padding: '8px 16px', background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
+          style={{ marginTop: 12, padding: '8px 16px', background: 'var(--vp-accent)', color: 'var(--vp-bg)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14 }}
         >
           Try again
         </button>
@@ -134,9 +134,9 @@ export default function MyCardPage() {
   }
 
   return (
-    <div style={{ padding: 48, textAlign: 'center', color: 'var(--dim)', fontSize: 13 }}>
+    <div style={{ padding: 48, textAlign: 'center', color: 'var(--vp-text-muted)', fontSize: 13 }}>
       Could not load your profile.{' '}
-      <a href="/profile" style={{ color: 'var(--accent)' }}>
+      <a href="/profile" style={{ color: 'var(--vp-accent)' }}>
         Back to profile
       </a>
     </div>

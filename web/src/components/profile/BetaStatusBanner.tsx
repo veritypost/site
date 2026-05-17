@@ -22,7 +22,7 @@ const C = {
   errBg: 'var(--danger-bg)',
   errBorder: '#dc2626',
   errText: '#991b1b',
-  cta: 'var(--accent)',
+  cta: 'var(--vp-accent)',
 } as const;
 
 type Banner = {

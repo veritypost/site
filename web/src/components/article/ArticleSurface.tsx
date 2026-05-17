@@ -235,7 +235,7 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
             onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.filter = ''; }}
             onFocus={(e) => {
               if ((e.currentTarget as HTMLAnchorElement).matches(':focus-visible')) {
-                (e.currentTarget as HTMLAnchorElement).style.outline = '2px solid var(--accent)';
+                (e.currentTarget as HTMLAnchorElement).style.outline = '2px solid var(--vp-ink)';
                 (e.currentTarget as HTMLAnchorElement).style.outlineOffset = '2px';
               }
             }}

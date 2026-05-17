@@ -20,8 +20,8 @@ function PaneHeader() {
     <div
       style={{
         padding: '16px 24px',
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--bg)',
+        borderBottom: '1px solid var(--vp-border)',
+        background: 'var(--vp-bg)',
       }}
     >
       <span
@@ -41,7 +41,7 @@ function RowList({ count, rowHeight }: { count: number; rowHeight: number }) {
           key={i}
           style={{
             padding: '12px 8px',
-            borderBottom: '1px solid var(--border)',
+            borderBottom: '1px solid var(--vp-border)',
           }}
         >
           <span
@@ -69,8 +69,8 @@ export default function DirectoryLoading() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        background: 'var(--bg)',
-        color: 'var(--text)',
+        background: 'var(--vp-bg)',
+        color: 'var(--vp-ink)',
       }}
     >
       <style>{`
@@ -84,7 +84,7 @@ export default function DirectoryLoading() {
           height: 100%;
           flex-shrink: 0;
           overflow: hidden;
-          border-right: 1px solid var(--border);
+          border-right: 1px solid var(--vp-border);
         }
         .vp-dir-loading-pane:last-child { border-right: none; }
         @media (min-width: 900px) {
@@ -126,7 +126,7 @@ export default function DirectoryLoading() {
                   key={i}
                   style={{
                     padding: '12px 0',
-                    borderBottom: '1px solid var(--border)',
+                    borderBottom: '1px solid var(--vp-border)',
                   }}
                 >
                   <span

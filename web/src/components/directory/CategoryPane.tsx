@@ -39,8 +39,8 @@ export default function CategoryPane({ categories, activeSlug, onSelect }: Categ
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: 'var(--bg)',
-        borderRight: '1px solid var(--border)',
+        background: 'var(--vp-bg)',
+        borderRight: '1px solid var(--vp-border)',
         overflowY: 'auto',
       }}
     >
@@ -55,8 +55,8 @@ export default function CategoryPane({ categories, activeSlug, onSelect }: Categ
           color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.15em',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--bg)',
+          borderBottom: '1px solid var(--vp-border)',
+          background: 'var(--vp-bg)',
           zIndex: 2,
         }}
       >
@@ -83,11 +83,11 @@ export default function CategoryPane({ categories, activeSlug, onSelect }: Categ
                   padding: '18px 24px',
                   borderTop: 'none',
                   borderRight: 'none',
-                  borderBottom: '1px solid var(--border)',
+                  borderBottom: '1px solid var(--vp-border)',
                   borderLeft: active ? '2px solid #e33010' : '2px solid transparent',
                   textAlign: 'left',
                   textDecoration: 'none',
-                  color: 'var(--text)',
+                  color: 'var(--vp-ink)',
                   background: 'transparent',
                   cursor: 'pointer',
                   fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',

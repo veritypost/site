@@ -112,12 +112,12 @@ interface FollowingRowShape {
 // (R13) so the two anon tabs feel like one system.
 // T82 — values point at globals.css CSS vars so brand-color edits cascade.
 const C = {
-  bg: 'var(--bg)',
-  card: 'var(--card)',
-  border: 'var(--border)',
-  text: 'var(--text)',
-  dim: 'var(--dim)',
-  accent: 'var(--accent)',
+  bg: 'var(--vp-bg)',
+  card: 'var(--vp-surface)',
+  border: 'var(--vp-border)',
+  text: 'var(--vp-ink)',
+  dim: 'var(--vp-text-muted)',
+  accent: 'var(--vp-accent)',
 } as const;
 
 // Auto-linkify plain http(s) URLs inside free-text fields like
@@ -387,13 +387,13 @@ export default function ProfilePage() {
     return (
       <div
         // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 60px is off-grid hero padding
-        style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--dim)' }}
+        style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--vp-text-muted)' }}
       >
         <p style={{ marginBottom: 'var(--s4)' }}>Something went wrong loading this profile.</p>
         <button
           onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}
           // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 18px horizontal padding off-grid; radius 8 off-grid (sits between --r-sm 6 and --r-md 10)
-          style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', cursor: 'pointer', fontSize: 13 }}
+          style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid var(--vp-border)', background: 'var(--vp-surface)', color: 'var(--vp-ink)', cursor: 'pointer', fontSize: 13 }}
         >
           Retry
         </button>
@@ -485,13 +485,13 @@ export default function ProfilePage() {
         // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 60px is off-grid hero padding
         style={{ padding: '60px 20px', textAlign: 'center' }}
       >
-        <h1 style={{ fontSize: 20, marginBottom: 'var(--s3)', color: 'var(--text)' }}>
+        <h1 style={{ fontSize: 20, marginBottom: 'var(--s3)', color: 'var(--vp-ink)' }}>
           This profile is private
         </h1>
-        <p style={{ color: 'var(--dim)', marginBottom: 'var(--s6)' }}>
+        <p style={{ color: 'var(--vp-text-muted)', marginBottom: 'var(--s6)' }}>
           This user has set their profile to private.
         </p>
-        <a href="/" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
+        <a href="/" style={{ color: 'var(--vp-accent)', textDecoration: 'none' }}>
           Browse Verity Post →
         </a>
       </main>
@@ -619,7 +619,7 @@ export default function ProfilePage() {
                 <span style={{
                   fontSize: 12,
                   fontWeight: 600,
-                  color: 'var(--accent)',
+                  color: 'var(--vp-accent)',
                   background: 'var(--accent-subtle)',
                   borderRadius: 4,
                   padding: '2px 6px',
@@ -1054,9 +1054,9 @@ export default function ProfilePage() {
               Copy shareable profile card link
             </a>
             {copyFailed && (
-              <span style={{ display: 'block', marginTop: 'var(--s1)', color: 'var(--dim)' }}>
+              <span style={{ display: 'block', marginTop: 'var(--s1)', color: 'var(--vp-text-muted)' }}>
                 Copy failed — paste the URL manually:{' '}
-                <span style={{ userSelect: 'all', color: 'var(--text)' }}>
+                <span style={{ userSelect: 'all', color: 'var(--vp-ink)' }}>
                   {typeof window !== 'undefined' && target.username
                     ? `${window.location.origin}/card/${target.username}`
                     : ''}
@@ -1091,11 +1091,11 @@ export default function ProfilePage() {
         </div>
 
         {followListError ? (
-          <p style={{ color: 'var(--dim)', fontSize: 13, padding: 'var(--s4) 0' }}>
+          <p style={{ color: 'var(--vp-text-muted)', fontSize: 13, padding: 'var(--s4) 0' }}>
             Couldn&apos;t load —{' '}
             <button
               onClick={() => { setFollowListError(false); setFollowListRetry((c) => c + 1); }}
-              style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 'var(--s0)', textDecoration: 'underline' }}
+              style={{ color: 'var(--vp-accent)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: 'var(--s0)', textDecoration: 'underline' }}
             >
               try again
             </button>
@@ -1126,7 +1126,7 @@ export default function ProfilePage() {
 function UserList({ users, listType }: { users: UserListItem[]; listType: FollowsTab }) {
   if (!users?.length) {
     return (
-      <p style={{ color: 'var(--dim)', fontSize: 14, padding: 'var(--s5) 0' }}>
+      <p style={{ color: 'var(--vp-text-muted)', fontSize: 14, padding: 'var(--s5) 0' }}>
         {listType === 'followers' ? 'No followers yet.' : 'Not following anyone yet.'}
       </p>
     );

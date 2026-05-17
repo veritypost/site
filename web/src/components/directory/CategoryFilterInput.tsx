@@ -23,12 +23,12 @@ export default function CategoryFilterInput({ value, onChange }: CategoryFilterI
         style={{
           width: '100%',
           padding: '8px 12px',
-          border: '1px solid var(--border)',
-          background: 'var(--bg)',
+          border: '1px solid var(--vp-border)',
+          background: 'var(--vp-bg)',
           borderRadius: 8,
           fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
           fontSize: 13,
-          color: 'var(--text)',
+          color: 'var(--vp-ink)',
           outline: 'none',
         }}
       />

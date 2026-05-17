@@ -20,7 +20,7 @@ export default function VerifiedBadge({ user, size = 'sm' }: VerifiedBadgeProps)
   if (!isVerified && !isExpert) return null;
 
   const label = isVerified ? 'Verified' : 'Expert';
-  const color = isVerified ? 'var(--p-verified)' : 'var(--accent)';
+  const color = isVerified ? 'var(--p-verified)' : 'var(--vp-accent)';
   const fontSize = size === 'lg' ? 11 : 10;
 
   return (

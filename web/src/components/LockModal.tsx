@@ -110,9 +110,9 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
     padding: 'var(--s4)',
   };
   const panelStyle: CSSProperties = {
-    background: 'var(--card)',
-    color: 'var(--text-primary)',
-    border: '1px solid var(--border)',
+    background: 'var(--vp-surface)',
+    color: 'var(--vp-ink)',
+    border: '1px solid var(--vp-border)',
     borderRadius: 'var(--r-lg)',
     maxWidth: 420,
     width: '100%',
@@ -124,8 +124,8 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
     padding: '9px 16px',
     borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for dialog buttons)
     background: 'transparent',
-    color: 'var(--text-primary)',
-    border: '1px solid var(--border)',
+    color: 'var(--vp-ink)',
+    border: '1px solid var(--vp-border)',
     fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
@@ -134,7 +134,7 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
     // eslint-disable-next-line no-restricted-syntax -- magic, intentional: 9x18 matches primary CTA pattern
     padding: '9px 18px',
     borderRadius: 8, // magic — intentional (between --r-sm 6 and --r-md 10 for dialog buttons)
-    background: 'var(--accent)',
+    background: 'var(--vp-accent)',
     color: '#fff',
     border: 'none',
     fontSize: 13,
@@ -155,7 +155,7 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
         <div id={titleId} style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
           {prompt.headline}
         </div>
-        <div style={{ fontSize: 14, color: 'var(--dim)', lineHeight: 1.5, marginBottom: 20 }}>
+        <div style={{ fontSize: 14, color: 'var(--vp-text-muted)', lineHeight: 1.5, marginBottom: 20 }}>
           {prompt.body}
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
@@ -173,7 +173,7 @@ export default function LockModal({ open, onClose, capability }: LockModalProps)
               onMouseLeave={(e) => { e.currentTarget.style.filter = ''; }}
               onFocus={(e) => {
                 if (e.currentTarget.matches(':focus-visible')) {
-                  e.currentTarget.style.outline = '2px solid var(--accent)';
+                  e.currentTarget.style.outline = '2px solid var(--vp-accent)';
                   e.currentTarget.style.outlineOffset = '2px';
                 }
               }}

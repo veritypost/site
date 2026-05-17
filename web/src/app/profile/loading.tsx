@@ -14,7 +14,7 @@ export default function ProfileLoading() {
           gap: 12,
           padding: '12px 16px',
           background: 'var(--surface)',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: '1px solid var(--vp-border)',
         }}
       >
         <div
@@ -22,7 +22,7 @@ export default function ProfileLoading() {
             width: 32,
             height: 32,
             borderRadius: '50%',
-            background: 'var(--card)',
+            background: 'var(--vp-surface)',
             animation: 'vp-sk 1.6s ease-in-out infinite',
           }}
         />
@@ -31,7 +31,7 @@ export default function ProfileLoading() {
             width: 100,
             height: 14,
             borderRadius: 4,
-            background: 'var(--card)',
+            background: 'var(--vp-surface)',
             animation: 'vp-sk 1.6s ease-in-out infinite',
           }}
         />
@@ -46,7 +46,7 @@ export default function ProfileLoading() {
                 width: `${w}%`,
                 height: 16,
                 borderRadius: 4,
-                background: 'var(--card)',
+                background: 'var(--vp-surface)',
                 animation: 'vp-sk 1.6s ease-in-out infinite',
               }}
             />

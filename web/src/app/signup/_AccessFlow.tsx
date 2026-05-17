@@ -1,11 +1,11 @@
 'use client';
 
 const C = {
-  bg: 'var(--bg)',
-  border: 'var(--border)',
-  text: 'var(--text)',
-  dim: 'var(--dim)',
-  accent: 'var(--accent)',
+  bg: 'var(--vp-bg)',
+  border: 'var(--vp-border)',
+  text: 'var(--vp-ink)',
+  dim: 'var(--vp-text-muted)',
+  accent: 'var(--vp-accent)',
 } as const;
 
 const STEPS = [

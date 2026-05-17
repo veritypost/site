@@ -8,10 +8,10 @@ import { BRAND_NAME } from '@/lib/brand';
 import RequestAccessForm from './_RequestAccessForm';
 
 const C = {
-  bg: 'var(--bg)',
-  card: 'var(--card)',
-  border: 'var(--border)',
-  accent: 'var(--accent)',
+  bg: 'var(--vp-bg)',
+  card: 'var(--vp-surface)',
+  border: 'var(--vp-border)',
+  accent: 'var(--vp-accent)',
 } as const;
 
 export default function RequestAccessPage() {

@@ -32,12 +32,12 @@ import DOMPurify from 'dompurify';
 // T82 — values point at globals.css CSS vars so brand-color edits cascade.
 // `success`/`warn`/`danger` keep inline hex (deeper variants than canonical).
 const C = {
-  bg: 'var(--bg)',
-  card: 'var(--card)',
-  border: 'var(--border)',
-  text: 'var(--text)',
-  dim: 'var(--dim)',
-  accent: 'var(--accent)',
+  bg: 'var(--vp-bg)',
+  card: 'var(--vp-surface)',
+  border: 'var(--vp-border)',
+  text: 'var(--vp-ink)',
+  dim: 'var(--vp-text-muted)',
+  accent: 'var(--vp-accent)',
   success: '#16a34a',
   warn: '#b45309',
   danger: '#dc2626',

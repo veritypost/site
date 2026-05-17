@@ -152,8 +152,8 @@ export default async function FeaturedArticle() {
   return (
     <article
       style={{
-        borderTop: '1px solid var(--border)',
-        borderBottom: '1px solid var(--border)',
+        borderTop: '1px solid var(--vp-border)',
+        borderBottom: '1px solid var(--vp-border)',
         padding: '32px 0',
         margin: '40px 0',
       }}
@@ -170,15 +170,15 @@ export default async function FeaturedArticle() {
           }}
         >
           {authorName && (
-            <span style={{ fontSize: 13, color: 'var(--dim)' }}>{authorName}</span>
+            <span style={{ fontSize: 13, color: 'var(--vp-text-muted)' }}>{authorName}</span>
           )}
           {label && (
             <span
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: 'var(--dim)',
-                border: '1px solid var(--border)',
+                color: 'var(--vp-text-muted)',
+                border: '1px solid var(--vp-border)',
                 borderRadius: 4,
                 padding: '1px 6px',
                 letterSpacing: 0.3,
@@ -188,7 +188,7 @@ export default async function FeaturedArticle() {
             </span>
           )}
           {publishDate && (
-            <span style={{ fontSize: 12, color: 'var(--dim)', marginLeft: 'auto' }}>
+            <span style={{ fontSize: 12, color: 'var(--vp-text-muted)', marginLeft: 'auto' }}>
               {publishDate}
             </span>
           )}
@@ -202,7 +202,7 @@ export default async function FeaturedArticle() {
           fontWeight: 600,
           lineHeight: 1.25,
           margin: '0 0 8px 0',
-          color: 'var(--text)',
+          color: 'var(--vp-ink)',
           fontFamily: 'var(--font-source-serif), Georgia, "Times New Roman", serif',
           letterSpacing: '-0.02em',
         }}
@@ -214,7 +214,7 @@ export default async function FeaturedArticle() {
         <p
           style={{
             fontSize: 16,
-            color: 'var(--dim)',
+            color: 'var(--vp-text-muted)',
             margin: '0 0 20px 0',
             lineHeight: 1.5,
           }}
@@ -226,7 +226,7 @@ export default async function FeaturedArticle() {
       {/* Body snippet — first 2 paragraphs, inline links preserved */}
       {snippetHtml && (
         <div
-          style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--text)' }}
+          style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--vp-ink)' }}
           // body_html is sanitized server-side by renderBodyHtml before storage
           dangerouslySetInnerHTML={{ __html: snippetHtml }}
         />
@@ -238,12 +238,12 @@ export default async function FeaturedArticle() {
           display: 'inline-block',
           marginTop: 16,
           fontSize: 13,
-          color: 'var(--text)',
+          color: 'var(--vp-ink)',
           fontWeight: 600,
           textDecoration: 'underline',
           textDecorationThickness: 1,
           textUnderlineOffset: '0.18em',
-          textDecorationColor: 'var(--border)',
+          textDecorationColor: 'var(--vp-border)',
         }}
       >
         read the full story →

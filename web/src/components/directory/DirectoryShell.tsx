@@ -352,8 +352,8 @@ export default function DirectoryShell({
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        background: 'var(--bg)',
-        color: 'var(--text)',
+        background: 'var(--vp-bg)',
+        color: 'var(--vp-ink)',
       }}
     >
       <style>{`
@@ -365,13 +365,13 @@ export default function DirectoryShell({
             gap: 8px;
             padding: 12px 24px;
             background: var(--accent-bg);
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--vp-border);
             font-family: "IBM Plex Mono", monospace;
             font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            color: var(--text);
+            color: var(--vp-ink);
             cursor: pointer;
           }
         }
@@ -480,8 +480,8 @@ function EmptyPane({ label, hint }: { label: string; hint: string }) {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: 'var(--bg)',
-        borderRight: '1px solid var(--border)',
+        background: 'var(--vp-bg)',
+        borderRight: '1px solid var(--vp-border)',
       }}
     >
       <header
@@ -493,7 +493,7 @@ function EmptyPane({ label, hint }: { label: string; hint: string }) {
           color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.15em',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: '1px solid var(--vp-border)',
         }}
       >
         {label}

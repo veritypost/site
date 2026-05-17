@@ -34,7 +34,7 @@ export default function LockedFeatureChip({
         alignItems: 'center',
         padding: '2px 8px',
         borderRadius: 999,
-        border: '1px solid var(--border)',
+        border: '1px solid var(--vp-border)',
         background: 'var(--accent-bg)',
         color: 'var(--text-secondary)',
         fontFamily: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',

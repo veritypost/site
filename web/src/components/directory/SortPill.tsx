@@ -28,7 +28,7 @@ export default function SortPill({ active, canTrending, onChange }: SortPillProp
   const pillBase = {
     padding: '4px 12px',
     borderRadius: 999,
-    border: '1px solid var(--border)',
+    border: '1px solid var(--vp-border)',
     background: 'transparent',
     color: 'var(--text-secondary)',
     fontFamily: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
@@ -42,9 +42,9 @@ export default function SortPill({ active, canTrending, onChange }: SortPillProp
   };
 
   const activeStyle = {
-    background: 'var(--text)',
-    color: 'var(--bg)',
-    borderColor: 'var(--text)',
+    background: 'var(--vp-ink)',
+    color: 'var(--vp-bg)',
+    borderColor: 'var(--vp-ink)',
   };
 
   return (

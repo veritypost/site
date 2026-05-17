@@ -75,7 +75,7 @@ export default function ProfileCategoryDrillIn() {
         style={{
           display: 'inline-block',
           fontSize: 12,
-          color: 'var(--dim)',
+          color: 'var(--vp-text-muted)',
           textDecoration: 'none',
           marginBottom: 16,
         }}
@@ -84,7 +84,7 @@ export default function ProfileCategoryDrillIn() {
       </a>
 
       {loading && (
-        <div style={{ color: 'var(--dim)', fontSize: 13, padding: 24, textAlign: 'center' }}>
+        <div style={{ color: 'var(--vp-text-muted)', fontSize: 13, padding: 24, textAlign: 'center' }}>
           Loading...
         </div>
       )}
@@ -111,13 +111,13 @@ export default function ProfileCategoryDrillIn() {
             style={{
               fontSize: 22,
               fontWeight: 700,
-              color: 'var(--text-primary)',
+              color: 'var(--vp-ink)',
               margin: '0 0 4px',
             }}
           >
             {category.name}
           </h1>
-          <div style={{ fontSize: 12, color: 'var(--dim)', marginBottom: 20 }}>
+          <div style={{ fontSize: 12, color: 'var(--vp-text-muted)', marginBottom: 20 }}>
             Your activity across every subcategory.
           </div>
 
@@ -126,9 +126,9 @@ export default function ProfileCategoryDrillIn() {
               style={{
                 padding: 20,
                 borderRadius: 12,
-                border: '1px solid var(--border)',
-                background: 'var(--card)',
-                color: 'var(--dim)',
+                border: '1px solid var(--vp-border)',
+                background: 'var(--vp-surface)',
+                color: 'var(--vp-text-muted)',
                 fontSize: 13,
                 textAlign: 'center',
               }}
@@ -144,15 +144,15 @@ export default function ProfileCategoryDrillIn() {
                 style={{
                   padding: 14,
                   borderRadius: 12,
-                  border: '1px solid var(--border)',
-                  background: 'var(--card)',
+                  border: '1px solid var(--vp-border)',
+                  background: 'var(--vp-surface)',
                 }}
               >
                 <div
                   style={{
                     fontSize: 14,
                     fontWeight: 600,
-                    color: 'var(--text-primary)',
+                    color: 'var(--vp-ink)',
                     marginBottom: 10,
                   }}
                 >

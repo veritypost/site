@@ -62,7 +62,7 @@ export default function ArticlePane({
             color: 'var(--muted-foreground)',
             textTransform: 'uppercase',
             letterSpacing: '0.15em',
-            borderBottom: '1px solid var(--border)',
+            borderBottom: '1px solid var(--vp-border)',
             background: 'var(--accent-bg)',
           }}
         >
@@ -109,7 +109,7 @@ export default function ArticlePane({
           color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.15em',
-          borderBottom: '1px solid var(--border)',
+          borderBottom: '1px solid var(--vp-border)',
           background: 'var(--accent-bg)',
           zIndex: 2,
           display: 'flex',

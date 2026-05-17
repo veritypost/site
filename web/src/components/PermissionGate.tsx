@@ -84,8 +84,8 @@ function LockedCard({ capability, onClick }: LockedCardProps) {
         width: '100%',
         padding: 28,
         textAlign: 'center',
-        background: 'var(--card)',
-        border: '1px solid var(--border)',
+        background: 'var(--vp-surface)',
+        border: '1px solid var(--vp-border)',
         borderRadius: 12,
         cursor: 'pointer',
       }}
@@ -93,7 +93,7 @@ function LockedCard({ capability, onClick }: LockedCardProps) {
       onMouseLeave={(e) => { e.currentTarget.style.filter = ''; }}
       onFocus={(e) => {
         if (e.currentTarget.matches(':focus-visible')) {
-          e.currentTarget.style.outline = '2px solid var(--accent)';
+          e.currentTarget.style.outline = '2px solid var(--vp-accent)';
           e.currentTarget.style.outlineOffset = '2px';
         }
       }}
@@ -102,10 +102,10 @@ function LockedCard({ capability, onClick }: LockedCardProps) {
         e.currentTarget.style.outlineOffset = '';
       }}
     >
-      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--vp-ink)', marginBottom: 6 }}>
         {capability.label || 'Locked'}
       </div>
-      <div style={{ fontSize: 13, color: 'var(--dim)', marginBottom: 16, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 13, color: 'var(--vp-text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
         {capability.lock_message || 'Tap to unlock.'}
       </div>
       <span
@@ -113,7 +113,7 @@ function LockedCard({ capability, onClick }: LockedCardProps) {
           display: 'inline-block',
           padding: '9px 18px',
           borderRadius: 8,
-          background: 'var(--accent)',
+          background: 'var(--vp-accent)',
           color: '#fff',
           fontSize: 13,
           fontWeight: 600,

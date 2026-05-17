@@ -32,11 +32,11 @@ interface RecapListResponse {
 // `success` keeps its inline hex (no matching `--success` value; `--success`
 // is `#22c55e`, this surface uses the deeper `#16a34a`).
 const C = {
-  card: 'var(--card)',
-  border: 'var(--border)',
-  text: 'var(--text)',
-  dim: 'var(--dim)',
-  accent: 'var(--accent)',
+  card: 'var(--vp-surface)',
+  border: 'var(--vp-border)',
+  text: 'var(--vp-ink)',
+  dim: 'var(--vp-text-muted)',
+  accent: 'var(--vp-accent)',
   success: '#16a34a',
 } as const;
 

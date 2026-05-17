@@ -91,7 +91,7 @@ function MessagesFallback() {
     <div
       style={{
         minHeight: '100vh',
-        background: 'var(--bg)',
+        background: 'var(--vp-bg)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -102,8 +102,8 @@ function MessagesFallback() {
           width: 32,
           height: 32,
           borderRadius: '50%',
-          border: '3px solid var(--border)',
-          borderTopColor: 'var(--text)',
+          border: '3px solid var(--vp-border)',
+          borderTopColor: 'var(--vp-ink)',
           animation: 'vpSpin 0.75s linear infinite',
         }}
       />
@@ -813,8 +813,8 @@ function MessagesPageInner() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-        <div style={{ padding: '16px 16px 10px', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--vp-bg)' }}>
+        <div style={{ padding: '16px 16px 10px', borderBottom: '1px solid var(--vp-border)' }}>
           <div
             style={{
               height: 28,
@@ -878,7 +878,7 @@ function MessagesPageInner() {
       <div
         style={{
           minHeight: '100vh',
-          background: 'var(--bg)',
+          background: 'var(--vp-bg)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -918,7 +918,7 @@ function MessagesPageInner() {
 
   return (
     // Ext-NN1 — main landmark for screen readers.
-    <main style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--vp-bg)' }}>
       <style>{`@keyframes vp-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
       {showDmPaywall && (
         <div

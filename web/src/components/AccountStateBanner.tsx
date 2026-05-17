@@ -16,7 +16,7 @@ const C = {
   amberBg: '#fffbeb',
   amberBorder: '#d97706',
   amberText: '#92400e',
-  cta: 'var(--accent)',
+  cta: 'var(--vp-accent)',
 } as const;
 
 interface BannerState {

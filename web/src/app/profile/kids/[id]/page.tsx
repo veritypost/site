@@ -15,11 +15,11 @@ import { formatDate, formatDateTime } from '@/lib/dates';
 // T82 — values point at globals.css CSS vars so brand-color edits cascade.
 // `success`/`warn`/`danger` keep inline hex (deeper variants than canonical).
 const C = {
-  card: 'var(--card)',
-  border: 'var(--border)',
-  text: 'var(--text)',
-  dim: 'var(--dim)',
-  accent: 'var(--accent)',
+  card: 'var(--vp-surface)',
+  border: 'var(--vp-border)',
+  text: 'var(--vp-ink)',
+  dim: 'var(--vp-text-muted)',
+  accent: 'var(--vp-accent)',
   success: '#16a34a',
   warn: '#b45309',
   danger: '#dc2626',
@@ -852,7 +852,7 @@ function BandPanel({
         </div>
         <div
           style={{
-            background: 'var(--bg)',
+            background: 'var(--vp-bg)',
             border: `1px solid ${C.border}`,
             padding: 8,
             borderRadius: 6,
@@ -950,7 +950,7 @@ function BandPanel({
       )}
 
       {confirmAction === 'tweens' && (
-        <div style={{ marginTop: 12, padding: 12, background: 'var(--bg)', borderRadius: 8 }}>
+        <div style={{ marginTop: 12, padding: 12, background: 'var(--vp-bg)', borderRadius: 8 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Advance to Tweens?</div>
           <div style={{ fontSize: 12, color: C.dim, marginBottom: 10 }}>
             Your child will see articles for ages 10-12. <strong>This cannot be undone.</strong>
@@ -990,7 +990,7 @@ function BandPanel({
       )}
 
       {confirmAction === 'graduated' && (
-        <div style={{ marginTop: 12, padding: 12, background: 'var(--bg)', borderRadius: 8 }}>
+        <div style={{ marginTop: 12, padding: 12, background: 'var(--vp-bg)', borderRadius: 8 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
             Move to the adult app?
           </div>
@@ -1192,7 +1192,7 @@ function DobCorrectionRequest({
           style={{
             marginTop: 10,
             padding: 12,
-            background: 'var(--bg)',
+            background: 'var(--vp-bg)',
             border: `1px solid ${C.danger}`,
             borderRadius: 8,
             fontSize: 12,
@@ -1245,7 +1245,7 @@ function DobCorrectionRequest({
           style={{
             marginTop: 10,
             padding: 10,
-            background: 'var(--bg)',
+            background: 'var(--vp-bg)',
             borderRadius: 8,
             fontSize: 12,
             color: C.dim,
@@ -1258,7 +1258,7 @@ function DobCorrectionRequest({
       )}
 
       {open && (
-        <div style={{ marginTop: 12, padding: 12, background: 'var(--bg)', borderRadius: 8 }}>
+        <div style={{ marginTop: 12, padding: 12, background: 'var(--vp-bg)', borderRadius: 8 }}>
           <div style={{ fontSize: 12, color: C.dim, marginBottom: 10, lineHeight: 1.5 }}>
             One correction per profile. We don&apos;t approve corrections that move your child to an
             older reading band without birth-certificate documentation. Younger-band corrections are

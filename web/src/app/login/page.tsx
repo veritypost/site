@@ -16,10 +16,10 @@ import { BRAND_NAME } from '@/lib/brand';
 import SingleDoorForm from './_SingleDoorForm';
 
 const C = {
-  bg: 'var(--bg)',
-  card: 'var(--card)',
-  border: 'var(--border)',
-  accent: 'var(--accent)',
+  bg: 'var(--vp-bg)',
+  card: 'var(--vp-surface)',
+  border: 'var(--vp-border)',
+  accent: 'var(--vp-accent)',
 } as const;
 
 function LoginFallback() {
@@ -106,7 +106,7 @@ function LoginPageInner() {
             style={{
               fontSize: '20px',
               fontWeight: 600,
-              color: 'var(--text)',
+              color: 'var(--vp-ink)',
               letterSpacing: '-0.02em',
               marginBottom: '24px',
             }}

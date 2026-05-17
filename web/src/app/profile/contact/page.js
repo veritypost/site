@@ -61,7 +61,7 @@ export default function ContactPage() {
             display: 'inline-block',
             fontSize: 13,
             fontWeight: 600,
-            color: 'var(--dim)',
+            color: 'var(--vp-text-muted)',
             textDecoration: 'none',
             marginBottom: 16,
           }}
@@ -72,7 +72,7 @@ export default function ContactPage() {
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.02em' }}>
           Contact Us
         </h1>
-        <p style={{ fontSize: 13, color: 'var(--dim)', margin: '0 0 24px' }}>
+        <p style={{ fontSize: 13, color: 'var(--vp-text-muted)', margin: '0 0 24px' }}>
           Have a question or need help? Send us a message and we&apos;ll get back to you.
         </p>
 
@@ -81,8 +81,8 @@ export default function ContactPage() {
             style={{
               padding: 24,
               borderRadius: 12,
-              border: '1px solid var(--border)',
-              background: 'var(--card)',
+              border: '1px solid var(--vp-border)',
+              background: 'var(--vp-surface)',
               textAlign: 'center',
             }}
           >
@@ -90,13 +90,13 @@ export default function ContactPage() {
               style={{
                 fontSize: 16,
                 fontWeight: 700,
-                color: 'var(--text-primary)',
+                color: 'var(--vp-ink)',
                 marginBottom: 8,
               }}
             >
               Message sent
             </div>
-            <div style={{ fontSize: 13, color: 'var(--dim)', marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: 'var(--vp-text-muted)', marginBottom: 16 }}>
               We&apos;ll get back to you as soon as possible.
             </div>
             <button
@@ -109,9 +109,9 @@ export default function ContactPage() {
               style={{
                 padding: '10px 20px',
                 borderRadius: 8,
-                border: '1px solid var(--border)',
-                background: 'var(--bg)',
-                color: 'var(--text-primary)',
+                border: '1px solid var(--vp-border)',
+                background: 'var(--vp-bg)',
+                color: 'var(--vp-ink)',
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -130,7 +130,7 @@ export default function ContactPage() {
                   display: 'block',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: 'var(--dim)',
+                  color: 'var(--vp-text-muted)',
                   marginBottom: 6,
                 }}
               >
@@ -150,9 +150,9 @@ export default function ContactPage() {
                       borderRadius: 20,
                       fontSize: 12,
                       fontWeight: 500,
-                      border: `1px solid ${topic === t.value ? 'var(--text-primary)' : 'var(--border)'}`,
-                      background: topic === t.value ? 'var(--text-primary)' : 'var(--bg)',
-                      color: topic === t.value ? 'var(--bg)' : 'var(--dim)',
+                      border: `1px solid ${topic === t.value ? 'var(--vp-ink)' : 'var(--vp-border)'}`,
+                      background: topic === t.value ? 'var(--vp-ink)' : 'var(--vp-bg)',
+                      color: topic === t.value ? 'var(--vp-bg)' : 'var(--vp-text-muted)',
                       cursor: 'pointer',
                       fontFamily: 'var(--font-sans)',
                     }}
@@ -170,7 +170,7 @@ export default function ContactPage() {
                   display: 'block',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: 'var(--dim)',
+                  color: 'var(--vp-text-muted)',
                   marginBottom: 6,
                 }}
               >
@@ -184,10 +184,10 @@ export default function ContactPage() {
                   width: '100%',
                   padding: '10px 14px',
                   borderRadius: 8,
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg)',
+                  border: '1px solid var(--vp-border)',
+                  background: 'var(--vp-bg)',
                   fontSize: 14,
-                  color: 'var(--text-primary)',
+                  color: 'var(--vp-ink)',
                   outline: 'none',
                   boxSizing: 'border-box',
                   fontFamily: 'var(--font-sans)',
@@ -202,7 +202,7 @@ export default function ContactPage() {
                   display: 'block',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: 'var(--dim)',
+                  color: 'var(--vp-text-muted)',
                   marginBottom: 6,
                 }}
               >
@@ -217,10 +217,10 @@ export default function ContactPage() {
                   width: '100%',
                   padding: '10px 14px',
                   borderRadius: 8,
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg)',
+                  border: '1px solid var(--vp-border)',
+                  background: 'var(--vp-bg)',
                   fontSize: 14,
-                  color: 'var(--text-primary)',
+                  color: 'var(--vp-ink)',
                   outline: 'none',
                   boxSizing: 'border-box',
                   fontFamily: 'var(--font-sans)',

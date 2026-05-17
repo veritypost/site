@@ -10,11 +10,11 @@ import { formatDate } from '@/lib/dates';
 // T82 — values point at globals.css CSS vars so brand-color edits cascade.
 // `success` keeps inline hex (this surface uses deeper #16a34a, not `--success`).
 const C = {
-  card: 'var(--card)',
-  border: 'var(--border)',
-  text: 'var(--text)',
-  dim: 'var(--dim)',
-  accent: 'var(--accent)',
+  card: 'var(--vp-surface)',
+  border: 'var(--vp-border)',
+  text: 'var(--vp-ink)',
+  dim: 'var(--vp-text-muted)',
+  accent: 'var(--vp-accent)',
   success: '#16a34a',
 } as const;
 
@@ -413,33 +413,33 @@ function FamilySeatsCard() {
   return (
     <div
       style={{
-        background: 'var(--card)',
-        border: '1px solid var(--border)',
+        background: 'var(--vp-surface)',
+        border: '1px solid var(--vp-border)',
         borderRadius: 10,
         padding: 14,
         marginBottom: 16,
         fontSize: 13,
-        color: 'var(--text)',
+        color: 'var(--vp-ink)',
       }}
     >
       <div style={{ fontWeight: 700, marginBottom: 4 }}>Family seats</div>
-      <div style={{ color: 'var(--dim)', marginBottom: 8 }}>
+      <div style={{ color: 'var(--vp-text-muted)', marginBottom: 8 }}>
         {state.used} of {state.paid} kid {state.paid === 1 ? 'seat' : 'seats'} used (cap{' '}
         {state.max_kids}).
         {extras > 0 ? ` Currently +$${monthlyAdded}/mo for extra seats.` : ''}
       </div>
       {state.platform === 'apple' && (
-        <div style={{ fontSize: 12, color: 'var(--dim)' }}>
+        <div style={{ fontSize: 12, color: 'var(--vp-text-muted)' }}>
           Billed via Apple. Manage seats in your iOS app or App Store settings.
         </div>
       )}
       {state.platform === 'google' && (
-        <div style={{ fontSize: 12, color: 'var(--dim)' }}>
+        <div style={{ fontSize: 12, color: 'var(--vp-text-muted)' }}>
           Billed via Google Play. Manage seats in your Google Play account.
         </div>
       )}
       {state.platform === 'stripe' && (
-        <div style={{ fontSize: 12, color: 'var(--dim)' }}>
+        <div style={{ fontSize: 12, color: 'var(--vp-text-muted)' }}>
           Adding a kid{' '}
           {state.used >= state.max_kids
             ? ''

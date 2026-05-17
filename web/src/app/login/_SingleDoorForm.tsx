@@ -10,12 +10,12 @@ import { createClient } from '@/lib/supabase/client';
 export const OAUTH_ENABLED = false;
 
 const C = {
-  bg: 'var(--bg)',
-  card: 'var(--card)',
-  border: 'var(--border)',
-  text: 'var(--text)',
-  dim: 'var(--dim)',
-  accent: 'var(--accent)',
+  bg: 'var(--vp-bg)',
+  card: 'var(--vp-surface)',
+  border: 'var(--vp-border)',
+  text: 'var(--vp-ink)',
+  dim: 'var(--vp-text-muted)',
+  accent: 'var(--vp-accent)',
   success: 'var(--success)',
   danger: 'var(--danger)',
 } as const;
@@ -245,7 +245,7 @@ export default function SingleDoorForm({ notice, rawNext = null, prefillEmail = 
           <div
             role="alert"
             style={{
-              backgroundColor: 'var(--card)',
+              backgroundColor: 'var(--vp-surface)',
               border: `1px solid ${C.border}`,
               borderRadius: '10px',
               padding: '12px 14px',

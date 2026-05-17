@@ -10,12 +10,12 @@ export default function ArticleSlugLoading() {
         gap: 18,
       }}
     >
-      <div style={{ height: 36, background: 'var(--card)', borderRadius: 6, width: '85%' }} />
-      <div style={{ height: 18, background: 'var(--card)', borderRadius: 6, width: '60%' }} />
-      <div style={{ height: 14, background: 'var(--card)', borderRadius: 6, marginTop: 24 }} />
-      <div style={{ height: 14, background: 'var(--card)', borderRadius: 6, width: '95%' }} />
-      <div style={{ height: 14, background: 'var(--card)', borderRadius: 6, width: '90%' }} />
-      <div style={{ height: 14, background: 'var(--card)', borderRadius: 6, width: '70%' }} />
+      <div style={{ height: 36, background: 'var(--vp-surface)', borderRadius: 6, width: '85%' }} />
+      <div style={{ height: 18, background: 'var(--vp-surface)', borderRadius: 6, width: '60%' }} />
+      <div style={{ height: 14, background: 'var(--vp-surface)', borderRadius: 6, marginTop: 24 }} />
+      <div style={{ height: 14, background: 'var(--vp-surface)', borderRadius: 6, width: '95%' }} />
+      <div style={{ height: 14, background: 'var(--vp-surface)', borderRadius: 6, width: '90%' }} />
+      <div style={{ height: 14, background: 'var(--vp-surface)', borderRadius: 6, width: '70%' }} />
     </div>
   );
 }

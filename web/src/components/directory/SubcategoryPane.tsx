@@ -65,8 +65,8 @@ export default function SubcategoryPane({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: 'var(--bg)',
-        borderRight: '1px solid var(--border)',
+        background: 'var(--vp-bg)',
+        borderRight: '1px solid var(--vp-border)',
         overflowY: 'auto',
       }}
     >
@@ -81,8 +81,8 @@ export default function SubcategoryPane({
           color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.15em',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--bg)',
+          borderBottom: '1px solid var(--vp-border)',
+          background: 'var(--vp-bg)',
           zIndex: 2,
           display: 'flex',
           justifyContent: 'space-between',
@@ -146,7 +146,7 @@ export default function SubcategoryPane({
                 border: 'none',
                 cursor: 'pointer',
                 padding: '18px 24px',
-                borderBottom: '1px solid var(--border)',
+                borderBottom: '1px solid var(--vp-border)',
                 borderLeft:
                   activeSubSlug === null
                     ? '2px solid #e33010'
@@ -154,7 +154,7 @@ export default function SubcategoryPane({
                 fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',
                 fontSize: 18,
                 fontWeight: activeSubSlug === null ? 600 : 500,
-                color: 'var(--text)',
+                color: 'var(--vp-ink)',
               }}
             >
               All
@@ -177,13 +177,13 @@ export default function SubcategoryPane({
                     padding: '18px 24px',
                     borderTop: 'none',
                     borderRight: 'none',
-                    borderBottom: '1px solid var(--border)',
+                    borderBottom: '1px solid var(--vp-border)',
                     borderLeft: active
                       ? '2px solid #e33010'
                       : '2px solid transparent',
                     textAlign: 'left',
                     textDecoration: 'none',
-                    color: 'var(--text)',
+                    color: 'var(--vp-ink)',
                     background: 'transparent',
                     cursor: 'pointer',
                     fontFamily: '"Source Serif 4", var(--font-source-serif), Georgia, serif',

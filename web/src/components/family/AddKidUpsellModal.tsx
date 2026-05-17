@@ -20,11 +20,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Z } from '@/lib/zIndex';
 
 const C = {
-  card: 'var(--card)',
-  border: 'var(--border)',
-  text: 'var(--text)',
-  dim: 'var(--dim)',
-  accent: 'var(--accent)',
+  card: 'var(--vp-surface)',
+  border: 'var(--vp-border)',
+  text: 'var(--vp-ink)',
+  dim: 'var(--vp-text-muted)',
+  accent: 'var(--vp-accent)',
   danger: '#dc2626',
 } as const;
 

@@ -39,7 +39,7 @@ export default function ArticleCard({ article, edgeStyle = false }: ArticleCardP
     <article
       style={{
         position: 'relative',
-        borderBottom: '1px solid var(--border)',
+        borderBottom: '1px solid var(--vp-border)',
         background: 'transparent',
       }}
     >
@@ -84,7 +84,7 @@ export default function ArticleCard({ article, edgeStyle = false }: ArticleCardP
             fontWeight: 500,
             lineHeight: 1.25,
             letterSpacing: '-0.005em',
-            color: 'var(--text)',
+            color: 'var(--vp-ink)',
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',

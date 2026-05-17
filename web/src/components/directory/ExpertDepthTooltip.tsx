@@ -123,13 +123,13 @@ export default function ExpertDepthTooltip({ storyId, count }: ExpertDepthToolti
             minWidth: 220,
             maxWidth: 280,
             padding: '10px 12px',
-            background: 'var(--bg)',
-            border: '1px solid var(--border)',
+            background: 'var(--vp-bg)',
+            border: '1px solid var(--vp-border)',
             borderRadius: 8,
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
             fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
             fontSize: 12,
-            color: 'var(--text)',
+            color: 'var(--vp-ink)',
           }}
         >
           {state.kind === 'loading' && (
@@ -162,8 +162,8 @@ export default function ExpertDepthTooltip({ storyId, count }: ExpertDepthToolti
                   display: 'inline-block',
                   padding: '6px 12px',
                   borderRadius: 6,
-                  background: 'var(--text)',
-                  color: 'var(--bg)',
+                  background: 'var(--vp-ink)',
+                  color: 'var(--vp-bg)',
                   textDecoration: 'none',
                   fontSize: 11,
                   fontWeight: 600,

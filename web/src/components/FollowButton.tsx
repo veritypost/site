@@ -47,8 +47,8 @@ export default function FollowButton({
           pointerEvents: 'none',
           padding: '8px 20px',
           borderRadius: 20,
-          background: 'var(--card)',
-          border: '1px solid var(--border)',
+          background: 'var(--vp-surface)',
+          border: '1px solid var(--vp-border)',
           fontSize: 14,
           cursor: 'default',
         }}

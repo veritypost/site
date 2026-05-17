@@ -15,15 +15,15 @@ export default function LeaderboardError({
 
   return (
     <div style={{ padding: 40, textAlign: 'center' }}>
-      <p style={{ color: 'var(--text-primary)', marginBottom: 16 }}>
+      <p style={{ color: 'var(--vp-ink)', marginBottom: 16 }}>
         Something went wrong loading the leaderboard.
       </p>
       <button
         onClick={reset}
         style={{
           padding: '10px 20px',
-          background: 'var(--accent)',
-          color: 'var(--bg)',
+          background: 'var(--vp-accent)',
+          color: 'var(--vp-bg)',
           border: 'none',
           borderRadius: 8,
           cursor: 'pointer',
