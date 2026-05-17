@@ -22,6 +22,7 @@ import { getSiteUrlOrNull } from '@/lib/siteUrl';
 import { incrementViewCount } from '@/lib/counters';
 import { getAnonReadCount } from '@/lib/anonReadCounter';
 import { RegistrationWallProvider } from '@/components/RegistrationWall';
+import ArticleChrome from '@/components/article/ArticleChrome';
 import ArticleSurface from '@/components/article/ArticleSurface';
 import ArticleReaderTabs from '@/components/article/ArticleReaderTabs';
 import TimelineSection from '@/components/article/TimelineSection';
@@ -422,6 +423,7 @@ export default async function ArticleSlugPage({
       initialSuppressed={wallSuppressed}
     >
       <>
+      <ArticleChrome />
       {jsonLd && <JsonLd data={jsonLd} />}
       {!isCoppa && article.status === 'published' && (
         <ArticleTracker articleId={article.id} articleSlug={story.slug} />
@@ -519,7 +521,7 @@ export default async function ArticleSlugPage({
                   display: 'inline-block',
                   padding: '8px 16px',
                   borderRadius: 8,
-                  background: 'var(--accent, #111)',
+                  background: 'var(--vp-accent)',
                   color: '#fff',
                   fontSize: 13,
                   fontWeight: 600,

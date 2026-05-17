@@ -95,7 +95,7 @@ export default function ErrorState({
   const buttonStyle: CSSProperties = {
     padding: inline ? '6px 14px' : '9px 20px',
     minHeight: inline ? 32 : 40,
-    background: 'var(--accent, #111)',
+    background: 'var(--vp-accent)',
     color: '#fff',
     border: 'none',
     borderRadius: 8,

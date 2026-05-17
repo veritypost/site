@@ -843,7 +843,7 @@ body {
   line-height: 0.85;
   float: left;
   padding: 4px 10px 0 0;
-  color: #171717;
+  color: var(--vp-ink);
   font-weight: 400;
 }
 [data-article-body] h2 {
@@ -1162,3 +1162,29 @@ body {
   padding: 3px 5px;
   pointer-events: none;
 }
+
+/* ------------------------------------------------------------------
+   Article reading viewport
+   ------------------------------------------------------------------
+   When an article page is mounted, ArticleChrome stamps
+   `data-vp-article="true"` on <body>. We use that flag to hide the
+   global bottom nav and the legal footer so the reading surface owns
+   the viewport. (The top bar stays — readers tap the wordmark to
+   return home.)
+
+   Replaces the old `pathname.startsWith('/story')` predicate in
+   NavWrapper, which never matches now that articles live at the root
+   namespace (`/<slug>`). Without these rules, mobile readers had a
+   64px bottom nav and the full legal footer overlapping the article.
+
+   Scoped strictly to body[data-vp-article] — the category fall-through
+   never sets the flag, so /politics, /world, etc. still get the home
+   chrome.
+   ------------------------------------------------------------------ */
+body[data-vp-article] nav[data-vp-bottom-nav] { display: none !important; }
+body[data-vp-article] footer.vp-footer { display: none !important; }
+/* NavWrapper reserves 68px (or 104 with admin banner) of bottom padding on
+   its wrapper div for the now-hidden bottom nav; reclaim that band so the
+   article doesn't end with an empty gap. Inline style → !important needed. */
+body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important; }
+

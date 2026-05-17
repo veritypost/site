@@ -78,10 +78,11 @@ async function fetchListRows(
     let q = service
       .from(fromTable)
       .select(
-        'article_id, articles!inner(id, title, stories(slug))',
+        'article_id, articles!inner(id, title, deleted_at, stories(slug))',
       )
       .gte('created_at', since)
       .not('article_id', 'is', null)
+      .is('articles.deleted_at', null)
       .limit(500);
     if (filterCol) q = q.eq(filterCol as 'id', 'visible');
     const { data } = await q;
@@ -90,6 +91,7 @@ async function fetchListRows(
       articles: {
         id: string;
         title: string | null;
+        deleted_at: string | null;
         stories: { slug: string | null } | null;
       } | null;
     }>;
@@ -133,6 +135,7 @@ async function fetchListRows(
       .from('articles')
       .select('id, title, updated_at, stories(slug)')
       .eq('status', 'published')
+      .is('deleted_at', null)
       .order('updated_at', { ascending: false })
       .limit(ROW_CAP * 6);
     const rows = (data ?? []) as Array<{

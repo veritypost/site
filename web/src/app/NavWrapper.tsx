@@ -467,6 +467,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         </Suspense>
       )}
       <div
+        data-vp-chrome-wrapper
         style={{
           // Bug 1 fix: reserve the FULL rendered top-bar height
           // (44 + safe-area-inset-top) so iPhone-notched devices don't
@@ -694,7 +695,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
         // overlap bottom-nav tappable targets. `viewport-fit=cover`
         // (layout.js) exposes the env() var; the padding grows only
         // on devices that have a home bar.
-        <nav style={navStyle}>
+        <nav data-vp-bottom-nav style={navStyle}>
           {/* DA-062 — aria-current on the active nav link so screen
               readers announce which route is current. */}
           {navItems.map((item) => {

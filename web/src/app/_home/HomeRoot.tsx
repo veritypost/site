@@ -8,6 +8,7 @@ import { createServiceClient } from '../../lib/supabase/server';
 import type { Tables } from '@/types/database-helpers';
 import { fetchLayoutBySlug, fetchLiveLayout } from './data';
 import HomeLayout from './HomeLayout';
+import { relativeTimeBucket } from './_shared';
 import type { TrendingArticle } from './slots/_shared';
 import RhStyles from './styles';
 
@@ -338,7 +339,7 @@ export default async function HomeRoot({
       lifecycleLabel,
       timelineCount: tlCountRes.count ?? tlRaw.length,
       sourcesCount: srcCountRes.count ?? 0,
-      lastChangedRelative: lastTs ? relativeTime(lastTs) : null,
+      lastChangedRelative: lastTs ? relativeTimeBucket(lastTs) : null,
       lastChangedIso: lastTs ?? null,
       changeNote: todaysChange,
     };
@@ -358,19 +359,6 @@ export default async function HomeRoot({
   );
 }
 
-// Bucketed relative-time formatter for the hero "Last changed Xm ago"
-// strip. Server-rendered so the string is stable across hydration.
-function relativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (!Number.isFinite(then)) return '';
-  const secs = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (secs < 60) return `${secs}s ago`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  const weeks = Math.floor(days / 7);
-  return `${weeks}w ago`;
-}
+// Bucketed relative-time formatter lives in ./_shared as
+// `relativeTimeBucket` so HomeRoot (SSR) and RelativeTime (client) use
+// the exact same ramp and the hero meta strip doesn't hydrate-flicker.

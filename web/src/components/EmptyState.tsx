@@ -81,7 +81,7 @@ export default function EmptyState({ icon, headline, body, cta, style }: EmptySt
     display: 'inline-block',
     marginTop: 4,
     padding: '10px 20px',
-    background: 'var(--accent, #111)',
+    background: 'var(--vp-accent)',
     color: '#fff',
     borderRadius: 10,
     fontSize: 13,

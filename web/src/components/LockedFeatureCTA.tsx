@@ -174,7 +174,7 @@ export default function LockedFeatureCTA({
     flexShrink: 0,
     padding: '7px 14px',
     borderRadius: 8,
-    background: 'var(--accent, #111)',
+    background: 'var(--vp-accent)',
     color: '#fff',
     border: 'none',
     fontSize: 12,
