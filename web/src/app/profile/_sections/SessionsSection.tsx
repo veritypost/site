@@ -103,7 +103,7 @@ export function SessionsSection({ preview }: Props) {
     return (
       <EmptyState
         title="No active sessions"
-        body="Looks like you're not signed in anywhere right now."
+        body="You're not signed in on any device right now."
       />
     );
   }

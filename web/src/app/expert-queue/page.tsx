@@ -319,9 +319,9 @@ export default function ExpertQueuePage() {
       {tab !== 'back-channel' &&
         (items.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: C.dim }}>
-            {tab === 'pending' && 'No pending questions in your categories.'}
-            {tab === 'claimed' && 'You haven\u2019t claimed any questions yet.'}
-            {tab === 'answered' && 'You haven\u2019t answered any questions yet.'}
+            {tab === 'pending' && 'No open questions in your areas right now.'}
+            {tab === 'claimed' && 'Questions you claim land here until you answer them.'}
+            {tab === 'answered' && 'Once you answer a question, it shows up here.'}
           </div>
         ) : (
           items.map((it) => (
@@ -599,7 +599,7 @@ export default function ExpertQueuePage() {
               Private channel — experts, editors, admins only (D33)
             </div>
             {backMessages.length === 0 ? (
-              <div style={{ fontSize: 13, color: C.dim, padding: 10 }}>No messages yet.</div>
+              <div style={{ fontSize: 13, color: C.dim, padding: 10 }}>Nothing in the back-channel yet.</div>
             ) : (
               backMessages.map((m) => (
                 <div key={m.id} style={{ padding: '8px 0', borderBottom: `1px solid ${C.border}` }}>

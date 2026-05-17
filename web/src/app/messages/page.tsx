@@ -1219,7 +1219,7 @@ function MessagesPageInner() {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      {c.last_message_preview || 'No messages yet'}
+                      {c.last_message_preview || 'No messages yet — say hi.'}
                     </div>
                   </div>
                 </div>

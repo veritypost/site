@@ -260,7 +260,7 @@ export function ExpertChatPanel({ categories, isAdminScope, preview }: Props) {
             }}
           >
             <div style={{ fontWeight: 600, color: C.inkSoft, marginBottom: S[1] }}>
-              No messages yet
+              Quiet in here
             </div>
             <div>Be the first to post in #{activeName || 'this room'}.</div>
           </div>

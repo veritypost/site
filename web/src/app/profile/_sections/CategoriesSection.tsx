@@ -134,8 +134,8 @@ export function CategoriesSection({ categories, scores, loading }: CategoriesSec
   if (parents.length === 0) {
     return (
       <EmptyState
-        title="No categories yet"
-        body="Categories aren't loaded for this surface."
+        title="Categories aren't loaded"
+        body="The category catalog hasn't loaded for this surface yet."
         variant="full"
       />
     );
@@ -147,8 +147,8 @@ export function CategoriesSection({ categories, scores, loading }: CategoriesSec
   if (scores.length === 0) {
     return (
       <EmptyState
-        title="No category data yet"
-        body="Read some articles to see your map. Each read tallies into the topic you read it under."
+        title="No reading map yet"
+        body="Read a few articles to build your map. Each read tallies into the topic it ran under."
         cta={{ label: 'Find an article', href: '/' }}
         variant="full"
       />

@@ -98,7 +98,7 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
   if (error) {
     return (
       <EmptyState
-        title="Couldn't load your activity"
+        title="We couldn't load your activity"
         body={error}
         cta={{ label: 'Try again', onClick: load }}
         variant="full"
@@ -153,8 +153,8 @@ export function ActivitySection({ authUserId, preview, perms, isPro }: Props) {
   if (items.length === 0) {
     return (
       <EmptyState
-        title="Nothing here yet"
-        body="Read an article or drop a comment to start your timeline."
+        title="Nothing to show here yet"
+        body="Read an article or leave a comment and it'll land on your timeline."
         cta={{ label: 'Read today’s top stories', href: '/' }}
         variant="full"
       />

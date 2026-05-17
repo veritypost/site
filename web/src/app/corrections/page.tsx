@@ -144,10 +144,10 @@ export default async function CorrectionsPage() {
             }}
           >
             <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 8px' }}>
-              No articles have been corrected or retracted.
+              Nothing on the record yet.
             </h2>
             <p style={{ fontSize: 14, color: '#555', lineHeight: 1.6, margin: 0 }}>
-              When an article is corrected, retracted, or unpublished it appears here with the
+              When an article is corrected, retracted, or unpublished it shows up here with the
               reason and date.
             </p>
           </div>

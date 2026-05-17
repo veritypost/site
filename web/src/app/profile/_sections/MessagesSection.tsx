@@ -125,7 +125,7 @@ export function MessagesSection({ preview }: Props) {
     return (
       <EmptyState
         title="No conversations yet"
-        body="When a reader or expert messages you, the thread will appear here."
+        body="When a reader or expert messages you, the thread lands here."
         variant="full"
       />
     );

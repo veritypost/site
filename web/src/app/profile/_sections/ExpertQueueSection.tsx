@@ -244,8 +244,8 @@ export function ExpertQueueSection({ preview }: Props) {
 
       {tab === 'back-channel' && categories.length === 0 ? (
         <EmptyState
-          title="Verify an area to use Expert chat"
-          body="Expert chat is a private space among experts in a given area. Get verified for one or more areas to join."
+          title="Expert chat is verified-only"
+          body="Each area has a private channel for its verified experts. Get verified in one to join the conversation."
           cta={{ label: 'Apply to be a verified expert', href: '/profile/settings/expert' }}
           variant="full"
         />
@@ -266,10 +266,10 @@ export function ExpertQueueSection({ preview }: Props) {
           }
           body={
             tab === 'pending'
-              ? 'You’re all caught up. New questions in your areas land here.'
+              ? 'You’re all caught up — new questions in your areas land here.'
               : tab === 'claimed'
-                ? 'Questions you’ve claimed but not yet answered will appear here.'
-                : 'Once you answer a question, it will appear in this list.'
+                ? 'Questions you claim sit here until you answer them.'
+                : 'Once you answer a question, it shows up here.'
           }
         />
       ) : (

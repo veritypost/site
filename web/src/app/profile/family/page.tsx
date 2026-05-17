@@ -285,7 +285,7 @@ export default function FamilyDashboard() {
           >
             {!report?.members?.length ? (
               <div style={{ color: C.dim, fontSize: 13, padding: 12 }}>
-                No activity logged this week.
+                Nothing logged this week yet.
               </div>
             ) : (
               <div

@@ -174,7 +174,7 @@ export default function AppealPage() {
 
       {warnings.length === 0 ? (
         <div style={{ padding: 30, textAlign: 'center', color: '#666', fontSize: 13 }}>
-          No penalties on your account. Nothing to appeal.
+          Your account is clean — nothing to appeal.
         </div>
       ) : (
         warnings.map((w) => {

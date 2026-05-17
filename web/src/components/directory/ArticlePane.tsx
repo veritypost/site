@@ -170,7 +170,7 @@ export default function ArticlePane({
             color: 'var(--muted-foreground)',
           }}
         >
-          {loading ? 'Loading records…' : 'No articles yet.'}
+          {loading ? 'Loading records…' : 'No articles filed under this yet.'}
         </div>
       ) : (
         <div style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 120ms ease' }}>

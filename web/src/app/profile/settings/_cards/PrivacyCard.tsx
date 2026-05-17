@@ -448,8 +448,8 @@ export function PrivacyCard({ user, preview }: Props) {
             }}
           >
             {audience === 'hidden'
-              ? 'No followers — you’re in lockdown.'
-              : 'Nobody follows you yet.'}
+              ? 'Your profile is hidden, so no one can follow you right now.'
+              : 'No followers yet.'}
           </div>
         ) : (
           <>

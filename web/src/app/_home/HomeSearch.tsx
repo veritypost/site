@@ -263,7 +263,7 @@ export default function HomeSearch({
             <p className="vp-rh-search-results__empty">Searching…</p>
           ) : allHits.length === 0 ? (
             <p className="vp-rh-search-results__empty">
-              No matches for &ldquo;{trimmed}&rdquo;.
+              Nothing matches &ldquo;{trimmed}&rdquo; — try a different word.
             </p>
           ) : (
             <>

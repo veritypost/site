@@ -118,8 +118,8 @@ export function BlockedSection({ preview }: Props) {
   if (rows.length === 0) {
     return (
       <EmptyState
-        title="You haven't blocked anyone"
-        body="Blocking someone hides their comments and messages from you. Easy to undo from this list."
+        title="No one blocked"
+        body="Block someone and they'll show up here. Their comments and messages stay hidden from you, and you can undo it any time."
         variant="full"
       />
     );

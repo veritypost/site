@@ -544,14 +544,14 @@ function EmptyState({ hasQuery, hasFilters }: { hasQuery: boolean; hasFilters: b
     return (
       <div className="vp-search-empty">
         <h2>No matches</h2>
-        <p>Try shorter keywords or remove a filter.</p>
+        <p>Try a shorter word, or drop a filter.</p>
       </div>
     );
   }
   if (hasFilters) {
     return (
       <div className="vp-search-empty">
-        <h2>No stories match these filters</h2>
+        <h2>No stories fit those filters</h2>
         <p>Loosen a filter, or pick a topic.</p>
       </div>
     );

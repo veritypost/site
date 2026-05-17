@@ -113,8 +113,8 @@ export function MilestonesSection({
   if (achievements.length === 0) {
     return (
       <EmptyState
-        title="No milestones yet"
-        body="The milestone catalog hasn't loaded for this surface."
+        title="Milestones aren't loaded"
+        body="The milestone catalog hasn't loaded for this surface yet."
         variant="full"
       />
     );
@@ -134,8 +134,8 @@ export function MilestonesSection({
       >
         {earnedList.length === 0 ? (
           <EmptyState
-            title="Nothing earned yet"
-            body="Read your first article to earn your first milestone."
+            title="No milestones yet"
+            body="Your first read earns your first milestone."
             cta={{ label: 'Find an article', href: '/' }}
           />
         ) : (
@@ -165,8 +165,8 @@ export function MilestonesSection({
       >
         {lockedList.length === 0 ? (
           <EmptyState
-            title="All caught up"
-            body="You've earned every milestone in the current catalog."
+            title="You've earned them all"
+            body="Every milestone in the current catalog is yours."
           />
         ) : (
           <div

@@ -799,7 +799,7 @@ function LeaderboardPageContent() {
           {!loading && !loadError && visibleUsers.length === 0 && (
             <div style={{ padding: 'var(--s6) var(--s5)', textAlign: 'center' }}>
               <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--vp-ink)', marginBottom: 6 /* magic — intentional (between --s1 4 and --s2 8 for tight headline gap) */, letterSpacing: '-0.01em' }}>
-                {!me ? 'Leaderboard is warming up' : 'No results'}
+                {!me ? 'The board is still filling up' : 'No one fits these filters'}
               </div>
               <div style={{ fontSize: 12, color: 'var(--vp-text-muted)', marginBottom: 14 /* magic — intentional (between --s3 12 and --s4 16) */, lineHeight: 1.5 }}>
                 {!me

@@ -275,7 +275,7 @@ export function AppShell({ user, preview, defaultSection = 'you', sections }: Pr
                   color: C.inkMuted,
                 }}
               >
-                No matches for &ldquo;{search}&rdquo;.
+                Nothing matches &ldquo;{search}&rdquo;.
               </div>
             ) : (
               groupedNav(matched).map((g) => (

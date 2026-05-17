@@ -476,7 +476,7 @@ function FollowingRow({
                 padding: '2px 0',
               }}
             >
-              Tap Follow on any story to track it here.
+              Stories you follow show up here.
             </p>
           ) : (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
