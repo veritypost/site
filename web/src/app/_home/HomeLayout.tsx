@@ -48,7 +48,24 @@ export default function HomeLayout({
   activeQ?: string;
   showEmptyPlaceholders?: boolean;
 }) {
-  const sorted = [...layout.slots].sort((a, b) => a.position - b.position);
+  // Drop later list-variant rail_card slots that have the same
+  // (source, days) config as an earlier one — they'd otherwise fetch
+  // identical rows and render the same headlines twice. First-seen
+  // wins so the position order in admin still controls which card
+  // remains visible. Non-list rail_cards and other kinds pass through
+  // untouched.
+  const seenListKey = new Set<string>();
+  const sorted = [...layout.slots]
+    .sort((a, b) => a.position - b.position)
+    .filter((s) => {
+      if (s.kind !== 'rail_card') return true;
+      const cfg = (s.config ?? {}) as { variant?: string; source?: string; days?: number };
+      if (cfg.variant !== 'list' || !cfg.source) return true;
+      const key = `${cfg.source}::${cfg.days ?? 'default'}`;
+      if (seenListKey.has(key)) return false;
+      seenListKey.add(key);
+      return true;
+    });
   const ctx = {
     categoryById,
     trendingArticles,
