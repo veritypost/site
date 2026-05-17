@@ -9,7 +9,6 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import Ad from '@/components/Ad';
-import ReadingProgressRibbon from '@/components/ReadingProgressRibbon';
 
 export type ArticleSurfaceArticle = {
   id: string;
@@ -222,7 +221,6 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
       .vp-h-anchor:focus-visible { opacity: 0.6; }
       .vp-h-anchor:hover { opacity: 1; }
     ` }} />
-    <ReadingProgressRibbon />
     <article style={PAGE_STYLE}>
       {canEdit && (
         <div style={{ textAlign: 'right', marginBottom: 'var(--s4)' }}>
