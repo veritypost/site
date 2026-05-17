@@ -339,6 +339,7 @@ export default async function HomeRoot({
       timelineCount: tlCountRes.count ?? tlRaw.length,
       sourcesCount: srcCountRes.count ?? 0,
       lastChangedRelative: lastTs ? relativeTime(lastTs) : null,
+      lastChangedIso: lastTs ?? null,
       changeNote: todaysChange,
     };
   }

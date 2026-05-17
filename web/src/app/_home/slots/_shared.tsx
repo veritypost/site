@@ -50,6 +50,7 @@ export type HeroMeta = {
   timelineCount: number;
   sourcesCount: number;
   lastChangedRelative: string | null; // e.g. "18m ago"
+  lastChangedIso: string | null; // raw ISO so the client can tick the relative label
   changeNote: string | null; // today's most-recent event_body, when dated today
 };
 

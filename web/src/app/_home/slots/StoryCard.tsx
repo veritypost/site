@@ -8,6 +8,7 @@ import type React from 'react';
 import Link from 'next/link';
 import Ad from '@/components/Ad';
 import type { SlotRow } from '../types';
+import RelativeTime from '../RelativeTime';
 import { type CardCtx, categoryFor, storyHref } from './_shared';
 
 export default function StoryCard({ slot, ctx }: { slot: SlotRow; ctx: CardCtx }) {
@@ -42,7 +43,19 @@ export default function StoryCard({ slot, ctx }: { slot: SlotRow; ctx: CardCtx }
   if (heroMeta?.lastChangedRelative) {
     metaParts.push({
       key: 'lc-ts',
-      node: <span>Last changed {heroMeta.lastChangedRelative}</span>,
+      node: (
+        <span>
+          Last changed{' '}
+          {heroMeta.lastChangedIso ? (
+            <RelativeTime
+              iso={heroMeta.lastChangedIso}
+              initial={heroMeta.lastChangedRelative}
+            />
+          ) : (
+            heroMeta.lastChangedRelative
+          )}
+        </span>
+      ),
     });
   }
 

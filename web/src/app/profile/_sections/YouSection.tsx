@@ -69,13 +69,29 @@ export function YouSection({ user, perms }: Props) {
           </div>
         </div>
         <div className="redesign-stat-grid" style={{ gap: S[5] }}>
-          <StatTile label="Quizzes" value={u.quizzes_completed_count ?? 0} />
-          <StatTile label="Comments" value={u.comment_count ?? 0} />
+          <StatTile
+            label="Quizzes"
+            value={u.quizzes_completed_count ?? 0}
+            href="?section=activity"
+          />
+          <StatTile
+            label="Discussion"
+            value={u.comment_count ?? 0}
+            href="?section=activity"
+          />
           {perms.followersView ? (
-            <StatTile label="Followers" value={u.followers_count ?? 0} />
+            <StatTile
+              label="Followers"
+              value={u.followers_count ?? 0}
+              href="?section=public"
+            />
           ) : null}
           {perms.followingView ? (
-            <StatTile label="Following" value={u.following_count ?? 0} />
+            <StatTile
+              label="Following"
+              value={u.following_count ?? 0}
+              href="?section=public"
+            />
           ) : null}
         </div>
       </section>

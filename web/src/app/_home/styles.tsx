@@ -145,7 +145,8 @@ export default function RhStyles() {
       color: var(--vp-ink);
       transition: background 0.12s;
     }
-    .vp-rh-search-results__link:hover {
+    .vp-rh-search-results__link:hover,
+    .vp-rh-search-results__item.is-active .vp-rh-search-results__link {
       background: var(--vp-accent-soft);
     }
     .vp-rh-search-results__kicker {

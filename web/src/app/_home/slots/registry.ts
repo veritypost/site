@@ -56,15 +56,16 @@ const REGISTRY: Record<SlotKind, SlotComponent> = {
 // directly). They aren't driven by home_slot_items, so the empty-check
 // would falsely hide them.
 //
-// `square_row` joins this set because it always renders 5 cells —
-// missing items become styled-empty placeholders inside the component
-// rather than collapsing the row.
+// Owner call 2026-05-17: square_row no longer self-sources empty cells —
+// when no articles are pinned, the row collapses entirely instead of
+// rendering 5 placeholder rectangles that read as "missing assets."
+// Admin preview still gets the placeholder treatment via the
+// `showEmptyPlaceholders` opt-in below.
 const SELF_SOURCING: ReadonlySet<SlotKind> = new Set([
   'feature',
   'data_ticker',
   'insight_row',
   'discovery_feed',
-  'square_row',
 ]);
 
 function slotIsEmpty(slot: SlotRow): boolean {

@@ -273,7 +273,7 @@ export function CategoriesSection({ categories, scores, loading }: CategoriesSec
             value={(scopeRow?.quizzes_passed ?? 0).toLocaleString()}
           />
           <DrillStat
-            label="Comments"
+            label="Discussion"
             value={(scopeRow?.comments ?? 0).toLocaleString()}
           />
           <DrillStat

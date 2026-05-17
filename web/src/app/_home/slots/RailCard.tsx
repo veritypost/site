@@ -204,10 +204,58 @@ export default async function RailCard({
 
   if (variant === 'list' && source && DEFAULT_LABEL[source]) {
     const rows = await fetchListRows(source, config.days);
-    if (rows.length === 0) return null;
     const label =
       (typeof config.label === 'string' && config.label) ||
       DEFAULT_LABEL[source];
+    const skeletonCss = `
+      @keyframes vp-rh-skel-pulse {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 0.35; }
+      }
+      .vp-rh-skel-bar {
+        background: var(--vp-border-soft);
+        border-radius: 4px;
+        height: 12px;
+        display: inline-block;
+        animation: vp-rh-skel-pulse 1.4s ease-in-out infinite;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .vp-rh-skel-bar { animation: none; }
+      }
+    `;
+    if (rows.length === 0) {
+      const widths = [80, 70, 75, 65];
+      return (
+        <aside className="vp-rh-rail-card vp-rh-rail-card--list">
+          <style dangerouslySetInnerHTML={{ __html: skeletonCss }} />
+          <p className="vp-rh-rail-card__list-label">{label}</p>
+          <ul className="vp-rh-rail-card__list-rows">
+            {widths.map((w, i) => (
+              <li key={i} className="vp-rh-rail-card__list-row">
+                <span
+                  className="vp-rh-rail-card__list-title"
+                  aria-hidden="true"
+                >
+                  <span
+                    className="vp-rh-skel-bar"
+                    style={{ width: `${w}%` }}
+                  />
+                </span>
+                <span
+                  className="vp-rh-rail-card__list-badge"
+                  aria-hidden="true"
+                >
+                  <span
+                    className="vp-rh-skel-bar"
+                    style={{ width: '20%' }}
+                  />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </aside>
+      );
+    }
     return (
       <aside className="vp-rh-rail-card vp-rh-rail-card--list">
         <p className="vp-rh-rail-card__list-label">{label}</p>

@@ -169,7 +169,7 @@ export default function ProfileCategoryDrillIn() {
                   total={SUB_THRESHOLDS.quizzes}
                 />
                 <StatRow
-                  label="Comments"
+                  label="Discussion"
                   value={Number(row.comments) || 0}
                   total={SUB_THRESHOLDS.comments}
                 />

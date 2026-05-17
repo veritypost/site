@@ -65,8 +65,27 @@ export default function HomeSearch({
   const [q, setQ] = useState(initialQ);
   const [hits, setHits] = useState<Hit[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Cmd/Ctrl+K focuses the masthead search from anywhere on the page.
+  // Skips when the user is already typing in another text field so we
+  // don't steal focus mid-form.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.key === 'k' || e.key === 'K')) return;
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const tag = (e.target as HTMLElement | null)?.tagName ?? '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const trimmed = useMemo(() => q.trim(), [q]);
   const showResults = trimmed.length >= 3;
@@ -207,12 +226,34 @@ export default function HomeSearch({
           <path d="M21 21l-4.3-4.3" />
         </svg>
         <input
+          ref={inputRef}
           type="search"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search stories, topics, people…"
+          onChange={(e) => {
+            setQ(e.target.value);
+            setActiveIdx(-1);
+          }}
+          onKeyDown={(e) => {
+            if (!showResults || allHits.length === 0) return;
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              setActiveIdx((i) => (i + 1) % allHits.length);
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              setActiveIdx((i) => (i <= 0 ? allHits.length - 1 : i - 1));
+            } else if (e.key === 'Enter' && activeIdx >= 0) {
+              e.preventDefault();
+              const hit = allHits[activeIdx];
+              if (hit) router.push(`/${hit.slug}`);
+            } else if (e.key === 'Escape') {
+              setActiveIdx(-1);
+              inputRef.current?.blur();
+            }
+          }}
+          placeholder="Search stories, topics, people…  (⌘K)"
           className="vp-rh-search__input"
           aria-label="Search query"
+          aria-activedescendant={activeIdx >= 0 ? `vp-rh-hit-${activeIdx}` : undefined}
           autoComplete="off"
         />
       </div>
@@ -227,7 +268,7 @@ export default function HomeSearch({
           ) : (
             <>
               <ul className="vp-rh-search-results__list">
-                {allHits.map((h) => {
+                {allHits.map((h, idx) => {
                   const kicker =
                     h.kind === 'category'
                       ? h.parentName
@@ -236,8 +277,16 @@ export default function HomeSearch({
                       : h.kind === 'story'
                         ? 'Story'
                         : 'Article';
+                  const isActive = idx === activeIdx;
                   return (
-                    <li key={h.key} className="vp-rh-search-results__item">
+                    <li
+                      key={h.key}
+                      id={`vp-rh-hit-${idx}`}
+                      role="option"
+                      aria-selected={isActive}
+                      className={`vp-rh-search-results__item${isActive ? ' is-active' : ''}`}
+                      onMouseEnter={() => setActiveIdx(idx)}
+                    >
                       <Link
                         href={`/${h.slug}`}
                         className="vp-rh-search-results__link"

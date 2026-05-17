@@ -1010,7 +1010,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <b>{(target.comment_count ?? 0).toLocaleString()}</b>{' '}
-              <span style={{ color: '#666' }}>Comments</span>
+              <span style={{ color: '#666' }}>Discussion</span>
             </div>
             <div>
               <b>{(target.followers_count ?? 0).toLocaleString()}</b>{' '}

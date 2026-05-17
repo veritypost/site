@@ -160,8 +160,68 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
     return () => window.removeEventListener('scroll', onScroll);
   }, [article.id, canViewBody]);
 
+  // Heading anchors: walk h2/h3 in the article body, assign slug ids
+  // (deduped on collision), and append a small hover-revealed "#" link
+  // after the heading text. Respects pre-existing ids on the heading.
+  useEffect(() => {
+    if (!canViewBody) return;
+    const bodyEl = document.querySelector('[data-article-body]') as HTMLElement | null;
+    if (!bodyEl) return;
+
+    const slugify = (raw: string): string =>
+      raw
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+
+    const seen = new Map<string, number>();
+    const headings = bodyEl.querySelectorAll('h2, h3');
+    headings.forEach((h) => {
+      const headingEl = h as HTMLElement;
+      // Skip if anchor already injected
+      if (headingEl.querySelector('a.vp-h-anchor')) return;
+
+      let id = headingEl.id;
+      if (!id) {
+        const base = slugify(headingEl.textContent || '') || 'section';
+        const count = seen.get(base) ?? 0;
+        id = count === 0 ? base : `${base}-${count + 1}`;
+        seen.set(base, count + 1);
+        headingEl.id = id;
+      } else {
+        // Track existing ids so derived slugs don't collide.
+        seen.set(id, (seen.get(id) ?? 0) + 1);
+      }
+
+      const anchor = document.createElement('a');
+      anchor.className = 'vp-h-anchor';
+      anchor.href = `#${id}`;
+      anchor.setAttribute('aria-label', 'Link to section');
+      anchor.textContent = '#';
+      headingEl.appendChild(anchor);
+    });
+  }, [bodyHtml, canViewBody]);
+
   return (
     <>
+    <style dangerouslySetInnerHTML={{ __html: `
+      .vp-h-anchor {
+        opacity: 0;
+        transition: opacity 120ms ease;
+        margin-left: 8px;
+        color: var(--vp-accent);
+        text-decoration: none;
+        font-weight: 400;
+      }
+      h2:hover .vp-h-anchor,
+      h3:hover .vp-h-anchor,
+      .vp-h-anchor:focus-visible { opacity: 0.6; }
+      .vp-h-anchor:hover { opacity: 1; }
+    ` }} />
     <ReadingProgressRibbon />
     <article style={PAGE_STYLE}>
       {canEdit && (
