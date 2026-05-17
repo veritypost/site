@@ -99,10 +99,13 @@ Package.resolved
 VerityPost/VerityPost/Secrets.xcconfig
 VerityPost/VerityPost/**/Secrets.xcconfig
 
-# --- Future Projects scratch HTML mockups ---------------------------------
-# Standalone HTML mockups dropped here for visual exploration. Not part of
-# the deployable surface; explicitly ignored to keep `git status` quiet.
+# --- Scratch HTML mockups -------------------------------------------------
+# Standalone HTML mockups dropped at the repo root or in Future Projects/
+# for visual exploration. Not part of the deployable surface. Anchored to
+# /<name>.html so we never accidentally swallow real .html assets that
+# live under web/public/ or other subdirs.
 Future Projects/*.html
+/*.html
 
 # --- Supabase local state --------------------------------------------------
 supabase/.temp/
