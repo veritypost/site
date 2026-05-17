@@ -93,14 +93,18 @@ async function fetchListRows(
         stories: { slug: string | null } | null;
       } | null;
     }>;
+    // Dedupe at story-slug level so two articles in the same story
+    // (which share a slug) collapse into a single row — otherwise the
+    // list reads as repeated headlines for the same arc.
     const counts = new Map<string, { row: ListRow; count: number }>();
     for (const r of rows) {
       if (!r.articles || !r.articles.stories?.slug) continue;
-      const existing = counts.get(r.article_id);
+      const key = r.articles.stories.slug;
+      const existing = counts.get(key);
       if (existing) {
         existing.count += 1;
       } else {
-        counts.set(r.article_id, {
+        counts.set(key, {
           row: {
             id: r.articles.id,
             title: r.articles.title ?? '',
@@ -121,26 +125,37 @@ async function fetchListRows(
   }
 
   if (source === 'recent_updates') {
+    // Over-fetch then story-slug dedupe — multiple articles in the
+    // same story all update around the same time (a story arc moves
+    // forward in waves), so the unfiltered top-N reads as repeated
+    // headlines. First-seen wins, which is the most recently updated.
     const { data } = await service
       .from('articles')
       .select('id, title, updated_at, stories(slug)')
       .eq('status', 'published')
       .order('updated_at', { ascending: false })
-      .limit(ROW_CAP);
+      .limit(ROW_CAP * 6);
     const rows = (data ?? []) as Array<{
       id: string;
       title: string | null;
       updated_at: string | null;
       stories: { slug: string | null } | null;
     }>;
-    return rows
-      .filter((r) => r.stories?.slug)
-      .map((r) => ({
+    const seen = new Set<string>();
+    const out: ListRow[] = [];
+    for (const r of rows) {
+      const slug = r.stories?.slug;
+      if (!slug || seen.has(slug)) continue;
+      seen.add(slug);
+      out.push({
         id: r.id,
         title: r.title ?? '',
-        slug: r.stories?.slug ?? null,
+        slug,
         badge: relTime(r.updated_at) || null,
-      }));
+      });
+      if (out.length >= ROW_CAP) break;
+    }
+    return out;
   }
 
   if (source === 'most_active_timelines') {
@@ -159,17 +174,21 @@ async function fetchListRows(
         title: string | null;
       } | null;
     }>;
+    // Dedupe by story slug (not story_id) to guard against any same-slug
+    // story rows leaking through — slug is what the UI links to and
+    // collapsing on it is what the reader perceives as "no dupes".
     const counts = new Map<
       string,
       { row: ListRow; count: number }
     >();
     for (const r of rows) {
       if (!r.stories?.slug) continue;
-      const ex = counts.get(r.story_id);
+      const key = r.stories.slug;
+      const ex = counts.get(key);
       if (ex) {
         ex.count += 1;
       } else {
-        counts.set(r.story_id, {
+        counts.set(key, {
           row: {
             id: r.story_id,
             title: r.stories.title ?? '',
