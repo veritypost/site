@@ -23,7 +23,6 @@ import { Z } from '@/lib/zIndex';
 import { BRAND_NAME, BRAND_LEGAL_ENTITY } from '../lib/brand';
 import ThemeToggle from '../components/ThemeToggle';
 import Avatar from '../components/Avatar';
-import SectionsMenu from './_home/SectionsMenu';
 
 type ProfileRow = Pick<
   Tables<'users'>,
@@ -619,7 +618,6 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
             </a>
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            {topBarActive && <SectionsMenu />}
             {/* Anon-only top-bar entrance. Quiet, type-link only — same scale
                 as the wordmark, no closed-beta scarcity language. The /login
                 page itself surfaces both the OTP form and the invite/access
