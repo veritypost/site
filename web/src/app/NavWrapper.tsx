@@ -618,23 +618,30 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
             </a>
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            {/* Anon-only top-bar entrance. Quiet, type-link only — same scale
-                as the wordmark, no closed-beta scarcity language. The /login
-                page itself surfaces both the OTP form and the invite/access
-                request paths, so anon viewers reach every door from one link. */}
+            {/* Anon-only top-bar entrance. Burgundy pill so anon viewers
+                see a real CTA, not a thin italic that disappears next to
+                the wordmark. The /login page surfaces both the OTP form
+                and invite/access-request paths, so this single button
+                covers every door. */}
             {authLoaded && !loggedIn && (
               <a
                 href="/login"
                 style={{
-                  fontFamily: 'Source Serif 4, var(--font-source-serif), Georgia, serif',
-                  fontStyle: 'italic',
-                  fontSize: 14,
-                  color: C.text,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '6px 14px',
+                  borderRadius: 999,
+                  background: 'var(--vp-accent)',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  letterSpacing: '0.01em',
                   textDecoration: 'none',
-                  padding: '4px 8px',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                sign in
+                Sign in
               </a>
             )}
             {/* Signed-in profile avatar — desktop only. On mobile the
@@ -656,6 +663,25 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 }}
               >
                 <Avatar user={user} size={28} />
+              </a>
+            )}
+            {/* Sign-out — visible quick exit when logged in. Routes to
+                /logout which clears the session and bounces home. Keeps
+                the full Sign-out section in /profile for the
+                everywhere-else / scope choices. */}
+            {authLoaded && loggedIn && (
+              <a
+                href="/logout"
+                style={{
+                  fontFamily: 'var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                  fontSize: 13,
+                  color: 'var(--vp-text-muted)',
+                  textDecoration: 'none',
+                  padding: '4px 8px',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Sign out
               </a>
             )}
             <ThemeToggle />
