@@ -153,9 +153,10 @@
      that hasn't joined the v2 sweep. When the whole site
      eventually migrates, --p-* values flip to match these.
 
-     No dark-mode override: v2 surfaces are locked to the light
-     burgundy palette across modes — same call the article + home
-     migrations already made.
+     Dark-mode overrides live in the :root[data-theme="dark"] block
+     below + the @media (prefers-color-scheme: dark) :root:not(
+     [data-theme]) block, so the OS pref and the ThemeToggle button
+     both flip the editorial palette to a warm-dark variant.
   */
   --vp-accent: #8b0f16;
   --vp-accent-dark: #64090e;
@@ -169,6 +170,15 @@
   --vp-ink: #171717;
   --vp-text-muted: #66615a;
   --vp-text-soft: #8a8379;
+  /* Card shadows used by home + article. Warm-black on cream in light
+     mode; the dark-mode overrides below switch these to deeper neutral
+     blacks so cards still separate from the warm-dark canvas. */
+  --vp-shadow-sm: rgba(20, 16, 12, 0.04);
+  --vp-shadow-md: rgba(20, 16, 12, 0.06);
+  --vp-shadow-lg: rgba(20, 16, 12, 0.08);
+  /* Sticky-bar bg — RGB triple so call sites can compose with alpha
+     for the translucent NavWrapper top bar. Flips to warm-dark below. */
+  --vp-sticky-rgb: 247, 244, 239;
 
   /* Radius scale — Q-D2 (2026-05-12). Mirrors iOS VP.Radius. */
   --r-sm: 6px;
@@ -299,6 +309,27 @@
     --s8: 40px;
     --s9: 56px;
     --s10: 72px;
+
+    /* v2 editorial palette — warm-dark variant. Mirrors light tokens
+       1:1 but darker. Burgundy accent brightened to #c4252e so it
+       clears AA contrast on the dark canvas. Shadow tokens shift to
+       neutral black so cards still separate from the warm bg. */
+    --vp-accent: #c4252e;
+    --vp-accent-dark: #8b0f16;
+    --vp-accent-soft: #3a1c1c;
+    --vp-bg: #14110d;
+    --vp-surface: #1c1814;
+    --vp-surface-soft: #221e18;
+    --vp-border: #2e2a23;
+    --vp-border-soft: #25211b;
+    --vp-quiz-border: #3a3128;
+    --vp-ink: #f5f0e7;
+    --vp-text-muted: #b8b1a4;
+    --vp-text-soft: #8a8379;
+    --vp-shadow-sm: rgba(0, 0, 0, 0.45);
+    --vp-shadow-md: rgba(0, 0, 0, 0.55);
+    --vp-shadow-lg: rgba(0, 0, 0, 0.65);
+    --vp-sticky-rgb: 20, 17, 13;
   }
 }
 
@@ -402,6 +433,26 @@
   --s8: 40px;
   --s9: 56px;
   --s10: 72px;
+
+  /* v2 editorial palette — warm-dark variant (mirrors the @media
+     dark block above so the explicit "Dark" toggle paints the same
+     surfaces as OS-dark). */
+  --vp-accent: #c4252e;
+  --vp-accent-dark: #8b0f16;
+  --vp-accent-soft: #3a1c1c;
+  --vp-bg: #14110d;
+  --vp-surface: #1c1814;
+  --vp-surface-soft: #221e18;
+  --vp-border: #2e2a23;
+  --vp-border-soft: #25211b;
+  --vp-quiz-border: #3a3128;
+  --vp-ink: #f5f0e7;
+  --vp-text-muted: #b8b1a4;
+  --vp-text-soft: #8a8379;
+  --vp-shadow-sm: rgba(0, 0, 0, 0.45);
+  --vp-shadow-md: rgba(0, 0, 0, 0.55);
+  --vp-shadow-lg: rgba(0, 0, 0, 0.65);
+  --vp-sticky-rgb: 20, 17, 13;
 }
 
 /* Explicit light override — allows OS-dark users who chose "Light"

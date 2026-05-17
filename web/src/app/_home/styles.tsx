@@ -28,23 +28,9 @@ export default function RhStyles() {
       color: var(--rh-ink);
       min-height: 100vh;
     }
-    /* Keep the light burgundy palette on dark mode rather than flipping
-       the entire home to a dark theme. The article page made the same
-       choice after the v2 migration; home should match. */
-    @media (prefers-color-scheme: dark) {
-      .vp-rh {
-        --rh-bg: var(--vp-bg);
-        --rh-ink: var(--vp-ink);
-        --rh-ink-2: var(--vp-text-muted);
-        --rh-ink-3: var(--vp-text-soft);
-        --rh-accent: var(--vp-accent);
-        --rh-accent-soft: var(--vp-accent-soft);
-        --rh-accent-dark: var(--vp-accent-dark);
-        --rh-border: var(--vp-border);
-        --rh-border-soft: var(--vp-border-soft);
-        --rh-surface-soft: var(--vp-surface-soft);
-      }
-    }
+    /* --rh-* aliases already point at --vp-* tokens, which flip via
+       the dark-mode overrides in globals.css. No per-component dark
+       block needed — the cascade does the work. */
 
     /* Bundle 7 — font-family bindings. The CSS variables are sourced
        from next/font invocations in app/layout.js (single source of truth)
@@ -101,7 +87,7 @@ export default function RhStyles() {
       background: var(--vp-surface);
       border: 1px solid var(--vp-border);
       border-radius: 999px;
-      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
+      box-shadow: 0 6px 18px var(--vp-shadow-sm);
       box-sizing: border-box;
     }
     .vp-rh-search__icon { color: var(--vp-text-soft); flex-shrink: 0; }
@@ -118,7 +104,7 @@ export default function RhStyles() {
     .vp-rh-search__input::placeholder { color: var(--vp-text-soft); }
     .vp-rh-search:focus-within {
       border-color: var(--vp-accent);
-      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04), 0 0 0 3px var(--vp-accent-soft);
+      box-shadow: 0 6px 18px var(--vp-shadow-sm), 0 0 0 3px var(--vp-accent-soft);
     }
     .vp-rh-search-wrap {
       position: relative;
@@ -134,7 +120,7 @@ export default function RhStyles() {
       background: var(--vp-surface);
       border: 1px solid var(--vp-border);
       border-radius: 18px;
-      box-shadow: 0 18px 48px rgba(20, 16, 12, 0.08);
+      box-shadow: 0 18px 48px var(--vp-shadow-lg);
       max-height: 480px;
       overflow-y: auto;
     }
@@ -231,7 +217,7 @@ export default function RhStyles() {
       background: var(--vp-surface);
       border: 1px solid var(--vp-border-soft);
       border-radius: 22px;
-      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
+      box-shadow: 0 6px 18px var(--vp-shadow-sm);
       /* No overflow: hidden — the catbar's hover flyouts need to
          escape below the masthead. Rounded corners still trim the
          filled background via border-radius alone. */
@@ -758,7 +744,7 @@ export default function RhStyles() {
       background: linear-gradient(180deg, var(--rh-bg) 0%, var(--rh-surface-soft) 100%);
       border: 1px solid var(--rh-border);
       border-radius: 22px;
-      box-shadow: 0 12px 28px rgba(20, 16, 12, 0.05);
+      box-shadow: 0 12px 28px var(--vp-shadow-sm);
     }
     @media (hover: hover) and (pointer: fine) {
       .vp-rh-lead:hover {
@@ -795,7 +781,7 @@ export default function RhStyles() {
         border-right: 1px solid var(--rh-border);
         padding: 32px 36px;
         border-radius: 28px;
-        box-shadow: 0 18px 48px rgba(20, 16, 12, 0.06);
+        box-shadow: 0 18px 48px var(--vp-shadow-md);
       }
       .vp-rh-lead-content { max-width: 880px; }
       .vp-rh-lead-title { font-size: clamp(38px, 4vw, 56px); max-width: 22ch; margin: 10px 0 12px; }
@@ -1061,7 +1047,7 @@ export default function RhStyles() {
       margin: 0;
       border: 1px solid var(--rh-border-soft);
       border-radius: 18px;
-      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
+      box-shadow: 0 6px 18px var(--vp-shadow-sm);
       overflow: hidden;
       flex-shrink: 0;
     }
@@ -1529,7 +1515,7 @@ export default function RhStyles() {
       background: transparent;
       border: 1px solid var(--rh-border);
       border-radius: 28px;
-      box-shadow: 0 18px 48px rgba(20, 16, 12, 0.06);
+      box-shadow: 0 18px 48px var(--vp-shadow-md);
       margin: 0;
       overflow: hidden;
       box-sizing: border-box;
@@ -1643,7 +1629,7 @@ export default function RhStyles() {
       .vp-rh-story-card:not(.vp-rh-story-card--hero) {
         border: 1px solid var(--rh-border);
         border-radius: 18px;
-        box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
+        box-shadow: 0 6px 18px var(--vp-shadow-sm);
         overflow: hidden;
       }
     }
@@ -1720,7 +1706,7 @@ export default function RhStyles() {
          drops the gradient so the hero sits cream-on-cream like the
          rest of the merged feed. */
       background: linear-gradient(180deg, var(--vp-surface) 0%, var(--vp-surface-soft) 100%);
-      box-shadow: 0 18px 48px rgba(20, 16, 12, 0.06);
+      box-shadow: 0 18px 48px var(--vp-shadow-md);
       overflow: hidden;
       margin: 0;
     }
@@ -1945,7 +1931,7 @@ export default function RhStyles() {
       margin: 0;
       border: 1px solid var(--rh-border-soft);
       border-radius: 18px;
-      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
+      box-shadow: 0 6px 18px var(--vp-shadow-sm);
       overflow: hidden;
       flex-shrink: 0;
     }
@@ -2111,7 +2097,7 @@ export default function RhStyles() {
       background: transparent;
       border: 1px solid var(--rh-border);
       border-radius: 18px;
-      box-shadow: 0 6px 18px rgba(20, 16, 12, 0.04);
+      box-shadow: 0 6px 18px var(--vp-shadow-sm);
       display: flex;
       overflow: hidden;
     }

@@ -387,7 +387,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     // burgundy palette instead of flipping with --bg-rgb. Letter colors
     // (C.accent / C.dim) now resolve to --vp-accent / --vp-text-muted,
     // which read correctly on cream.
-    background: 'rgba(247, 244, 239, 0.92)',
+    background: 'rgba(var(--vp-sticky-rgb), 0.92)',
     backdropFilter: 'blur(12px)',
     borderTop: `1px solid ${C.border}`,
     display: 'flex',
@@ -421,7 +421,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     // article + home migration's choice to lock the light burgundy
     // palette across modes; previous theme-aware --bg-rgb flip is
     // gone to keep the masthead consistent with the rest of v2.
-    background: 'rgba(247, 244, 239, 0.92)',
+    background: 'rgba(var(--vp-sticky-rgb), 0.92)',
     backdropFilter: 'blur(12px)',
     borderBottom: '1px solid var(--vp-border)',
     display: 'flex',
