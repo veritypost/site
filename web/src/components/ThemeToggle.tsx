@@ -7,12 +7,13 @@ type ThemePref = 'light' | 'dark' | 'system';
 const STORAGE_KEY = 'vp_theme';
 
 /**
- * Sun/moon/monitor top-bar toggle. Three-state cycle (light → dark → system)
- * so the stored `vp_theme` preference is never silently overwritten.
- * The full three-way (Light / System / Dark) radio lives in Profile →
- * Appearance and writes to the same `vp_theme` localStorage key. Both stay
- * in sync via a `storage` event listener so toggling here updates the radio
- * group on a different tab and vice versa.
+ * Sun/moon top-bar toggle. Two-state cycle (light ↔ dark) only. The
+ * "System" option moved to Profile → Appearance per owner call so the
+ * top bar reads as a binary flip, not a tri-state cycle. If the user
+ * was on "system" when they tap here, we resolve their current effective
+ * scheme first, then flip to the opposite — so the next tap always
+ * does something visible. Both surfaces (top bar + profile radio) read
+ * and write the same `vp_theme` localStorage key.
  */
 function readStoredPref(): ThemePref {
   try {
@@ -36,7 +37,17 @@ function applyPref(pref: ThemePref) {
   try { localStorage.setItem(STORAGE_KEY, pref); } catch { /* private browsing */ }
 }
 
-const CYCLE: ThemePref[] = ['light', 'dark', 'system'];
+function resolveEffective(pref: ThemePref): 'light' | 'dark' {
+  if (pref === 'light' || pref === 'dark') return pref;
+  // 'system' — read the current OS pref
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
+  } catch {
+    return 'light';
+  }
+}
 
 export default function ThemeToggle() {
   // Render-stub on first paint to avoid hydration mismatch (server can't
@@ -61,7 +72,8 @@ export default function ThemeToggle() {
   }, []);
 
   function toggle() {
-    const next = CYCLE[(CYCLE.indexOf(pref) + 1) % CYCLE.length];
+    const current = resolveEffective(pref);
+    const next: ThemePref = current === 'dark' ? 'light' : 'dark';
     applyPref(next);
     setPref(next);
   }
@@ -71,18 +83,15 @@ export default function ThemeToggle() {
     return <div style={{ width: 36, height: 36 }} aria-hidden="true" />;
   }
 
-  const LABELS: Record<ThemePref, string> = {
-    light: 'Light',
-    dark: 'Dark',
-    system: 'System',
-  };
+  const effective = resolveEffective(pref);
+  const label = effective === 'dark' ? 'Switch to light' : 'Switch to dark';
 
   return (
     <button
       type="button"
       onClick={toggle}
-      aria-label={LABELS[pref]}
-      title={LABELS[pref]}
+      aria-label={label}
+      title={label}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -98,22 +107,16 @@ export default function ThemeToggle() {
         marginRight: -8,
       }}
     >
-      {pref === 'dark' ? (
-        // Sun — currently dark, next click goes to system
+      {effective === 'dark' ? (
+        // Sun — currently dark, next click goes to light
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="4" />
           <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
         </svg>
-      ) : pref === 'light' ? (
-        // Moon — currently light, next click goes to dark
+      ) : (
+        // Moon — currently light (or system→light), next click goes to dark
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-        </svg>
-      ) : (
-        // Monitor — currently system, next click goes to light
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <rect x="2" y="3" width="20" height="14" rx="2" />
-          <path d="M8 21h8M12 17v4" />
         </svg>
       )}
     </button>

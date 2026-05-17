@@ -22,6 +22,7 @@ import type { Tables } from '@/types/database-helpers';
 import { Z } from '@/lib/zIndex';
 import { BRAND_NAME, BRAND_LEGAL_ENTITY } from '../lib/brand';
 import Avatar from '../components/Avatar';
+import ThemeToggle from '../components/ThemeToggle';
 
 type ProfileRow = Pick<
   Tables<'users'>,
@@ -657,6 +658,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 <Avatar user={user} size={28} />
               </a>
             )}
+            <ThemeToggle />
           </div>
         </header>
       )}
