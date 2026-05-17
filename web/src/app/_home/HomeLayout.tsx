@@ -8,6 +8,7 @@
 import type { LayoutRow, SlotRow } from './types';
 import type { Tables } from '@/types/database-helpers';
 import { renderSlot } from './slots/registry';
+import { partitionDuplicateListRails } from './dedupe';
 import type {
   HeroMeta,
   HeroTimelineEvent,
@@ -53,19 +54,13 @@ export default function HomeLayout({
   // identical rows and render the same headlines twice. First-seen
   // wins so the position order in admin still controls which card
   // remains visible. Non-list rail_cards and other kinds pass through
-  // untouched.
-  const seenListKey = new Set<string>();
-  const sorted = [...layout.slots]
-    .sort((a, b) => a.position - b.position)
-    .filter((s) => {
-      if (s.kind !== 'rail_card') return true;
-      const cfg = (s.config ?? {}) as { variant?: string; source?: string; days?: number };
-      if (cfg.variant !== 'list' || !cfg.source) return true;
-      const key = `${cfg.source}::${cfg.days ?? 'default'}`;
-      if (seenListKey.has(key)) return false;
-      seenListKey.add(key);
-      return true;
-    });
+  // untouched. The dedupe rule is shared with the admin canvas via
+  // _home/dedupe.ts so the admin preview can't drift from this filter
+  // (and so admin can flag shadowed duplicates instead of hiding them).
+  const positionSorted = [...layout.slots].sort(
+    (a, b) => a.position - b.position,
+  );
+  const { visible: sorted } = partitionDuplicateListRails(positionSorted);
   const ctx = {
     categoryById,
     trendingArticles,

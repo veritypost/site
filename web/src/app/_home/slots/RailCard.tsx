@@ -72,20 +72,28 @@ async function fetchListRows(
   const days = resolveDays(source, cfgDays);
 
   if (source === 'most_read' || source === 'most_discussed') {
-    const fromTable = source === 'most_read' ? 'reading_log' : 'comments';
-    const filterCol = source === 'most_discussed' ? 'status' : null;
     const since = isoDaysAgo(days);
-    let q = service
-      .from(fromTable)
-      .select(
-        'article_id, articles!inner(id, title, deleted_at, stories(slug))',
-      )
-      .gte('created_at', since)
-      .not('article_id', 'is', null)
-      .is('articles.deleted_at', null)
-      .limit(500);
-    if (filterCol) q = q.eq(filterCol as 'id', 'visible');
-    const { data } = await q;
+    const { data } =
+      source === 'most_discussed'
+        ? await service
+            .from('comments')
+            .select(
+              'article_id, status, articles!inner(id, title, deleted_at, stories(slug))',
+            )
+            .gte('created_at', since)
+            .not('article_id', 'is', null)
+            .is('articles.deleted_at', null)
+            .eq('status', 'visible')
+            .limit(500)
+        : await service
+            .from('reading_log')
+            .select(
+              'article_id, articles!inner(id, title, deleted_at, stories(slug))',
+            )
+            .gte('created_at', since)
+            .not('article_id', 'is', null)
+            .is('articles.deleted_at', null)
+            .limit(500);
     const rows = (data ?? []) as Array<{
       article_id: string;
       articles: {

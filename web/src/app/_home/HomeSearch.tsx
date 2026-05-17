@@ -71,14 +71,19 @@ export default function HomeSearch({
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Cmd/Ctrl+K focuses the masthead search from anywhere on the page.
-  // Skips when the user is already typing in another text field so we
-  // don't steal focus mid-form.
+  // Skips when the user is already typing in another text field (including
+  // contenteditable rich-text composers used by admin/comment editors), and
+  // skips when a modal is open (modals lock `body.style.overflow = 'hidden'`
+  // — used by RegistrationWall, CommentThread, AppShell mobile drawer).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (!(e.key === 'k' || e.key === 'K')) return;
       if (!(e.metaKey || e.ctrlKey)) return;
-      const tag = (e.target as HTMLElement | null)?.tagName ?? '';
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName ?? '';
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (target?.isContentEditable === true) return;
+      if (typeof document !== 'undefined' && document.body.style.overflow === 'hidden') return;
       e.preventDefault();
       inputRef.current?.focus();
       inputRef.current?.select();

@@ -38,7 +38,7 @@ export const C = {
   success: 'var(--p-success)',
   successSoft: 'var(--p-success-soft)',
   warn: 'var(--p-warn)',
-  warnSoft: '#fef3c7',
+  warnSoft: 'var(--p-warn-soft)',
   danger: 'var(--p-danger)',
   dangerSoft: 'var(--p-danger-soft)',
   info: 'var(--p-info)',

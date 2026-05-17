@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { C, F, R, S } from '../_lib/palette';
-
-type ThemePref = 'light' | 'system' | 'dark';
-
-const STORAGE_KEY = 'vp_theme';
+import {
+  applyTheme,
+  readStoredThemePref,
+  subscribeThemeChange,
+  type ThemePref,
+} from '../../../lib/theme';
 
 const OPTIONS: { value: ThemePref; label: string; description: string }[] = [
   { value: 'light', label: 'Light', description: 'Always use the light theme.' },
@@ -13,49 +15,19 @@ const OPTIONS: { value: ThemePref; label: string; description: string }[] = [
   { value: 'dark', label: 'Dark', description: 'Always use the dark theme.' },
 ];
 
-function applyTheme(pref: ThemePref) {
-  if (pref === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  } else if (pref === 'light') {
-    document.documentElement.setAttribute('data-theme', 'light');
-  } else {
-    document.documentElement.removeAttribute('data-theme');
-  }
-  try {
-    localStorage.setItem(STORAGE_KEY, pref);
-  } catch {
-    // private browsing — DOM change still applies for this session
-  }
-}
-
-function readStoredPref(): ThemePref {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
-  } catch {
-    // ignore
-  }
-  return 'system';
-}
-
 export function AppearanceSection() {
   // ProfileApp returns null until its async data fetch resolves, so this
   // component never renders during SSR. Reading localStorage in the lazy
   // initializer is safe — no hydration mismatch risk.
-  const [pref, setPref] = useState<ThemePref>(readStoredPref);
+  const [pref, setPref] = useState<ThemePref>(readStoredThemePref);
 
-  // Cross-tab sync: if the user changes preference in another tab, apply it here too.
+  // Same-tab (top-bar toggle CustomEvent) + cross-tab (storage event)
+  // sync. `subscribeThemeChange` handles the DOM flip for cross-tab
+  // events internally; we just sync local state.
   useEffect(() => {
-    function onStorage(e: StorageEvent) {
-      if (e.key !== STORAGE_KEY) return;
-      const val = e.newValue;
-      if (val === 'light' || val === 'dark' || val === 'system') {
-        setPref(val);
-        applyTheme(val);
-      }
-    }
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    return subscribeThemeChange((val) => {
+      setPref(val);
+    });
   }, []);
 
   function handleSelect(next: ThemePref) {

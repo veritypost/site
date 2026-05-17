@@ -15,6 +15,7 @@ import CookieBanner from '../components/CookieBanner';
 import ConsentedScripts from '../components/ConsentedScripts';
 import { BRAND_NAME, BRAND_DOMAIN } from '../lib/brand';
 import MobileStickyAd from '../components/MobileStickyAd';
+import ThemeColorSync from '../components/ThemeColorSync';
 
 // GA4 measurement ID. Set via NEXT_PUBLIC_GA_MEASUREMENT_ID in Vercel env;
 // fallback literal is the Verity Post production property so the tag ships
@@ -187,6 +188,13 @@ export default async function RootLayout({ children }) {
         </Suspense>
 
         <ObservabilityInit />
+        {/* Keeps <meta name="theme-color"> in sync with the EFFECTIVE
+            theme (data-theme override on <html> OR OS pref). iOS Safari
+            notch chrome reads this tag at runtime, so an in-app toggle
+            override now propagates to the status-bar fill instead of
+            being stuck on the OS color scheme. The static themeColor
+            viewport export above remains as a first-paint SSR fallback. */}
+        <ThemeColorSync />
         <PermissionsProvider>
           <ToastProvider>
             {/* DA-051 — `<main>` landmark wraps every page. Pages that

@@ -184,17 +184,18 @@ export default function ArticleSurface({ article, bodyHtml, canEdit, canViewBody
       // Skip if anchor already injected
       if (headingEl.querySelector('a.vp-h-anchor')) return;
 
-      let id = headingEl.id;
-      if (!id) {
-        const base = slugify(headingEl.textContent || '') || 'section';
-        const count = seen.get(base) ?? 0;
-        id = count === 0 ? base : `${base}-${count + 1}`;
-        seen.set(base, count + 1);
-        headingEl.id = id;
-      } else {
-        // Track existing ids so derived slugs don't collide.
-        seen.set(id, (seen.get(id) ?? 0) + 1);
-      }
+      // Compute the base candidate: either the author-provided id, or a
+      // slug derived from heading text. Then run BOTH through the same
+      // dedupe path so collisions (author-vs-author or author-vs-derived)
+      // resolve to unambiguous `-2`, `-3`, ... suffixes. First occurrence
+      // keeps the bare id; later occurrences get suffixed and the DOM id
+      // is rewritten so the injected `#` link targets the final id.
+      const preset = headingEl.id;
+      const base = preset || slugify(headingEl.textContent || '') || 'section';
+      const count = seen.get(base) ?? 0;
+      const id = count === 0 ? base : `${base}-${count + 1}`;
+      seen.set(base, count + 1);
+      if (id !== preset) headingEl.id = id;
 
       const anchor = document.createElement('a');
       anchor.className = 'vp-h-anchor';

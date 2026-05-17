@@ -33,6 +33,7 @@ import Spinner from '@/components/admin/Spinner';
 import { useToast } from '@/components/admin/Toast';
 import { ADMIN_C as C, F, S } from '@/lib/adminPalette';
 import type { LayoutRow, SlotKind, SlotRow, SlotSpan } from '@/app/_home/types';
+import { partitionDuplicateListRails } from '@/app/_home/dedupe';
 import RhStyles from '@/app/_home/styles';
 import IndividualAdsList, {
   type AdUnitRow,
@@ -1858,9 +1859,19 @@ function LayoutCanvas({
     .filter((s) => s.kind !== 'breaking_strip')
     .sort((a, b) => a.position - b.position);
 
+  // Apply the same list-rail dedupe HomeLayout applies on the public
+  // page. Unlike the live renderer (which silently drops duplicates),
+  // the admin canvas KEEPS the shadowed slots in the layout so the
+  // editor can see + clear the misconfigured one — but renders them
+  // with a "Hidden on live — duplicate source" treatment so it's
+  // obvious which card will actually ship.
+  const { shadowedIds } = partitionDuplicateListRails(orderedSlots);
+
   // Partition into top / main / rail / bottom — same rule HomeLayout
   // uses. span-12 slots become top/bottom anchored by their position
   // relative to the main column, span >= 6 → main, span < 6 → rail.
+  // Shadowed (duplicate) slots stay in their column so the editor sees
+  // exactly where the misconfigured slot lives.
   const mainSlots = orderedSlots.filter((s) => s.span !== 12 && s.span >= 6);
   const railSlots = orderedSlots.filter((s) => s.span !== 12 && s.span < 6);
   const fullWidth = orderedSlots.filter((s) => s.span === 12);
@@ -1868,6 +1879,54 @@ function LayoutCanvas({
   const lastMainPos = mainSlots[mainSlots.length - 1]?.position ?? -Infinity;
   const topSlots = fullWidth.filter((s) => s.position < firstMainPos);
   const bottomSlots = fullWidth.filter((s) => s.position > lastMainPos);
+
+  // Wrap a slot's rendered output with a shadowed treatment when it
+  // sits in `shadowedIds`. Pointer events stay enabled so the editor
+  // can still click in and clear / reassign / delete the duplicate.
+  const renderSlotMaybeShadowed = (slot: SlotRow): React.ReactNode => {
+    const node = renderSlot(slot);
+    if (!shadowedIds.has(slot.id)) return node;
+    // span the wrapper to the same column-width the slot would have
+    // taken on its own (rail_card slots are always span<6), so the
+    // shadowed cell occupies the editor's expected footprint.
+    return (
+      <div
+        key={`shadow:${slot.id}`}
+        data-shadowed="true"
+        style={{
+          gridColumn: `span ${slot.span}`,
+          position: 'relative',
+          minWidth: 0,
+          opacity: 0.42,
+          filter: 'grayscale(0.6)',
+        }}
+        title="Hidden on live — duplicate source. The first rail card with this source wins; clear or reconfigure this slot to make it shippable."
+      >
+        {node}
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: 6,
+            left: 6,
+            zIndex: 2,
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            padding: '3px 6px',
+            background: '#fff6d6',
+            color: '#7a4a00',
+            border: '1px solid #d9a900',
+            borderRadius: 2,
+            pointerEvents: 'none',
+          }}
+        >
+          Hidden on live — duplicate source
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div style={{ position: 'relative' }}>
@@ -1890,20 +1949,20 @@ function LayoutCanvas({
           <div className="vp-rh-grid">
             {topSlots.length > 0 && (
               <div className="vp-rh-grid__top">
-                {topSlots.map((slot) => renderSlot(slot))}
+                {topSlots.map((slot) => renderSlotMaybeShadowed(slot))}
               </div>
             )}
             <div className="vp-rh-body">
               <div className="vp-rh-body__main">
-                {mainSlots.map((slot) => renderSlot(slot))}
+                {mainSlots.map((slot) => renderSlotMaybeShadowed(slot))}
               </div>
               <div className="vp-rh-body__rail">
-                {railSlots.map((slot) => renderSlot(slot))}
+                {railSlots.map((slot) => renderSlotMaybeShadowed(slot))}
               </div>
             </div>
             {bottomSlots.length > 0 && (
               <div className="vp-rh-grid__bottom">
-                {bottomSlots.map((slot) => renderSlot(slot))}
+                {bottomSlots.map((slot) => renderSlotMaybeShadowed(slot))}
               </div>
             )}
           </div>

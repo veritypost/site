@@ -163,7 +163,28 @@ export default async function HomeRoot({
 
     if (activeFilter.topic) {
       const catId = slugToId.get(activeFilter.topic);
-      if (catId) q = q.eq('category_id', catId);
+      if (catId) {
+        // Subcategory rollup — when the slug resolves to a parent
+        // category (parent_id IS NULL), the feed should include
+        // articles in any of its child subcategories too. /politics
+        // surfaces Congress/Elections/White House articles, not just
+        // ones pinned to the bare parent. categoryById is already
+        // hydrated from the same cats query above, so no extra DB
+        // round-trip.
+        const cat = categoryById[catId];
+        if (cat && !cat.parent_id) {
+          const childIds = cats
+            .filter((c) => c.parent_id === catId)
+            .map((c) => c.id);
+          if (childIds.length > 0) {
+            q = q.in('category_id', [catId, ...childIds]);
+          } else {
+            q = q.eq('category_id', catId);
+          }
+        } else {
+          q = q.eq('category_id', catId);
+        }
+      }
     }
 
     if (activeFilter.chip === 'developing') {
@@ -187,14 +208,68 @@ export default async function HomeRoot({
       if (safe) q = q.ilike('title', `%${safe}%`);
     }
 
-    const orderCol =
-      activeFilter.sort === 'newest_article' ? 'published_at' : 'updated_at';
-    q = q.order(orderCol, { ascending: false }).limit(60);
+    // Sort selection — `most_discussed` and `most_viewed` ride the
+    // denormalized counters on articles (comment_count, view_count)
+    // so they're a single column-order. `most_recent_comments` can't
+    // be done in a single PostgREST .order() call because the sort
+    // key (max(comments.created_at) per article) lives on a different
+    // table; we run a small pre-query to get the article-ids in
+    // recency order, then constrain + reorder the main feed below.
+    // `newest_article` uses published_at, everything else falls back
+    // to updated_at (the default home order).
+    let recentCommentOrder: string[] | null = null;
+    if (activeFilter.sort === 'most_recent_comments') {
+      const { data: commentRows } = await service
+        .from('comments')
+        .select('article_id, created_at')
+        .is('deleted_at', null)
+        .eq('status', 'visible')
+        .not('article_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      const seen = new Set<string>();
+      const ids: string[] = [];
+      for (const r of (commentRows ?? []) as Array<{
+        article_id: string | null;
+      }>) {
+        const aid = r.article_id;
+        if (!aid || seen.has(aid)) continue;
+        seen.add(aid);
+        ids.push(aid);
+        if (ids.length >= 60) break;
+      }
+      recentCommentOrder = ids;
+      if (ids.length > 0) {
+        q = q.in('id', ids);
+      } else {
+        // No comments anywhere — return an empty feed rather than
+        // silently falling back to updated_at order.
+        q = q.in('id', ['00000000-0000-0000-0000-000000000000']);
+      }
+    } else if (activeFilter.sort === 'most_discussed') {
+      q = q.order('comment_count', { ascending: false, nullsFirst: false });
+    } else if (activeFilter.sort === 'most_viewed') {
+      q = q.order('view_count', { ascending: false, nullsFirst: false });
+    } else if (activeFilter.sort === 'newest_article') {
+      q = q.order('published_at', { ascending: false });
+    } else {
+      q = q.order('updated_at', { ascending: false });
+    }
+    q = q.limit(60);
 
     const { data: feedRows } = await q;
-    const feed = ((feedRows as import('./types').HomeStory[] | null) ?? []).filter(
+    let feed = ((feedRows as import('./types').HomeStory[] | null) ?? []).filter(
       (a) => !!a.stories?.slug,
     );
+    // Reorder by comment-recency when that sort is active (PostgREST
+    // gave us the rows in arbitrary order since the .in() clause
+    // doesn't preserve list order).
+    if (recentCommentOrder) {
+      const rank = new Map(recentCommentOrder.map((id, i) => [id, i] as const));
+      feed = feed
+        .filter((a) => rank.has(a.id))
+        .sort((a, b) => (rank.get(a.id)! - rank.get(b.id)!));
+    }
 
     // Walk the existing slots in position order. For every story_card
     // slot (hero + regular) and every square_row inner cell, replace

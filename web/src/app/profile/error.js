@@ -2,7 +2,7 @@
 export default function Error({ reset }) {
   return (
     <div style={{ padding: '40px', textAlign: 'center' }}>
-      <p style={{ color: '#b91c1c', marginBottom: '16px' }}>
+      <p style={{ color: 'var(--danger)', marginBottom: '16px' }}>
         Profile couldn&apos;t be loaded. Please try again.
       </p>
       <button

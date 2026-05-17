@@ -706,7 +706,6 @@ const styles = `
 }
 .vp-chip-filters { display: none; }
 .vp-search-typetabs {
-  display: flex;
   gap: 16px;
   border-bottom: 1px solid var(--vp-border-soft);
   margin-bottom: 16px;

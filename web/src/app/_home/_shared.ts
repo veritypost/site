@@ -1,7 +1,7 @@
 // Shared home tokens + helpers (HomeStory projection, HOME_COLORS,
 // HOME_SERIF_STACK, HOME_EDITORIAL_TZ, timeShort). Imported by Sidebar,
-// SectionsMenu, types, and the slot _shared module. `slots/_shared.tsx`
-// wraps these for slot-side consumption (CardCtx, StoryLink, MetaLine).
+// types, and the slot _shared module. `slots/_shared.tsx` wraps these
+// for slot-side consumption (CardCtx, StoryLink, MetaLine).
 
 import type { Tables } from '@/types/database-helpers';
 

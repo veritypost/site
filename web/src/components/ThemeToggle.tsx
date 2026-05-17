@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-
-type ThemePref = 'light' | 'dark' | 'system';
-
-const STORAGE_KEY = 'vp_theme';
+import {
+  applyTheme,
+  readStoredThemePref,
+  subscribeThemeChange,
+  type ThemePref,
+} from '../lib/theme';
 
 /**
  * Sun/moon top-bar toggle. Two-state cycle (light ↔ dark) only. The
@@ -13,30 +15,8 @@ const STORAGE_KEY = 'vp_theme';
  * was on "system" when they tap here, we resolve their current effective
  * scheme first, then flip to the opposite — so the next tap always
  * does something visible. Both surfaces (top bar + profile radio) read
- * and write the same `vp_theme` localStorage key.
+ * and write the same `vp_theme` localStorage key via `web/src/lib/theme`.
  */
-function readStoredPref(): ThemePref {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
-  } catch {
-    // private browsing
-  }
-  return 'system';
-}
-
-function applyPref(pref: ThemePref) {
-  if (pref === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  } else if (pref === 'light') {
-    document.documentElement.setAttribute('data-theme', 'light');
-  } else {
-    // system: let the bootstrap script / MQL drive data-theme
-    document.documentElement.removeAttribute('data-theme');
-  }
-  try { localStorage.setItem(STORAGE_KEY, pref); } catch { /* private browsing */ }
-}
-
 function resolveEffective(pref: ThemePref): 'light' | 'dark' {
   if (pref === 'light' || pref === 'dark') return pref;
   // 'system' — read the current OS pref
@@ -57,24 +37,20 @@ export default function ThemeToggle() {
 
   useEffect(() => {
     setMounted(true);
-    setPref(readStoredPref());
+    setPref(readStoredThemePref());
 
-    // Cross-tab sync with the Appearance settings radio.
-    function onStorage(e: StorageEvent) {
-      if (e.key !== STORAGE_KEY) return;
-      const val = e.newValue;
-      if (val === 'light' || val === 'dark' || val === 'system') {
-        setPref(val);
-      }
-    }
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    // Same-tab (CustomEvent) + cross-tab (storage event) sync with the
+    // Appearance settings radio. `subscribeThemeChange` handles the DOM
+    // flip for cross-tab events internally; we just sync local state.
+    return subscribeThemeChange((val) => {
+      setPref(val);
+    });
   }, []);
 
   function toggle() {
     const current = resolveEffective(pref);
     const next: ThemePref = current === 'dark' ? 'light' : 'dark';
-    applyPref(next);
+    applyTheme(next);
     setPref(next);
   }
 
