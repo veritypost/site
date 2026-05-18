@@ -280,11 +280,14 @@ struct MessagesView: View {
                 }
                 .padding(.top, 80)
             } else if conversations.isEmpty {
+                // Web parity (web/src/app/messages/page.tsx lines 1109-1139) —
+                // warmer "no conversations yet" copy that hooks the empty
+                // inbox toward replying to a story. Matches eb0aac89.
                 VStack(spacing: 12) {
-                    Text("No messages yet")
+                    Text("No conversations yet")
                         .font(.system(.subheadline, design: .default, weight: .semibold))
                         .foregroundColor(VP.text)
-                    Text("Message an expert, author, or another reader to get started.")
+                    Text("Start a conversation by replying to a story.")
                         .font(.caption)
                         .foregroundColor(VP.dim)
                     Button {
@@ -336,12 +339,17 @@ struct MessagesView: View {
                                                 .clipShape(Capsule())
                                         }
                                         if let date = convo.lastMessageAt {
-                                            Text(timeAgo(date))
-                                                .font(.caption)
-                                                .foregroundColor(VP.muted)
+                                            // Web parity — auto-ticking relative
+                                            // time via shared bucketer. Locked
+                                            // rule: reuse HomeView.relativeTimeBucket.
+                                            TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                                                Text(HomeView.relativeTimeBucket(date, now: ctx.date))
+                                                    .font(.caption)
+                                                    .foregroundColor(VP.muted)
+                                            }
                                         }
                                     }
-                                    Text(convo.lastMessagePreview ?? "No messages yet")
+                                    Text(convo.lastMessagePreview ?? "No messages yet \u{2014} say hi.")
                                         .font(.system(.footnote, design: .default, weight: isUnread ? .semibold : .regular))
                                         .foregroundColor(isUnread ? VP.text : VP.dim)
                                         .lineLimit(1)
@@ -768,14 +776,10 @@ struct MessagesView: View {
         }
     }
 
-    private func timeAgo(_ date: Date) -> String {
-        let secs = Int(Date().timeIntervalSince(date))
-        let m = secs / 60
-        if m < 60 { return "\(m)m" }
-        let h = m / 60
-        if h < 24 { return "\(h)h" }
-        return "\(h / 24)d"
-    }
+    // `timeAgo` removed 2026-05-18 in favor of the shared
+    // `HomeView.relativeTimeBucket(_:now:)` bucketer (locked rule: don't
+    // fork a second bucketer). Conversation-list and thread-bubble
+    // timestamps both route through it, auto-ticked by TimelineView.
 }
 
 // MARK: - Chat Thread
@@ -845,6 +849,16 @@ struct DMThreadView: View {
                 ScrollView {
                     if loading {
                         ProgressView().padding(.top, 40)
+                    } else if messages.isEmpty {
+                        // Web parity (web/src/app/messages/page.tsx
+                        // line 1510) — gentle prompt when two users
+                        // have no exchanged messages yet.
+                        Text("Say hi. They\u{2019}ll see your first message when they open the chat.")
+                            .font(.footnote)
+                            .foregroundColor(VP.muted)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                            .padding(.top, 40)
                     } else {
                         // iMessage-style "Read" caption: attach once, to the
                         // last of the viewer's OWN sent messages that has a
@@ -867,6 +881,20 @@ struct DMThreadView: View {
                                             .background(isMe ? VP.accent : VP.surfaceSunken)
                                             .clipShape(RoundedRectangle(cornerRadius: 18))
                                         if !isMe { Spacer(minLength: 60) }
+                                    }
+                                    // Web parity (web lines 1566-1579) —
+                                    // small uppercase tracked-letter caption
+                                    // under every bubble, routed through the
+                                    // shared bucketer + TimelineView so the
+                                    // label auto-refreshes every 30s.
+                                    if let date = msg.createdAt {
+                                        TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                                            Text(HomeView.relativeTimeBucket(date, now: ctx.date).uppercased())
+                                                .font(.system(.caption2, design: .default, weight: .semibold))
+                                                .tracking(0.6)
+                                                .foregroundColor(VP.muted)
+                                                .padding(.horizontal, 4)
+                                        }
                                     }
                                     if msg.id == lastReadOwnId {
                                         Text("Read")
@@ -917,14 +945,25 @@ struct DMThreadView: View {
                         .overlay(RoundedRectangle(cornerRadius: VP.radiusFull).stroke(VP.border))
                         .onSubmit { Task { await send() } }
 
+                    // Web parity (web/src/app/messages/page.tsx lines
+                    // 1634-1651) — text "Send" pill in VP.accent; greys
+                    // to VP.border when empty/sending. Replaces prior
+                    // arrow.up.circle.fill icon button.
+                    let canSend = !input.trimmingCharacters(in: .whitespaces).isEmpty && !sending
                     Button {
                         Task { await send() }
                     } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.largeTitle)
-                            .foregroundColor(input.trimmingCharacters(in: .whitespaces).isEmpty ? VP.inkFaint : VP.accent)
+                        Text("Send")
+                            .font(.system(.subheadline, design: .default, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 10)
+                            .frame(minHeight: 44)
+                            .background(canSend ? VP.accent : VP.border)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
                     }
-                    .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || sending)
+                    .buttonStyle(.plain)
+                    .disabled(!canSend)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
