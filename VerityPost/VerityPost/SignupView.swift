@@ -182,7 +182,7 @@ struct SignupView: View {
                 if loading {
                     ProgressView().tint(.white)
                 } else {
-                    Text("Send sign-up link")
+                    Text("Send code")
                         .font(.system(.subheadline, design: .default, weight: .semibold))
                 }
             }
@@ -200,12 +200,12 @@ struct SignupView: View {
     @ViewBuilder
     private func sentCard(email: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Enter your 8-digit code")
+            Text("Check your email")
                 .font(.system(.title3, design: .default, weight: .bold))
                 .foregroundColor(VP.text)
                 .padding(.bottom, 8)
 
-            Text("We sent a code to \(email). Enter it below to sign in.")
+            Text("We sent an 8-digit code to \(email). Enter it below.")
                 .font(.footnote)
                 .foregroundColor(VP.dim)
                 .multilineTextAlignment(.leading)
@@ -264,7 +264,7 @@ struct SignupView: View {
             .padding(.bottom, 20)
 
             HStack {
-                Button("Use a different email") {
+                Button("\u{2190} Use a different email") {
                     auth.clearMagicLinkState()
                     self.email = ""
                     otpCode = ""

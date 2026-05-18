@@ -1389,11 +1389,11 @@ final class AuthViewModel: ObservableObject {
                 return false
             }
             if http.statusCode == 400 {
-                authError = "Invalid code. Please try again."
+                authError = "Invalid code. Please try again or request a new code."
                 return false
             }
             if !(200...299).contains(http.statusCode) {
-                authError = "Invalid code. Please try again."
+                authError = "Invalid code. Please try again or request a new code."
                 return false
             }
             struct SessionShape: Decodable {
@@ -1419,7 +1419,7 @@ final class AuthViewModel: ObservableObject {
             guard let parsed = try? JSONDecoder().decode(OTPResponse.self, from: data),
                   parsed.ok == true,
                   let s = parsed.session else {
-                authError = "Invalid code. Please try again."
+                authError = "Invalid code. Please try again or request a new code."
                 return false
             }
             // Distinct error path for the server-side anomaly where a
