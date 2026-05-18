@@ -429,15 +429,18 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
   };
   const topBarInnerStyle: CSSProperties = {
     // Centered content rail — matches the home/article max-width so
-    // the wordmark + pill sit directly above the content below.
+    // wordmark (left), pill (center), auth (right) all sit above the
+    // content below. 3-zone grid (1fr auto 1fr) forces the
+    // auto-sized pill into the geometric center; left + right zones
+    // balance so the pill stays centered regardless of left/right
+    // content widths.
     maxWidth: 1408,
     margin: '0 auto',
     padding: '4px 16px',
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: '1fr auto 1fr',
     alignItems: 'center',
-    flexWrap: 'wrap',
     columnGap: 12,
-    rowGap: 6,
     minHeight: TOP_BAR_HEIGHT,
     boxSizing: 'border-box',
   };
@@ -637,7 +640,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
             </a>
           </div>
           {showHeaderControls && <GlobalHeaderControls />}
-          <div className="vp-global-header__auth" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <div className="vp-global-header__auth" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, justifySelf: 'end' }}>
             {/* Anon-only top-bar entrance. Burgundy pill so anon viewers
                 see a real CTA, not a thin italic that disappears next to
                 the wordmark. The /login page surfaces both the OTP form

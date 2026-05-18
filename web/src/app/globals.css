@@ -1537,3 +1537,19 @@ body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important
 .vp-global-header .vp-rh-fpill__trigger {
   width: auto;
 }
+/* Mobile fallback: the 3-zone grid (wordmark | pill | auth) collapses
+   to 2 zones with the pill on its own row beneath when the viewport
+   is too narrow to fit all three side-by-side. */
+@media (max-width: 720px) {
+  .vp-global-header__inner {
+    grid-template-columns: 1fr auto !important;
+    row-gap: 6px !important;
+  }
+  .vp-global-header .vp-gh-controls__pill {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+  .vp-global-header .vp-rh-fpill__trigger {
+    width: 100%;
+  }
+}
