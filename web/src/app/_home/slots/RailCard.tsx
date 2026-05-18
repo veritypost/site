@@ -174,7 +174,7 @@ async function fetchListRows(
     const { data } = await service
       .from('timelines')
       .select(
-        'story_id, stories!inner(slug, title, articles!fk_articles_story_id(id, title))',
+        'story_id, stories!inner(slug, title, articles!articles_story_id_fkey(id, title))',
       )
       .gte('event_date', since)
       .limit(500);
