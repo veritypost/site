@@ -2,9 +2,19 @@
 
 // Compact filter pill + expanded drawer for the home masthead.
 // Replaces the legacy catbar + filter strip nav. Tapping the pill
-// opens a popover with three stacked cards (SCOPE / VIEW / TIME).
-// Each pick navigates via router.push so back/forward history works
-// and the server re-renders the feed with the chosen filters.
+// opens a popover with four stacked cards (SCOPE / VIEW / TIME / SEARCH).
+//
+// Drawer behavior:
+// - Opening the drawer captures the current committed filter state
+//   into a local `draft` object. All in-drawer interactions mutate
+//   `draft` only — the URL stays put until the user taps Apply.
+// - Apply commits the entire `draft` in a single router.push, so the
+//   user's flow of "pick category → subcategory → view → time → search"
+//   doesn't trigger four page reloads.
+// - Closing the drawer (outside-click, Esc, or trigger toggle) without
+//   tapping Apply discards the draft entirely.
+// - The compact pill label keeps reflecting the COMMITTED (URL) state,
+//   not the in-flight draft.
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -27,6 +37,16 @@ type ViewKey =
   | 'newest_article';
 
 type TimeKey = '' | 'today' | 'this_week' | 'this_month' | 'range';
+
+type Draft = {
+  topicSlug: string; // '' === Home; otherwise parent slug
+  subSlug: string;   // '' === All; otherwise sub slug
+  view: ViewKey;
+  time: TimeKey;
+  dateFrom: string;
+  dateTo: string;
+  q: string;
+};
 
 const VIEW_OPTIONS: Array<{ key: ViewKey; label: string }> = [
   { key: '', label: 'Top Stories' },
@@ -68,6 +88,18 @@ function labelForTime(
   return TIME_OPTIONS.find((o) => o.key === (key ?? ''))?.label ?? 'All time';
 }
 
+const EMPTY_DRAFT: Draft = {
+  topicSlug: '',
+  subSlug: '',
+  view: '',
+  time: '',
+  dateFrom: '',
+  dateTo: '',
+  q: '',
+};
+
+const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 export default function HomeFilterPill({
   categories,
   activeTopic,
@@ -85,8 +117,7 @@ export default function HomeFilterPill({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [fromInput, setFromInput] = useState(fromDate ?? '');
-  const [toInput, setToInput] = useState(toDate ?? '');
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   // SCOPE state — derive top-level + sub from activeTopic.
@@ -105,10 +136,14 @@ export default function HomeFilterPill({
     }
     return m;
   }, [categories]);
+  const catBySlug = useMemo(() => {
+    const m: Record<string, FilterCategory> = {};
+    for (const c of categories) m[c.slug] = c;
+    return m;
+  }, [categories]);
 
-  const activeCat = activeTopic
-    ? categories.find((c) => c.slug === activeTopic)
-    : undefined;
+  // Committed (URL-derived) labels for the compact pill.
+  const activeCat = activeTopic ? catBySlug[activeTopic] : undefined;
   const activeParent =
     activeCat && activeCat.parent_id
       ? categories.find((c) => c.id === activeCat.parent_id)
@@ -125,7 +160,40 @@ export default function HomeFilterPill({
   const viewLabel = labelForView(activeView);
   const timeLabel = labelForTime(activeTime, fromDate, toDate);
 
-  // Close on outside click or Escape.
+  // Seed `draft` from committed state + ?q each time the drawer opens.
+  // Reset to EMPTY_DRAFT on close so no stale state lingers in memory.
+  useEffect(() => {
+    if (!open) {
+      setDraft(EMPTY_DRAFT);
+      return;
+    }
+    // Resolve parent+sub from activeTopic.
+    const cat = activeTopic ? catBySlug[activeTopic] : undefined;
+    const parent =
+      cat && cat.parent_id
+        ? categories.find((c) => c.id === cat.parent_id)
+        : cat;
+    const sub = cat && cat.parent_id ? cat : undefined;
+    // Read ?q from the current URL (client-only; guard SSR).
+    let qSeed = '';
+    if (typeof window !== 'undefined') {
+      const usp = new URLSearchParams(window.location.search);
+      qSeed = usp.get('q') ?? '';
+    }
+    setDraft({
+      topicSlug: parent?.slug ?? '',
+      subSlug: sub?.slug ?? '',
+      view: activeView ?? '',
+      time: activeTime ?? (fromDate || toDate ? 'range' : ''),
+      dateFrom: fromDate ?? '',
+      dateTo: toDate ?? '',
+      q: qSeed,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Close on outside click or Escape. Both paths discard the draft
+  // (the [open] effect above resets draft when `open` goes false).
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent) {
@@ -143,68 +211,103 @@ export default function HomeFilterPill({
     };
   }, [open]);
 
-  // Build a URL from a partial spec. Topic lands on /<slug> when set,
-  // otherwise / — matching the live home routing contract.
-  function buildUrl(spec: {
-    topic?: string | null;
-    view?: ViewKey | null;
-    time?: TimeKey | null;
-    from?: string | null;
-    to?: string | null;
-  }): string {
-    const topic =
-      spec.topic === undefined ? activeTopic : spec.topic ?? undefined;
-    const view = spec.view === undefined ? activeView : spec.view ?? undefined;
-    const time = spec.time === undefined ? activeTime : spec.time ?? undefined;
-    const from = spec.from === undefined ? fromDate : spec.from ?? undefined;
-    const to = spec.to === undefined ? toDate : spec.to ?? undefined;
+  // Build a URL from the draft exclusively. Anything not in draft is
+  // dropped (so switching draft.q from "trump" to "" must NOT inherit
+  // the prior ?q). Route shape mirrors the legacy logic: when no chip
+  // / sort / range is active, use clean /<slug> (or /); otherwise route
+  // through /?topic=<slug>&... since /<slug>/page.tsx doesn't forward
+  // searchParams to HomeRoot.
+  function buildUrlFromDraft(d: Draft): string {
+    // Resolve the topic slug we send to the URL: a chosen sub takes
+    // priority; else the parent; else nothing.
+    const topicForUrl = d.subSlug || d.topicSlug || '';
 
     const usp = new URLSearchParams();
-    // Presence-only keys (chip / sort / type).
-    if (view) usp.append(view, '');
+    // Presence-only view chip.
+    if (d.view) usp.append(d.view, '');
     // Time. 'range' is represented by from/to, not a chip.
-    if (time && time !== 'range') usp.append(time, '');
-    if (from) usp.set('from', from);
-    if (to) usp.set('to', to);
-    // Route shape: when no view/time/range is active, use the clean
-    // /<topic> slug URL (or / for Home). When a view/time/range is
-    // active alongside a topic, fall back to /?topic=<slug>&... so the
-    // home page picks both params up — /<slug>/page.tsx doesn't forward
-    // searchParams to HomeRoot, so /<slug>?chip would silently drop the
-    // chip. Clean URLs stay clean, chip URLs go through the home route.
-    const hasChip = usp.size > 0;
+    if (d.time && d.time !== 'range') usp.append(d.time, '');
+    if (d.dateFrom) usp.set('from', d.dateFrom);
+    if (d.dateTo) usp.set('to', d.dateTo);
+    if (d.q.trim()) usp.set('q', d.q.trim());
+
+    const hasParams = usp.size > 0;
     const qs = usp.toString().replace(/=(&|$)/g, '$1');
-    if (!topic) return qs ? `/?${qs}` : '/';
-    if (!hasChip) return `/${topic}`;
+
+    if (!topicForUrl) return qs ? `/?${qs}` : '/';
+    if (!hasParams) return `/${topicForUrl}`;
     const u2 = new URLSearchParams();
-    u2.set('topic', topic);
+    u2.set('topic', topicForUrl);
     for (const [k, v] of usp.entries()) u2.append(k, v);
     return `/?${u2.toString().replace(/=(&|$)/g, '$1')}`;
   }
 
-  function go(spec: Parameters<typeof buildUrl>[0]) {
-    router.push(buildUrl(spec));
+  // Apply gate. Date Range requires BOTH dates valid AND from ≤ to.
+  function isApplyDisabled(d: Draft): boolean {
+    if (d.time === 'range') {
+      if (!d.dateFrom || !d.dateTo) return true;
+      if (!ISO_RE.test(d.dateFrom) || !ISO_RE.test(d.dateTo)) return true;
+      if (d.dateFrom > d.dateTo) return true;
+    }
+    return false;
   }
 
-  function applyRange() {
-    const re = /^\d{4}-\d{2}-\d{2}$/;
-    const fromOk = !fromInput || re.test(fromInput);
-    const toOk = !toInput || re.test(toInput);
-    if (!fromOk || !toOk) return;
-    // Reset time chip when entering an explicit range.
-    router.push(
-      buildUrl({
-        time: null,
-        from: fromInput || null,
-        to: toInput || null,
-      }),
-    );
-    setOpen(false);
+  function commitApply() {
+    if (isApplyDisabled(draft)) return;
+    const url = buildUrlFromDraft(draft);
+    setOpen(false); // also clears draft via the [open] effect
+    router.push(url);
   }
 
-  const hasActiveSubs = activeParent
-    ? (subsByParent[activeParent.id] ?? []).length > 0
+  // Draft mutators.
+  function setTopic(slug: string) {
+    setDraft((prev) => {
+      const cat = slug ? catBySlug[slug] : undefined;
+      const hasSubs = cat ? (subsByParent[cat.id] ?? []).length > 0 : false;
+      return {
+        ...prev,
+        topicSlug: slug,
+        // Reset sub on parent change. If new parent has no subs, blank it.
+        subSlug: hasSubs ? '' : '',
+      };
+    });
+  }
+
+  function setSub(slug: string) {
+    setDraft((prev) => ({ ...prev, subSlug: slug }));
+  }
+
+  function setView(v: ViewKey) {
+    setDraft((prev) => ({ ...prev, view: v }));
+  }
+
+  function setTime(t: TimeKey) {
+    setDraft((prev) => ({
+      ...prev,
+      time: t,
+      // Leaving 'range' for a chip clears the date inputs; entering
+      // 'range' from a chip leaves the (empty) date inputs alone.
+      dateFrom: t === 'range' ? prev.dateFrom : '',
+      dateTo: t === 'range' ? prev.dateTo : '',
+    }));
+  }
+
+  function setDateFrom(v: string) {
+    setDraft((prev) => ({ ...prev, dateFrom: v, time: 'range' }));
+  }
+  function setDateTo(v: string) {
+    setDraft((prev) => ({ ...prev, dateTo: v, time: 'range' }));
+  }
+  function setQ(v: string) {
+    setDraft((prev) => ({ ...prev, q: v }));
+  }
+
+  // Draft-derived view of the SCOPE card.
+  const draftParent = draft.topicSlug ? catBySlug[draft.topicSlug] : undefined;
+  const draftHasSubs = draftParent
+    ? (subsByParent[draftParent.id] ?? []).length > 0
     : false;
+  const applyDisabled = isApplyDisabled(draft);
 
   return (
     <div className="vp-rh-fpill" ref={wrapRef}>
@@ -247,11 +350,8 @@ export default function HomeFilterPill({
             <select
               id="vp-fpill-cat"
               className="vp-rh-fpill__select"
-              value={activeParent?.slug ?? ''}
-              onChange={(e) => {
-                const slug = e.target.value;
-                go({ topic: slug || null });
-              }}
+              value={draft.topicSlug}
+              onChange={(e) => setTopic(e.target.value)}
             >
               <option value="">Home</option>
               {topCats.map((c) => (
@@ -260,7 +360,7 @@ export default function HomeFilterPill({
                 </option>
               ))}
             </select>
-            {hasActiveSubs && activeParent && (
+            {draftHasSubs && draftParent && (
               <>
                 <label className="vp-rh-fpill__lbl" htmlFor="vp-fpill-sub">
                   Subcategory
@@ -268,14 +368,11 @@ export default function HomeFilterPill({
                 <select
                   id="vp-fpill-sub"
                   className="vp-rh-fpill__select"
-                  value={activeSub?.slug ?? ''}
-                  onChange={(e) => {
-                    const slug = e.target.value;
-                    go({ topic: slug || activeParent.slug });
-                  }}
+                  value={draft.subSlug}
+                  onChange={(e) => setSub(e.target.value)}
                 >
                   <option value="">All</option>
-                  {(subsByParent[activeParent.id] ?? []).map((s) => (
+                  {(subsByParent[draftParent.id] ?? []).map((s) => (
                     <option key={s.id} value={s.slug}>
                       {s.name}
                     </option>
@@ -290,13 +387,13 @@ export default function HomeFilterPill({
             <p className="vp-rh-fpill__cardhead">View</p>
             <div className="vp-rh-fpill__opts">
               {VIEW_OPTIONS.map((o) => {
-                const isActive = (activeView ?? '') === o.key;
+                const isActive = draft.view === o.key;
                 return (
                   <button
                     key={o.key || 'top'}
                     type="button"
                     className={`vp-rh-fpill__opt${isActive ? ' is-active' : ''}`}
-                    onClick={() => go({ view: o.key || null })}
+                    onClick={() => setView(o.key)}
                   >
                     {o.label}
                   </button>
@@ -310,60 +407,77 @@ export default function HomeFilterPill({
             <p className="vp-rh-fpill__cardhead">Time</p>
             <div className="vp-rh-fpill__opts">
               {TIME_OPTIONS.map((o) => {
-                const inRange = !!(fromDate || toDate);
-                const isActive =
-                  o.key === 'range'
-                    ? inRange
-                    : !inRange && (activeTime ?? '') === o.key;
+                const isActive = draft.time === o.key;
                 return (
                   <button
                     key={o.key || 'all'}
                     type="button"
                     className={`vp-rh-fpill__opt${isActive ? ' is-active' : ''}`}
-                    onClick={() => {
-                      if (o.key === 'range') return; // handled by inputs
-                      go({
-                        time: o.key || null,
-                        from: null,
-                        to: null,
-                      });
-                    }}
+                    onClick={() => setTime(o.key)}
                   >
                     {o.label}
                   </button>
                 );
               })}
             </div>
-            <div className="vp-rh-fpill__range">
-              <label className="vp-rh-fpill__lbl" htmlFor="vp-fpill-from">
-                From
-              </label>
-              <input
-                id="vp-fpill-from"
-                type="date"
-                className="vp-rh-fpill__date"
-                value={fromInput}
-                onChange={(e) => setFromInput(e.target.value)}
-              />
-              <label className="vp-rh-fpill__lbl" htmlFor="vp-fpill-to">
-                To
-              </label>
-              <input
-                id="vp-fpill-to"
-                type="date"
-                className="vp-rh-fpill__date"
-                value={toInput}
-                onChange={(e) => setToInput(e.target.value)}
-              />
-              <button
-                type="button"
-                className="vp-rh-fpill__apply"
-                onClick={applyRange}
-              >
-                Apply range
-              </button>
-            </div>
+            {draft.time === 'range' && (
+              <div className="vp-rh-fpill__range">
+                <label className="vp-rh-fpill__lbl" htmlFor="vp-fpill-from">
+                  From
+                </label>
+                <input
+                  id="vp-fpill-from"
+                  type="date"
+                  className="vp-rh-fpill__date"
+                  value={draft.dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                />
+                <label className="vp-rh-fpill__lbl" htmlFor="vp-fpill-to">
+                  To
+                </label>
+                <input
+                  id="vp-fpill-to"
+                  type="date"
+                  className="vp-rh-fpill__date"
+                  value={draft.dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                />
+              </div>
+            )}
           </div>
+
+          {/* SEARCH card — spans full drawer width on desktop. */}
+          <div className="vp-rh-fpill__card vp-rh-fpill__card--full">
+            <p className="vp-rh-fpill__cardhead">Search</p>
+            <label className="vp-rh-fpill__lbl" htmlFor="vp-fpill-q">
+              Query
+            </label>
+            <input
+              id="vp-fpill-q"
+              type="search"
+              className="vp-rh-fpill__select"
+              placeholder="Search a topic, person, policy, place, or storyline"
+              value={draft.q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitApply();
+                }
+              }}
+            />
+          </div>
+
+          {/* Apply — spans full drawer width. Single commit path. */}
+          <button
+            type="button"
+            className="vp-rh-fpill__apply"
+            onClick={commitApply}
+            disabled={applyDisabled}
+            aria-disabled={applyDisabled}
+          >
+            Apply
+          </button>
         </div>
       )}
     </div>
