@@ -4130,6 +4130,12 @@ struct DataPrivacyView: View {
     @State private var showDeleteConfirm = false
     @State private var deleteSubmitted = false
     @State private var deleteError: String? = nil
+    // Type-DELETE confirmation flow (web `DataCard.tsx` parity). The
+    // destructive button is disabled until `deleteConfirmText` exactly
+    // equals "DELETE" (case-sensitive — matches web's
+    // `confirmText !== 'DELETE'` gate).
+    @State private var deleteConfirmText: String = ""
+    @State private var deleteRequestInFlight = false
     // Task 62 — DM read receipts opt-out (migration 044).
     @State private var dmReceiptsEnabled = true
     @State private var dmReceiptsLoading = true
@@ -4222,11 +4228,30 @@ struct DataPrivacyView: View {
         .task(id: perms.changeToken) {
             canExport = await PermissionService.shared.has("settings.data.request_export")
         }
-        .alert("Delete account?", isPresented: $showDeleteConfirm) {
-            Button("Delete", role: .destructive) { Task { await requestDeletion() } }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This submits a deletion request. Your account and data will be removed within 30 days. You can cancel by logging back in before then.")
+        // Type-DELETE confirmation — mirrors web `DataCard.tsx` flow. The
+        // sheet replaces the legacy single-step destructive alert; the
+        // network call (`requestDeletion()`) is unchanged. Haptic fires
+        // when the row button presents the sheet (see button handler).
+        .sheet(isPresented: $showDeleteConfirm) {
+            DeleteAccountConfirmSheet(
+                confirmText: $deleteConfirmText,
+                inFlight: $deleteRequestInFlight,
+                onConfirm: {
+                    Task {
+                        await MainActor.run { deleteRequestInFlight = true }
+                        await requestDeletion()
+                        await MainActor.run {
+                            deleteRequestInFlight = false
+                            deleteConfirmText = ""
+                            showDeleteConfirm = false
+                        }
+                    }
+                },
+                onCancel: {
+                    deleteConfirmText = ""
+                    showDeleteConfirm = false
+                }
+            )
         }
     }
 
@@ -4313,6 +4338,89 @@ struct DataPrivacyView: View {
             Log.d("Data deletion request error:", error)
             deleteError = "Couldn\u{2019}t submit deletion request. Try again."
         }
+    }
+}
+
+// MARK: - Delete account confirmation sheet
+//
+// Type-DELETE gate matching web `DataCard.tsx`. The destructive button is
+// disabled until the input exactly equals "DELETE" (case-sensitive,
+// trimmed of surrounding whitespace — matches the JS `=== 'DELETE'`
+// gate). Sheet replaces the legacy single-step destructive alert so the
+// destructive action requires deliberate text entry; the underlying
+// network call (`DataPrivacyView.requestDeletion()`) is unchanged.
+private struct DeleteAccountConfirmSheet: View {
+    @Binding var confirmText: String
+    @Binding var inFlight: Bool
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    private var isConfirmEnabled: Bool {
+        confirmText == "DELETE" && !inFlight
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text("Delete account")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(VP.text)
+
+                    // Copy mirrors web `DataCard.tsx`:
+                    //   "This deletes your profile, comments, and reading
+                    //    history after a 30-day grace period. Type DELETE
+                    //    to confirm."
+                    Text("This deletes your profile, comments, and reading history after a 30-day grace period. Type DELETE to confirm.")
+                        .font(.system(size: VP.Size.base))
+                        .foregroundColor(VP.textMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel("This deletes your profile, comments, and reading history after a 30-day grace period. Type the word DELETE in all caps to confirm.")
+
+                    TextField("DELETE", text: $confirmText)
+                        .font(.system(size: VP.Size.base, design: .monospaced))
+                        .foregroundColor(VP.text)
+                        .autocorrectionDisabled(true)
+                        .textInputAutocapitalization(.characters)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 11)
+                        .background(VP.bg)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: VP.radiusSM)
+                                .stroke(VP.border, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: VP.radiusSM))
+                        .accessibilityLabel("Type DELETE to confirm")
+
+                    Button(action: { if isConfirmEnabled { onConfirm() } }) {
+                        Text(inFlight ? "Scheduling\u{2026}" : "Delete my account")
+                            .font(.system(size: VP.Size.base, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(isConfirmEnabled ? VP.danger : VP.danger.opacity(0.45))
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                    }
+                    .disabled(!isConfirmEnabled)
+                    .accessibilityLabel(inFlight ? "Scheduling deletion" : "Delete my account")
+                    .accessibilityHint(isConfirmEnabled ? "Submits the deletion request." : "Type DELETE in the field above to enable.")
+
+                    Spacer(minLength: 8)
+                }
+                .padding(20)
+            }
+            .background(VP.bg.ignoresSafeArea())
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { onCancel(); dismiss() }
+                        .foregroundColor(VP.text)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 

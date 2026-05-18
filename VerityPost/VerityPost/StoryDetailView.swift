@@ -1012,13 +1012,14 @@ struct StoryDetailView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
 
-            // Deck / subtitle — sans 19pt, muted. `story.summary` (excerpt)
-            // is the deck source; web uses `article.subtitle` first but the
-            // iOS Story model doesn't decode that column today (planner
-            // gap — owner question). Falling back to excerpt keeps parity
-            // close until subtitle plumbing lands.
-            if let summary = story.summary, !summary.isEmpty {
-                Text(summary)
+            // Deck / subtitle — sans 19pt, muted. Web reads
+            // `article.subtitle` first and falls back to `excerpt`; the
+            // iOS Story Codable now decodes `subtitle` directly so we
+            // mirror that fallback chain. Empty strings count as "no
+            // subtitle" (back-compat with rows where subtitle is "").
+            if let deck = (story.subtitle?.isEmpty == false ? story.subtitle : story.summary),
+               !deck.isEmpty {
+                Text(deck)
                     .font(.system(size: 19, weight: .regular))
                     .lineSpacing(19 * 0.55) // line-height ~1.55
                     .foregroundColor(VP.textMuted)
@@ -1061,20 +1062,15 @@ struct StoryDetailView: View {
 
             if canViewBody {
                 if let content = story.content, !content.isEmpty {
-                    let paras = content.split(whereSeparator: \.isNewline).map(String.init).filter { !$0.isEmpty }
-                    // Serif 18pt body, line-height 1.68 (web BODY_STYLE).
-                    // Paragraph spacing ~18pt between blocks mirrors web's
-                    // [data-article-body] p { margin: 0 0 1.1em }.
-                    VStack(alignment: .leading, spacing: 18) {
-                        ForEach(Array(paras.enumerated()), id: \.offset) { _, p in
-                            Text(p)
-                                .font(.system(size: 18, weight: .regular, design: .serif))
-                                .lineSpacing(18 * 0.68)
-                                .foregroundColor(VP.ink)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.horizontal, 20)
-                        }
-                    }
+                    // Compact path: route the body through ArticleBodyText
+                    // so the first paragraph picks up a web-parity drop
+                    // cap on its leading glyph. iPad (`regularStoryContent`)
+                    // keeps the SwiftUI Text-per-paragraph render — a wide
+                    // measure column doesn't need the float-left wrap and
+                    // the editorial deck reads better with the existing
+                    // typography stack on tablet widths.
+                    ArticleBodyText(body: content)
+                        .padding(.horizontal, 20)
                     HomeAdSlot(placement: "article_in_body", page: "article", articleId: story.id)
                         .padding(.top, 24)
                 }

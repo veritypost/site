@@ -179,6 +179,10 @@ struct Story: Codable, Identifiable, Hashable {
     var storyId: String?
     var stories: StorySlugRef?
     var title: String?
+    /// Editorial deck / subtitle (web `article.subtitle`, sans-serif under
+    /// the headline). Distinct from `summary`/`excerpt` — when present this
+    /// is the canonical deck source; falls back to excerpt when nil/empty.
+    var subtitle: String?
     var summary: String?
     var content: String?
     var imageUrl: String?
@@ -206,7 +210,7 @@ struct Story: Codable, Identifiable, Hashable {
     var sensitivityTags: [String]?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, status, stories
+        case id, title, subtitle, status, stories
         case storyId = "story_id"
         case summary = "excerpt"
         case content = "body"
