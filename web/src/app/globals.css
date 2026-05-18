@@ -1427,8 +1427,12 @@ body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important
 /* Mobile: pill collapses to summary-only capsule so it fits inline
    with the wordmark in the header. Search input + EXPLORE button
    move into the drawer at this size (the drawer's bottom CTA does
-   the commit). Capsule shape preserved. */
-@media (max-width: 720px) {
+   the commit). Capsule shape preserved.
+   Breakpoint 768px chosen 2026-05-18 to match MobileStickyAd's
+   max-width: 768 threshold — the previous 720 created a
+   no-man's-land at iPad mini portrait (720–767px) where the pill
+   was already compact but the sticky ad still desktop-hidden. */
+@media (max-width: 768px) {
   .vp-rh-fpill__divider,
   .vp-rh-fpill__qinput,
   .vp-rh-fpill__explore {
@@ -1455,7 +1459,7 @@ body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important
 .vp-rh-fpill__apply--mobile {
   display: none;
 }
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .vp-rh-fpill__card--mobile {
     display: grid;
   }
@@ -1492,7 +1496,7 @@ body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important
   gap: 12px;
   animation: vp-rh-fpill-in 0.14s ease-out;
 }
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .vp-rh-fpill__drawer {
     grid-template-columns: 1fr;
     width: min(360px, 92vw);
@@ -1634,8 +1638,11 @@ body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important
    button hidden via the .vp-rh-fpill__bar mobile rules; user taps
    the pill to open the drawer where they pick filters + type query
    + commit). Grid columns become auto | 1fr | auto so wordmark and
-   auth size to content and the pill takes the remaining row width. */
-@media (max-width: 720px) {
+   auth size to content and the pill takes the remaining row width.
+   Breakpoint 768px chosen 2026-05-18 to match the filter pill's own
+   compact-mode threshold above — keeps the header grid + pill in
+   lockstep so they don't disagree between 721–767px. */
+@media (max-width: 768px) {
   .vp-global-header__inner {
     grid-template-columns: auto 1fr auto !important;
     padding: 4px 10px !important;
