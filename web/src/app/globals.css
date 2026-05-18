@@ -1517,42 +1517,22 @@ body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important
   cursor: not-allowed;
 }
 
-/* Global-header layout: wordmark + filter pill + search + auth in a
-   single flex row on desktop; wraps on mobile so the filter pill and
-   search each get their own full-width row. The header itself has
-   `flex-wrap: wrap` set inline in NavWrapper. */
+/* Global-header layout: wordmark + single filter pill + auth in one
+   flex row on desktop. 2026-05-18 — the previous search pill was
+   folded into the filter pill's drawer (SEARCH card + Explore CTA),
+   so the header now carries ONE pill in the middle slot. On mobile
+   (<720) the pill drops to its own row beneath wordmark + auth via
+   the header's inline `flex-wrap: wrap`. */
 .vp-global-header__wordmark { flex-shrink: 0; }
 .vp-global-header__auth { flex-shrink: 0; }
-/* The filter pill and search share the remaining row width on desktop. */
 .vp-global-header .vp-gh-controls__pill {
-  flex: 1 1 200px;
+  flex: 1 1 240px;
   min-width: 0;
   /* Lift the filter pill's drawer above the cream chrome border. */
   position: relative;
 }
-.vp-global-header .vp-gh-controls__search {
-  flex: 1 1 240px;
-  min-width: 0;
-  position: relative;
-}
-/* On mobile (<720), each control claims a full row below the
-   wordmark + auth row. The header's `flex-wrap: wrap` lets these
-   `flex-basis: 100%` rules push pill + search to new rows. */
 @media (max-width: 720px) {
-  .vp-global-header .vp-gh-controls__pill,
-  .vp-global-header .vp-gh-controls__search {
+  .vp-global-header .vp-gh-controls__pill {
     flex: 1 1 100%;
   }
-}
-/* Tighten the global-header search pill — the home masthead used 12px
-   vertical padding; in a 44px-tall sticky bar we need a shorter pill
-   so it doesn't dominate the row height. */
-.vp-global-header .vp-rh-search {
-  margin: 0;
-  padding: 6px 14px;
-  max-width: none;
-}
-.vp-global-header .vp-rh-search-wrap {
-  margin: 0;
-  max-width: none;
 }

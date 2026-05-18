@@ -20,9 +20,8 @@ import WelcomeModalMount from '../components/welcome/WelcomeModalMount';
 import { hasPermission, refreshAllPermissions, refreshIfStale } from '../lib/permissions';
 import type { Tables } from '@/types/database-helpers';
 import { Z } from '@/lib/zIndex';
-import { BRAND_NAME, BRAND_LEGAL_ENTITY } from '../lib/brand';
+import { BRAND_NAME, BRAND_NAME_LOWER, BRAND_LEGAL_ENTITY } from '../lib/brand';
 import Avatar from '../components/Avatar';
-import ThemeToggle from '../components/ThemeToggle';
 import GlobalHeaderControls from '../components/GlobalHeaderControls';
 
 type ProfileRow = Pick<
@@ -630,7 +629,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 textDecoration: 'none',
               }}
             >
-              {BRAND_NAME.toLowerCase()}
+              {BRAND_NAME_LOWER}
             </a>
           </div>
           {showHeaderControls && <GlobalHeaderControls />}
@@ -682,30 +681,11 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 <Avatar user={user} size={28} />
               </a>
             )}
-            {/* Sign-out — visible quick exit when logged in. Routes to
-                /logout which clears the session and bounces home. Keeps
-                the full Sign-out section in /profile for the
-                everywhere-else / scope choices.
-                2026-05-18 — owner-locked: desktop hides this link
-                (Profile → Sign out section is the desktop path);
-                mobile keeps it as a quick exit since the bottom nav
-                Profile slot is the only other route in. */}
-            {authLoaded && loggedIn && !isDesktop && (
-              <a
-                href="/logout"
-                style={{
-                  fontFamily: 'var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                  fontSize: 13,
-                  color: 'var(--vp-text-muted)',
-                  textDecoration: 'none',
-                  padding: '4px 8px',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Sign out
-              </a>
-            )}
-            <ThemeToggle />
+            {/* 2026-05-18 — owner-locked: top bar has NO sign-out link
+                (desktop or mobile) and NO theme toggle. Sign-out lives in
+                Profile → Sign out section (reachable via avatar on desktop
+                or the bottom-nav Profile tab on mobile). Theme toggle
+                lives in Profile → Appearance. */}
           </div>
         </header>
       )}

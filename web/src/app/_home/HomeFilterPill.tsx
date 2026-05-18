@@ -468,15 +468,20 @@ export default function HomeFilterPill({
             />
           </div>
 
-          {/* Apply — spans full drawer width. Single commit path. */}
+          {/* Explore — spans full drawer width. Single commit path.
+              Owner-locked 2026-05-18: button text is "Explore", not
+              "Apply". Class name `vp-rh-fpill__apply` retained so the
+              shipped style block keeps owning this button without a
+              CSS rename. */}
           <button
             type="button"
             className="vp-rh-fpill__apply"
             onClick={commitApply}
             disabled={applyDisabled}
             aria-disabled={applyDisabled}
+            aria-label="Explore"
           >
-            Apply
+            Explore
           </button>
         </div>
       )}

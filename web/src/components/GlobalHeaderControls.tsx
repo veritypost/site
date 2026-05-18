@@ -1,23 +1,23 @@
 'use client';
 
-// Global header controls — filter pill + search-with-Explore that mount
-// in the NavWrapper top bar on every page. The controls always route
-// through `/?...` (or `/<slug>` for clean topic-only URLs) via the
-// existing HomeFilterPill / HomeSearch internals, so firing a filter
-// from an article / profile / search page lands the user back on the
-// home with the chosen scope.
+// Global header controls — a single rounded filter pill that mounts in
+// the NavWrapper top bar on every page. The pill itself houses SCOPE /
+// VIEW / TIME / SEARCH cards in its drawer (see HomeFilterPill), so the
+// header surfaces ONE control instead of the previous filter + search
+// pair. Filter commits route through `/?...` (or `/<slug>` for clean
+// topic-only URLs), so firing a filter from an article / profile /
+// search page lands the user back on home with the chosen scope.
 //
 // On `/`, the URL reflects the active topic/view/time, so we read
 // them out of `useSearchParams` + `usePathname` to pre-fill the pill's
 // scope/view/time summary. On every other page the pill renders its
-// default summary ("Home · Top Stories · All time") — tapping a chip
+// default summary ("Home · Top Stories · All time") — tapping Explore
 // still routes correctly because the pill builds URLs from its props,
 // not from the current location.
 
 import { Suspense, useEffect, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import HomeFilterPill, { type FilterCategory } from '../app/_home/HomeFilterPill';
-import HomeSearch, { type CategoryItem } from '../app/_home/HomeSearch';
 
 type CategoryRow = {
   id: string;
@@ -80,13 +80,11 @@ function HeaderControlsInner({
   let activeTime: string | undefined;
   let fromDate: string | undefined;
   let toDate: string | undefined;
-  let activeQ: string | undefined;
 
   if (onHome && searchParams) {
     activeTopic = searchParams.get('topic') ?? undefined;
     fromDate = searchParams.get('from') ?? undefined;
     toDate = searchParams.get('to') ?? undefined;
-    activeQ = searchParams.get('q') ?? undefined;
     // Presence-only keys.
     for (const [k] of searchParams.entries()) {
       if (VIEW_KEYS.has(k)) activeView = k;
@@ -101,32 +99,17 @@ function HeaderControlsInner({
     parent_id: c.parent_id,
   }));
 
-  const byId: Record<string, CategoryRow> = {};
-  for (const c of categories) byId[c.id] = c;
-  const searchCats: CategoryItem[] = categories.map((c) => ({
-    id: c.id,
-    name: c.name,
-    slug: c.slug,
-    parent_id: c.parent_id,
-    parent_name: c.parent_id ? byId[c.parent_id]?.name : undefined,
-  }));
-
   return (
-    <>
-      <div className="vp-gh-controls__pill">
-        <HomeFilterPill
-          categories={filterCats}
-          activeTopic={activeTopic}
-          activeView={activeView as never}
-          activeTime={activeTime as never}
-          fromDate={fromDate}
-          toDate={toDate}
-        />
-      </div>
-      <div className="vp-gh-controls__search">
-        <HomeSearch categories={searchCats} initialQ={activeQ ?? ''} />
-      </div>
-    </>
+    <div className="vp-gh-controls__pill">
+      <HomeFilterPill
+        categories={filterCats}
+        activeTopic={activeTopic}
+        activeView={activeView as never}
+        activeTime={activeTime as never}
+        fromDate={fromDate}
+        toDate={toDate}
+      />
+    </div>
   );
 }
 
