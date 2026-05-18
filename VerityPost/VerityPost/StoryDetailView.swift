@@ -830,7 +830,24 @@ struct StoryDetailView: View {
     }
 
     // MARK: - Story content
+    //
+    // Branches on horizontal size class. iPhone (`.compact`) renders the
+    // editorial typography that mirrors web ArticleSurface.tsx: large
+    // serif title, sans deck, stacked byline + hairline, serif 18pt
+    // body, horizontal logo-only sources row, More-in-category footer.
+    // iPad (`.regular`) keeps the pre-existing layout intact so the
+    // rail-mode reading column does not shift under owners; that path
+    // is touched by a separate wave.
     @ViewBuilder private var storyContent: some View {
+        if hSize == .compact {
+            compactStoryContent
+        } else {
+            regularStoryContent
+        }
+    }
+
+    // MARK: iPad / regular path — preserved verbatim from the prior layout.
+    @ViewBuilder private var regularStoryContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Category + badges
             HStack(spacing: 6) {
@@ -950,6 +967,359 @@ struct StoryDetailView: View {
         // and the rail-mode width math all resolve to one source.
         .frame(maxWidth: VP.LayoutBreak.readingColumn)
         .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    // MARK: iPhone / compact path — editorial typography parity with
+    // web ArticleSurface.tsx + SourcesSection.tsx + NextStoryFooter.tsx.
+    //
+    // Constants below mirror the web TITLE_STYLE / SUBTITLE_STYLE /
+    // BYLINE_* / BODY_STYLE rules. Sizes are point-for-point. No
+    // hard-coded hex — every color routes through `VP.*`.
+    //
+    // Body render path: the article `content` is plain markdown (split
+    // on newlines), not HTML, so an attributed-string drop cap is not
+    // applied in this wave — the planner flagged it for a separate
+    // attributed-string conversion pass.
+    @ViewBuilder private var compactStoryContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Title — serif, regular weight, tight tracking, line-height ~1.0.
+            // Sized at 36pt to match web's `clamp(36px, 4.2vw, 52px)` lower
+            // bound (iPhone widths land at the floor on web too).
+            Text(story.title ?? "Untitled")
+                .font(.system(size: 36, weight: .regular, design: .serif))
+                .tracking(-1.4) // ≈ -0.04em at 36pt
+                .lineSpacing(0)
+                .foregroundColor(VP.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+
+            // Deck / subtitle — sans 19pt, muted. `story.summary` (excerpt)
+            // is the deck source; web uses `article.subtitle` first but the
+            // iOS Story model doesn't decode that column today (planner
+            // gap — owner question). Falling back to excerpt keeps parity
+            // close until subtitle plumbing lands.
+            if let summary = story.summary, !summary.isEmpty {
+                Text(summary)
+                    .font(.system(size: 19, weight: .regular))
+                    .lineSpacing(19 * 0.55) // line-height ~1.55
+                    .foregroundColor(VP.textMuted)
+                    .frame(maxWidth: 540, alignment: .leading) // ~62ch at 19pt
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+            }
+
+            // Byline block — two stacked rows + hairline divider, mirrors
+            // BYLINE_ROW_STYLE + BYLINE_META_STYLE + BYLINE_BLOCK_STYLE.
+            // Row 2 ticks every 30s via TimelineView + the shared
+            // HomeView.relativeTimeBucket (s/m/h/d/w/mo/y).
+            VStack(alignment: .leading, spacing: 6) {
+                Text("By Verity Post")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(VP.ink)
+                if let pub = story.publishedAt {
+                    TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                        Text(HomeView.relativeTimeBucket(pub, now: ctx.date).uppercased())
+                            .font(.system(size: 10, weight: .regular, design: .monospaced))
+                            .tracking(0.4)
+                            .foregroundColor(VP.textSoft)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 18)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(VP.borderSoft)
+                    .frame(height: 1)
+                    .padding(.horizontal, 20)
+            }
+            .padding(.bottom, 18)
+
+            // Ad slot — same article positions as the web [slug]/page.tsx.
+            HomeAdSlot(placement: "article_header", page: "article", articleId: story.id)
+                .padding(.bottom, 16)
+
+            if canViewBody {
+                if let content = story.content, !content.isEmpty {
+                    let paras = content.split(whereSeparator: \.isNewline).map(String.init).filter { !$0.isEmpty }
+                    // Serif 18pt body, line-height 1.68 (web BODY_STYLE).
+                    // Paragraph spacing ~18pt between blocks mirrors web's
+                    // [data-article-body] p { margin: 0 0 1.1em }.
+                    VStack(alignment: .leading, spacing: 18) {
+                        ForEach(Array(paras.enumerated()), id: \.offset) { _, p in
+                            Text(p)
+                                .font(.system(size: 18, weight: .regular, design: .serif))
+                                .lineSpacing(18 * 0.68)
+                                .foregroundColor(VP.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, 20)
+                        }
+                    }
+                    HomeAdSlot(placement: "article_in_body", page: "article", articleId: story.id)
+                        .padding(.top, 24)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Upgrade to read this article")
+                        .font(.system(.callout, design: .default, weight: .bold))
+                        .foregroundColor(VP.ink)
+                    Text("Your current plan does not include full article access.")
+                        .font(.footnote)
+                        .foregroundColor(VP.textMuted)
+                    Button {
+                        showSubscription = true
+                    } label: {
+                        Text("Upgrade")
+                            .font(.system(.footnote, design: .default, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 10)
+                            .background(VP.burgundy)
+                            .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                    }
+                }
+                .padding(20)
+            }
+
+            // Sources — horizontal favicon-only row with tap-to-expand
+            // headline card. Mirrors web SourcesSection.tsx.
+            if canViewSources && !sources.isEmpty {
+                compactSourcesRow
+                    .padding(.top, 32)
+            }
+
+            // Meta strip — date · source count · read time. Demoted from
+            // its old slot above the body to under-the-body chrome so the
+            // headline → deck → byline → body register reads cleanly.
+            HStack(spacing: 8) {
+                let dateStr = story.publishedAt.map(formatDate) ?? ""
+                let srcCount = sources.count
+                let metaLine: String = {
+                    var parts: [String] = []
+                    if !dateStr.isEmpty { parts.append(dateStr) }
+                    if srcCount > 0 { parts.append("\(srcCount) source\(srcCount == 1 ? "" : "s")") }
+                    parts.append("\(estimatedReadMinutes) min read")
+                    return parts.joined(separator: " · ")
+                }()
+                Text(metaLine)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(VP.textSoft)
+                Spacer()
+                if canPlayTTS { ttsControls }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+
+            HomeAdSlot(placement: "article_end", page: "article", articleId: story.id)
+                .padding(.top, 24)
+
+            // More in <category> footer — mirrors web NextStoryFooter.tsx.
+            // Reuses the existing `upNextStories` array (same-category,
+            // recent, limit 3) — no duplicate query.
+            if !upNextStories.isEmpty, let catName = categoryName, !catName.isEmpty {
+                moreInCategoryFooter(catName: catName)
+                    .padding(.top, 40)
+                    .padding(.horizontal, 20)
+            }
+
+            Spacer().frame(height: 80)
+        }
+        .frame(maxWidth: VP.LayoutBreak.readingColumn)
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    // MARK: - Compact sources row (web SourcesSection parity)
+    //
+    // Horizontal wrap of 24pt favicons under a mono "SOURCES" kicker.
+    // Tap a favicon → toggles `expandedSource`; expanded panel below
+    // shows the source headline as a tappable link to the publisher URL
+    // and the host in mono caps. Same Codable shape as the legacy
+    // vertical card stack — just a different presentation layer.
+    @ViewBuilder private var compactSourcesRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("SOURCES")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .tracking(1.0)
+                .foregroundColor(VP.burgundy)
+                .padding(.horizontal, 20)
+
+            // Favicon row — wraps with FlowLayout-style fallback. Pre-iOS 16
+            // would need a custom layout; HStack with allowsHitTesting is
+            // good enough at low source counts (web caps at ≤8 typically).
+            HStack(spacing: 14) {
+                ForEach(Array(sources.enumerated()), id: \.element.id) { i, src in
+                    sourceFaviconButton(index: i, src: src)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 20)
+
+            if let idx = expandedSource, idx >= 0, idx < sources.count {
+                let src = sources[idx]
+                let host = hostFromSourceURL(src.url)
+                VStack(alignment: .leading, spacing: 6) {
+                    if let url = src.url, let u = URL(string: url), let title = src.headline, !title.isEmpty {
+                        Link(destination: u) {
+                            Text(title)
+                                .font(.system(size: 16, weight: .regular, design: .serif))
+                                .lineSpacing(16 * 0.3)
+                                .foregroundColor(VP.ink)
+                                .underline(true, color: VP.burgundy)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .accessibilityHint("Opens \(host ?? "publisher") in your browser")
+                    } else if let title = src.headline, !title.isEmpty {
+                        Text(title)
+                            .font(.system(size: 16, weight: .regular, design: .serif))
+                            .foregroundColor(VP.ink)
+                    } else if let url = src.url, let u = URL(string: url) {
+                        Link(destination: u) {
+                            Text("\(host ?? "View source") ↗")
+                                .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                .tracking(0.7)
+                                .foregroundColor(VP.burgundy)
+                        }
+                    } else {
+                        Text("No headline available")
+                            .font(.system(size: 13))
+                            .foregroundColor(VP.textSoft)
+                    }
+                    if let h = host, src.url != nil, src.headline != nil {
+                        Text(h.uppercased())
+                            .font(.system(size: 10, weight: .regular, design: .monospaced))
+                            .tracking(0.6)
+                            .foregroundColor(VP.textSoft)
+                            .padding(.top, 2)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(VP.surfaceSunken)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(VP.borderSoft, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    /// 24pt favicon button. Tap toggles the expanded headline card.
+    /// Falls back to the outlet's initial glyph when no favicon URL.
+    @ViewBuilder
+    private func sourceFaviconButton(index i: Int, src: SourceLink) -> some View {
+        let isOpen = expandedSource == i
+        let host = hostFromSourceURL(src.url)
+        let outlet = src.outletName ?? "Source"
+        let faviconURL: URL? = host.flatMap { h in
+            URL(string: "https://www.google.com/s2/favicons?domain=\(h)&sz=64")
+        }
+        Button {
+            if reduceMotion {
+                expandedSource = isOpen ? nil : i
+            } else {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    expandedSource = isOpen ? nil : i
+                }
+            }
+        } label: {
+            ZStack {
+                if let f = faviconURL {
+                    AsyncImage(url: f) { phase in
+                        switch phase {
+                        case .success(let img):
+                            img.resizable().scaledToFit()
+                        default:
+                            Text(String(outlet.first.map { String($0) } ?? "S").uppercased())
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(VP.burgundy)
+                        }
+                    }
+                    .frame(width: 24, height: 24)
+                } else {
+                    Text(String(outlet.first.map { String($0) } ?? "S").uppercased())
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(VP.burgundy)
+                        .frame(width: 24, height: 24)
+                        .background(Circle().fill(VP.burgundy.opacity(0.08)))
+                }
+            }
+            .opacity(isOpen ? 1.0 : 0.85)
+            .frame(minWidth: 44, minHeight: 44, alignment: .center)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Show headline from \(outlet)")
+        .accessibilityAddTraits(isOpen ? [.isSelected] : [])
+    }
+
+    /// Pure string helper — host extraction without URLComponents quirks.
+    /// Strips `www.` prefix to match web `hostFromUrl`.
+    private func hostFromSourceURL(_ raw: String?) -> String? {
+        guard let s = raw, !s.isEmpty, let u = URL(string: s), let h = u.host else { return nil }
+        return h.hasPrefix("www.") ? String(h.dropFirst(4)) : h
+    }
+
+    // MARK: - More-in-category footer (web NextStoryFooter parity)
+    //
+    // Surface-soft card with a mono "MORE IN <CATEGORY>" kicker over a
+    // hairline, then 3 serif story rows. Each row routes to the new
+    // article through `linkedArticle` — same mechanism the existing Up
+    // Next sheet uses, so the StoryDetailView navigation stack stays
+    // intact (no new route binding).
+    @ViewBuilder
+    private func moreInCategoryFooter(catName: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("MORE IN \(catName.uppercased())")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .tracking(1.0)
+                .foregroundColor(VP.burgundy)
+                .padding(.bottom, 12)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(VP.borderSoft).frame(height: 1)
+                }
+                .padding(.bottom, 12)
+
+            ForEach(Array(upNextStories.enumerated()), id: \.element.id) { idx, s in
+                let isLast = idx == upNextStories.count - 1
+                Button {
+                    linkedArticle = s
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
+                        Text(s.title ?? "Untitled")
+                            .font(.system(size: 16, weight: .regular, design: .serif))
+                            .lineSpacing(16 * 0.35)
+                            .foregroundColor(VP.ink)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(VP.textSoft)
+                    }
+                    .padding(.vertical, 14)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(s.title ?? "Untitled"). More in \(catName).")
+                if !isLast {
+                    Rectangle().fill(VP.borderSoft).frame(height: 1)
+                }
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 24)
+        .background(VP.surfaceSunken)
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(VP.burgundyQuizBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
     // MARK: - TTS controls (D17, Verity+ only)

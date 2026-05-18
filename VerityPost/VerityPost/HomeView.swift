@@ -795,7 +795,11 @@ struct HomeView: View {
     // article that shows "5m ago" on iPhone matches web to the same
     // bucket. `now` is parameterized so TimelineView's `ctx.date` can
     // drive recomputation every 30s instead of stale-on-render.
-    fileprivate static func relativeTimeBucket(_ date: Date, now: Date = Date()) -> String {
+    //
+    // Internal (not `fileprivate`) so StoryDetailView's article header
+    // can share the exact same bucket — owner memory rule: don't fork a
+    // second bucketer.
+    static func relativeTimeBucket(_ date: Date, now: Date = Date()) -> String {
         let secs = max(0, Int(now.timeIntervalSince(date)))
         if secs < 60 { return "\(secs)s ago" }
         let mins = secs / 60
