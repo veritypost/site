@@ -224,6 +224,16 @@ export default function TimelineSection({
   articleCountReached = false,
   currentArticleId,
 }: TimelineSectionProps) {
+  // Hooks must be called before any early return per rules-of-hooks.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   if (!events.length && !showTease) return null;
 
   if (showTease) {
@@ -251,15 +261,6 @@ export default function TimelineSection({
 
   const lastArticleIdx = sorted.reduce<number>((acc, ev, i) => (ev.type === 'article' ? i : acc), -1);
   const nowIdx = lastArticleIdx >= 0 ? lastArticleIdx : sorted.length - 1;
-
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggleExpanded = (id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
 
   const firstDate = sorted[0] ? formatStartedDate(sorted[0].event_date) : '';
 
