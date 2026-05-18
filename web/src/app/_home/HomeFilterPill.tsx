@@ -76,7 +76,7 @@ function labelForTime(
   from?: string,
   to?: string,
 ): string {
-  if (key === 'range' || from || to) {
+  if (from || to) {
     const fmt = (iso?: string) => {
       if (!iso) return '';
       const [y, m, d] = iso.split('-');
@@ -85,6 +85,10 @@ function labelForTime(
     };
     return `${fmt(from)} → ${fmt(to)}`.trim();
   }
+  // 'range' selected but neither date filled in yet — show the label
+  // 'Date Range' rather than the empty ' → ' string the formatter
+  // would produce.
+  if (key === 'range') return 'Date Range';
   return TIME_OPTIONS.find((o) => o.key === (key ?? ''))?.label ?? 'All time';
 }
 

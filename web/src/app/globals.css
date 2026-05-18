@@ -1572,21 +1572,13 @@ body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important
    the header's inline `flex-wrap: wrap`. */
 .vp-global-header__wordmark { flex-shrink: 0; }
 .vp-global-header__auth { flex-shrink: 0; }
-/* Pill is content-sized — owner-locked 2026-05-18. Doesn't stretch
-   across the header; just takes the room its label needs and sits
-   next to the wordmark. Drawer absolutely-positions so it can grow
-   beyond the pill width when opened. */
+/* Pill sits in the centered cell of the 3-col grid (1fr auto 1fr).
+   The 'auto' track sizes to content but we cap with max-width so an
+   absurdly long scope label can't push past the comfortable rail
+   width; min-width keeps the search input usable. 2026-05-18. */
 .vp-global-header .vp-gh-controls__pill {
-  flex: 0 0 auto;
-  min-width: 0;
   position: relative;
-}
-/* Pill (now containing summary + search + Explore) sits in the
-   centered cell. Grows to fill available room so the search input
-   has space to breathe. */
-.vp-global-header .vp-gh-controls__pill {
-  flex: 1 1 0;
-  min-width: 240px;
+  min-width: 320px;
   max-width: 720px;
   width: 100%;
 }

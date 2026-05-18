@@ -134,15 +134,18 @@ struct HomeMasthead: View {
     @EnvironmentObject var auth: AuthViewModel
     let categories: [VPCategory]
     @Binding var filter: HomeFilter
-    /// Theme cycle binding — shares @AppStorage("vp_theme") with the legacy
-    /// topBar so the masthead button writes to the same storage VerityPostApp
-    /// uses for .preferredColorScheme().
+    /// Theme cycle binding — preserved on the call site for backwards
+    /// compatibility with HomeView, but no longer surfaced in the masthead.
+    /// 2026-05-18 owner-locked spec: no theme toggle in the global chrome;
+    /// theme lives in Profile → Appearance.
     @Binding var vpTheme: String
     /// Tap target for the Explore button + search pill. The owner-deferred
     /// search rework lands separately — for now both controls push the
     /// existing FindView.
     var onTapSearch: () -> Void
     var onSignIn: () -> Void
+    /// Preserved on the call site; not surfaced in the masthead. Sign-out
+    /// lives in Profile (reachable via the bottom-nav Profile tab).
     var onSignOut: () -> Void
 
     @State private var showPicker = false
@@ -176,50 +179,18 @@ struct HomeMasthead: View {
     // MARK: Row 1 — wordmark + auth controls
 
     private var wordmarkRow: some View {
+        // 2026-05-18 owner-locked: lowercase wordmark, no theme toggle,
+        // no sign-out, no avatar on mobile (Profile is reachable through
+        // the bottom-nav Profile tab). Only an anon Sign-in pill rides
+        // along on row 1 for parity with web mobile.
         HStack(spacing: 12) {
-            Text("Verity Post")
+            Text("verity post")
                 .font(.system(size: 22, weight: .regular, design: .serif))
                 .foregroundColor(VP.ink)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
             Spacer()
-            // Theme cycle — preserved from legacy topBar so the inline
-            // masthead keeps feature parity for compact width.
-            Button {
-                switch vpTheme {
-                case "system": vpTheme = "light"
-                case "light":  vpTheme = "dark"
-                default:       vpTheme = "system"
-                }
-            } label: {
-                Image(systemName: {
-                    switch vpTheme {
-                    case "light": return "sun.max.fill"
-                    case "dark":  return "moon.fill"
-                    default:      return "circle.lefthalf.filled"
-                    }
-                }())
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(VP.ink)
-                .frame(width: 36, height: 36)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel({
-                switch vpTheme {
-                case "light": return "Theme: Light"
-                case "dark":  return "Theme: Dark"
-                default:      return "Theme: System"
-                }
-            }())
-
-            if auth.isLoggedIn {
-                AvatarView(user: auth.currentUser, size: 28)
-                Button("Sign out", action: onSignOut)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(VP.inkDim)
-                    .buttonStyle(.plain)
-            } else {
+            if !auth.isLoggedIn {
                 Button(action: onSignIn) {
                     Text("Sign in")
                         .font(.system(size: 13, weight: .semibold))

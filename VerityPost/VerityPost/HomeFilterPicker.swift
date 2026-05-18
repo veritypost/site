@@ -64,7 +64,12 @@ struct HomeFilterPicker: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done", action: onDismiss)
+                    // 2026-05-18 — labelled "Explore" to mirror the web
+                    // merged-pill's commit CTA. Native iOS behavior is
+                    // already two-way binding (changes apply on pick), so
+                    // this button dismisses the sheet rather than firing a
+                    // separate commit; semantically it confirms the choice.
+                    Button("Explore", action: onDismiss)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(VP.burgundy)
                 }
