@@ -1015,7 +1015,11 @@ function LeaderboardPageContent() {
         <div
           style={{
             position: 'fixed',
-            bottom: 0,
+            // Stack above the bottom nav on mobile via the chrome's
+            // shared CSS var (published by NavWrapper). Falls back to
+            // 0 when the var is missing or the page is rendered
+            // without the nav (admin / story / fully-bare).
+            bottom: 'var(--vp-nav-stack-h, 0px)',
             left: 0,
             right: 0,
             zIndex: 100,

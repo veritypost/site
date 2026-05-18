@@ -36,8 +36,8 @@ export default function MobileStickyAd() {
             left: 0;
             right: 0;
             z-index: 40;
-            background: var(--bg, #ffffff);
-            border-top: 1px solid var(--border, #e5e5e5);
+            background: var(--vp-bg, #ffffff);
+            border-top: 1px solid var(--vp-border, #e5e5e5);
             padding: 4px 8px;
             padding-bottom: 4px;
           }

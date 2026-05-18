@@ -90,7 +90,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         aria-atomic="true"
         style={{
           position: 'fixed',
-          bottom: 24,
+          // 24px from the bottom edge, PLUS the chrome stack offset
+          // (bottom nav height + safe area) on mobile so toasts don't
+          // appear behind the nav on phones. Falls back to bare 24px
+          // when the var is unset (story reader, admin, fully-bare).
+          bottom: 'calc(24px + var(--vp-nav-stack-h, 0px))',
           left: '50%',
           transform: 'translateX(-50%)',
           display: 'flex',

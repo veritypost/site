@@ -101,7 +101,10 @@ export default function CookieBanner() {
       aria-labelledby="vp-consent-title"
       style={{
         position: 'fixed',
-        bottom: 16,
+        // 16px from the bottom edge, PLUS the chrome stack offset
+        // (bottom nav height + safe area) on mobile so the consent
+        // banner doesn't sit behind the bottom nav on phones.
+        bottom: 'calc(16px + var(--vp-nav-stack-h, 0px))',
         left: 16,
         right: 16,
         maxWidth: 720,
