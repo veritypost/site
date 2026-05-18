@@ -557,13 +557,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
   }
 
-  // Slug lives on stories (Slice 05). Apply slug + published_at to stories row.
-  if (prior.story_id && (nextSlug !== null || (body.status === 'published' && prior.status !== 'published'))) {
-    const storyUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    if (nextSlug !== null) storyUpdate.slug = nextSlug;
-    if (body.status === 'published' && prior.status !== 'published') {
-      storyUpdate.published_at = (update.published_at as string) ?? new Date().toISOString();
-    }
+  // Slug lives on stories (Slice 05). Apply slug to stories row when it
+  // changes. stories.published_at is owned by the
+  // articles_sync_story_published_at_(ins|upd) triggers — when this
+  // route's articles UPDATE flips status to 'published', the AFTER
+  // UPDATE OF status trigger fires and sets stories.published_at via
+  // _sync_story_published_at_on_article_publish(). The orphan branch
+  // below still has to write published_at explicitly because the
+  // trigger doesn't fire on INSERT INTO stories.
+  if (prior.story_id && nextSlug !== null) {
+    const storyUpdate: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+      slug: nextSlug,
+    };
     const { error: storyErr } = await service
       .from('stories')
       .update(storyUpdate as never)
