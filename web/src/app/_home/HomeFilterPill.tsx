@@ -134,6 +134,7 @@ export default function HomeFilterPill({
     setQInput(initialQ ?? '');
   }, [initialQ]);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const drawerRef = useRef<HTMLDivElement | null>(null);
 
   // SCOPE state — derive top-level + sub from activeTopic.
   const topCats = useMemo(
@@ -207,8 +208,11 @@ export default function HomeFilterPill({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Close on outside click or Escape. Both paths discard the draft
-  // (the [open] effect above resets draft when `open` goes false).
+  // Close on outside click or Escape. Trap Tab so keyboard users can't
+  // alt-tab past the open drawer into the page underneath, and lock
+  // body scroll on mobile so the page doesn't scroll behind the modal.
+  // Both close paths discard the draft (the [open] effect above resets
+  // draft when `open` goes false).
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent) {
@@ -216,13 +220,58 @@ export default function HomeFilterPill({
       if (!wrapRef.current.contains(e.target as Node)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        return;
+      }
+      if (e.key !== 'Tab' || !drawerRef.current) return;
+      // Focus trap. Build a list of focusable elements inside the
+      // drawer at the moment Tab fires (the conditional Subcategory
+      // <select> and the From/To date inputs come and go, so caching
+      // this on open isn't safe).
+      const FOCUSABLE_SEL =
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      const nodes = Array.from(
+        drawerRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SEL),
+      ).filter((el) => !el.hasAttribute('aria-hidden'));
+      if (nodes.length === 0) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      // Cycle: shift+tab from first goes to last; tab from last goes
+      // to first. Outside the drawer entirely → snap back to first.
+      if (e.shiftKey) {
+        if (active === first || !drawerRef.current.contains(active)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || !drawerRef.current.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      }
     }
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
+    // Move focus into the drawer so a keyboard user can't tab past the
+    // open dialog to the page beneath it on the very first Tab press.
+    // requestAnimationFrame defers until after React paints the drawer.
+    const raf = requestAnimationFrame(() => {
+      if (!drawerRef.current) return;
+      const first = drawerRef.current.querySelector<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled])',
+      );
+      first?.focus();
+    });
+    // Lock body scroll while the drawer is open (matters on mobile,
+    // where the drawer overlays the feed and the background would
+    // otherwise scroll under finger drags).
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onKey);
+      cancelAnimationFrame(raf);
+      document.body.style.overflow = prevOverflow;
     };
   }, [open]);
 
@@ -428,7 +477,13 @@ export default function HomeFilterPill({
       </div>
 
       {open && (
-        <div className="vp-rh-fpill__drawer" role="dialog" aria-label="Filter feed">
+        <div
+          className="vp-rh-fpill__drawer"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Filter feed"
+          ref={drawerRef}
+        >
           {/* SCOPE card */}
           <div className="vp-rh-fpill__card">
             <p className="vp-rh-fpill__cardhead">Scope</p>
@@ -508,30 +563,52 @@ export default function HomeFilterPill({
                 );
               })}
             </div>
-            {draft.time === 'range' && (
-              <div className="vp-rh-fpill__range">
-                <label className="vp-rh-fpill__lbl" htmlFor="vp-fpill-from">
-                  From
-                </label>
-                <input
-                  id="vp-fpill-from"
-                  type="date"
-                  className="vp-rh-fpill__date"
-                  value={draft.dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                />
-                <label className="vp-rh-fpill__lbl" htmlFor="vp-fpill-to">
-                  To
-                </label>
-                <input
-                  id="vp-fpill-to"
-                  type="date"
-                  className="vp-rh-fpill__date"
-                  value={draft.dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                />
-              </div>
-            )}
+            {draft.time === 'range' && (() => {
+              const dateError =
+                !draft.dateFrom || !draft.dateTo
+                  ? 'Pick a start and end date.'
+                  : draft.dateFrom > draft.dateTo
+                    ? 'Start date must be on or before end date.'
+                    : '';
+              return (
+                <div className="vp-rh-fpill__range">
+                  <label className="vp-rh-fpill__lbl" htmlFor="vp-fpill-from">
+                    From
+                  </label>
+                  <input
+                    id="vp-fpill-from"
+                    type="date"
+                    className="vp-rh-fpill__date"
+                    value={draft.dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    aria-invalid={dateError ? 'true' : 'false'}
+                    aria-describedby={dateError ? 'vp-fpill-range-err' : undefined}
+                  />
+                  <label className="vp-rh-fpill__lbl" htmlFor="vp-fpill-to">
+                    To
+                  </label>
+                  <input
+                    id="vp-fpill-to"
+                    type="date"
+                    className="vp-rh-fpill__date"
+                    value={draft.dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    aria-invalid={dateError ? 'true' : 'false'}
+                    aria-describedby={dateError ? 'vp-fpill-range-err' : undefined}
+                  />
+                  {dateError && (
+                    <p
+                      id="vp-fpill-range-err"
+                      className="vp-rh-fpill__rangeerr"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {dateError}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* SEARCH card — mobile-only. Desktop has the search input

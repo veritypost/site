@@ -1572,6 +1572,14 @@ body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important
   padding-top: 8px;
   border-top: 1px solid var(--vp-border-soft);
 }
+.vp-rh-fpill__rangeerr {
+  margin: 6px 0 0;
+  font-family: var(--font-ibm-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vp-accent);
+}
 /* Cards flagged --full span every column in the drawer grid (Search
    card + Apply button both go below the SCOPE/VIEW/TIME row). */
 .vp-rh-fpill__card--full {
