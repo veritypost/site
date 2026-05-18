@@ -511,3 +511,518 @@ enum AdTrackingConsent {
         }
     }
 }
+
+// MARK: - Home-feed slot views (Wave 5 — home_layouts data path)
+//
+// iPhone home now renders the same home_layouts → home_slots →
+// home_slot_items tree as web. These views handle the slot kinds that
+// didn't exist on iOS before this wave (square_row, rail_card list
+// variant, rail_card default). The compact hero (story_card with
+// config.variant == 'hero') stays in HomeView so it can keep the
+// @ScaledMetric + lastVisitDate context that already lives there.
+//
+// Token-only — no hard-coded hex. Slot variants that don't have an iOS
+// renderer (top_banner / feature / list_rail / data_ticker / insight_row /
+// discovery_feed / engagement / promo / cluster / lead / etc.) render
+// EmptyView via the dispatcher in HomeView. Future waves can fill those
+// in without touching the data path.
+
+// Square row (compact width) — web mobile collapses the 5-up grid to
+// a single column where each tile reads as a normal card. Mirrors that:
+// up to 5 stacked tiles, empty slot items collapse silently, ads not
+// supported on iOS home (Wave 6a ships AdMob via HomeAdSlot in the feed,
+// not inside slot items). Tap → StoryDetailView via NavigationLink.
+struct HomeSquareRowView: View {
+    let slot: HomeSlotRow
+    let categories: [VPCategory]
+
+    var body: some View {
+        VStack(spacing: 14) {
+            ForEach(filledItems, id: \.id) { item in
+                if let story = item.articles {
+                    NavigationLink(value: story) {
+                        tile(for: story)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+    }
+
+    // Drop items that have no article so the row never renders an empty
+    // placeholder rectangle. Matches the owner-locked behavior from web
+    // SquareRow (registry comment "square_row no longer self-sources
+    // empty cells — when no articles are pinned, the row collapses
+    // entirely instead of rendering 5 placeholder rectangles").
+    private var filledItems: [HomeSlotItemRow] {
+        (slot.home_slot_items ?? [])
+            .sorted { $0.position < $1.position }
+            .filter { $0.articles != nil }
+    }
+
+    @ViewBuilder
+    private func tile(for story: Story) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let cat = categoryName(for: story.categoryId) {
+                // Mono caps kicker on burgundy — mirrors web
+                // `.vp-rh-square__cat` (small mono uppercase accent).
+                Text(cat.uppercased())
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .tracking(1.0)
+                    .foregroundColor(VP.burgundy)
+            }
+            Text(story.title ?? "Untitled")
+                // System serif regular at 14pt matches web
+                // `.vp-rh-square__title` (serif, weight 400, ~0.95rem).
+                .font(.system(size: 14, weight: .regular, design: .serif))
+                .lineSpacing(1)
+                .foregroundColor(VP.ink)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(VP.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(VP.border, lineWidth: 1)
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(story.title ?? "Untitled")
+        .accessibilityAddTraits(.isLink)
+    }
+
+    private func categoryName(for id: String?) -> String? {
+        guard let id else { return nil }
+        return categories.first(where: { $0.id == id })?.displayName
+    }
+}
+
+// Default rail card — single-article cell. On compact width this stacks
+// inline with the main feed (rail/main column merge per web mobile).
+// Mirrors web RailCard.tsx default variant.
+struct HomeRailCardView: View {
+    let slot: HomeSlotRow
+    let categories: [VPCategory]
+
+    private var firstStory: Story? {
+        (slot.home_slot_items ?? [])
+            .sorted { $0.position < $1.position }
+            .first(where: { $0.articles != nil })?
+            .articles
+    }
+
+    var body: some View {
+        if let story = firstStory {
+            NavigationLink(value: story) {
+                VStack(alignment: .leading, spacing: 6) {
+                    if let cat = categories.first(where: { $0.id == story.categoryId })?.displayName {
+                        Text(cat.uppercased())
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .tracking(1.0)
+                            .foregroundColor(VP.burgundy)
+                            .padding(.bottom, 2)
+                    }
+                    Text(story.title ?? "Untitled")
+                        .font(.system(size: 16, weight: .regular, design: .serif))
+                        .lineSpacing(1)
+                        .foregroundColor(VP.ink)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let excerpt = story.excerpt, !excerpt.isEmpty {
+                        Text(excerpt)
+                            .font(.system(size: 13, weight: .regular))
+                            .lineSpacing(2)
+                            .foregroundColor(VP.textMuted)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 4)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(18)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(VP.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(VP.border, lineWidth: 1)
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(story.title ?? "Untitled")
+                .accessibilityAddTraits(.isLink)
+            }
+            .buttonStyle(.plain)
+        } else {
+            EmptyView()
+        }
+    }
+}
+
+// List-variant rail card — mono caps label + up to 4 hairline-divided
+// rows. Data is fetched server-side per slot (one of: most_read /
+// most_discussed / recent_updates / most_active_timelines). Mirrors web
+// RailCard.tsx list variant.
+struct HomeRailListView: View {
+    let label: String
+    let rows: [HomeListRow]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(label.uppercased())
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .tracking(1.0)
+                .foregroundColor(VP.burgundy)
+                .padding(.bottom, 10)
+            ForEach(Array(rows.enumerated()), id: \.element.id) { idx, row in
+                if idx > 0 {
+                    Rectangle().fill(VP.borderSoft).frame(height: 1)
+                }
+                HStack(alignment: .top, spacing: 12) {
+                    if let slug = row.slug {
+                        NavigationLink(value: HomeStorySlugLink(slug: slug, title: row.title)) {
+                            Text(row.title)
+                                .font(.system(size: 13, weight: .regular, design: .serif))
+                                .foregroundColor(VP.ink)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Text(row.title)
+                            .font(.system(size: 13, weight: .regular, design: .serif))
+                            .foregroundColor(VP.ink)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if let badge = row.badge, !badge.isEmpty {
+                        Text(badge)
+                            .font(.system(size: 10, weight: .regular, design: .monospaced))
+                            .tracking(0.4)
+                            .foregroundColor(VP.textSoft)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                }
+                .padding(.vertical, 10)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(VP.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(VP.border, lineWidth: 1)
+        )
+        .padding(.horizontal, 20)
+        .padding(.top, 14)
+    }
+}
+
+// Slug-based navigation target — list-rail rows know the story slug
+// but don't carry a full Story. The home NavigationStack already has a
+// destination for `Story`; this is a second value type so list-rail
+// rows can push directly to a slug-only target.
+struct HomeStorySlugLink: Hashable {
+    let slug: String
+    let title: String
+}
+
+// Resolves a slug-only link to a full Story and mounts StoryDetailView.
+// Shows a brief loading state while the article row is fetched. Falls
+// back to a friendly error if the slug doesn't resolve.
+struct HomeListRailDestination: View {
+    let link: HomeStorySlugLink
+    @EnvironmentObject var auth: AuthViewModel
+
+    @State private var story: Story? = nil
+    @State private var loadFailed = false
+
+    var body: some View {
+        Group {
+            if let story {
+                StoryDetailView(story: story)
+            } else if loadFailed {
+                VStack(spacing: 8) {
+                    Text("Story unavailable")
+                        .font(.system(.callout, design: .default, weight: .semibold))
+                        .foregroundColor(VP.text)
+                    Text("We couldn't load this article.")
+                        .font(.system(.footnote))
+                        .foregroundColor(VP.dim)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(VP.bg.ignoresSafeArea())
+            } else {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text(link.title)
+                        .font(.system(.footnote))
+                        .foregroundColor(VP.dim)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(VP.bg.ignoresSafeArea())
+            }
+        }
+        .task(id: link.slug) {
+            await resolve()
+        }
+    }
+
+    private func resolve() async {
+        let client = SupabaseManager.shared.client
+        do {
+            // Resolve slug → most-recent published article for that
+            // story. List-rail rows on most_active_timelines key by
+            // story_id; for the other sources the row's article_id
+            // could equally be queried, but going via slug keeps a
+            // single code path.
+            let rows: [Story] = try await client.from("articles")
+                .select("*, ad_eligible, sensitivity_tags, stories!inner(slug)")
+                .eq("stories.slug", value: link.slug)
+                .eq("status", value: "published")
+                .is("deleted_at", value: nil)
+                .order("published_at", ascending: false)
+                .limit(1)
+                .execute()
+                .value
+            if let first = rows.first {
+                await MainActor.run { story = first }
+            } else {
+                await MainActor.run { loadFailed = true }
+            }
+        } catch {
+            Log.d("[HomeListRailDestination] resolve failed: \(error)")
+            await MainActor.run { loadFailed = true }
+        }
+    }
+}
+
+// MARK: - List-rail data fetcher
+//
+// Mirrors web RailCard.tsx `fetchListRows`. Source-specific Supabase
+// queries, slug-deduped so two articles in the same story collapse to
+// one row. Runs on the iOS side because iOS doesn't have a per-card
+// server fetch.
+enum HomeListRailSource {
+    static let defaultLabel: [String: String] = [
+        "most_read": "Most read",
+        "most_discussed": "Most discussed",
+        "recent_updates": "Recent updates",
+        "most_active_timelines": "Most active timelines",
+    ]
+    static let defaultDays: [String: Int] = [
+        "most_read": 7,
+        "most_discussed": 7,
+        "recent_updates": 0,
+        "most_active_timelines": 30,
+    ]
+
+    static func resolveDays(source: String, cfgDays: Int?) -> Int {
+        if let d = cfgDays, d > 0, d <= 365 { return d }
+        return defaultDays[source] ?? 7
+    }
+
+    static func label(forSource source: String, cfgLabel: String?) -> String {
+        if let l = cfgLabel, !l.isEmpty { return l }
+        return defaultLabel[source] ?? source
+    }
+
+    static let rowCap = 4
+}
+
+// Minimal join shapes for the list-rail queries. Kept here next to the
+// fetcher so the wire shape lives with its only consumer.
+private struct LRArticleRow: Decodable {
+    let article_id: String?
+    struct ArticleRef: Decodable {
+        let id: String
+        let title: String?
+        let stories: StorySlugRef?
+    }
+    let articles: ArticleRef?
+}
+
+private struct LRRecentArticleRow: Decodable {
+    let id: String
+    let title: String?
+    let updated_at: Date?
+    let stories: StorySlugRef?
+}
+
+private struct LRTimelineRow: Decodable {
+    let story_id: String
+    struct StoryRef: Decodable {
+        let slug: String?
+        let title: String?
+    }
+    let stories: StoryRef?
+}
+
+enum HomeListRailFetcher {
+    static func relTime(_ date: Date?) -> String? {
+        guard let date else { return nil }
+        let ms = Date().timeIntervalSince(date)
+        if !ms.isFinite || ms < 0 { return nil }
+        let mins = Int(ms / 60)
+        if mins < 60 { return "\(mins)m ago" }
+        let hrs = mins / 60
+        if hrs < 24 { return "\(hrs)h ago" }
+        let days = hrs / 24
+        if days < 7 { return "\(days)d ago" }
+        return "\(days / 7)w ago"
+    }
+
+    static func fetch(source: String, cfgDays: Int?) async -> [HomeListRow] {
+        let client = SupabaseManager.shared.client
+        let days = HomeListRailSource.resolveDays(source: source, cfgDays: cfgDays)
+        let isoFmt = ISO8601DateFormatter()
+        let since = isoFmt.string(from: Date().addingTimeInterval(-Double(days) * 86400))
+
+        do {
+            switch source {
+            case "most_read":
+                let rows: [LRArticleRow] = try await client.from("reading_log")
+                    .select("article_id, articles!inner(id, title, deleted_at, stories(slug))")
+                    .gte("created_at", value: since)
+                    .not("article_id", operator: .is, value: "null")
+                    .is("articles.deleted_at", value: nil)
+                    .limit(500)
+                    .execute()
+                    .value
+                return tallyArticleRows(rows, badgeSuffix: "reads")
+
+            case "most_discussed":
+                let rows: [LRArticleRow] = try await client.from("comments")
+                    .select("article_id, status, articles!inner(id, title, deleted_at, stories(slug))")
+                    .gte("created_at", value: since)
+                    .not("article_id", operator: .is, value: "null")
+                    .is("articles.deleted_at", value: nil)
+                    .eq("status", value: "visible")
+                    .limit(500)
+                    .execute()
+                    .value
+                return tallyArticleRows(rows, badgeSuffix: "replies")
+
+            case "recent_updates":
+                let rows: [LRRecentArticleRow] = try await client.from("articles")
+                    .select("id, title, updated_at, stories(slug)")
+                    .eq("status", value: "published")
+                    .is("deleted_at", value: nil)
+                    .order("updated_at", ascending: false)
+                    .limit(HomeListRailSource.rowCap * 6)
+                    .execute()
+                    .value
+                var seen = Set<String>()
+                var out: [HomeListRow] = []
+                for r in rows {
+                    guard let slug = r.stories?.slug, !seen.contains(slug) else { continue }
+                    seen.insert(slug)
+                    out.append(HomeListRow(
+                        id: r.id,
+                        title: r.title ?? "",
+                        slug: slug,
+                        badge: relTime(r.updated_at)
+                    ))
+                    if out.count >= HomeListRailSource.rowCap { break }
+                }
+                return out
+
+            case "most_active_timelines":
+                let rows: [LRTimelineRow] = try await client.from("timelines")
+                    .select("story_id, stories!inner(slug, title)")
+                    .gte("event_date", value: since)
+                    .limit(500)
+                    .execute()
+                    .value
+                // Slug-dedupe (not story_id) — matches web rule.
+                var counts: [String: (row: HomeListRow, count: Int)] = [:]
+                for r in rows {
+                    guard let slug = r.stories?.slug else { continue }
+                    if var ex = counts[slug] {
+                        ex.count += 1
+                        counts[slug] = ex
+                    } else {
+                        counts[slug] = (
+                            HomeListRow(
+                                id: r.story_id,
+                                title: r.stories?.title ?? "",
+                                slug: slug,
+                                badge: nil
+                            ),
+                            1
+                        )
+                    }
+                }
+                return counts.values
+                    .sorted { $0.count > $1.count }
+                    .prefix(HomeListRailSource.rowCap)
+                    .map { entry in
+                        HomeListRow(
+                            id: entry.row.id,
+                            title: entry.row.title,
+                            slug: entry.row.slug,
+                            badge: "+\(entry.count) this month"
+                        )
+                    }
+
+            default:
+                return []
+            }
+        } catch {
+            Log.d("[HomeListRailFetcher] \(source) failed: \(error)")
+            return []
+        }
+    }
+
+    private static func tallyArticleRows(
+        _ rows: [LRArticleRow],
+        badgeSuffix: String
+    ) -> [HomeListRow] {
+        // Slug-dedupe so two articles in the same story collapse into
+        // one row. First-seen seeds the title/id; later siblings just
+        // bump the count.
+        var counts: [String: (row: HomeListRow, count: Int)] = [:]
+        for r in rows {
+            guard let art = r.articles,
+                  let slug = art.stories?.slug else { continue }
+            if var ex = counts[slug] {
+                ex.count += 1
+                counts[slug] = ex
+            } else {
+                counts[slug] = (
+                    HomeListRow(
+                        id: art.id,
+                        title: art.title ?? "",
+                        slug: slug,
+                        badge: nil
+                    ),
+                    1
+                )
+            }
+        }
+        return counts.values
+            .sorted { $0.count > $1.count }
+            .prefix(HomeListRailSource.rowCap)
+            .map { entry in
+                HomeListRow(
+                    id: entry.row.id,
+                    title: entry.row.title,
+                    slug: entry.row.slug,
+                    badge: "\(entry.count) \(badgeSuffix)"
+                )
+            }
+    }
+}

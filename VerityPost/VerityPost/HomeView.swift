@@ -28,6 +28,14 @@ struct HomeView: View {
     @State private var categories: [VPCategory] = []
     @State private var loading = true
     @State private var loadError: String? = nil
+    // Wave 5 — home_layouts data path. Populated on compact width when
+    // the live layout query succeeds; legacy `stories` array is still
+    // populated as a fallback so the iPhone home never goes blank if
+    // the layout query fails or returns no live layout.
+    @State private var liveLayout: HomeLayoutRow? = nil
+    // Per-slot list-rail rows. Keyed by slot.id since the same source
+    // can appear in multiple slots with different `days` configs.
+    @State private var listRailRows: [String: [HomeListRow]] = [:]
     @State private var showRegistrationWall = false
     // T244 — handle for the in-flight pull-to-refresh load. Cancelled
     // before each new pull so two fast drags don't stack parallel HTTP
@@ -226,6 +234,13 @@ struct HomeView: View {
                             loadingState
                         } else if let err = loadError {
                             errorState(err)
+                        } else if hSize == .compact, let layout = liveLayout {
+                            // Wave 5 — layout-driven feed. iPhone walks
+                            // home_slots in position order (span ignored
+                            // per web mobile, which merges main/rail
+                            // columns into one feed). iPad keeps the
+                            // legacy `stories` path below.
+                            layoutFeed(layout)
                         } else if stories.isEmpty {
                             VStack(spacing: 8) {
                                 Text("Nothing published today.")
@@ -341,6 +356,14 @@ struct HomeView: View {
                     .navigationDestination(for: Story.self) { story in
                         StoryDetailView(story: story)
                             .onAppear { trackArticleView(articleId: story.id) }
+                    }
+                    // Wave 5 — list-rail rows carry just (article_id,
+                    // slug, title). Resolve the slug to a full Story on
+                    // push so StoryDetailView's id-keyed fetches (.task,
+                    // sources, timeline) have what they need.
+                    .navigationDestination(for: HomeStorySlugLink.self) { link in
+                        HomeListRailDestination(link: link)
+                            .environmentObject(auth)
                     }
                     .padding(.bottom, 80)
                 }
@@ -656,6 +679,114 @@ struct HomeView: View {
             .accessibilityAddTraits(.isLink)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Layout-driven feed (Wave 5 — home_layouts data path)
+    //
+    // Walks home_slots in position order, ignores span (web mobile
+    // merges main + rail columns into one feed). Each slot dispatches
+    // by kind. Unimplemented kinds collapse to nothing — no placeholder
+    // — so the feed never shows "missing surface" stubs.
+    @ViewBuilder
+    private func layoutFeed(_ layout: HomeLayoutRow) -> some View {
+        let slots = (layout.home_slots ?? []).sorted { $0.position < $1.position }
+        VStack(spacing: 0) {
+            ForEach(Array(slots.enumerated()), id: \.element.id) { idx, slot in
+                renderSlot(slot)
+                // One ad break after every 6 slots so the layout-driven
+                // feed isn't ad-free vs the legacy path. Wave 6a AdMob
+                // mount happens through HomeAdSlot.
+                if idx == 3 {
+                    HomeAdSlot(placement: iosHomePlacement(.inFeed1, authed: auth.isLoggedIn), page: "home")
+                        .padding(.top, 16)
+                } else if idx == 9 {
+                    HomeAdSlot(placement: iosHomePlacement(.inFeed2, authed: auth.isLoggedIn), page: "home")
+                        .padding(.top, 16)
+                }
+            }
+            HomeAdSlot(placement: iosHomePlacement(.belowFold, authed: auth.isLoggedIn), page: "home")
+                .padding(.top, 16)
+            NavigationLink {
+                RecapListView().environmentObject(auth)
+            } label: {
+                HStack {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: VP.Size.sm, weight: .semibold))
+                        .foregroundColor(VP.brand)
+                    Text("See all recaps")
+                        .font(.system(size: VP.Size.base, weight: .semibold))
+                        .foregroundColor(VP.text)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: VP.Size.sm, weight: .semibold))
+                        .foregroundColor(VP.muted)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(VP.card)
+                .overlay(Rectangle().fill(VP.border).frame(height: 1), alignment: .top)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 24)
+        }
+        .padding(.top, 8)
+    }
+
+    // Slot-kind dispatcher. Returns EmptyView for kinds without an iOS
+    // renderer; future waves can fill those in without touching the
+    // data path.
+    @ViewBuilder
+    private func renderSlot(_ slot: HomeSlotRow) -> some View {
+        switch slot.kind {
+        case "story_card":
+            if slot.variant == "hero" {
+                if let firstStory = (slot.home_slot_items ?? [])
+                    .sorted(by: { $0.position < $1.position })
+                    .compactMap({ $0.articles })
+                    .first {
+                    heroBlockCompact(firstStory)
+                        .padding(.top, 14)
+                }
+            } else {
+                if let firstStory = (slot.home_slot_items ?? [])
+                    .sorted(by: { $0.position < $1.position })
+                    .compactMap({ $0.articles })
+                    .first {
+                    NavigationLink(value: firstStory) {
+                        supportingCard(firstStory)
+                            .padding(.horizontal, 20)
+                    }
+                    .buttonStyle(.plain)
+                    hairline.padding(.horizontal, 20)
+                }
+            }
+        case "square_row":
+            HomeSquareRowView(slot: slot, categories: categories)
+        case "rail_card":
+            if slot.variant == "list", let source = slot.sourceKey {
+                let label = HomeListRailSource.label(
+                    forSource: source,
+                    cfgLabel: slot.config?["label"]?.stringValue
+                )
+                if let rows = listRailRows[slot.id], !rows.isEmpty {
+                    HomeRailListView(label: label, rows: rows)
+                } else {
+                    // No rows resolved yet (or source returned empty).
+                    // Match web's behavior — show the label + skeleton
+                    // hint instead of collapsing, so the slot reads as
+                    // "loading" not "broken."
+                    HomeRailListView(label: label, rows: [])
+                }
+            } else {
+                HomeRailCardView(slot: slot, categories: categories)
+            }
+        default:
+            // top_banner, feature, list_rail (legacy), data_ticker,
+            // insight_row, discovery_feed, engagement, promo, cluster,
+            // lead, second_lead, breaking_strip, secondary_pair,
+            // wide_strip, editors_picks — no iOS renderer in this wave.
+            EmptyView()
+        }
     }
 
     // Bucketed relative time — mirrors web `relativeTimeBucket` in
@@ -1065,6 +1196,22 @@ struct HomeView: View {
             stories = ranked
             breakingStory = breakingFirst
             categories = cats
+
+            // Wave 5 — try the home_layouts data path on compact width.
+            // The legacy `stories` array above is the unconditional
+            // fallback; if the layout query fails OR returns no live
+            // layout, the iPhone home renders via the legacy path so
+            // it never goes blank. The default filter ("All") is the
+            // only state where the editor's layout is the right shape;
+            // a topic/sort filter falls back to the legacy filtered
+            // feed because home_slot_items pins are editorial choices
+            // for All, not for an arbitrary topic slice.
+            if hSize == .compact && homeFilter.isAll {
+                await loadLiveLayout()
+            } else {
+                liveLayout = nil
+                listRailRows = [:]
+            }
             // Section E.1 — stamp the last successful load. App-foreground
             // staleness check (HomeFeedRefreshPolicy.postIfStale) keys off
             // this so a failed load can't fake freshness.
@@ -1076,6 +1223,87 @@ struct HomeView: View {
         }
         if Task.isCancelled { return }
         loading = false
+    }
+
+    // MARK: - Live layout (Wave 5)
+    //
+    // Mirror of web/src/app/_home/data.ts `fetchLiveLayout`. Queries
+    // home_layouts where status='live' with a single nested PostgREST
+    // select that drags down home_slots + home_slot_items + the joined
+    // articles row. Failure paths (no live layout / network error /
+    // decode error) leave `liveLayout` nil so the dispatcher in `body`
+    // falls back to the legacy `stories` array — same fail-open
+    // posture as web.
+    private func loadLiveLayout() async {
+        let articleSelect = "id, title, story_id, published_at, excerpt, cover_image_url, category_id, is_breaking, is_developing, ad_eligible, sensitivity_tags, stories(slug)"
+        let layoutSelect = """
+        id, slug, name, status, ads_enabled,
+        home_slots (
+          id, key, kind, span, position, config,
+          home_slot_items (
+            id, position, content_type, ref_id, article_id, payload,
+            articles!fk_home_slot_items_article_id (\(articleSelect))
+          )
+        )
+        """
+        do {
+            let layouts: [HomeLayoutRow] = try await client.from("home_layouts")
+                .select(layoutSelect)
+                .eq("status", value: "live")
+                .order("updated_at", ascending: false)
+                .limit(1)
+                .execute()
+                .value
+            guard let layout = layouts.first else {
+                await MainActor.run {
+                    liveLayout = nil
+                    listRailRows = [:]
+                }
+                return
+            }
+
+            // Fetch list-rail rows in parallel — each list-variant
+            // rail_card needs its own source-specific query. Web does
+            // this server-side per card; on iOS we hoist all of them
+            // into one TaskGroup so the feed doesn't fan out N HTTP
+            // round-trips serially on render.
+            let listSlots = (layout.home_slots ?? []).filter {
+                $0.kind == "rail_card" &&
+                $0.variant == "list" &&
+                ($0.sourceKey).map { HomeListRailSource.defaultLabel[$0] != nil } ?? false
+            }
+            var rows: [String: [HomeListRow]] = [:]
+            if !listSlots.isEmpty {
+                await withTaskGroup(of: (String, [HomeListRow]).self) { group in
+                    for slot in listSlots {
+                        guard let source = slot.sourceKey else { continue }
+                        let days = slot.configDays
+                        group.addTask {
+                            let r = await HomeListRailFetcher.fetch(
+                                source: source,
+                                cfgDays: days
+                            )
+                            return (slot.id, r)
+                        }
+                    }
+                    for await (slotId, slotRows) in group {
+                        rows[slotId] = slotRows
+                    }
+                }
+            }
+
+            if Task.isCancelled { return }
+            await MainActor.run {
+                liveLayout = layout
+                listRailRows = rows
+            }
+        } catch {
+            Log.d("[HomeView.loadLiveLayout] failed: \(error)")
+            await MainActor.run {
+                liveLayout = nil
+                listRailRows = [:]
+            }
+        }
     }
 
     // MARK: - Registration wall
