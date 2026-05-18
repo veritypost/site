@@ -622,13 +622,13 @@ struct ProfileView: View {
             .navigationTitle("You")
             .navigationBarTitleDisplayMode(.inline)
         case .publicProfile:
-            webFallback(title: "Public profile",
-                        body: "Edit your public bio, avatar, and visibility on the web.",
-                        path: "/profile?section=public")
+            PublicProfileEditor()
+                .environmentObject(auth)
         case .background:
-            webFallback(title: "Background",
-                        body: "Add the short line that says who you are when you comment.",
-                        path: "/profile?section=background")
+            SettingsBackgroundView()
+                .environmentObject(auth)
+                .navigationTitle("Background")
+                .navigationBarTitleDisplayMode(.inline)
         case .activity:
             activitySection
                 .navigationTitle("Activity")
@@ -670,17 +670,14 @@ struct ProfileView: View {
             SubscriptionSettingsView()
                 .environmentObject(auth)
         case .refer:
-            webFallback(title: "Invite friends",
-                        body: "Two invite links to share. Each one lets one friend join Verity Post.",
-                        path: "/profile?section=refer")
+            InviteFriendsView()
         case .help:
             helpSection
                 .navigationTitle("Help & support")
                 .navigationBarTitleDisplayMode(.inline)
         case .data:
-            webFallback(title: "Your data",
-                        body: "Export your data or close your account on the web.",
-                        path: "/profile?section=data")
+            DataPrivacyView()
+                .environmentObject(auth)
         case .signout:
             signoutSection
                 .navigationTitle("Sign out")
@@ -1007,9 +1004,8 @@ struct ProfileView: View {
             AccountSettingsView()
                 .environmentObject(auth)
         case .publicProfile:
-            webFallback(title: "Bio & expertise",
-                        body: "Edit your public bio, avatar, and visibility on the web.",
-                        path: "/profile?section=public")
+            PublicProfileEditor()
+                .environmentObject(auth)
         case .privacy:
             DataPrivacyView()
                 .environmentObject(auth)
