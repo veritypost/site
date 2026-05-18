@@ -1525,14 +1525,15 @@ body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important
    the header's inline `flex-wrap: wrap`. */
 .vp-global-header__wordmark { flex-shrink: 0; }
 .vp-global-header__auth { flex-shrink: 0; }
+/* Pill is content-sized — owner-locked 2026-05-18. Doesn't stretch
+   across the header; just takes the room its label needs and sits
+   next to the wordmark. Drawer absolutely-positions so it can grow
+   beyond the pill width when opened. */
 .vp-global-header .vp-gh-controls__pill {
-  flex: 1 1 240px;
+  flex: 0 0 auto;
   min-width: 0;
-  /* Lift the filter pill's drawer above the cream chrome border. */
   position: relative;
 }
-@media (max-width: 720px) {
-  .vp-global-header .vp-gh-controls__pill {
-    flex: 1 1 100%;
-  }
+.vp-global-header .vp-rh-fpill__trigger {
+  width: auto;
 }
