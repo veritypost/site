@@ -666,7 +666,7 @@ struct StoryDetailView: View {
                         // gate prompt; logged-in → real discussion content.
                         // C2 — comments.section.view denial (web parity).
                         if !canViewComments {
-                            Text("Comments aren't available for your account.")
+                            Text("Discussion isn't available for your account.")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                                 .padding()
@@ -722,46 +722,64 @@ struct StoryDetailView: View {
     }
 
     // MARK: - Anon Discussion tab gate (Story Task 18)
+    //
+    // Web parity (ArticleEngagementZone.tsx anon branch): mono kicker
+    // "Discussion locked" → serif headline "Earn the discussion" → sans
+    // body explaining the quiz gate → accent CTA + secondary sign-in.
     @ViewBuilder private var anonDiscussionPrompt: some View {
-        VStack(spacing: 14) {
-            Text("Earn the discussion.")
-                .font(.system(.title3, design: .default, weight: .bold))
+        VStack(alignment: .leading, spacing: 8) {
+            Text("DISCUSSION LOCKED")
+                .font(.system(.caption2, design: .monospaced, weight: .medium))
+                .tracking(1.0)
+                .foregroundColor(Self.quizAccent)
+            Text("Earn the discussion")
+                .font(.system(size: 24, weight: .regular, design: .serif))
                 .foregroundColor(VP.text)
-            Text("Create a free account, pass the quiz, and join the conversation.")
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Pass a short comprehension check to join the conversation. Comments stay open to readers who've shown they've read the piece.")
                 .font(.subheadline)
                 .foregroundColor(VP.dim)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 4)
             Button {
                 showLogin = true
             } label: {
-                Text("Create free account")
+                Text("Create free account →")
                     .font(.system(.subheadline, design: .default, weight: .semibold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 28)
+                    .padding(.horizontal, 22)
                     .padding(.vertical, 12)
                     .frame(minHeight: 44)
-                    .background(VP.burgundy)
-                    .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+                    .background(Self.quizAccent)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
-            .padding(.top, 4)
+            .padding(.top, 12)
             Button {
                 showLogin = true
             } label: {
                 Text("Already have an account? Sign in")
                     .font(.footnote)
-                    .foregroundColor(VP.burgundy)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .frame(minWidth: 44, minHeight: 44)
+                    .foregroundColor(Self.quizAccent)
+                    .padding(.vertical, 6)
+                    .frame(minHeight: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
-        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(28)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Self.quizSurfaceSoft)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Self.quizCardBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, 20)
+        .padding(.top, 24)
         // Q-NEW2 (2026-05-12) — `.large` detent prevents the iPad formSheet
         // postage-stamp default; iPhone behavior unchanged.
         .sheet(isPresented: $showLogin) {
@@ -2209,12 +2227,14 @@ struct StoryDetailView: View {
             if comments.isEmpty {
                 // Editorial empty state — serif headline + muted subhead.
                 VStack(alignment: .center, spacing: 8) {
-                    Text("Be the first to comment")
+                    Text("Be the first to comment.")
                         .font(.system(size: 22, weight: .regular, design: .serif))
                         .foregroundColor(VP.text)
-                    Text("You read it. You passed.")
+                    Text("You read it. You passed. Your take belongs here.")
                         .font(.subheadline)
                         .foregroundColor(Self.quizTextMuted)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 36)
@@ -2482,7 +2502,7 @@ struct StoryDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     // v2 composer input — white card with warm-soft stroke
                     // matching the quiz inner-question chrome.
-                    TextField("Join the discussion…", text: $commentText, axis: .vertical)
+                    TextField("What's your take?", text: $commentText, axis: .vertical)
                         .font(.subheadline)
                         .foregroundColor(VP.text)
                         .lineLimit(1...4)
@@ -2988,10 +3008,16 @@ struct StoryDetailView: View {
                     }
                     Spacer()
                     if let d = comment.createdAt {
-                        // v2 timestamp — mono caption, soft warm grey.
-                        Text(timeAgo(d))
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundColor(Self.quizTextSoft)
+                        // v2 timestamp — mono caption, soft warm grey. Wrapped
+                        // in TimelineView so the bucket recomputes every 30s
+                        // (parity with the article byline + HomeView feed). Uses
+                        // the shared HomeView.relativeTimeBucket helper so the
+                        // bucket ladder matches web's relativeTimeBucket exactly.
+                        TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                            Text(HomeView.relativeTimeBucket(d, now: ctx.date))
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundColor(Self.quizTextSoft)
+                        }
                     }
                 }
                 if comment.isDeleted {
@@ -5033,13 +5059,17 @@ struct StoryDetailView: View {
             }
             if !isOwn && auth.isLoggedIn {
                 ForEach(Self.readerTagOrder, id: \.kind) { entry in
-                    let glyph = entry.kind == "i_agree" ? "✓" : "★"
+                    // Web parity: action-row pills are text-only ("I agree",
+                    // "Helpful") — no leading glyph. CommentRow.tsx renders a
+                    // single label span + optional count, so iOS drops the
+                    // legacy ✓ / ★ glyphs here to match. (Owner rule: never
+                    // emojis or decorative glyphs in chrome.)
                     let count = tagCount(for: comment, kind: entry.kind)
                     let isCast = userTags.contains(entry.kind)
                     let busy = commentTagBusyKey == "\(comment.id):\(entry.kind)"
                     commentPillButton(
                         label: entry.label,
-                        glyph: glyph,
+                        glyph: nil,
                         count: count > 0 ? count : nil,
                         active: isCast,
                         disabled: busy,
