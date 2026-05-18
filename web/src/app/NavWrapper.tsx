@@ -23,6 +23,7 @@ import { Z } from '@/lib/zIndex';
 import { BRAND_NAME, BRAND_LEGAL_ENTITY } from '../lib/brand';
 import Avatar from '../components/Avatar';
 import ThemeToggle from '../components/ThemeToggle';
+import GlobalHeaderControls from '../components/GlobalHeaderControls';
 
 type ProfileRow = Pick<
   Tables<'users'>,
@@ -423,14 +424,28 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     background: 'rgba(var(--vp-sticky-rgb), 0.92)',
     backdropFilter: 'blur(12px)',
     borderBottom: '1px solid var(--vp-border)',
+    // 2026-05-18 — header is now a multi-zone bar (wordmark + filter
+    // pill + search + auth controls). Height auto-grows on mobile when
+    // the controls wrap to additional rows. The reserved-height var
+    // below tracks the desktop single-row case; mobile pages don't
+    // sticky-offset against this var so the additional rows are fine.
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    height: TOP_BAR_HEIGHT,
-    padding: '0 16px',
-    paddingTop: 'env(safe-area-inset-top)',
+    flexWrap: 'wrap',
+    columnGap: 12,
+    rowGap: 6,
+    minHeight: TOP_BAR_HEIGHT,
+    padding: '4px 16px',
+    paddingTop: 'calc(env(safe-area-inset-top) + 4px)',
     boxSizing: 'content-box',
   };
+  // Whether the current route should surface the filter pill + search
+  // in the global header. Auth-route hides (login / signup / welcome
+  // / beta-locked / etc.) already short-circuit `showTopBar`; admin
+  // and mockup routes likewise. So if the top bar is visible at all,
+  // these controls are too — except `/welcome` is already excluded
+  // upstream. Ideas preview is fully bare so no top bar there either.
+  const showHeaderControls = showTopBar;
   // Expose the total reserved height to children via a CSS custom
   // property so per-page sticky chrome (story tab bar, etc.) can offset
   // below the global top bar with a single source of truth.
@@ -579,8 +594,8 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
       </div>
 
       {showTopBar && (
-        <header style={topBarStyle}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <header style={topBarStyle} className="vp-global-header">
+          <div className="vp-global-header__wordmark" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {!topBarActive && (
               <a
                 href={topBarHomeHref}
@@ -618,7 +633,8 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
               {BRAND_NAME.toLowerCase()}
             </a>
           </div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          {showHeaderControls && <GlobalHeaderControls />}
+          <div className="vp-global-header__auth" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             {/* Anon-only top-bar entrance. Burgundy pill so anon viewers
                 see a real CTA, not a thin italic that disappears next to
                 the wordmark. The /login page surfaces both the OTP form
@@ -669,8 +685,12 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
             {/* Sign-out — visible quick exit when logged in. Routes to
                 /logout which clears the session and bounces home. Keeps
                 the full Sign-out section in /profile for the
-                everywhere-else / scope choices. */}
-            {authLoaded && loggedIn && (
+                everywhere-else / scope choices.
+                2026-05-18 — owner-locked: desktop hides this link
+                (Profile → Sign out section is the desktop path);
+                mobile keeps it as a quick exit since the bottom nav
+                Profile slot is the only other route in. */}
+            {authLoaded && loggedIn && !isDesktop && (
               <a
                 href="/logout"
                 style={{

@@ -14,8 +14,6 @@ import type {
   HeroTimelineEvent,
   TrendingArticle,
 } from './slots/_shared';
-import HomeSearch from './HomeSearch';
-import HomeFilterPill from './HomeFilterPill';
 import RhStyles from './styles';
 
 type CategoryRow = Pick<
@@ -112,44 +110,9 @@ export default function HomeLayout({
     <div className="vp-rh">
       <h1 className="vp-rh-sr">Verity Post</h1>
       <div className="vp-rh-grid">
-        {/* New masthead — wordmark + compact filter pill + search-with-
-            Explore + date stamp. Replaces the legacy 4-band masthead
-            (search row, catbar, subcatbar, filter strip). Scope/View/
-            Time live behind the filter pill's drawer. */}
-        <div className="vp-rh-masthead2">
-          <div className="vp-rh-masthead2__row">
-            <a className="vp-rh-masthead2__wordmark" href="/">
-              Verity Post
-            </a>
-            <HomeFilterPill
-              categories={Object.values(categoryById).map((c) => ({
-                id: c.id,
-                name: c.name,
-                slug: c.slug,
-                parent_id: c.parent_id,
-              }))}
-              activeTopic={activeTopic}
-              activeView={activeView as never}
-              activeTime={activeTime as never}
-              fromDate={fromDate}
-              toDate={toDate}
-            />
-            <div className="vp-rh-masthead2__search">
-              <HomeSearch
-                categories={Object.values(categoryById).map((c) => ({
-                  id: c.id,
-                  name: c.name,
-                  slug: c.slug,
-                  parent_id: c.parent_id,
-                  parent_name: c.parent_id
-                    ? categoryById[c.parent_id]?.name
-                    : undefined,
-                }))}
-                initialQ={activeQ ?? ''}
-              />
-            </div>
-          </div>
-        </div>
+        {/* 2026-05-18 — masthead controls (wordmark + filter pill +
+            search-with-Explore) live in the global NavWrapper top bar
+            now. The home no longer renders its own masthead row. */}
         {topSlots.length > 0 && (
           <div className="vp-rh-grid__top">{topSlots.map(renderOne)}</div>
         )}
