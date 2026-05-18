@@ -131,7 +131,7 @@ type ExistingPin = {
 //                    Article/Ad/Clear picker, scoped to a single position)
 //   ad_placement   — baked ad tiles (ticker / insight / per-discovery cell);
 //                    creative-edit link + per-ad toggle, no position writes
-//   payload        — feature / engagement / promo block editor
+//   payload        — engagement / promo block editor
 type ActiveEdit =
   | { kind: 'article_cell'; slotId: string; position: number }
   | { kind: 'ad_placement'; slotId: string; placement: string; slotKind: SlotKind }
@@ -2003,7 +2003,7 @@ function LayoutCanvas({
 // Floating popover anchored next to the clicked tile. Three variants:
 //   article_cell  — full Article/Ad picker scoped to one (slot, position)
 //   ad_placement  — Edit creative link + per-ad toggle (baked placements)
-//   payload       — feature/engagement/promo block editor
+//   payload       — engagement/promo block editor
 // Click-outside (backdrop) + ESC close (ESC wired in HomeEditorInner).
 function SlotInlineEditor({
   anchorEl,
@@ -2683,7 +2683,7 @@ function SlotInlineEditor({
     );
   };
 
-  // ----- Variant: payload (feature / engagement / promo) -----
+  // ----- Variant: payload (engagement / promo) -----
   const payloadVariant = () => {
     if (activeEdit.kind !== 'payload') return null;
     return (

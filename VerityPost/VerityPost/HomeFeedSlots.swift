@@ -522,7 +522,7 @@ enum AdTrackingConsent {
 // @ScaledMetric + lastVisitDate context that already lives there.
 //
 // Token-only — no hard-coded hex. Slot variants that don't have an iOS
-// renderer (top_banner / feature / list_rail / data_ticker / insight_row /
+// renderer (top_banner / list_rail / data_ticker / insight_row /
 // discovery_feed / engagement / promo / cluster / lead / etc.) render
 // EmptyView via the dispatcher in HomeView. Future waves can fill those
 // in without touching the data path.

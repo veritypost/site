@@ -781,10 +781,10 @@ struct HomeView: View {
                 HomeRailCardView(slot: slot, categories: categories)
             }
         default:
-            // top_banner, feature, list_rail (legacy), data_ticker,
-            // insight_row, discovery_feed, engagement, promo, cluster,
-            // lead, second_lead, breaking_strip, secondary_pair,
-            // wide_strip, editors_picks — no iOS renderer in this wave.
+            // top_banner, list_rail, data_ticker, insight_row,
+            // discovery_feed, engagement, promo, cluster, lead,
+            // second_lead, breaking_strip, secondary_pair, wide_strip,
+            // editors_picks — no iOS renderer in this wave.
             EmptyView()
         }
     }
