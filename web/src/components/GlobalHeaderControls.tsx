@@ -81,10 +81,12 @@ function HeaderControlsInner({
   let fromDate: string | undefined;
   let toDate: string | undefined;
 
+  let activeQ: string | undefined;
   if (onHome && searchParams) {
     activeTopic = searchParams.get('topic') ?? undefined;
     fromDate = searchParams.get('from') ?? undefined;
     toDate = searchParams.get('to') ?? undefined;
+    activeQ = searchParams.get('q') ?? undefined;
     // Presence-only keys.
     for (const [k] of searchParams.entries()) {
       if (VIEW_KEYS.has(k)) activeView = k;
@@ -108,6 +110,7 @@ function HeaderControlsInner({
         activeTime={activeTime as never}
         fromDate={fromDate}
         toDate={toDate}
+        initialQ={activeQ}
       />
     </div>
   );

@@ -107,6 +107,7 @@ export default function HomeFilterPill({
   activeTime,
   fromDate,
   toDate,
+  initialQ,
 }: {
   categories: FilterCategory[];
   activeTopic?: string;
@@ -114,10 +115,20 @@ export default function HomeFilterPill({
   activeTime?: TimeKey;
   fromDate?: string;
   toDate?: string;
+  initialQ?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  // Inline search query — lives on the pill chrome itself so users
+  // can type without opening the drawer. Seeded from URL ?q via the
+  // `initialQ` prop. When the drawer is open the SEARCH card mirrors
+  // this same state so the in-drawer field and the inline field
+  // never diverge.
+  const [qInput, setQInput] = useState(initialQ ?? '');
+  useEffect(() => {
+    setQInput(initialQ ?? '');
+  }, [initialQ]);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   // SCOPE state — derive top-level + sub from activeTopic.
@@ -254,9 +265,48 @@ export default function HomeFilterPill({
 
   function commitApply() {
     if (isApplyDisabled(draft)) return;
-    const url = buildUrlFromDraft(draft);
+    // Drawer is open: commit the draft (which carries the user's
+    // picked filters), but use the live inline search input as the
+    // source of truth for q — so the user can type in either field
+    // and the result is the same.
+    const url = buildUrlFromDraft({ ...draft, q: qInput });
     setOpen(false); // also clears draft via the [open] effect
     router.push(url);
+  }
+
+  // Quick commit path for when the drawer is CLOSED. Combines the
+  // currently committed URL filter state (passed in via props) with
+  // the typed query, and navigates. Lets the user fire a search
+  // without opening the drawer.
+  function commitInlineSearch() {
+    const usp = new URLSearchParams();
+    if (activeView) usp.append(activeView, '');
+    if (activeTime && activeTime !== 'range') usp.append(activeTime, '');
+    if (fromDate) usp.set('from', fromDate);
+    if (toDate) usp.set('to', toDate);
+    if (qInput.trim()) usp.set('q', qInput.trim());
+    const topicForUrl = activeTopic ?? '';
+    const qs = usp.toString().replace(/=(&|$)/g, '$1');
+    if (!topicForUrl) {
+      router.push(qs ? `/?${qs}` : '/');
+      return;
+    }
+    if (!qs) {
+      router.push(`/${topicForUrl}`);
+      return;
+    }
+    const u2 = new URLSearchParams();
+    u2.set('topic', topicForUrl);
+    for (const [k, v] of usp.entries()) u2.append(k, v);
+    router.push(`/?${u2.toString().replace(/=(&|$)/g, '$1')}`);
+  }
+
+  function onExploreClick() {
+    if (open) {
+      commitApply();
+    } else {
+      commitInlineSearch();
+    }
   }
 
   // Draft mutators.
@@ -311,33 +361,67 @@ export default function HomeFilterPill({
 
   return (
     <div className="vp-rh-fpill" ref={wrapRef}>
-      <button
-        type="button"
-        className="vp-rh-fpill__trigger"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-      >
-        <span className="vp-rh-fpill__scope">{scopeLabel}</span>
-        <span className="vp-rh-fpill__sep" aria-hidden="true">·</span>
-        <span className="vp-rh-fpill__view">{viewLabel}</span>
-        <span className="vp-rh-fpill__sep" aria-hidden="true">·</span>
-        <span className="vp-rh-fpill__time">{timeLabel}</span>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-          className="vp-rh-fpill__caret"
+      <div className="vp-rh-fpill__bar" role="group" aria-label="Filter and search">
+        <button
+          type="button"
+          className="vp-rh-fpill__summary"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          aria-label="Open filter drawer"
         >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
+          <span className="vp-rh-fpill__scope">{scopeLabel}</span>
+          <span className="vp-rh-fpill__sep" aria-hidden="true">·</span>
+          <span className="vp-rh-fpill__view">{viewLabel}</span>
+          <span className="vp-rh-fpill__sep" aria-hidden="true">·</span>
+          <span className="vp-rh-fpill__time">{timeLabel}</span>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="vp-rh-fpill__caret"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <span className="vp-rh-fpill__divider" aria-hidden="true" />
+        <input
+          type="search"
+          className="vp-rh-fpill__qinput"
+          value={qInput}
+          onChange={(e) => {
+            const v = e.target.value;
+            setQInput(v);
+            // Keep draft.q in sync when the drawer is open so the
+            // in-drawer field reads the same value the user typed
+            // inline.
+            if (open) setDraft((prev) => ({ ...prev, q: v }));
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              onExploreClick();
+            }
+          }}
+          placeholder="Search a topic, person, policy, place, or storyline"
+          aria-label="Search query"
+        />
+        <button
+          type="button"
+          className="vp-rh-fpill__explore"
+          onClick={onExploreClick}
+          disabled={open ? applyDisabled : false}
+          aria-disabled={open ? applyDisabled : false}
+        >
+          Explore
+        </button>
+      </div>
 
       {open && (
         <div className="vp-rh-fpill__drawer" role="dialog" aria-label="Filter feed">
@@ -446,43 +530,10 @@ export default function HomeFilterPill({
             )}
           </div>
 
-          {/* SEARCH card — spans full drawer width on desktop. */}
-          <div className="vp-rh-fpill__card vp-rh-fpill__card--full">
-            <p className="vp-rh-fpill__cardhead">Search</p>
-            <label className="vp-rh-fpill__lbl" htmlFor="vp-fpill-q">
-              Query
-            </label>
-            <input
-              id="vp-fpill-q"
-              type="search"
-              className="vp-rh-fpill__select"
-              placeholder="Search a topic, person, policy, place, or storyline"
-              value={draft.q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  commitApply();
-                }
-              }}
-            />
-          </div>
-
-          {/* Explore — spans full drawer width. Single commit path.
-              Owner-locked 2026-05-18: button text is "Explore", not
-              "Apply". Class name `vp-rh-fpill__apply` retained so the
-              shipped style block keeps owning this button without a
-              CSS rename. */}
-          <button
-            type="button"
-            className="vp-rh-fpill__apply"
-            onClick={commitApply}
-            disabled={applyDisabled}
-            aria-disabled={applyDisabled}
-            aria-label="Explore"
-          >
-            Explore
-          </button>
+          {/* Search lives on the pill chrome itself (not in the
+              drawer) so users can type without opening this panel.
+              Explore commits SCOPE + VIEW + TIME + the inline query
+              in a single navigation. */}
         </div>
       )}
     </div>

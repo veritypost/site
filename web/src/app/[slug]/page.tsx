@@ -44,6 +44,7 @@ type StoryRow = {
   id: string;
   slug: string;
   title: string;
+  description: string | null;
   published_at: string | null;
 };
 
@@ -88,7 +89,7 @@ const fetchBySlug = cache(async (
   const service = createServiceClient();
   const { data: story } = await service
     .from('stories')
-    .select('id, slug, title, published_at')
+    .select('id, slug, title, description, published_at')
     .eq('slug', slug)
     .maybeSingle();
   if (!story) return null;
@@ -468,7 +469,7 @@ export default async function ArticleSlugPage({
         }
         timelineSlot={
           <>
-            <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} storyTitle={story.title} showTease={false} articleCountReached={articleCountReached} currentArticleId={article.id} />
+            <TimelineSection events={!isAnon ? timeline : []} storySlug={story.slug} storyTitle={story.title} storyDescription={story.description} showTease={false} articleCountReached={articleCountReached} currentArticleId={article.id} />
             {/* Related stories — auto-fetched same-category, recent
                 first. Sits between the timeline and the article_rail
                 ad so readers can jump to adjacent coverage. */}

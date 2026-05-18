@@ -79,6 +79,21 @@ Read `web/src/lib/pipeline/editorial-guide.ts` directly. The short version:
 - The render's `formatDateShort` now produces `MMM DD, YYYY` for full-date events (e.g., "Jan 06, 2021"), so the year is always visible — critical when timelines span years (locked 2026-05-18). Don't strip the year back out.
 - `metadata.date_display` precedence: if set, it wins over `formatDateShort`. Use it for year-only ("2016") or month-year ("Mar 2025") entries.
 
+**Story title vs. article title vs. story description**
+- `stories.title` is **arc-level** — what the whole slug covers across time ("Trump's 2026 China visit", "Israel–Hamas war", "2026 Long Island Rail Road strike"). NOT today's headline.
+- `articles.title` is **today's beat** — the news event being covered in that specific article ("Trump and Xi wrap two-day China summit with no Taiwan deal").
+- `stories.description` (column added 2026-05-18) is a one-line summary of what the slug covers — appears in the timeline header below the story title. Example: "President Trump's May 2026 state visit to China for talks with Xi Jinping on Taiwan, trade, the Iran war and artificial intelligence, alongside Putin's follow-on Beijing visit."
+- **Pipeline gotcha (open):** the initial `persist_generated_article` RPC copies the article title into `stories.title` at story-creation time. This is wrong — story title should be arc-level from the start. Until the pipeline is fixed, manually rewrite `stories.title` + set `stories.description` after the first article in any story is generated.
+- Rendered by `TimelineSection.tsx` — title in `<h2>`, description in a paragraph below.
+
+**Timeline event bodies — hand-written, never AI**
+- Every event has an `event_body` field (2–4 sentences). The render surfaces it on click — each event label is a button with a ▸ caret; click expands the body underneath (wired 2026-05-18 in `TimelineSection.tsx`).
+- **Owner rule: event bodies are hand-written, not pipeline-generated.** The original pipeline filled them in to keep the schema non-null, but going forward they should be owner-edited. The label is the scannable headline; the body is the depth a curious reader clicks for.
+- **The right shape:** explain what the event *was*, name the players, give the consequence, anchor any number that matters. Don't just restate the label — add real information beyond what's in the headline.
+  - BAD body for label "Makary takes over": "Marty Makary becomes FDA commissioner." (restates label, no depth)
+  - GOOD body for label "Closed-primary law signed": "Gov. Jeff Landry signs Act 1 of the 2024 First Extraordinary Session, ending Louisiana's jungle primary for federal, state Supreme Court, PSC and BESE races. It takes effect Jan. 1, 2026, setting up the state's first closed-party Senate primary since the 1970s."
+- The pre-2026-05-18 pipeline-generated bodies on the first 10 articles vary in quality — some are substantive, many just restate the label. Audit and rewrite as you cover each story.
+
 ---
 
 ## What was done in the 2026-05-18 editorial pass

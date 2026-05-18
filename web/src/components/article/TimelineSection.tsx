@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, type CSSProperties } from 'react';
+
 export type TimelineItem = {
   id: string;
   event_date: string;
@@ -138,6 +140,37 @@ const NOW_DATE_STYLE: React.CSSProperties = {
   color: ACCENT,
 };
 
+const EXPAND_BUTTON_STYLE: CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  margin: 0,
+  font: 'inherit',
+  color: 'inherit',
+  textAlign: 'left',
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'baseline',
+  gap: 6,
+};
+
+const CARET_STYLE: CSSProperties = {
+  fontFamily: MONO,
+  fontSize: 10,
+  color: TEXT_SOFT,
+  flexShrink: 0,
+  width: 10,
+  display: 'inline-block',
+};
+
+const BODY_STYLE: CSSProperties = {
+  marginTop: 6,
+  fontFamily: SANS,
+  fontSize: 12,
+  lineHeight: 1.55,
+  color: TEXT_SOFT,
+};
+
 const READ_COVERAGE_STYLE: React.CSSProperties = {
   display: 'inline-block',
   marginTop: 6,
@@ -154,6 +187,7 @@ interface TimelineSectionProps {
   events: TimelineItem[];
   storySlug?: string;
   storyTitle?: string;
+  storyDescription?: string | null;
   showTease?: boolean;
   articleCountReached?: boolean;
   currentArticleId?: string;
@@ -185,6 +219,7 @@ export default function TimelineSection({
   events,
   storySlug,
   storyTitle,
+  storyDescription,
   showTease = false,
   articleCountReached = false,
   currentArticleId,
@@ -217,12 +252,26 @@ export default function TimelineSection({
   const lastArticleIdx = sorted.reduce<number>((acc, ev, i) => (ev.type === 'article' ? i : acc), -1);
   const nowIdx = lastArticleIdx >= 0 ? lastArticleIdx : sorted.length - 1;
 
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   const firstDate = sorted[0] ? formatStartedDate(sorted[0].event_date) : '';
 
   return (
     <section style={CARD_STYLE}>
       <div style={KICKER_STYLE}>Story timeline</div>
       {storyTitle && <h2 style={TITLE_STYLE}>{storyTitle}</h2>}
+      {storyDescription && (
+        <p style={{ margin: '4px 0 10px', fontFamily: SANS, fontSize: 13, lineHeight: 1.5, color: TEXT_MUTED }}>
+          {storyDescription}
+        </p>
+      )}
       <div style={COUNT_STYLE}>
         {sorted.length} {sorted.length === 1 ? 'event' : 'events'}
         {firstDate ? ` · started ${firstDate}` : ''}
@@ -236,6 +285,9 @@ export default function TimelineSection({
           const dateLabel = (((ev.metadata as Record<string, unknown> | null)?.date_display as string | undefined)
             || formatDateShort(ev.event_date));
 
+          const hasBody = ev.type === 'event' && ev.event_body && ev.event_body.trim().length > 0;
+          const isExpanded = expanded.has(ev.id);
+
           const labelNode = ev.type === 'article' && storySlug && ev.linked_article_id ? (
             <a
               href={`/${storySlug}?a=${ev.linked_article_id}`}
@@ -243,9 +295,23 @@ export default function TimelineSection({
             >
               {ev.event_label}
             </a>
+          ) : hasBody ? (
+            <button
+              type="button"
+              onClick={() => toggleExpanded(ev.id)}
+              aria-expanded={isExpanded}
+              style={EXPAND_BUTTON_STYLE}
+            >
+              <span style={CARET_STYLE}>{isExpanded ? '▾' : '▸'}</span>
+              <span style={{ textAlign: 'left' }}>{ev.event_label}</span>
+            </button>
           ) : (
             <>{ev.event_label}</>
           );
+
+          const bodyNode = hasBody && isExpanded ? (
+            <div style={BODY_STYLE}>{ev.event_body}</div>
+          ) : null;
 
           if (isNow) {
             const showReadLink = ev.type === 'article'
@@ -280,6 +346,7 @@ export default function TimelineSection({
               <span style={DOT_STYLE} />
               <span style={DATE_STYLE}>{dateLabel}</span>
               <div>{labelNode}</div>
+              {bodyNode}
             </div>
           );
         })}
