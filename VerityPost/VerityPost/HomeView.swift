@@ -510,8 +510,111 @@ struct HomeView: View {
 
     // MARK: - Hero / Supporting
 
+    // Size-class-gated hero. Compact (iPhone) renders the cream-on-cream
+    // typographic hero card that matches the web mobile vp-rh-story-card
+    // --hero (serif title, mono meta strip, no category-tinted banner).
+    // Regular (iPad) keeps the legacy colored-banner path untouched per
+    // owner ask 2026-05-17.
     @ViewBuilder
     private func heroBlock(_ story: Story) -> some View {
+        if hSize == .compact {
+            heroBlockCompact(story)
+        } else {
+            heroBlockLegacyBanner(story)
+        }
+    }
+
+    // iPhone hero — mirrors web/src/app/_home/slots/StoryCard.tsx hero
+    // variant (no category-tinted banner; cream-on-cream card; serif
+    // title; mono meta strip with auto-ticking "Last changed Xm ago").
+    // The 2-column timeline grid web uses at >=900px is intentionally
+    // omitted here per the mobile media query `display:none` in
+    // styles.tsx, and matches owner's "iPhone only in this pass" scope.
+    @ViewBuilder
+    private func heroBlockCompact(_ story: Story) -> some View {
+        NavigationLink(value: story) {
+            VStack(alignment: .leading, spacing: 0) {
+                if let cat = categoryName(for: story.categoryId) {
+                    // Kicker — mono caps in burgundy. 10pt, 0.1em tracking,
+                    // semibold. Subcategory not modeled on iOS Story yet;
+                    // category-only is the current parity baseline.
+                    Text(cat.uppercased())
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .tracking(1.0)
+                        .foregroundColor(VP.burgundy)
+                        .padding(.bottom, 14)
+                }
+                // Title — system serif at the redesigned hero size (~32pt
+                // on compact, scaling via @ScaledMetric `heroTitleSize`).
+                // Regular weight + tight tracking + tight line-height
+                // match the web `font-weight: 400` / `line-height: 1.05`
+                // / `letter-spacing: -0.02em`.
+                Text(story.title ?? "Untitled")
+                    .font(.system(size: heroTitleSize, weight: .regular, design: .serif))
+                    .tracking(-0.6)
+                    .lineSpacing(0)
+                    .foregroundColor(VP.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let excerpt = story.excerpt, !excerpt.isEmpty {
+                    // Dek — system 16pt regular on muted ink. Capped at
+                    // ~62ch via container max-width; line-spacing tuned
+                    // to match web's 1.5 line-height.
+                    Text(excerpt)
+                        .font(.system(size: 16, weight: .regular))
+                        .lineSpacing(6)
+                        .foregroundColor(VP.textMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 14)
+                }
+                // Meta strip — auto-ticks every 30s like web's
+                // RelativeTime component so "1m ago" → "2m ago" without
+                // a manual refresh. TimelineView wakes the closure on
+                // every tick and recomputes the bucketed label.
+                if let pub = story.publishedAt {
+                    TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                        Text("Last changed \(Self.relativeTimeBucket(pub, now: ctx.date))")
+                            .font(.system(size: 11, weight: .regular, design: .monospaced))
+                            .tracking(0.66)
+                            .foregroundColor(VP.textSoft)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.top, 18)
+                }
+            }
+            // 28pt internal padding matches web hero `.vp-rh-story-card
+            // --hero .vp-rh-story-card__link { padding: 28px }` on
+            // mobile. 28pt corner radius + 1pt VP.border + .vpShadowLg
+            // match the cluster chrome (white→ivory gradient dropped
+            // on mobile per `@media (max-width: 899px) { background:
+            // transparent }`; we use the plain VP.surface raised tone
+            // so the card sits on the cream canvas just like web).
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(28)
+            .background(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(VP.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .strokeBorder(VP.border, lineWidth: 1)
+            )
+            .vpShadowLg()
+            .padding(.horizontal, 20)
+            // Whole-card tap target: the NavigationLink wraps the entire
+            // VStack + chrome, so the hit-area covers padding + shadow.
+            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(heroAccessibilityLabel(for: story))
+            .accessibilityAddTraits(.isLink)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // Legacy iPad hero — category-tinted dark banner, full-bleed. Left
+    // untouched 2026-05-18 hero-parity step. Do NOT inline the compact
+    // hero's chrome here; iPad parity is a separate session.
+    @ViewBuilder
+    private func heroBlockLegacyBanner(_ story: Story) -> some View {
         let bg = heroBg(for: story)
         NavigationLink(value: story) {
             VStack(alignment: .leading, spacing: 0) {
@@ -548,15 +651,32 @@ struct HomeView: View {
             .padding(.vertical, 40)
             .frame(maxWidth: .infinity)
             .background(bg.ignoresSafeArea(edges: .horizontal))
-            // VoiceOver: collapse the 5 Text nodes into a single focusable
-            // element + composed label. `.ignore` (not `.combine`) so the
-            // headline reads first instead of being buried behind the
-            // category eyebrow + Breaking/Developing badge.
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(heroAccessibilityLabel(for: story))
             .accessibilityAddTraits(.isLink)
         }
         .buttonStyle(.plain)
+    }
+
+    // Bucketed relative time — mirrors web `relativeTimeBucket` in
+    // web/src/app/_home/_shared.ts. Ramp: Xs / Xm / Xh / Xd / Xw / Xmo
+    // / Xy. Identical thresholds (60s, 60m, 24h, 7d, 30d, 12mo) so an
+    // article that shows "5m ago" on iPhone matches web to the same
+    // bucket. `now` is parameterized so TimelineView's `ctx.date` can
+    // drive recomputation every 30s instead of stale-on-render.
+    fileprivate static func relativeTimeBucket(_ date: Date, now: Date = Date()) -> String {
+        let secs = max(0, Int(now.timeIntervalSince(date)))
+        if secs < 60 { return "\(secs)s ago" }
+        let mins = secs / 60
+        if mins < 60 { return "\(mins)m ago" }
+        let hrs = mins / 60
+        if hrs < 24 { return "\(hrs)h ago" }
+        let days = hrs / 24
+        if days < 7 { return "\(days)d ago" }
+        if days < 30 { return "\(days / 7)w ago" }
+        let months = days / 30
+        if months < 12 { return "\(months)mo ago" }
+        return "\(months / 12)y ago"
     }
 
     // Lead status row — mono pills under the hero deck. Mirrors the v2 web
