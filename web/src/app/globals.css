@@ -1424,6 +1424,33 @@ body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important
   opacity: 0.4;
   cursor: not-allowed;
 }
+/* Mobile: stack the summary on its own row inside the pill; search +
+   Explore wrap to row 2. The pill loses its full pill shape (radius
+   stays large but the inner rows make it read as a rounded rect
+   instead of a single capsule). Summary gets a hairline divider
+   below to separate it from the search row. */
+@media (max-width: 720px) {
+  .vp-rh-fpill__bar {
+    flex-wrap: wrap;
+    border-radius: 20px;
+  }
+  .vp-rh-fpill__summary {
+    flex: 1 1 100%;
+    width: 100%;
+    border-bottom: 1px solid var(--vp-border);
+    justify-content: space-between;
+  }
+  .vp-rh-fpill__divider {
+    display: none;
+  }
+  .vp-rh-fpill__qinput {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .vp-rh-fpill__explore {
+    flex: 0 0 auto;
+  }
+}
 .vp-rh-fpill__scope { font-weight: 600; }
 .vp-rh-fpill__sep {
   color: var(--vp-text-soft);
