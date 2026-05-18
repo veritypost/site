@@ -639,12 +639,15 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: 36,
-                  height: 36,
+                  // 44×44 hit target meets WCAG 2.5.5 (AAA) / Apple
+                  // HIG minimum. The 18px chevron stays the same; the
+                  // tappable area around it grows.
+                  width: 44,
+                  height: 44,
                   borderRadius: 999,
                   color: C.text,
                   textDecoration: 'none',
-                  marginLeft: -8,
+                  marginLeft: -10,
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -663,6 +666,17 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 letterSpacing: '0.02em',
                 color: 'var(--vp-ink)',
                 textDecoration: 'none',
+                // Wordmark is bare text; without a minimum hit area
+                // the tap target is just the glyph height. 44px tall
+                // padding meets WCAG 2.5.5; -8px negative left margin
+                // keeps the visible wordmark flush with the masthead
+                // edge while the invisible padding extends the tap
+                // surface to the right.
+                display: 'inline-flex',
+                alignItems: 'center',
+                minHeight: 44,
+                paddingInline: 8,
+                marginInlineStart: -8,
               }}
             >
               {BRAND_NAME_LOWER}
