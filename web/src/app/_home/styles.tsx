@@ -196,6 +196,257 @@ export default function RhStyles() {
       background: var(--vp-accent-soft);
     }
 
+    /* Two-band masthead browse nav.
+       Band 1 = the taxonomy spine: 20 top-level categories typeset as
+       quiet Plex Sans text links (NOT pills, NOT serif — research
+       panel converged: serif reserved for editorial body content,
+       all-caps mono reserved for kicker meta, Plex Sans 13/500 with
+       slight tracking reads as wayfinding furniture).
+       Band 2 = cross-cutting filters (Today / Most discussed / etc.)
+       in IBM Plex Mono 11px caps — visually demoted vs categories
+       because they are lenses applied to a destination, not
+       destinations themselves. */
+    /* Unified masthead block — search pill, catbar, subcatbar, and
+       filter strip all share one white surface with a single soft
+       border + rounded corners. Internal hairlines separate the
+       bands so it reads as one masthead module instead of four
+       disconnected bars on cream. */
+    .vp-rh-masthead {
+      width: 100%;
+      max-width: 1408px;
+      margin: 8px auto 0;
+      background: var(--vp-surface);
+      border: 1px solid var(--vp-border-soft);
+      border-radius: 22px;
+      box-shadow: 0 6px 18px var(--vp-shadow-sm);
+      /* No overflow: hidden — the catbar's hover flyouts need to
+         escape below the masthead. Rounded corners still trim the
+         filled background via border-radius alone. */
+      position: relative;
+      z-index: 5;
+    }
+    .vp-rh-masthead .vp-rh-search-wrap {
+      max-width: none;
+      margin: 0;
+    }
+    .vp-rh-masthead .vp-rh-search {
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      border-bottom: 1px solid var(--vp-border-soft);
+      max-width: none;
+      margin: 0;
+      padding: 14px 20px;
+      background: transparent;
+    }
+    .vp-rh-masthead .vp-rh-search:focus-within {
+      border-color: transparent;
+      border-bottom-color: var(--vp-accent);
+      box-shadow: none;
+    }
+    .vp-rh-catbar {
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      background: transparent;
+      border-top: 0;
+      border-bottom: 1px solid var(--vp-border-soft);
+    }
+    .vp-rh-catbar__inner {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      padding: 12px 24px;
+      /* overflow-x: clip allows overflow-y: visible (auto/scroll on
+         one axis forces the other to clip in CSS spec). Hover flyouts
+         can now escape downward without being clipped. Long category
+         lists overflow horizontally with no scrollbar — flex-wrap on
+         narrow viewports handles the wrap. */
+      overflow-x: clip;
+      overflow-y: visible;
+      white-space: nowrap;
+    }
+    /* Mobile: keep the catbar visible inline in the masthead, but
+       collapse it to a single horizontal-scroll row so 16 categories
+       don't wrap into 5 stacked rows of pills. Subcatbar gets the
+       same treatment when a topic is active. */
+    @media (max-width: 720px) {
+      .vp-rh-catbar__inner,
+      .vp-rh-subcatbar__inner {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        gap: 18px;
+        padding: 10px 16px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+      }
+      .vp-rh-catbar__inner::-webkit-scrollbar,
+      .vp-rh-subcatbar__inner::-webkit-scrollbar { display: none; }
+    }
+    .vp-rh-catbar__link {
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--vp-ink);
+      text-decoration: none;
+      flex-shrink: 0;
+      position: relative;
+      padding-bottom: 4px;
+      transition: color 0.12s;
+    }
+    .vp-rh-catbar__link:hover { color: var(--vp-accent); }
+    .vp-rh-catbar__link[aria-current="page"] {
+      font-weight: 600;
+      color: var(--vp-ink);
+    }
+    .vp-rh-catbar__link[aria-current="page"]::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 2px;
+      background: var(--vp-accent);
+    }
+    .vp-rh-catbar__link--home {
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--vp-text-soft);
+      padding-right: 12px;
+      border-right: 1px solid var(--vp-border-soft);
+    }
+    .vp-rh-catbar__link--home:hover { color: var(--vp-accent); }
+    /* Subcategory rail — only renders when an active topic is in
+       the URL. Shows the active category's subcategories so the
+       reader who clicked "Politics" sees Congress / Supreme Court /
+       White House / Elections without leaving the page. */
+    .vp-rh-subcatbar {
+      width: 100%;
+      max-width: 1408px;
+      margin: 0 auto;
+      background: var(--vp-surface);
+      border-bottom: 1px solid var(--vp-border-soft);
+    }
+    .vp-rh-subcatbar__inner {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 10px 24px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      white-space: nowrap;
+    }
+    .vp-rh-subcatbar__inner::-webkit-scrollbar { display: none; }
+    /* All-subs variant on the home — flex-wrap into multiple rows
+       grouped by parent. Each group reads: parent name kicker +
+       subs after it; thin divider between groups. */
+    .vp-rh-subcatbar__inner--wrap {
+      flex-wrap: wrap;
+      overflow-x: visible;
+      white-space: normal;
+      gap: 4px 14px;
+      padding: 10px 20px;
+    }
+    .vp-rh-subcat-group {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .vp-rh-subcat-group__head {
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--vp-text-soft);
+    }
+    .vp-rh-subcat-group__sep {
+      display: inline-block;
+      width: 1px;
+      height: 12px;
+      background: var(--vp-border);
+      align-self: center;
+      margin: 0 4px;
+    }
+    .vp-rh-subcatbar__link {
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--vp-text-muted);
+      text-decoration: none;
+      flex-shrink: 0;
+      transition: color 0.12s;
+    }
+    .vp-rh-subcatbar__link:hover { color: var(--vp-accent); }
+    .vp-rh-subcatbar__link[aria-current="page"] {
+      color: var(--vp-accent);
+      font-weight: 500;
+    }
+    /* Filter strip — mono caps, smaller than categories, visually
+       distinct as "lenses" rather than destinations. */
+    .vp-rh-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      align-items: center;
+      justify-content: center;
+      max-width: 1408px;
+      margin: 0 auto;
+      padding: 12px 24px;
+    }
+    .vp-rh-masthead .vp-rh-filters {
+      max-width: none;
+      margin: 0;
+      padding: 10px 24px;
+    }
+    @media (max-width: 720px) {
+      .vp-rh-filters {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        justify-content: flex-start;
+        gap: 14px;
+        padding: 10px 16px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+      }
+      .vp-rh-filters::-webkit-scrollbar { display: none; }
+      .vp-rh-masthead .vp-rh-filters { padding: 10px 16px; }
+    }
+    .vp-rh-masthead .vp-rh-subcatbar {
+      max-width: none;
+      margin: 0;
+    }
+    .vp-rh-filter {
+      display: inline-flex;
+      align-items: center;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--vp-text-soft);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color 0.12s;
+    }
+    .vp-rh-filter:hover { color: var(--vp-accent); }
+    .vp-rh-filter[aria-current="page"] {
+      color: var(--vp-accent);
+    }
+    .vp-rh-filter__sep {
+      display: inline-block;
+      width: 1px;
+      height: 14px;
+      background: var(--vp-border);
+      margin: 0 2px;
+    }
+
     /* New layout shape — full-width top band, 2-col body (main left +
        rail right, independent vertical stacks), full-width bottom band.
        Replaces the previous 12-col paired-row grid so rail-card
@@ -1896,9 +2147,10 @@ export default function RhStyles() {
     .vp-rh-square--ad { padding: 6px; }
     .vp-rh-square--empty { background: var(--rh-surface-soft); }
 
-    /* ===== Masthead (2026-05-18 redesign) =====
+    /* ===== New masthead (2026-05-18 redesign) =====
        Wordmark + compact filter pill + search-with-Explore + date stamp.
-       Replaces the legacy 4-band masthead. */
+       Replaces the legacy 4-band masthead. Old vp-rh-catbar / -subcatbar
+       / -filters rules stay above as dead code; nothing renders them. */
     .vp-rh-masthead2 {
       width: 100%;
       max-width: 1408px;
