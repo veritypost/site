@@ -23,6 +23,7 @@ import { Z } from '@/lib/zIndex';
 import { BRAND_NAME, BRAND_NAME_LOWER, BRAND_LEGAL_ENTITY } from '../lib/brand';
 import Avatar from '../components/Avatar';
 import GlobalHeaderControls from '../components/GlobalHeaderControls';
+import ThemeToggle from '../components/ThemeToggle';
 
 type ProfileRow = Pick<
   Tables<'users'>,
@@ -731,11 +732,14 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 <Avatar user={user} size={28} />
               </a>
             )}
-            {/* 2026-05-18 — owner-locked: top bar has NO sign-out link
-                (desktop or mobile) and NO theme toggle. Sign-out lives in
-                Profile → Sign out section (reachable via avatar on desktop
-                or the bottom-nav Profile tab on mobile). Theme toggle
-                lives in Profile → Appearance. */}
+            {/* Theme toggle re-added 2026-05-18 by owner request after
+                the earlier "no theme toggle on top bar" lock was reversed
+                — readers want the light/dark flip reachable from every
+                page without a Profile detour. The System tri-state still
+                lives in Profile → Appearance; the top-bar control is a
+                binary light↔dark flip per ThemeToggle.tsx's docstring.
+                Sign-out remains Profile-only. */}
+            <ThemeToggle />
           </div>
           </div>
         </header>

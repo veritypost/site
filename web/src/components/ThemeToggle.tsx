@@ -56,7 +56,7 @@ export default function ThemeToggle() {
 
   if (!mounted) {
     // Reserve the slot so the header doesn't reflow when the toggle hydrates.
-    return <div style={{ width: 36, height: 36 }} aria-hidden="true" />;
+    return <div style={{ width: 44, height: 44 }} aria-hidden="true" />;
   }
 
   const effective = resolveEffective(pref);
@@ -72,15 +72,18 @@ export default function ThemeToggle() {
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: 36,
-        height: 36,
+        // 44×44 to match the rest of the top-bar touch targets
+        // (back-arrow + wordmark hit-area). Sun/moon glyph stays
+        // 18px; the tappable circle grows.
+        width: 44,
+        height: 44,
         border: 'none',
         borderRadius: 999,
         background: 'transparent',
         color: 'var(--vp-ink)',
         cursor: 'pointer',
         padding: 0,
-        marginRight: -8,
+        marginRight: -10,
       }}
     >
       {effective === 'dark' ? (
