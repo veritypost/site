@@ -47,6 +47,15 @@ struct ProfileSectionDef: Identifiable, Hashable {
     var listID: String { id.rawValue }
 }
 
+/// Action card spec for the You section's grid of CTAs (web parity with
+/// YouSection.tsx's ActionCard list). `section` is the destination route.
+private struct ActionCardSpec: Identifiable {
+    let section: ProfileSectionID
+    let title: String
+    let body: String
+    var id: String { section.rawValue }
+}
+
 // MARK: - ProfileView
 
 struct ProfileView: View {
@@ -690,6 +699,7 @@ struct ProfileView: View {
                 statRow(user)
                 socialRow(user)
                 quickActionsRow(user)
+                actionCardsRow(user)
                 recentActivityPreview
                 achievementsPreview(user: user)
                 bioAndCard(user)
@@ -742,15 +752,22 @@ struct ProfileView: View {
                     }
                 }
 
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                // Web parity 2026-05-16: "Verity Score" caps muted label on
+                // top, then large numeric below — same vertical order as the
+                // editorial hero tile in YouSection.tsx. Weight 600 (not 800/
+                // heavy) per the demoted spec; iOS uses .rounded design so the
+                // numerals stay legible at this weight.
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Verity Score")
+                        .font(.system(size: VP.Size.xs, weight: .semibold))
+                        .tracking(0.3)
+                        .foregroundColor(VP.inkMuted)
                     Text(score.formatted())
-                        .font(.system(size: VP.Size.xl, weight: .heavy))
-                        .tracking(-0.5)
+                        .font(.system(size: VP.Size.xxl, weight: .semibold, design: .rounded))
+                        .tracking(-0.8)
                         .foregroundColor(VP.ink)
                         .contentTransition(.numericText())
-                    Text("Verity score")
-                        .font(.system(size: VP.Size.xs, weight: .semibold))
-                        .foregroundColor(VP.inkMuted)
+                        .accessibilityLabel("Verity Score \(score)")
                 }
             }
         }
@@ -769,19 +786,41 @@ struct ProfileView: View {
     }
 
     // MARK: - Stat row
+    // Web parity: YouSection.tsx renders Quizzes + Discussion StatTiles that
+    // deep-link to `?section=activity`. iOS mirrors this by wrapping each
+    // tile in a NavigationLink that pushes the Activity section. Memory rule:
+    // user-facing copy says "Discussion" not "Comments" (the Activity filter
+    // chip stays "Comments" since web's filter ID does too — this is the stat
+    // label only).
     @ViewBuilder
     private func statRow(_ user: VPUser) -> some View {
         HStack(spacing: 8) {
-            statTile(
-                label: "Quizzes passed",
-                value: "\((user.quizzesCompletedCount ?? 0).formatted())",
-                icon: "checkmark.seal.fill"
-            )
-            statTile(
-                label: "Comments",
-                value: "\((user.commentCount ?? 0).formatted())",
-                icon: "bubble.left.fill"
-            )
+            NavigationLink {
+                activitySection
+                    .navigationTitle("Activity")
+                    .navigationBarTitleDisplayMode(.inline)
+            } label: {
+                statTile(
+                    label: "Quizzes",
+                    value: "\((user.quizzesCompletedCount ?? 0).formatted())",
+                    icon: "checkmark.seal.fill"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Quizzes \((user.quizzesCompletedCount ?? 0)). Opens activity.")
+            NavigationLink {
+                activitySection
+                    .navigationTitle("Activity")
+                    .navigationBarTitleDisplayMode(.inline)
+            } label: {
+                statTile(
+                    label: "Discussion",
+                    value: "\((user.commentCount ?? 0).formatted())",
+                    icon: "bubble.left.fill"
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Discussion \((user.commentCount ?? 0)). Opens activity.")
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
@@ -901,6 +940,117 @@ struct ProfileView: View {
         .background(VP.card)
         .overlay(RoundedRectangle(cornerRadius: VP.radiusMD).stroke(VP.border))
         .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD))
+    }
+
+    // MARK: - Action cards row
+    // Web parity: YouSection.tsx renders an auto-fit grid of ActionCard
+    // links (Avatar & display name / Bio & expertise / Privacy / optional
+    // Expert queue + Family). iOS mirrors with NavigationLinks into the
+    // existing section destinations. Expert queue is launch-hidden across
+    // both platforms (commit 7b3541a1) so the iOS catalog never adds it.
+    @ViewBuilder
+    private func actionCardsRow(_ user: VPUser) -> some View {
+        let cards: [ActionCardSpec] = {
+            var arr: [ActionCardSpec] = [
+                ActionCardSpec(
+                    section: .identity,
+                    title: "Avatar & display name",
+                    body: "Set how you show up in comments, expert answers, and the leaderboard."
+                ),
+                ActionCardSpec(
+                    section: .publicProfile,
+                    title: "Bio & expertise",
+                    body: "A short blurb readers see next to your name. Helps replies land."
+                ),
+                ActionCardSpec(
+                    section: .privacy,
+                    title: "Privacy",
+                    body: "Who can message you, see your activity, or find your profile."
+                ),
+            ]
+            if canViewFamily {
+                arr.append(ActionCardSpec(
+                    section: .family,
+                    title: "Family",
+                    body: "Manage kid accounts, seats, and supervisors on your plan."
+                ))
+            }
+            return arr
+        }()
+
+        VStack(spacing: 8) {
+            ForEach(cards) { card in
+                NavigationLink {
+                    actionCardDestination(for: card.section)
+                } label: {
+                    actionCard(title: card.title, body: card.body)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(card.title). \(card.body)")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)   // S[7]=44 on web → toned down for phone density
+        .padding(.bottom, 12)
+    }
+
+    /// Standalone destination resolver for action-card NavigationLinks.
+    /// We can't reuse `detailView(for:user:)` here — the Swift compiler can't
+    /// infer the opaque return type when `detailView` (called inside
+    /// `youSection`) transitively references `youSection` via its `.you`
+    /// branch, creating a recursive type. Keeping a narrow dispatcher with
+    /// just the 4 You-section CTA targets sidesteps the cycle.
+    @ViewBuilder
+    private func actionCardDestination(for id: ProfileSectionID) -> some View {
+        switch id {
+        case .identity:
+            AccountSettingsView()
+                .environmentObject(auth)
+        case .publicProfile:
+            webFallback(title: "Bio & expertise",
+                        body: "Edit your public bio, avatar, and visibility on the web.",
+                        path: "/profile?section=public")
+        case .privacy:
+            DataPrivacyView()
+                .environmentObject(auth)
+        case .family:
+            FamilyDashboardView()
+                .environmentObject(auth)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func actionCard(title: String, body: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: VP.Size.md, weight: .semibold, design: .serif))
+                    .foregroundColor(VP.ink)
+                    .tracking(-0.3)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                Text(body)
+                    .font(.system(size: VP.Size.sm, weight: .regular))
+                    .foregroundColor(VP.inkMuted)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(VP.dim)
+                .padding(.top, 4)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(VP.surfaceRaised)
+        .overlay(
+            RoundedRectangle(cornerRadius: VP.radiusMD, style: .continuous)
+                .stroke(VP.borderSoft)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: VP.radiusMD, style: .continuous))
+        .vpShadowAmbient()
     }
 
     // MARK: - Recent activity preview (top 3, navigates to Activity section)
@@ -1189,7 +1339,7 @@ struct ProfileView: View {
                 HStack(spacing: 10) {
                     inlineStat(value: "\((user.verityScore ?? 0).formatted())", label: "score")
                     inlineStat(value: "\((user.quizzesCompletedCount ?? 0).formatted())", label: "quizzes")
-                    inlineStat(value: "\((user.commentCount ?? 0).formatted())", label: "comments")
+                    inlineStat(value: "\((user.commentCount ?? 0).formatted())", label: "discussion")
                 }
                 .padding(.top, 2)
             }
@@ -1467,7 +1617,7 @@ struct ProfileView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         StatRowView(label: "Read", value: catReads, total: max(totalReads, 1))
                         StatRowView(label: "Quizzes", value: catQuizzes, total: max(totalQuizzes, 1))
-                        StatRowView(label: "Comments", value: catComments, total: max(totalComments, 1))
+                        StatRowView(label: "Discussion", value: catComments, total: max(totalComments, 1))
                         StatRowView(label: "Upvotes", value: catUpv, total: max(totalUpvotes, 1))
 
                         if !subs.isEmpty {
@@ -1532,7 +1682,7 @@ struct ProfileView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     StatRowView(label: "Read", value: stats.reads, total: subThresholds.reads)
                     StatRowView(label: "Quizzes", value: stats.quizzes, total: subThresholds.quizzes)
-                    StatRowView(label: "Comments", value: stats.comments, total: subThresholds.comments)
+                    StatRowView(label: "Discussion", value: stats.comments, total: subThresholds.comments)
                     StatRowView(label: "Upvotes", value: upv, total: subThresholds.upvotes)
                 }
                 .padding(.leading, 8)
