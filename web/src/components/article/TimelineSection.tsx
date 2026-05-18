@@ -252,10 +252,16 @@ export default function TimelineSection({
               && ev.linked_article_id
               && ev.linked_article_id !== currentArticleId
               && storySlug;
+            const parsed = parseIsoDate(ev.event_date);
+            const now = new Date();
+            const isActuallyToday = !!parsed
+              && parsed.y === now.getUTCFullYear()
+              && parsed.m === now.getUTCMonth() + 1
+              && parsed.d === now.getUTCDate();
             return (
               <div key={ev.id} style={NOW_EVENT_STYLE}>
                 <span style={NOW_DOT_STYLE} />
-                <span style={NOW_DATE_STYLE}>Today</span>
+                <span style={NOW_DATE_STYLE}>{isActuallyToday ? 'Today' : dateLabel}</span>
                 <div>{labelNode}</div>
                 {showReadLink && (
                   <a
