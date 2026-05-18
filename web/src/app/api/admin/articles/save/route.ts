@@ -333,5 +333,11 @@ export async function POST(request: Request) {
     },
   });
 
+  // Bust the home layout cache so a save shows up on / immediately
+  // (new article, status flip to published, headline/excerpt edits,
+  // etc.). Matches the pattern in admin PATCH/DELETE; without it
+  // readers wait on the 60s TTL safety net.
+  revalidateTag('home-layout');
+
   return NextResponse.json({ ok: true, article_id: articleId, story_id: storyId, entry_id_remap: entryIdRemap });
 }

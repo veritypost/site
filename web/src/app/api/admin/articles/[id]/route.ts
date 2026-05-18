@@ -857,6 +857,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   // Re-read to return fresh state to the client so the UI can settle
   // without a second round-trip.
   const after = await fetchArticleWithAudience(service, id);
+
+  // Bust the home layout cache so edits to articles surfaced on / —
+  // title, excerpt, cover_image_url, is_breaking, is_developing,
+  // status flips, etc. — show up immediately instead of waiting on
+  // the 60s TTL safety net.
+  revalidateTag('home-layout');
+
   return NextResponse.json({
     ok: true,
     audience,
@@ -921,6 +928,11 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     console.error('[admin.articles.delete]', error.message);
     return NextResponse.json({ error: 'Could not delete article' }, { status: 500 });
   }
+
+  // A soft-deleted article should disappear from / immediately. The
+  // home layout cache reads articles eagerly so without an explicit
+  // bust here readers would still see the deleted row for up to 60s.
+  revalidateTag('home-layout');
 
   return NextResponse.json({ ok: true });
 }
