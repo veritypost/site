@@ -255,12 +255,19 @@ export default function HomeSearch({
               inputRef.current?.blur();
             }
           }}
-          placeholder="Search stories, topics, people…  (⌘K)"
+          placeholder="Search a topic, person, policy, place, or storyline"
           className="vp-rh-search__input"
           aria-label="Search query"
           aria-activedescendant={activeIdx >= 0 ? `vp-rh-hit-${activeIdx}` : undefined}
           autoComplete="off"
         />
+        <button
+          type="submit"
+          className="vp-rh-search__explore"
+          aria-label="Explore search"
+        >
+          Explore
+        </button>
       </div>
       {showResults && (
         <div className="vp-rh-search-results" role="listbox">

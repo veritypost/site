@@ -21,16 +21,18 @@ type SearchParams = Record<string, string | undefined>;
 const CHIP_KEYS = new Set([
   'today',
   'this_week',
+  'this_month',
+  'new_24h',
   'developing',
-  'updated_recently',
 ]);
 const SORT_KEYS = new Set([
   'most_discussed',
   'most_recent_comments',
   'most_viewed',
   'newest_article',
+  'updated_recently',
 ]);
-const TYPE_KEYS = new Set(['questions']);
+const TYPE_KEYS = new Set(['questions', 'no_discussion']);
 
 export default async function HomePage({
   searchParams,

@@ -2146,6 +2146,242 @@ export default function RhStyles() {
     }
     .vp-rh-square--ad { padding: 6px; }
     .vp-rh-square--empty { background: var(--rh-surface-soft); }
+
+    /* ===== New masthead (2026-05-18 redesign) =====
+       Wordmark + compact filter pill + search-with-Explore + date stamp.
+       Replaces the legacy 4-band masthead. Old vp-rh-catbar / -subcatbar
+       / -filters rules stay above as dead code; nothing renders them. */
+    .vp-rh-masthead2 {
+      width: 100%;
+      max-width: 1408px;
+      margin: 12px auto 0;
+      padding: 0 8px;
+      box-sizing: border-box;
+    }
+    .vp-rh-masthead2__row {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .vp-rh-masthead2__wordmark {
+      font-family: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+      font-size: 24px;
+      line-height: 1;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--vp-ink);
+      text-decoration: none;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .vp-rh-masthead2__search {
+      /* Equal share with the filter pill — owner-locked 2026-05-18.
+         Both flex: 1 1 0 so they split the available row width. */
+      flex: 1 1 0;
+      min-width: 0;
+      position: relative;
+    }
+    .vp-rh-masthead2__search .vp-rh-search-wrap {
+      max-width: none;
+      margin: 0;
+    }
+    .vp-rh-masthead2__search .vp-rh-search {
+      margin: 0;
+      max-width: none;
+    }
+    @media (max-width: 720px) {
+      .vp-rh-masthead2 { padding: 0 4px; }
+      .vp-rh-masthead2__row {
+        gap: 10px;
+      }
+      .vp-rh-masthead2__wordmark { font-size: 20px; }
+      .vp-rh-masthead2__search {
+        flex: 1 1 100%;
+        order: 99;
+      }
+    }
+
+    /* Explore button on the search pill — black ink bg, cream text. */
+    .vp-rh-search__explore {
+      flex-shrink: 0;
+      padding: 7px 16px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--vp-ink);
+      color: var(--vp-bg);
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: opacity 0.12s;
+      margin-left: 4px;
+    }
+    .vp-rh-search__explore:hover { opacity: 0.85; }
+    .vp-rh-search__explore:focus-visible {
+      outline: 2px solid var(--vp-accent);
+      outline-offset: 2px;
+    }
+
+    /* ===== Compact filter pill + drawer ===== */
+    .vp-rh-fpill {
+      position: relative;
+      /* Share the row with the search pill — owner-locked 2026-05-18.
+         flex:1 on both so neither dominates. min-width keeps the pill
+         from collapsing below its label content. */
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .vp-rh-fpill__trigger {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 14px;
+      border: 1px solid var(--vp-border);
+      border-radius: 999px;
+      background: var(--vp-surface);
+      color: var(--vp-ink);
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      transition: border-color 0.12s, box-shadow 0.12s;
+      box-shadow: 0 2px 6px var(--vp-shadow-sm);
+      text-align: left;
+    }
+    .vp-rh-fpill__trigger:hover {
+      border-color: var(--vp-accent);
+    }
+    .vp-rh-fpill__trigger[aria-expanded="true"] {
+      border-color: var(--vp-accent);
+      box-shadow: 0 0 0 3px var(--vp-accent-soft);
+    }
+    .vp-rh-fpill__scope { font-weight: 600; }
+    .vp-rh-fpill__sep {
+      color: var(--vp-text-soft);
+    }
+    .vp-rh-fpill__view,
+    .vp-rh-fpill__time {
+      color: var(--vp-text-muted);
+    }
+    .vp-rh-fpill__caret {
+      color: var(--vp-text-soft);
+      margin-left: 2px;
+    }
+
+    .vp-rh-fpill__drawer {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      z-index: 50;
+      width: min(720px, 92vw);
+      background: var(--vp-surface);
+      border: 1px solid var(--vp-border);
+      border-radius: 16px;
+      box-shadow: 0 18px 48px var(--vp-shadow-lg);
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      animation: vp-rh-fpill-in 0.14s ease-out;
+    }
+    @media (max-width: 720px) {
+      .vp-rh-fpill__drawer {
+        grid-template-columns: 1fr;
+        width: min(360px, 92vw);
+      }
+    }
+    @keyframes vp-rh-fpill-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .vp-rh-fpill__card {
+      border: 1px solid var(--vp-border-soft);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: var(--vp-bg);
+    }
+    .vp-rh-fpill__cardhead {
+      margin: 0 0 8px;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--vp-text-soft);
+    }
+    .vp-rh-fpill__lbl {
+      display: block;
+      font-family: var(--font-ibm-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--vp-text-soft);
+      margin: 6px 0 4px;
+    }
+    .vp-rh-fpill__select,
+    .vp-rh-fpill__date {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 10px;
+      border: 1px solid var(--vp-border);
+      border-radius: 8px;
+      background: var(--vp-surface);
+      color: var(--vp-ink);
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+    }
+    .vp-rh-fpill__select:focus,
+    .vp-rh-fpill__date:focus {
+      outline: 2px solid var(--vp-accent);
+      outline-offset: 1px;
+    }
+    .vp-rh-fpill__opts {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .vp-rh-fpill__opt {
+      text-align: left;
+      padding: 6px 10px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--vp-ink);
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .vp-rh-fpill__opt:hover { background: var(--vp-accent-soft); }
+    .vp-rh-fpill__opt.is-active {
+      background: var(--vp-accent-soft);
+      color: var(--vp-accent);
+      font-weight: 600;
+    }
+    .vp-rh-fpill__range {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--vp-border-soft);
+    }
+    .vp-rh-fpill__apply {
+      margin-top: 8px;
+      width: 100%;
+      padding: 7px 12px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--vp-ink);
+      color: var(--vp-bg);
+      font-family: var(--font-ibm-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .vp-rh-fpill__apply:hover { opacity: 0.85; }
   `;
   return <style dangerouslySetInnerHTML={{ __html: css }} />;
 }

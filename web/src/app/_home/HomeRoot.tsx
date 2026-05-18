@@ -158,8 +158,22 @@ export default async function HomeRoot({
       q = q.gte('published_at', new Date(now - day).toISOString());
     else if (activeFilter.chip === 'this_week')
       q = q.gte('published_at', new Date(now - 7 * day).toISOString());
-    else if (activeFilter.chip === 'updated_recently')
+    else if (activeFilter.chip === 'this_month') {
+      // First moment of the current calendar month (server local UTC).
+      const d = new Date();
+      const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+      q = q.gte('published_at', start.toISOString());
+    } else if (activeFilter.chip === 'new_24h')
+      q = q.gte('published_at', new Date(now - day).toISOString());
+    else if (activeFilter.sort === 'updated_recently')
       q = q.gte('updated_at', new Date(now - 7 * day).toISOString());
+
+    // No-discussion lens — articles with zero comments. Renders as a
+    // VIEW pick in the new filter pill; backend stays a simple
+    // .or() against comment_count.
+    if (activeFilter.type === 'no_discussion') {
+      q = q.or('comment_count.is.null,comment_count.eq.0');
+    }
 
     if (activeFilter.topic) {
       const catId = slugToId.get(activeFilter.topic);
@@ -420,6 +434,20 @@ export default async function HomeRoot({
     };
   }
 
+  // Time keys belong to chip; view keys cover sort + type (+ some chips
+  // like new_24h that are conceptually views). Split them out so the
+  // filter pill can render the SCOPE / VIEW / TIME summary cleanly.
+  const TIME_CHIPS = new Set(['today', 'this_week', 'this_month']);
+  const activeTime = activeFilter?.chip && TIME_CHIPS.has(activeFilter.chip)
+    ? activeFilter.chip
+    : undefined;
+  const activeView =
+    activeFilter?.sort ??
+    activeFilter?.type ??
+    (activeFilter?.chip && !TIME_CHIPS.has(activeFilter.chip)
+      ? activeFilter.chip
+      : undefined);
+
   return (
     <HomeLayout
       layout={filledLayout}
@@ -428,7 +456,10 @@ export default async function HomeRoot({
       heroTimeline={heroTimeline}
       heroMeta={heroMeta}
       activeTopic={activeFilter?.topic}
-      activeChip={activeFilter?.chip ?? activeFilter?.sort ?? activeFilter?.type}
+      activeView={activeView}
+      activeTime={activeTime}
+      fromDate={activeFilter?.from}
+      toDate={activeFilter?.to}
       activeQ={activeFilter?.q}
     />
   );
