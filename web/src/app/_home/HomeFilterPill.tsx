@@ -534,10 +534,43 @@ export default function HomeFilterPill({
             )}
           </div>
 
-          {/* Search lives on the pill chrome itself (not in the
-              drawer) so users can type without opening this panel.
-              Explore commits SCOPE + VIEW + TIME + the inline query
-              in a single navigation. */}
+          {/* SEARCH card — mobile-only. Desktop has the search input
+              on the pill chrome itself; phones don't have room for
+              inline search, so the drawer carries the field at that
+              size. Spans full drawer width. */}
+          <div className="vp-rh-fpill__card vp-rh-fpill__card--full vp-rh-fpill__card--mobile">
+            <p className="vp-rh-fpill__cardhead">Search</p>
+            <input
+              type="search"
+              className="vp-rh-fpill__select"
+              placeholder="Search a topic, person, policy, place, or storyline"
+              value={draft.q}
+              onChange={(e) => {
+                setDraft((prev) => ({ ...prev, q: e.target.value }));
+                setQInput(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitApply();
+                }
+              }}
+            />
+          </div>
+
+          {/* In-drawer Explore — mobile-only. The pill's inline Explore
+              button is hidden on phones, so the drawer needs its own
+              commit affordance. Same handler as the inline button. */}
+          <button
+            type="button"
+            className="vp-rh-fpill__apply vp-rh-fpill__apply--mobile"
+            onClick={commitApply}
+            disabled={applyDisabled}
+            aria-disabled={applyDisabled}
+            aria-label="Explore"
+          >
+            Explore
+          </button>
         </div>
       )}
     </div>

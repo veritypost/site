@@ -1424,31 +1424,43 @@ body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important
   opacity: 0.4;
   cursor: not-allowed;
 }
-/* Mobile: stack the summary on its own row inside the pill; search +
-   Explore wrap to row 2. The pill loses its full pill shape (radius
-   stays large but the inner rows make it read as a rounded rect
-   instead of a single capsule). Summary gets a hairline divider
-   below to separate it from the search row. */
+/* Mobile: pill collapses to summary-only capsule so it fits inline
+   with the wordmark in the header. Search input + EXPLORE button
+   move into the drawer at this size (the drawer's bottom CTA does
+   the commit). Capsule shape preserved. */
 @media (max-width: 720px) {
-  .vp-rh-fpill__bar {
-    flex-wrap: wrap;
-    border-radius: 20px;
-  }
-  .vp-rh-fpill__summary {
-    flex: 1 1 100%;
-    width: 100%;
-    border-bottom: 1px solid var(--vp-border);
-    justify-content: space-between;
-  }
-  .vp-rh-fpill__divider {
+  .vp-rh-fpill__divider,
+  .vp-rh-fpill__qinput,
+  .vp-rh-fpill__explore {
     display: none;
   }
-  .vp-rh-fpill__qinput {
-    flex: 1 1 0;
-    min-width: 0;
+  .vp-rh-fpill__summary {
+    padding: 8px 14px;
+    font-size: 12px;
+    gap: 6px;
   }
-  .vp-rh-fpill__explore {
-    flex: 0 0 auto;
+  /* Trim the summary to "Scope ▾" on phones — Scope · View · Time
+     would overflow the wordmark+pill+auth row. Tap the pill to see
+     all three axes in the drawer. */
+  .vp-rh-fpill__summary .vp-rh-fpill__sep,
+  .vp-rh-fpill__summary .vp-rh-fpill__view,
+  .vp-rh-fpill__summary .vp-rh-fpill__time {
+    display: none;
+  }
+}
+/* Mobile-only drawer extras: SEARCH card + in-drawer Explore button.
+   Both hidden on desktop (the pill chrome owns the search input
+   and Explore button there). */
+.vp-rh-fpill__card--mobile,
+.vp-rh-fpill__apply--mobile {
+  display: none;
+}
+@media (max-width: 720px) {
+  .vp-rh-fpill__card--mobile {
+    display: grid;
+  }
+  .vp-rh-fpill__apply--mobile {
+    display: block;
   }
 }
 .vp-rh-fpill__scope { font-weight: 600; }
@@ -1609,16 +1621,21 @@ body[data-vp-article] div[data-vp-chrome-wrapper] { padding-bottom: 0 !important
   max-width: 720px;
   width: 100%;
 }
-/* Mobile fallback: pill drops to its own row beneath wordmark + auth.
-   Search-inside-pill stays usable; the whole merged control gets
-   full width on narrow viewports. */
+/* Mobile: pill stays inline with wordmark + auth on row 1. The pill
+   itself collapses to a summary-only capsule (search input + Explore
+   button hidden via the .vp-rh-fpill__bar mobile rules; user taps
+   the pill to open the drawer where they pick filters + type query
+   + commit). Grid columns become auto | 1fr | auto so wordmark and
+   auth size to content and the pill takes the remaining row width. */
 @media (max-width: 720px) {
   .vp-global-header__inner {
-    grid-template-columns: 1fr auto !important;
-    row-gap: 8px !important;
+    grid-template-columns: auto 1fr auto !important;
+    padding: 4px 10px !important;
+    column-gap: 8px !important;
   }
   .vp-global-header .vp-gh-controls__pill {
-    grid-column: 1 / -1;
+    grid-column: 2;
+    min-width: 0;
     max-width: none;
   }
 }
