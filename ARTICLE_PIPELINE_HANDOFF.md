@@ -73,6 +73,12 @@ Read `web/src/lib/pipeline/editorial-guide.ts` directly. The short version:
 - Every event must stand alone — some readers only read the timeline.
 - **Mini-headline format, not slug format.** Owner rule, locked 2026-05-18. Each label is subject + verb + something specific — like a small headline, not a tag. "U.S. drones deployed" fails (slug-y); "U.S. deploys drones to Nigeria over Christian violence" passes. If the event can't justify a substantive label, it doesn't belong on the timeline — cut it. Don't pad timelines with thin events to hit a count.
 
+**Timeline event dates — precision and display**
+- `event_date` is always a real `timestamptz` and drives sort order. Use the most specific date you actually know.
+- **Don't fake the day.** If you only know the month, do NOT use the 1st of that month and let the render show "Jan 01" — set `metadata.date_display` to a string at the precision you actually have ("Mar 2025", "1976") and the render will use that override instead.
+- The render's `formatDateShort` now produces `MMM DD, YYYY` for full-date events (e.g., "Jan 06, 2021"), so the year is always visible — critical when timelines span years (locked 2026-05-18). Don't strip the year back out.
+- `metadata.date_display` precedence: if set, it wins over `formatDateShort`. Use it for year-only ("2016") or month-year ("Mar 2025") entries.
+
 ---
 
 ## What was done in the 2026-05-18 editorial pass

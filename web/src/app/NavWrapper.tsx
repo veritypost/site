@@ -416,27 +416,30 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     left: 0,
     right: 0,
     zIndex: Z.CRITICAL_NAV,
-    // v2 chrome — cream-translucent + warm border. Mirrors the v2
-    // article + home migration's choice to lock the light burgundy
-    // palette across modes; previous theme-aware --bg-rgb flip is
-    // gone to keep the masthead consistent with the rest of v2.
+    // v2 chrome — cream-translucent + warm border. Bg spans the full
+    // viewport so the blur reads across the whole top edge; the inner
+    // wrapper centers the controls to the 1408px content rail so
+    // wordmark + pill align with the page content below.
     background: 'rgba(var(--vp-sticky-rgb), 0.92)',
     backdropFilter: 'blur(12px)',
     borderBottom: '1px solid var(--vp-border)',
-    // 2026-05-18 — header is now a multi-zone bar (wordmark + filter
-    // pill + search + auth controls). Height auto-grows on mobile when
-    // the controls wrap to additional rows. The reserved-height var
-    // below tracks the desktop single-row case; mobile pages don't
-    // sticky-offset against this var so the additional rows are fine.
+    minHeight: TOP_BAR_HEIGHT,
+    paddingTop: 'env(safe-area-inset-top)',
+    boxSizing: 'content-box',
+  };
+  const topBarInnerStyle: CSSProperties = {
+    // Centered content rail — matches the home/article max-width so
+    // the wordmark + pill sit directly above the content below.
+    maxWidth: 1408,
+    margin: '0 auto',
+    padding: '4px 16px',
     display: 'flex',
     alignItems: 'center',
     flexWrap: 'wrap',
     columnGap: 12,
     rowGap: 6,
     minHeight: TOP_BAR_HEIGHT,
-    padding: '4px 16px',
-    paddingTop: 'calc(env(safe-area-inset-top) + 4px)',
-    boxSizing: 'content-box',
+    boxSizing: 'border-box',
   };
   // Whether the current route should surface the filter pill + search
   // in the global header. Auth-route hides (login / signup / welcome
@@ -594,6 +597,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
 
       {showTopBar && (
         <header style={topBarStyle} className="vp-global-header">
+          <div style={topBarInnerStyle} className="vp-global-header__inner">
           <div className="vp-global-header__wordmark" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {!topBarActive && (
               <a
@@ -686,6 +690,7 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
                 Profile → Sign out section (reachable via avatar on desktop
                 or the bottom-nav Profile tab on mobile). Theme toggle
                 lives in Profile → Appearance. */}
+          </div>
           </div>
         </header>
       )}

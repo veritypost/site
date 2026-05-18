@@ -172,7 +172,7 @@ function parseIsoDate(iso: string): { y: number; m: number; d: number } | null {
 function formatDateShort(iso: string): string {
   const parsed = parseIsoDate(iso);
   if (!parsed) return iso;
-  return `${MONTHS_SHORT[parsed.m - 1]} ${String(parsed.d).padStart(2, '0')}`;
+  return `${MONTHS_SHORT[parsed.m - 1]} ${String(parsed.d).padStart(2, '0')}, ${parsed.y}`;
 }
 
 function formatStartedDate(iso: string): string {
