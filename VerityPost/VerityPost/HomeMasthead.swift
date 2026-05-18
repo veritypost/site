@@ -2,77 +2,158 @@ import SwiftUI
 
 // MARK: - HomeFilter
 //
-// State shape for the inline catbar + filter strip masthead. Mirrors web's
-// vp-rh-masthead query params: ?<chip-key> for sort/time chips, /<slug>
-// path for active topic. `topicSlug` is the slug of the currently selected
-// top-level OR sub-category (web treats subcategories as first-class
-// active topics — see HomeLayout.tsx activeCat lookup).
+// State shape for the compact masthead's filter pill + Explore search.
+// Mirrors web's HomeFilterPill contract (web/src/app/_home/HomeFilterPill.tsx
+// + web/src/app/page.tsx CHIP_KEYS / SORT_KEYS / TYPE_KEYS) so the same
+// filter state produces the same feed on both platforms.
 //
-// "chip" covers time-window filters (today / this_week / developing /
-// updated_recently / newest_article). "sort" covers the right-hand sort
-// chips (most_discussed / most_recent_comments / most_viewed). "questions"
-// is its own boolean because web routes it as `/?questions` and it can
-// stack with a topic. Mutually exclusive within group is enforced at the
-// tap site, not by the data shape — keeps loadData simple.
+// Three axes — SCOPE (topic/sub slugs), VIEW (8 options), TIME (4 options
+// + a Date Range pair). `topicSlug == nil` means "Home" (no category
+// filter); when topicSlug points at a sub, the parent rolls up via
+// `subcategory_id` rather than `category_id` in the feed query.
 struct HomeFilter: Equatable, Hashable {
-    var topicSlug: String? = nil
-    var chip: String? = nil
-    var sort: String? = nil
-    var questions: Bool = false
+    // VIEW — the 8 lenses that map to web's `sort` / `type` / chip-like-`view`
+    // keys. Ordering matches the drawer.
+    enum View: String, CaseIterable, Identifiable, Hashable {
+        case top                 // default — no extra filter, no sort override
+        case mostCommented       // sort comment_count desc nullsLast
+        case mostViewed          // sort view_count desc nullsLast
+        case new                 // published_at >= now - 24h
+        case noDiscussion        // comment_count is null OR = 0
+        case openQuestions       // articles with intent='question' comments
+        case updatedTimelines    // sort updated_at desc (timelines-updated proxy)
+        case newest              // sort published_at desc
+        var id: String { rawValue }
 
-    var isAll: Bool { topicSlug == nil && chip == nil && sort == nil && !questions }
+        var label: String {
+            switch self {
+            case .top:              return "Top Stories"
+            case .mostCommented:    return "Most Commented"
+            case .mostViewed:       return "Most Viewed"
+            case .new:              return "New"
+            case .noDiscussion:     return "No Discussion Yet"
+            case .openQuestions:    return "Open Questions"
+            case .updatedTimelines: return "Updated Timelines"
+            case .newest:           return "Newest"
+            }
+        }
+    }
+
+    // TIME — Today / Week / Month / explicit Date Range. dateRange writes
+    // dateFrom + dateTo; the other three derive their lower bound from
+    // calendar boundaries at load time.
+    enum Time: String, CaseIterable, Identifiable, Hashable {
+        case today
+        case thisWeek
+        case thisMonth
+        case dateRange
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .today:     return "Today"
+            case .thisWeek:  return "This Week"
+            case .thisMonth: return "This Month"
+            case .dateRange: return "Date Range"
+            }
+        }
+    }
+
+    var topicSlug: String? = nil      // nil = Home; otherwise resolves to a parent or sub
+    var view: View = .top
+    var time: Time = .today
+    var dateFrom: Date? = nil         // only populated when time == .dateRange
+    var dateTo: Date? = nil
+
+    /// Default state — Home + Top + Today + no explicit dates. The
+    /// home_layouts data path only renders for `isAll` since pinned slots
+    /// are an editorial choice for All, not for an arbitrary slice.
+    var isAll: Bool {
+        topicSlug == nil
+            && view == .top
+            && time == .today
+            && dateFrom == nil
+            && dateTo == nil
+    }
+
+    // MARK: - Pill label
+    //
+    // Compact `Scope · View · Time` summary. Examples:
+    //   - "Home · Top Stories · Today"
+    //   - "Politics → Congress · Most Commented · This Month"
+    //   - "Technology → AI · Newest · 09/01/25 → 09/30/25"
+    func pillLabelParts(categories: [VPCategory]) -> (scope: String, view: String, time: String) {
+        let scope = scopeLabel(categories: categories)
+        let viewLabel = view.label
+        let timeLabel: String
+        if time == .dateRange, dateFrom != nil || dateTo != nil {
+            timeLabel = "\(Self.shortDate(dateFrom)) → \(Self.shortDate(dateTo))"
+        } else {
+            timeLabel = time.label
+        }
+        return (scope, viewLabel, timeLabel)
+    }
+
+    private func scopeLabel(categories: [VPCategory]) -> String {
+        guard let slug = topicSlug,
+              let exact = categories.first(where: { $0.slug == slug })
+        else { return "Home" }
+        if let parentId = exact.categoryId,
+           let parent = categories.first(where: { $0.id == parentId }) {
+            return "\(parent.displayName) → \(exact.displayName)"
+        }
+        // Parent itself selected — show "<Parent> → All" to mirror web.
+        return "\(exact.displayName) → All"
+    }
+
+    private static let shortDateFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "MM/dd/yy"
+        return f
+    }()
+
+    private static func shortDate(_ d: Date?) -> String {
+        guard let d else { return "" }
+        return shortDateFmt.string(from: d)
+    }
 }
 
 // MARK: - HomeMasthead
 //
-// Compact-width-only masthead that mirrors the web mobile masthead
-// structure (web/src/app/_home/HomeLayout.tsx + styles.tsx vp-rh-masthead).
-// Rows: wordmark+auth · search pill · catbar · filter strip · (optional)
-// subcategory strip. The whole block sits on VP.surface with rounded
-// corners + 1pt VP.borderSoft hairlines between rows.
+// Compact-width-only masthead. Three rows:
+//   1) Verity Post wordmark + theme + auth control
+//   2) Filter pill — `Scope · View · Time`, taps open HomeFilterPicker sheet
+//   3) Search pill + black "Explore" button — routes through FindView
 //
-// Wired in HomeView only when horizontalSizeClass == .compact. Regular
-// width (iPad) keeps the legacy `topBar` + modal HomeSectionsSheet path
-// untouched per owner ask.
+// Mirrors web's home masthead after commit 318f98ec (replaced the
+// catbar + filter strip with a single compact pill + standalone Explore
+// search). iPad (regular hSize) keeps the legacy `topBar` path on the
+// HomeView side — this view is never mounted there.
 struct HomeMasthead: View {
     @EnvironmentObject var auth: AuthViewModel
     let categories: [VPCategory]
     @Binding var filter: HomeFilter
-    /// Theme cycle binding — same @AppStorage key the legacy topBar uses.
+    /// Theme cycle binding — shares @AppStorage("vp_theme") with the legacy
+    /// topBar so the masthead button writes to the same storage VerityPostApp
+    /// uses for .preferredColorScheme().
     @Binding var vpTheme: String
-    /// Tap forwards into FindView for now. Owner ask: search is being
-    /// reworked separately, push to FindView rather than over-invest on an
-    /// inline dropdown in this pass.
+    /// Tap target for the Explore button + search pill. The owner-deferred
+    /// search rework lands separately — for now both controls push the
+    /// existing FindView.
     var onTapSearch: () -> Void
     var onSignIn: () -> Void
     var onSignOut: () -> Void
 
-    private static let filterItems: [FilterItem] = [
-        .chip(key: "today", label: "Today"),
-        .chip(key: "this_week", label: "This week"),
-        .chip(key: "developing", label: "Developing"),
-        .chip(key: "updated_recently", label: "Recent updates"),
-        .chip(key: "newest_article", label: "Recently posted"),
-        .separator,
-        .sort(key: "most_discussed", label: "Most discussed"),
-        .sort(key: "most_recent_comments", label: "Most recent comments"),
-        .sort(key: "most_viewed", label: "Most viewed"),
-        .questions(key: "questions", label: "Questions"),
-    ]
+    @State private var showPicker = false
 
     var body: some View {
         VStack(spacing: 0) {
             wordmarkRow
             Rectangle().fill(VP.borderSoft).frame(height: 1)
+            filterPillRow
+            Rectangle().fill(VP.borderSoft).frame(height: 1)
             searchRow
-            Rectangle().fill(VP.borderSoft).frame(height: 1)
-            catbarRow
-            Rectangle().fill(VP.borderSoft).frame(height: 1)
-            filterRow
-            if let subs = activeSubcategories, !subs.isEmpty {
-                Rectangle().fill(VP.borderSoft).frame(height: 1)
-                subcategoryRow(subs)
-            }
         }
         .background(VP.surface)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -83,6 +164,13 @@ struct HomeMasthead: View {
         .padding(.horizontal, 12)
         .padding(.top, 8)
         .padding(.bottom, 12)
+        .sheet(isPresented: $showPicker) {
+            HomeFilterPicker(
+                categories: categories,
+                filter: $filter,
+                onDismiss: { showPicker = false }
+            )
+        }
     }
 
     // MARK: Row 1 — wordmark + auth controls
@@ -149,191 +237,101 @@ struct HomeMasthead: View {
         .padding(.vertical, 10)
     }
 
-    // MARK: Row 2 — search pill
+    // MARK: Row 2 — filter pill
 
-    private var searchRow: some View {
-        Button(action: onTapSearch) {
+    private var filterPillRow: some View {
+        let parts = filter.pillLabelParts(categories: categories)
+        return Button {
+            showPicker = true
+        } label: {
             HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(VP.inkDim)
-                Text("Search stories, topics, people…")
-                    .font(.system(size: 14))
-                    .foregroundColor(VP.inkDim)
+                Text(parts.scope)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(VP.ink)
                     .lineLimit(1)
-                Spacer(minLength: 0)
+                Text("·")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(VP.inkDim)
+                Text(parts.view)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(VP.inkSoft)
+                    .lineLimit(1)
+                Text("·")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(VP.inkDim)
+                Text(parts.time)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(VP.inkSoft)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(VP.inkDim)
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                Capsule().fill(VP.bg)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(VP.surfaceSunken)
             )
             .overlay(
-                Capsule().stroke(VP.border, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(VP.borderSoft, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .accessibilityLabel("Search")
+        .accessibilityLabel("Filter: \(parts.scope), \(parts.view), \(parts.time)")
+        .accessibilityHint("Opens the filter picker")
     }
 
-    // MARK: Row 3 — catbar (All + top categories)
+    // MARK: Row 3 — search pill + Explore button
 
-    private var topLevelCats: [VPCategory] {
-        categories.filter { $0.categoryId == nil && ($0.visible ?? true) }
-            .sorted { ($0.displayOrder ?? 999) < ($1.displayOrder ?? 999) }
-    }
-
-    /// Active top-level category — either the active topic itself or its
-    /// parent if the active topic is a subcategory. Mirrors web activeParent.
-    private var activeParent: VPCategory? {
-        guard let slug = filter.topicSlug else { return nil }
-        if let exact = categories.first(where: { $0.slug == slug }) {
-            if exact.categoryId == nil { return exact }
-            return categories.first(where: { $0.id == exact.categoryId })
-        }
-        return nil
-    }
-
-    private var activeSubcategories: [VPCategory]? {
-        guard let parent = activeParent else { return nil }
-        let subs = categories.filter { $0.categoryId == parent.id && ($0.visible ?? true) }
-            .sorted { ($0.displayOrder ?? 999) < ($1.displayOrder ?? 999) }
-        return subs.isEmpty ? nil : subs
-    }
-
-    private var catbarRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 18) {
-                catbarLink(label: "All", isActive: filter.isAll) {
-                    filter = HomeFilter()
+    private var searchRow: some View {
+        HStack(spacing: 8) {
+            Button(action: onTapSearch) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(VP.inkDim)
+                    Text("Search a topic, person, policy, place, or storyline…")
+                        .font(.system(size: 13))
+                        .foregroundColor(VP.inkDim)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 0)
                 }
-                ForEach(topLevelCats) { cat in
-                    catbarLink(
-                        label: cat.displayName,
-                        isActive: activeParent?.id == cat.id
-                    ) {
-                        var f = filter
-                        f.topicSlug = cat.slug
-                        filter = f
-                    }
-                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule().fill(VP.surfaceSunken)
+                )
+                .overlay(
+                    Capsule().stroke(VP.borderSoft, lineWidth: 1)
+                )
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-        }
-    }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Search")
 
-    @ViewBuilder
-    private func catbarLink(label: String, isActive: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Text(label)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isActive ? VP.burgundy : VP.ink)
-                    .lineLimit(1)
-                Rectangle()
-                    .fill(isActive ? VP.burgundy : Color.clear)
-                    .frame(height: 1.5)
+            // Explore — black pill button. Mirrors web's `.vp-rh-explore`
+            // CTA on the masthead search row. Routes through the same
+            // FindView handler as the pill tap (search rework deferred).
+            Button(action: onTapSearch) {
+                Text("Explore")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        Capsule().fill(VP.ink)
+                    )
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Explore")
         }
-        .buttonStyle(.plain)
-        .fixedSize(horizontal: true, vertical: false)
-    }
-
-    // MARK: Row 4 — filter strip (chips + separator)
-
-    private var filterRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(Array(Self.filterItems.enumerated()), id: \.offset) { _, item in
-                    switch item {
-                    case .separator:
-                        Rectangle()
-                            .fill(VP.borderSoft)
-                            .frame(width: 1, height: 14)
-                            .padding(.horizontal, 2)
-                    case .chip(let key, let label):
-                        filterChip(label: label, isActive: filter.chip == key) {
-                            var f = filter
-                            f.chip = (f.chip == key) ? nil : key
-                            filter = f
-                        }
-                    case .sort(let key, let label):
-                        filterChip(label: label, isActive: filter.sort == key) {
-                            var f = filter
-                            f.sort = (f.sort == key) ? nil : key
-                            filter = f
-                        }
-                    case .questions(_, let label):
-                        filterChip(label: label, isActive: filter.questions) {
-                            var f = filter
-                            f.questions.toggle()
-                            filter = f
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-        }
-    }
-
-    @ViewBuilder
-    private func filterChip(label: String, isActive: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 3) {
-                Text(label.uppercased())
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .tracking(0.8)
-                    .foregroundColor(isActive ? VP.burgundy : VP.inkDim)
-                    .lineLimit(1)
-                Rectangle()
-                    .fill(isActive ? VP.burgundy : Color.clear)
-                    .frame(height: 1.5)
-            }
-        }
-        .buttonStyle(.plain)
-        .fixedSize(horizontal: true, vertical: false)
-    }
-
-    // MARK: Row 5 — subcategory strip (conditional)
-
-    @ViewBuilder
-    private func subcategoryRow(_ subs: [VPCategory]) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
-                ForEach(subs) { sub in
-                    let active = filter.topicSlug == sub.slug
-                    Button {
-                        var f = filter
-                        f.topicSlug = sub.slug
-                        filter = f
-                    } label: {
-                        VStack(spacing: 3) {
-                            Text(sub.displayName)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(active ? VP.burgundy : VP.inkMuted)
-                                .lineLimit(1)
-                            Rectangle()
-                                .fill(active ? VP.burgundy : Color.clear)
-                                .frame(height: 1.5)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .fixedSize(horizontal: true, vertical: false)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-        }
-    }
-
-    private enum FilterItem {
-        case chip(key: String, label: String)
-        case sort(key: String, label: String)
-        case questions(key: String, label: String)
-        case separator
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 }

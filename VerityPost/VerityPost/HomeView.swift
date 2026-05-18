@@ -1065,65 +1065,163 @@ struct HomeView: View {
 
         do {
             let todayStartIso = HomeView.loadDataISOFmt.string(from: today.startUtc)
-            _ = todayStartIso // currently unused below; kept so the filter block can splice time-window where clauses without re-importing the formatter
 
             // Filter-aware base query. The inline masthead (compact width)
             // writes into `homeFilter`; regular width never mutates it so
             // this collapses to the legacy unfiltered query on iPad.
+            // Subcategory rollup mirrors web HomeRoot.tsx: when the active
+            // topic is a parent, the feed includes articles in any of its
+            // child subcategories (e.g. /politics surfaces Congress +
+            // Elections + White House, not just bare-parent pins).
             var q = client.from("articles")
                 .select("*, ad_eligible, sensitivity_tags, stories(slug)")
                 .eq("status", value: "published")
                 .eq("browse_only", value: false)
 
-            // Topic filter: resolve slug → category row, then constrain
-            // by category_id or subcategory_id depending on depth.
+            // Topic filter — match web's subcategory rollup. parent → any
+            // of {parentId, childIds}; sub → exact match.
             if let topicSlug = homeFilter.topicSlug,
                let cat = categories.first(where: { $0.slug == topicSlug }) {
-                let col = cat.categoryId == nil ? "category_id" : "subcategory_id"
-                q = q.eq(col, value: cat.id)
+                if cat.categoryId == nil {
+                    // Parent: roll up into any of its child cats too.
+                    let childIds = categories
+                        .filter { $0.categoryId == cat.id }
+                        .map { $0.id }
+                    let pool = [cat.id] + childIds
+                    if pool.count == 1 {
+                        q = q.eq("category_id", value: cat.id)
+                    } else {
+                        q = q.in("category_id", values: pool)
+                    }
+                } else {
+                    // Subcategory: exact subcategory_id match. The article
+                    // schema carries both category_id (parent) and
+                    // subcategory_id, so narrow on the sub.
+                    q = q.eq("subcategory_id", value: cat.id)
+                }
             }
 
-            // Time-window / lifecycle chips.
-            switch homeFilter.chip {
-            case "today":
-                q = q.gte("published_at", value: todayStartIso)
-            case "this_week":
-                let weekAgo = Date().addingTimeInterval(-7 * 86400)
-                q = q.gte("published_at", value: HomeView.loadDataISOFmt.string(from: weekAgo))
-            case "developing":
-                q = q.eq("is_developing", value: true)
-            case "updated_recently":
+            // VIEW dimension — controls extra filter predicates AND/OR
+            // sort overrides. Mirrors web HomeRoot.tsx filter block.
+            switch homeFilter.view {
+            case .new:
+                // `new_24h` lens: published_at >= now - 24h. Takes
+                // precedence over the TIME axis (web does the same — chip
+                // is the time-window source of truth for this lens).
                 let dayAgo = Date().addingTimeInterval(-24 * 3600)
                 q = q.gte("published_at", value: HomeView.loadDataISOFmt.string(from: dayAgo))
-            case "newest_article":
-                break // sort branch covers this
+            case .noDiscussion:
+                // No-discussion lens: zero comments. Web uses
+                // .or('comment_count.is.null,comment_count.eq.0').
+                q = q.or("comment_count.is.null,comment_count.eq.0")
+            case .openQuestions:
+                // Open Questions: articles with at least one visible
+                // `intent='question'` comment. Pre-query article_ids and
+                // .in() into the main feed; same shape as web's
+                // most_recent_comments pre-query.
+                struct QArticleId: Decodable { let article_id: String? }
+                let qRows: [QArticleId] = (try? await client.from("comments")
+                    .select("article_id")
+                    .eq("intent", value: "question")
+                    .eq("status", value: "visible")
+                    .is("deleted_at", value: nil)
+                    .not("article_id", operator: .is, value: "null")
+                    .order("created_at", ascending: false)
+                    .limit(500)
+                    .execute()
+                    .value) ?? []
+                var seen = Set<String>()
+                let ids = qRows.compactMap { row -> String? in
+                    guard let aid = row.article_id, !seen.contains(aid) else { return nil }
+                    seen.insert(aid)
+                    return aid
+                }
+                if ids.isEmpty {
+                    // Match web's empty-feed sentinel.
+                    q = q.in("id", values: ["00000000-0000-0000-0000-000000000000"])
+                } else {
+                    q = q.in("id", values: ids)
+                }
             default:
                 break
             }
 
-            // Sort branch. Engagement-sort columns are best-effort —
-            // missing columns fall back to published_at ordering.
+            // TIME dimension — applies AFTER the view-side filters so
+            // a Date Range can stack with No Discussion / Most Viewed /
+            // etc. The `.new` view sets its own 24h window and ignores
+            // the TIME axis (web behavior).
+            if homeFilter.view != .new {
+                switch homeFilter.time {
+                case .today:
+                    q = q.gte("published_at", value: todayStartIso)
+                case .thisWeek:
+                    var cal = Calendar(identifier: .gregorian)
+                    cal.timeZone = HomeView.editorialTimeZone
+                    // ISO week starts Monday; Calendar.firstWeekday is
+                    // locale-driven, so force the start to whatever the
+                    // platform considers week-start. Web uses now-7d
+                    // rolling; we use calendar-week-start to honor the
+                    // owner-locked spec ("This Week = start of this week").
+                    let now = Date()
+                    let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)
+                    if let weekStart = cal.date(from: comps) {
+                        q = q.gte("published_at", value: HomeView.loadDataISOFmt.string(from: weekStart))
+                    }
+                case .thisMonth:
+                    var cal = Calendar(identifier: .gregorian)
+                    cal.timeZone = HomeView.editorialTimeZone
+                    let now = Date()
+                    let comps = cal.dateComponents([.year, .month], from: now)
+                    if let monthStart = cal.date(from: comps) {
+                        q = q.gte("published_at", value: HomeView.loadDataISOFmt.string(from: monthStart))
+                    }
+                case .dateRange:
+                    if let from = homeFilter.dateFrom {
+                        q = q.gte("published_at", value: HomeView.loadDataISOFmt.string(from: from))
+                    }
+                    if let to = homeFilter.dateTo {
+                        // Inclusive upper bound — push to end-of-day so
+                        // an article published at 23:30 on `to` lands.
+                        let endOfDay = Calendar.current.date(bySettingHour: 23, minute: 59, second: 59, of: to) ?? to
+                        q = q.lte("published_at", value: HomeView.loadDataISOFmt.string(from: endOfDay))
+                    }
+                }
+            }
+
+            // Sort branch — VIEW selects the order column. Mirrors web's
+            // sort ladder: most_discussed → comment_count desc nullsLast,
+            // most_viewed → view_count desc nullsLast, newest →
+            // published_at desc, updated_timelines → updated_at desc,
+            // everything else → updated_at desc (default home order).
             let storiesReq: [Story]
-            switch homeFilter.sort {
-            case "most_viewed":
+            switch homeFilter.view {
+            case .mostViewed:
                 storiesReq = try await q
                     .order("view_count", ascending: false)
                     .limit(12)
                     .execute()
                     .value
-            case "most_discussed":
+            case .mostCommented:
                 storiesReq = try await q
                     .order("comment_count", ascending: false)
                     .limit(12)
                     .execute()
                     .value
-            case "most_recent_comments":
+            case .newest:
                 storiesReq = try await q
-                    .order("last_commented_at", ascending: false)
+                    .order("published_at", ascending: false)
                     .limit(12)
                     .execute()
                     .value
-            default:
+            case .updatedTimelines:
+                storiesReq = try await q
+                    .order("updated_at", ascending: false)
+                    .limit(12)
+                    .execute()
+                    .value
+            case .top, .new, .noDiscussion, .openQuestions:
+                // Default order — published_at desc. Top Stories keeps
+                // the legacy hero-pick ranking below when isAll holds.
                 storiesReq = try await q
                     .order("published_at", ascending: false)
                     .limit(12)
