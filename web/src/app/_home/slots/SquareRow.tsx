@@ -1,8 +1,11 @@
-// Square row — span-12 container holding 5 small 1:1 squares in an
-// internal 5-track sub-grid. Mock grid uses one of these at pos 95
-// to close the page (5 ad/story squares). Each item is either an
-// article (linked) or an ad (Ad component). Empty items collapse
-// without breaking the row width — but typical case is all 5 filled.
+// Square row — span-12 container holding up to 5 small 1:1 squares in
+// an internal 5-track sub-grid. Mock grid uses one of these at pos 95
+// to close the page. Each item is either an article (linked) or an ad
+// (Ad component).
+//
+// Owner call 2026-05-17 (registry.ts): no self-sourced empty cells.
+// Partial rows render only their real items (1-4 squares); fully empty
+// rows are collapsed upstream by slotIsEmpty in registry.ts.
 
 import Link from 'next/link';
 import Ad from '@/components/Ad';
@@ -10,17 +13,9 @@ import type { SlotRow } from '../types';
 import { type CardCtx, categoryFor, storyHref } from './_shared';
 
 export default function SquareRow({ slot, ctx }: { slot: SlotRow; ctx: CardCtx }) {
-  // Always render 5 cells. Missing items render an empty placeholder
-  // so the row geometry is stable regardless of how many items the
-  // admin has pinned.
-  const cells = Array.from({ length: 5 }, (_, i) => slot.items[i] ?? null);
-
   return (
     <div className="vp-rh-square-row">
-      {cells.map((item, i) => {
-        if (!item) {
-          return <div key={`empty-${i}`} className="vp-rh-square vp-rh-square--empty" />;
-        }
+      {slot.items.map((item) => {
         if (item.content_type === 'ad') {
           const placement = (item.payload?.placement as string) || 'home_bottom_row';
           return (
@@ -30,9 +25,7 @@ export default function SquareRow({ slot, ctx }: { slot: SlotRow; ctx: CardCtx }
           );
         }
         const story = item.article;
-        if (!story) {
-          return <div key={item.id} className="vp-rh-square vp-rh-square--empty" />;
-        }
+        if (!story) return null;
         const href = storyHref(story);
         const cat = categoryFor(story, ctx);
         const inner = (
