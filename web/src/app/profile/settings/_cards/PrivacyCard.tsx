@@ -99,14 +99,27 @@ export function PrivacyCard({ user, preview }: Props) {
       setFollowersLoading(false);
       return;
     }
-    const { data, error } = await supabase
-      .from('follows')
-      .select(
-        'follower_id, user:users!fk_follows_follower_id(id, username, display_name, avatar_url, avatar_color)'
-      )
-      .eq('following_id', authUser.id)
-      .order('created_at', { ascending: false })
-      .limit(200);
+    const { data, error } = await supabase.rpc('list_user_followers', {
+      p_user_id: authUser.id,
+      p_limit: 200,
+    });
+    type RpcRow = {
+      id: string;
+      username: string | null;
+      display_name: string | null;
+      avatar_url: string | null;
+      avatar_color: string | null;
+    };
+    const mapped: FollowerRow[] = ((data as RpcRow[] | null) ?? []).map((r) => ({
+      follower_id: r.id,
+      user: {
+        id: r.id,
+        username: r.username,
+        display_name: r.display_name,
+        avatar_url: r.avatar_url,
+        avatar_color: r.avatar_color,
+      },
+    }));
     if (error) {
       toast.error('Could not load followers. Try again.');
       // T351 — keep the failure state in component memory so the empty-list
@@ -117,7 +130,7 @@ export function PrivacyCard({ user, preview }: Props) {
       setFollowersLoading(false);
       return;
     }
-    setFollowers((data ?? []) as unknown as FollowerRow[]);
+    setFollowers(mapped);
     setFollowersLoading(false);
   }, [preview, supabase, toast]);
 

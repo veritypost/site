@@ -162,7 +162,6 @@ const KIND_DEFAULT_CAPACITY: Record<SlotKind, number> = {
   breaking_strip: 1,
   cluster: 15,
   list_rail: 8,
-  feature: 1,
   engagement: 1,
   promo: 1,
   secondary_pair: 6,
@@ -195,7 +194,6 @@ const KIND_LABEL: Record<SlotKind, string> = {
   breaking_strip: 'Breaking strip',
   cluster: 'Cluster',
   list_rail: 'List rail',
-  feature: 'Feature',
   engagement: 'Daily quiz',
   promo: 'Promo',
   secondary_pair: 'Secondary pair',
@@ -585,11 +583,7 @@ function HomeEditorInner() {
     if (mutating) return;
     setMutating(true);
     const contentType =
-      slot.kind === 'feature'
-        ? 'feature'
-        : slot.kind === 'engagement'
-          ? 'quiz'
-          : 'custom';
+      slot.kind === 'engagement' ? 'quiz' : 'custom';
     const res = await fetch('/api/admin/home/items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1791,9 +1785,9 @@ function LayoutCanvas({
       );
     }
 
-    // Payload-only kinds: feature, engagement, promo. No
-    // vp-rh-* equivalent — render a single labeled block that opens the
-    // block editor on click. Spans full row so it doesn't break the grid.
+    // Payload-only kinds: engagement, promo. No vp-rh-* equivalent —
+    // render a single labeled block that opens the block editor on
+    // click. Spans full row so it doesn't break the grid.
     const anchor = `payload:${slot.id}`;
     const itemCount = slot.items.length;
     return (
@@ -3716,25 +3710,20 @@ function PayloadEditor({
   const initial = (item?.payload ?? {}) as Record<string, unknown>;
 
   const fields: Array<{ key: string; label: string; multiline?: boolean }> =
-    slot.kind === 'feature'
+    slot.kind === 'engagement'
       ? [
           { key: 'label', label: 'Label' },
-          { key: 'body', label: 'Body', multiline: true },
+          { key: 'prompt', label: 'Prompt', multiline: true },
+          { key: 'href', label: 'Link URL' },
+          { key: 'cta', label: 'Button text' },
         ]
-      : slot.kind === 'engagement'
-        ? [
-            { key: 'label', label: 'Label' },
-            { key: 'prompt', label: 'Prompt', multiline: true },
-            { key: 'href', label: 'Link URL' },
-            { key: 'cta', label: 'Button text' },
-          ]
-        : [
-            { key: 'label', label: 'Label' },
-            { key: 'heading', label: 'Heading' },
-            { key: 'body', label: 'Body', multiline: true },
-            { key: 'href', label: 'Link URL' },
-            { key: 'cta', label: 'Button text' },
-          ];
+      : [
+          { key: 'label', label: 'Label' },
+          { key: 'heading', label: 'Heading' },
+          { key: 'body', label: 'Body', multiline: true },
+          { key: 'href', label: 'Link URL' },
+          { key: 'cta', label: 'Button text' },
+        ];
 
   const [values, setValues] = useState<Record<string, string>>(() => {
     const v: Record<string, string> = {};

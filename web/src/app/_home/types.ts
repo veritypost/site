@@ -27,7 +27,6 @@ export type SlotKind =
   | 'breaking_strip'
   | 'cluster'
   | 'list_rail'
-  | 'feature'
   | 'engagement'
   | 'promo'
   | 'secondary_pair'
@@ -50,7 +49,6 @@ export type SlotSpan = 3 | 4 | 6 | 8 | 12;
 export type SlotItemContentType =
   | 'article'
   | 'quiz'
-  | 'feature'
   | 'custom'
   | 'ad';
 

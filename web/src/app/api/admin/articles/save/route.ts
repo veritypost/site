@@ -141,6 +141,13 @@ export async function POST(request: Request) {
   const { slug: _dropSlug, ...articleFieldsWithoutSlug } = body.article as ArticleFields & { slug?: unknown };
   const articleRow: ArticleFields = { ...articleFieldsWithoutSlug };
 
+  // Defense-in-depth: articles.age_band is NOT NULL DEFAULT 'adult'. If the
+  // client omits or nulls the field on a new draft, coerce to 'adult' before
+  // the insert so we never round-trip a NULL through to the DB constraint.
+  if (articleRow.age_band == null) {
+    articleRow.age_band = 'adult';
+  }
+
   // Wave 2 — sanitize ad-eligibility inputs. `ad_eligible` is coerced
   // to a strict boolean when present (treat undefined as "leave column
   // alone" so partial saves don't clobber the toggle). `sensitivity_tags`

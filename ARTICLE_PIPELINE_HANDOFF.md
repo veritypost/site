@@ -39,6 +39,25 @@ The first 10 articles went live around 2026-05-16 (Trump–Xi summit, Cassidy pr
 
 Read `web/src/lib/pipeline/editorial-guide.ts` directly. The short version:
 
+**The bar (read first; overrides everything below if there's a conflict)**
+
+An article reports what happened. Nothing else — the events, the people involved, the numbers, the direct quotes, and the one-clause glosses a reader needs to follow the topic. No characterization of the events, no implied causation between them, no third-party opinion layered on top of them, no hints at what they mean.
+
+The self-enforcing test, every sentence: **if the topic changed — politics for sports, war for finance, a left protest for a right protest, a vaccine review for a trade deal — would the sentence still read the same way?** If yes, it's reporting. If the tone or shape would shift depending on the topic, framing has leaked in. Cut until it doesn't. A reader should finish any article and not be able to tell whether the site leans left, right, independent, wire, or anywhere else.
+
+**The audit surface (every pass touches ALL of these):**
+- `articles.title`
+- `articles.subtitle`
+- `articles.excerpt` ← easy to skip; loads separately for cards/feeds/social
+- `articles.body`
+- `articles.body_html`
+- `stories.title`
+- `stories.description`
+
+Checking only the body is a half-pass. The first 10 published articles got a topic-swap audit that missed `articles.excerpt` and two `stories.description` rows — both came back later as visible framing leaks. Lock-in 2026-05-18.
+
+**Attribution does not fully neutralize contested category labels.** "Demonstrators said they were marching as anti-genocide and anti-fascist" reads as the writer's framing even though it's attributed self-description — would you write "demonstrators said they were marching as anti-jihadist and anti-globalist" in neutral wire prose? Render positions as **actions** ("said they were marching to oppose X and Y"), not as **category labels** ("as anti-X and anti-Y demonstrators"). Same fact, no leaked frame. Caught 2026-05-18 by a second-opinion audit on the London article after the first topic-swap pass missed it.
+
 **Voice**
 - Wire-service / trusted-colleague register. State what happened. No tease, no press release.
 - Vary sentence length deliberately. Short sentences land harder after long ones. Never stack three same-length sentences.

@@ -12,7 +12,6 @@ import SecondLead from './SecondLead';
 import BreakingStrip from './BreakingStrip';
 import Cluster from './Cluster';
 import ListRail from './ListRail';
-import Feature from './Feature';
 import Engagement from './Engagement';
 import Promo from './Promo';
 import SecondaryPair from './SecondaryPair';
@@ -37,7 +36,6 @@ const REGISTRY: Record<SlotKind, SlotComponent> = {
   breaking_strip: BreakingStrip,
   cluster: Cluster,
   list_rail: ListRail,
-  feature: Feature,
   engagement: Engagement,
   promo: Promo,
   secondary_pair: SecondaryPair,
@@ -52,9 +50,9 @@ const REGISTRY: Record<SlotKind, SlotComponent> = {
   square_row: SquareRow,
 };
 
-// Slots that source their own content (e.g. Feature reads daily_features
-// directly). They aren't driven by home_slot_items, so the empty-check
-// would falsely hide them.
+// Slots that source their own content from analytics / ad tables. They
+// aren't driven by home_slot_items, so the empty-check would falsely
+// hide them.
 //
 // Owner call 2026-05-17: square_row no longer self-sources empty cells —
 // when no articles are pinned, the row collapses entirely instead of
@@ -62,7 +60,6 @@ const REGISTRY: Record<SlotKind, SlotComponent> = {
 // Admin preview still gets the placeholder treatment via the
 // `showEmptyPlaceholders` opt-in below.
 const SELF_SOURCING: ReadonlySet<SlotKind> = new Set([
-  'feature',
   'data_ticker',
   'insight_row',
   'discovery_feed',

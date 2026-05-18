@@ -62,7 +62,6 @@ const SLOT_KINDS: ReadonlySet<SlotKind> = new Set([
   'breaking_strip',
   'cluster',
   'list_rail',
-  'feature',
   'engagement',
   'promo',
   'secondary_pair',

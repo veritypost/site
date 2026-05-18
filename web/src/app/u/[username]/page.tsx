@@ -100,14 +100,6 @@ interface UserListItem {
 
 type FollowsTab = 'followers' | 'following';
 
-// Supabase-nested-select rows.
-interface FollowerRowShape {
-  users: UserListItem | null;
-}
-interface FollowingRowShape {
-  users: UserListItem | null;
-}
-
 // Q1 — color palette used by the anon CTA hero. Mirrors `/notifications`
 // (R13) so the two anon tabs feel like one system.
 // T82 — values point at globals.css CSS vars so brand-color edits cascade.
@@ -356,23 +348,19 @@ export default function ProfilePage() {
       setFollowListError(false);
       try {
         if (tab === 'followers') {
-          const { data, error } = await supabase
-            .from('follows')
-            .select('users!fk_follows_follower_id(id, username, avatar_color, avatar_url)')
-            .eq('following_id', target.id)
-            .limit(100);
+          const { data, error } = await supabase.rpc('list_user_followers', {
+            p_user_id: target.id,
+            p_limit: 100,
+          });
           if (error) throw error;
-          const rows = (data as unknown as FollowerRowShape[] | null) || [];
-          setFollowers(rows.map((r) => r.users).filter((u): u is UserListItem => !!u));
+          setFollowers(((data as UserListItem[] | null) ?? []).filter((u) => !!u));
         } else if (tab === 'following') {
-          const { data, error } = await supabase
-            .from('follows')
-            .select('users!fk_follows_following_id(id, username, avatar_color, avatar_url)')
-            .eq('follower_id', target.id)
-            .limit(100);
+          const { data, error } = await supabase.rpc('list_user_following', {
+            p_user_id: target.id,
+            p_limit: 100,
+          });
           if (error) throw error;
-          const rows = (data as unknown as FollowingRowShape[] | null) || [];
-          setFollowingList(rows.map((r) => r.users).filter((u): u is UserListItem => !!u));
+          setFollowingList(((data as UserListItem[] | null) ?? []).filter((u) => !!u));
         }
       } catch (err) {
         console.error('Followers/following load error:', err);

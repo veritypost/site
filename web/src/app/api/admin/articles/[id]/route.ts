@@ -641,47 +641,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
           return NextResponse.json({ error: 'Could not save sources' }, { status: 500 });
         }
 
-        // Wave 0 of AI_Redesign.md — append to the no-delete provenance
-        // log. `sources` above is the editor-mutable citation list;
-        // `article_sources` accumulates every URL we've ever cited on
-        // this article. ON CONFLICT DO NOTHING so re-saves don't dupe.
-        // outlet_snapshot + url_snapshot are NOT NULL — silently skip
-        // legacy rows missing publisher/url so the rest of the save
-        // still lands.
-        const provenanceRows = body.sources
-          .filter((s) => !!s.url && !!s.publisher)
-          .map((s) => ({
-            article_id: id,
-            url_snapshot: s.url!,
-            title_snapshot: s.title ?? null,
-            outlet_snapshot: s.publisher!,
-            fetched_at: s.published_date ?? new Date().toISOString(),
-            source_class: s.source_type ?? null,
-            feed_id: null,
-          }));
-        if (provenanceRows.length > 0) {
-          const { error: provErr } = await service
-            .from('article_sources')
-            .upsert(provenanceRows, {
-              onConflict: 'article_id,url_snapshot',
-              ignoreDuplicates: true,
-            });
-          if (provErr) {
-            // Provenance is append-only insurance — log and keep going.
-            // The editor-visible `sources` row already saved; failing
-            // the whole PATCH would punish the editor for an audit-log
-            // hiccup. Sentry surfaces it for operator follow-up.
-            await captureMessage('admin article PATCH provenance log failed', 'warning', {
-              article_id: id,
-              audience,
-              table: 'article_sources',
-              phase: 'insert_after_sources',
-              row_count: provenanceRows.length,
-              error: provErr.message,
-            });
-            console.error('[admin.articles.patch] article_sources insert failed:', provErr.message);
-          }
-        }
       }
     } catch (err) {
       await captureMessage('admin article PATCH inconsistent state', 'error', {

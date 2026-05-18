@@ -783,6 +783,33 @@ export async function POST(req: Request) {
     );
   }
 
+  // Cluster-mode soft lock — mirrors the story-mode check above. The DB
+  // unique index uniq_articles_cluster_band_active will reject a duplicate
+  // (cluster_id, age_band) with 23505 at persist time, but only after the
+  // LLM steps have run. Pre-check here so a re-click on an already-generated
+  // band returns 409 before any provider spend.
+  {
+    const { data: dupeArticle, error: dupeErr } = await service
+      .from('articles')
+      .select('id')
+      .eq('cluster_id', cluster_id)
+      .eq('age_band', effectiveAgeBand)
+      .in('status', ['draft', 'published'])
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+    if (dupeErr) {
+      console.error('[newsroom.generate.cluster_band_lock_check]', dupeErr.message);
+      return NextResponse.json({ error: 'Cluster lock check failed' }, { status: 500 });
+    }
+    if (dupeArticle) {
+      return NextResponse.json(
+        { error: 'A live article already exists for this cluster + age band' },
+        { status: 409 }
+      );
+    }
+  }
+
   // 3. Kill switch
   const enabled = await isGenerationEnabled(service, audience);
   if (!enabled) {

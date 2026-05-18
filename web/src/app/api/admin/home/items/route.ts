@@ -1,8 +1,8 @@
 // POST — assign an item to a v2 home slot. Articles use { slot_id,
 // position, content_type:'article', article_id }. Custom payload slots
-// (feature/engagement/promo/custom) use { slot_id, position,
-// content_type, payload }. Upsert by (slot_id, position) so re-pinning
-// the same position replaces the existing item.
+// (engagement/promo/custom) use { slot_id, position, content_type,
+// payload }. Upsert by (slot_id, position) so re-pinning the same
+// position replaces the existing item.
 
 import { NextResponse } from 'next/server';
 import { revalidatePath, revalidateTag } from 'next/cache';
@@ -12,7 +12,7 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { permissionError, recordAdminAction } from '@/lib/adminMutation';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ALLOWED_CONTENT_TYPES = ['article', 'quiz', 'feature', 'custom', 'ad'] as const;
+const ALLOWED_CONTENT_TYPES = ['article', 'quiz', 'custom', 'ad'] as const;
 
 export async function POST(request: Request) {
   let actor;

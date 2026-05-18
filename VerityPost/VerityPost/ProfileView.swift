@@ -2111,24 +2111,20 @@ struct ProfileView: View {
             catStats = cat
             subStats = sub
 
-            struct UpRow: Decodable {
-                let comments: CommentJoin?
-                struct CommentJoin: Decodable {
-                    let user_id: String?
-                    let articles: StoryJoin?
-                    struct StoryJoin: Decodable { let category_id: String?; let subcategory_id: String? }
-                }
+            struct TallyRow: Decodable {
+                let category_id: String?
+                let subcategory_id: String?
+                let n: Int
             }
-            let ups: [UpRow] = (try? await client.from("comment_votes")
-                .select("comments!inner(user_id, articles(category_id, subcategory_id))")
-                .eq("vote_type", value: "upvote")
-                .eq("comments.user_id", value: userId)
+            struct TallyParams: Encodable { let p_user_id: String }
+            let tallyRows: [TallyRow] = (try? await client
+                .rpc("user_received_upvote_category_tally", params: TallyParams(p_user_id: userId))
                 .execute().value) ?? []
             var catU: [String: Int] = [:]
             var subU: [String: Int] = [:]
-            for u in ups {
-                if let cid = u.comments?.articles?.category_id { catU[cid, default: 0] += 1 }
-                if let sid = u.comments?.articles?.subcategory_id { subU[sid, default: 0] += 1 }
+            for r in tallyRows {
+                if let cid = r.category_id { catU[cid, default: 0] += r.n }
+                if let sid = r.subcategory_id { subU[sid, default: 0] += r.n }
             }
             catUpvotes = catU
             subUpvotes = subU
@@ -2449,18 +2445,13 @@ struct UserFollowListView: View {
     }
 
     private func load() async {
+        struct Params: Encodable { let p_user_id: String; let p_limit: Int }
         do {
-            let fkHint = mode == .followers
-                ? "users!fk_follows_follower_id(id, username, avatar_color, avatar_url)"
-                : "users!fk_follows_following_id(id, username, avatar_color, avatar_url)"
-            let filterKey = mode == .followers ? "following_id" : "follower_id"
-            let rows: [FollowRow] = try await client
-                .from("follows")
-                .select(fkHint)
-                .eq(filterKey, value: userId)
-                .limit(200)
+            let fn = mode == .followers ? "list_user_followers" : "list_user_following"
+            let rows: [FollowUser] = try await client
+                .rpc(fn, params: Params(p_user_id: userId, p_limit: 200))
                 .execute().value
-            users = rows.compactMap { $0.users }
+            users = rows
             loaded = true
         } catch {
             Log.d("UserFollowListView load error:", error)
