@@ -332,6 +332,35 @@ export default function NavWrapper({ children }: { children: ReactNode }) {
     mounted && SHOW_BOTTOM_NAV && !isDesktop && !fullyBare && !isStory(path) && !isMockup(path);
   const showFooter = mounted && SHOW_FOOTER && !fullyBare && !isStory(path) && !isMockup(path);
   const onAdminPage = mounted && isAdmin(path);
+
+  // Publish the bottom "safe stacking offset" as a CSS variable so any
+  // viewport-fixed element below the chrome (MobileStickyAd, future
+  // toast trays, etc.) can sit cleanly above whatever else is at the
+  // bottom of the viewport — instead of behind the nav or under the
+  // iOS home indicator.
+  //
+  // - showNav=true: nav is 64px + env(safe-area-inset-bottom) tall and
+  //   already absorbs the safe area itself, so other fixed elements
+  //   anchor at 64 + safe-area.
+  // - showNav=false (story reader, admin, fully-bare): no nav present,
+  //   so other fixed elements just need to clear the home indicator.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    // Nav rendered height = 64 + max(4px, env(safe-area-inset-bottom))
+    // exactly mirrors navStyle.paddingBottom below. Using plain env()
+    // here would leave a 4px gap on devices with no safe area (Android,
+    // older iPhones) where the nav is actually 68px tall, not 64.
+    root.style.setProperty(
+      '--vp-nav-stack-h',
+      showNav
+        ? 'calc(64px + max(4px, env(safe-area-inset-bottom, 0px)))'
+        : 'env(safe-area-inset-bottom, 0px)',
+    );
+    return () => {
+      root.style.setProperty('--vp-nav-stack-h', '0px');
+    };
+  }, [showNav]);
   // UJ-200 (Pass 17): banner is strictly admin+ territory. Editor and
   // moderator roles can reach the admin routes they're authorised for
   // without the dark "Back to site" chrome — keeps the UI honest about

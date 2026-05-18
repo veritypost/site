@@ -25,14 +25,21 @@ export default function MobileStickyAd() {
             display: flex;
             align-items: center;
             position: fixed;
-            bottom: 0;
+            /* Sit ABOVE the bottom nav (when present) so the nav doesn't
+               occlude the ad. --vp-nav-stack-h is published by
+               NavWrapper: equals 64px + env(safe-area-inset-bottom) on
+               pages with the bottom nav, 0px otherwise. The fallback
+               keeps this safe if the var ever fails to mount (admin
+               pages already early-return MobileStickyAd, so 0 is the
+               correct default for pages without nav). */
+            bottom: var(--vp-nav-stack-h, 0px);
             left: 0;
             right: 0;
             z-index: 40;
             background: var(--bg, #ffffff);
             border-top: 1px solid var(--border, #e5e5e5);
             padding: 4px 8px;
-            padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
+            padding-bottom: 4px;
           }
         }
       `}</style>
