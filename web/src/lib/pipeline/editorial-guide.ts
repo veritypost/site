@@ -887,7 +887,7 @@ AGGREGATOR CITATION CHAIN.
         with a different institutional position or
         geographic base — that covered the same story, in
         the sources block.
-    (c) Include one sentence in the `verification_note`
+    (c) Include one sentence in the verification_note
         field disclosing that Verity Post relied on the
         chain and did not independently report. The
         verification_note renders below the body and above
@@ -1102,7 +1102,7 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
     article. The article's last sentence is its kicker — the
     line the reader carries away. The kicker is NOT a
     verification disclosure, hedge, or "what's next" graf.
-    Those belong in the `verification_note` field, which
+    Those belong in the verification_note field, which
     renders below the body and above the sources block. The
     body closes on the most resonant fact in the piece.
       BAD CLOSE:  "Verity Post did not independently report
