@@ -295,11 +295,6 @@ export default async function ArticleSlugPage({
             .select('id, event_date, event_label, event_body, type, linked_article_id, metadata')
             .eq('story_id', story.id)
             .order('event_date', { ascending: true }),
-          service
-            .from('story_resources')
-            .select('id, title, url, description, resource_type, sort_order')
-            .eq('story_id', story.id)
-            .order('sort_order', { ascending: true }),
           article.category_id
             ? service
                 .from('categories')
@@ -338,14 +333,12 @@ export default async function ArticleSlugPage({
     passCheckResult,
     sourcesResult,
     timelineResult,
-    resourcesResult,
     categoryResult,
     nearbyStoriesResult,
   ] = fetchResult.data;
 
   if (quizCountResult.error) console.error('[article] quiz count query failed', quizCountResult.error);
   if (passCheckResult.error) console.error('[article] quiz pass query failed', passCheckResult.error);
-  if (resourcesResult.error) console.error('[article] story_resources query failed', resourcesResult.error);
   if (categoryResult.error) console.error('[article] category query failed', categoryResult.error);
   if (nearbyStoriesResult.error) console.error('[article] nearby stories query failed', nearbyStoriesResult.error);
 
@@ -354,14 +347,6 @@ export default async function ArticleSlugPage({
   const initialPassed = passCheckResult.error ? false : !!passCheckResult.data;
   const sources = sourcesResult.data ?? [];
   const timeline = timelineResult.data ?? [];
-  const resources = (resourcesResult.data ?? []) as Array<{
-    id: string;
-    title: string;
-    url: string;
-    description: string | null;
-    resource_type: string;
-    sort_order: number;
-  }>;
   const category = categoryResult.error ? null : (categoryResult.data as { name: string; slug: string } | null);
   type NearbyRow = {
     id: string;
@@ -480,49 +465,6 @@ export default async function ArticleSlugPage({
                 the same scroll, not in a side rail they often miss.
                 Logo-driven rows with click-to-expand headlines. */}
             <SourcesSection sources={!isAnon ? sources : []} showTease={false} articleCountReached={articleCountReached} />
-            {/* Further reading — curated external links per story
-                slug. The "How we got here" in-house prose surface
-                was killed 2026-05-19 — the timeline section already
-                carries the historical context via expandable
-                event_body content, and a parallel prose block
-                duplicated that work at twice the reading load. */}
-            {!isAnon && resources.length > 0 && (
-              <section
-                aria-label="Further reading"
-                style={{
-                  margin: '32px 0 0',
-                  padding: '20px 0',
-                  borderTop: '1px solid var(--vp-border, #ddd)',
-                  fontFamily: 'var(--vp-serif, Georgia, "Times New Roman", serif)',
-                }}
-              >
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 14px', letterSpacing: 0.2 }}>
-                  Further reading
-                </h2>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {resources.map((r) => (
-                    <li key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <a
-                        href={r.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ fontSize: 15, fontWeight: 600, textDecoration: 'none', borderBottom: '1px solid currentColor', alignSelf: 'flex-start' }}
-                      >
-                        {r.title}
-                      </a>
-                      {r.description && (
-                        <span style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--vp-text-muted, #555)' }}>
-                          {r.description}
-                        </span>
-                      )}
-                      <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--vp-text-muted, #888)' }}>
-                        {r.resource_type.replace(/_/g, ' ')}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
           </>
         }
         timelineSlot={
