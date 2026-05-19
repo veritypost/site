@@ -1906,6 +1906,7 @@ export type Database = {
           title: string
           unpublished_at: string | null
           updated_at: string
+          verification_note: string | null
           verified_at: string | null
           verified_by: string | null
           view_count: number
@@ -1977,6 +1978,7 @@ export type Database = {
           title: string
           unpublished_at?: string | null
           updated_at?: string
+          verification_note?: string | null
           verified_at?: string | null
           verified_by?: string | null
           view_count?: number
@@ -2048,6 +2050,7 @@ export type Database = {
           title?: string
           unpublished_at?: string | null
           updated_at?: string
+          verification_note?: string | null
           verified_at?: string | null
           verified_by?: string | null
           view_count?: number
@@ -7235,6 +7238,117 @@ export type Database = {
         Relationships: []
       }
       events_20260519: {
+        Row: {
+          article_id: string | null
+          article_slug: string | null
+          author_id: string | null
+          category_slug: string | null
+          consent_ads: boolean | null
+          consent_analytics: boolean | null
+          content_type: string | null
+          country_iso2: string | null
+          created_at: string
+          device_id: string | null
+          device_type: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket: string | null
+          ip_hash: string | null
+          is_bot: boolean
+          occurred_at: string
+          page: string | null
+          payload: Json
+          received_at: string
+          referrer_domain: string | null
+          region: string | null
+          session_id: string
+          subcategory_slug: string | null
+          user_agent_hash: string | null
+          user_id: string | null
+          user_tenure_days: number | null
+          user_tier: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          viewport_h: number | null
+          viewport_w: number | null
+        }
+        Insert: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category: string
+          event_id: string
+          event_name: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Update: {
+          article_id?: string | null
+          article_slug?: string | null
+          author_id?: string | null
+          category_slug?: string | null
+          consent_ads?: boolean | null
+          consent_analytics?: boolean | null
+          content_type?: string | null
+          country_iso2?: string | null
+          created_at?: string
+          device_id?: string | null
+          device_type?: string | null
+          event_category?: string
+          event_id?: string
+          event_name?: string
+          experiment_bucket?: string | null
+          ip_hash?: string | null
+          is_bot?: boolean
+          occurred_at?: string
+          page?: string | null
+          payload?: Json
+          received_at?: string
+          referrer_domain?: string | null
+          region?: string | null
+          session_id?: string
+          subcategory_slug?: string | null
+          user_agent_hash?: string | null
+          user_id?: string | null
+          user_tenure_days?: number | null
+          user_tier?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          viewport_h?: number | null
+          viewport_w?: number | null
+        }
+        Relationships: []
+      }
+      events_20260520: {
         Row: {
           article_id: string | null
           article_slug: string | null
@@ -12839,6 +12953,50 @@ export type Database = {
           },
           {
             foreignKeyName: "fk_story_observations_story"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      story_resources: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          resource_type: string
+          sort_order: number
+          story_id: string
+          title: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          resource_type?: string
+          sort_order?: number
+          story_id: string
+          title: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          resource_type?: string
+          sort_order?: number
+          story_id?: string
+          title?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_resources_story_id_fkey"
             columns: ["story_id"]
             isOneToOne: false
             referencedRelation: "stories"
