@@ -69,11 +69,10 @@ type ArticleRow = {
   deleted_at: string | null;
   cover_image_url: string | null;
   cover_image_alt: string | null;
-  verification_note: string | null;
 };
 
 const ARTICLE_SELECT =
-  'id, story_id, category_id, title, subtitle, body, body_html, excerpt, status, age_band, is_kids_safe, is_ai_generated, ai_model, ai_provider, published_at, updated_at, deleted_at, cover_image_url, cover_image_alt, verification_note';
+  'id, story_id, category_id, title, subtitle, body, body_html, excerpt, status, age_band, is_kids_safe, is_ai_generated, ai_model, ai_provider, published_at, updated_at, deleted_at, cover_image_url, cover_image_alt';
 
 function isCoppaBand(row: { age_band: string | null; is_kids_safe: boolean | null }): boolean {
   return row.age_band === 'kids' || row.age_band === 'tweens' || row.is_kids_safe === true;
@@ -477,28 +476,6 @@ export default async function ArticleSlugPage({
                 currentUserId={user?.id ?? null}
               />
             )}
-            {/* Verification note — small italic disclosure below the body,
-                above the sources block. Lets the article body close on its
-                kicker rather than trailing into "could not independently
-                verify" hedges. Owner-locked 2026-05-18. */}
-            {article.verification_note && article.verification_note.trim().length > 0 && (
-              <aside
-                style={{
-                  margin: '24px 0 0',
-                  padding: '12px 16px',
-                  borderLeft: '2px solid var(--vp-border, #ddd)',
-                  fontFamily: 'var(--vp-serif, Georgia, "Times New Roman", serif)',
-                  fontSize: 13,
-                  lineHeight: 1.55,
-                  fontStyle: 'italic',
-                  color: 'var(--vp-text-muted, #555)',
-                }}
-                aria-label="Verification note"
-              >
-                <strong style={{ fontStyle: 'normal', marginRight: 6 }}>Verification note —</strong>
-                {article.verification_note}
-              </aside>
-            )}
             {/* Sources block — moved out of the timeline rail per TODO-3.
                 Lives inside the article body so readers see provenance in
                 the same scroll, not in a side rail they often miss.
@@ -520,17 +497,13 @@ export default async function ArticleSlugPage({
                   fontFamily: 'var(--vp-serif, Georgia, "Times New Roman", serif)',
                 }}
               >
-                <h2 style={{ fontSize: 22, fontWeight: 600, margin: '0 0 6px', letterSpacing: 0.2 }}>
+                <h2 style={{ fontSize: 22, fontWeight: 600, margin: '0 0 18px', letterSpacing: 0.2 }}>
                   How we got here
                 </h2>
-                <p style={{ fontSize: 13, lineHeight: 1.55, margin: '0 0 18px', color: 'var(--vp-text-muted, #555)', fontStyle: 'italic' }}>
-                  Background context on the arc — written by our editors.
-                </p>
                 <div
                   style={{
                     fontSize: 16,
                     lineHeight: 1.7,
-                    color: 'var(--vp-text, #1a1a1a)',
                     whiteSpace: 'pre-wrap',
                     marginBottom: 24,
                   }}

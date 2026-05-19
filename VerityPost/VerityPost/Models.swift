@@ -208,11 +208,6 @@ struct Story: Codable, Identifiable, Hashable {
     /// blocking set (tragedy, breaking_casualty, suicide_coverage, cw_sa,
     /// cw_violence, obit) means the article is unfit for ad adjacency.
     var sensitivityTags: [String]?
-    /// Below-body verification disclosure — shown between body and the
-    /// sources block. Keeps the article kicker clean while preserving
-    /// credibility transparency. Owner-locked 2026-05-18; schema column
-    /// `articles.verification_note`.
-    var verificationNote: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, subtitle, status, stories
@@ -228,7 +223,6 @@ struct Story: Codable, Identifiable, Hashable {
         case heroPickForDate = "hero_pick_for_date"
         case adEligible = "ad_eligible"
         case sensitivityTags = "sensitivity_tags"
-        case verificationNote = "verification_note"
     }
 
     /// Slug lives on the related stories row; this computed property

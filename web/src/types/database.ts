@@ -1906,7 +1906,6 @@ export type Database = {
           title: string
           unpublished_at: string | null
           updated_at: string
-          verification_note: string | null
           verified_at: string | null
           verified_by: string | null
           view_count: number
@@ -1978,7 +1977,6 @@ export type Database = {
           title: string
           unpublished_at?: string | null
           updated_at?: string
-          verification_note?: string | null
           verified_at?: string | null
           verified_by?: string | null
           view_count?: number
@@ -2050,7 +2048,6 @@ export type Database = {
           title?: string
           unpublished_at?: string | null
           updated_at?: string
-          verification_note?: string | null
           verified_at?: string | null
           verified_by?: string | null
           view_count?: number

@@ -76,10 +76,14 @@
  *      STRUCTURE gets HUMAN ANCHOR — REQUIRED ONCE PER BATCH and
  *      ONE-DETAIL RULE. FACTS ONLY gets OBSERVATIONAL SENTENCE —
  *      ONE PERMITTED. LANGUAGE RULES gets rule 21: STRESS POSITION
- *      OF THE ARTICLE — THE KICKER. Schema migration adds
- *      articles.verification_note column rendered below body /
- *      above sources so kickers close on the resonant fact rather
- *      than verification hedges. Owner: "make it fucking perfect."
+ *      OF THE ARTICLE — THE KICKER. (NOTE: the original 2026-05-18
+ *      ship included an articles.verification_note column for
+ *      below-body hedges; owner killed the surface and the column
+ *      2026-05-19 — see provenance #13. The kicker rule now stands
+ *      alone: body closes on the resonant fact, period; hedges that
+ *      would have lived in a separate disclosure surface either
+ *      land in the body or the piece doesn't ship.) Owner: "make
+ *      it fucking perfect."
  *  11. NO DIRECT QUOTES / NO OUTLET REFS — ABSOLUTE (2026-05-18):
  *      THE BAR gets an absolute rule that supersedes every
  *      earlier carve-out — direct quotes in body cause emotional
@@ -108,6 +112,21 @@
  *      vs TIMELINE section enumerates the resource categories.
  *      Owner: "10 questions and it asks a random 5 yes or no? and
  *      … another section per slug for deeper dive yes or no? yes."
+ *  13. verification_note surface killed (2026-05-19): the
+ *      below-body verification_note italic aside shipped in
+ *      provenance #10 cluttered the kicker and didn't earn its
+ *      pixels — owner asked to remove the surface AND the data.
+ *      Schema dropped articles.verification_note, persist RPC
+ *      recreated without v_verification_note, /[slug] render
+ *      hard-deleted, persist-article.ts type field removed, iOS
+ *      Story model field removed. Provenance entries #10 and #11
+ *      get inline footnotes pointing here; AGGREGATOR CITATION
+ *      CHAIN provision (c) rewritten — if you'd have written a
+ *      verification disclosure, it lives in the body now or the
+ *      piece doesn't ship; LANGUAGE RULE 21 KICKER's bad-close
+ *      examples updated to not reference verification_note as
+ *      the destination for hedges. Owner: "verification note
+ *      needs to be removed from the DB as well and code."
  *
  * HEADLINE_PROMPT emits one JSON {title, summary} per snapshot L649-653.
  * Body generation is a separate canonical step owned by Phase 3;
@@ -874,11 +893,14 @@ BURIED-THREAD RULE.
   location clause plants a frame the article has not earned.
 
 AGGREGATOR CITATION CHAIN.
-  AMENDED 2026-05-18: provision (a) below previously
-  required crediting the named reporter inline. THE BAR
-  now prohibits ALL inline outlet references; reporter
-  and outlet credit live in the sources block exclusively.
-  The revised rule:
+  AMENDED 2026-05-18 and 2026-05-19: provision (a) below
+  previously required crediting the named reporter inline.
+  THE BAR now prohibits ALL inline outlet references;
+  reporter and outlet credit live in the sources block
+  exclusively. Provision (c) previously required a
+  disclosure sentence in a separate verification_note
+  surface; owner killed that surface 2026-05-19 — see
+  provenance #13. The revised rule:
   When a story is built on one secondary outlet's primary
   reporting:
     (a) Credit the named reporter AND outlet in the
@@ -887,11 +909,11 @@ AGGREGATOR CITATION CHAIN.
         with a different institutional position or
         geographic base — that covered the same story, in
         the sources block.
-    (c) Include one sentence in the verification_note
-        field disclosing that Verity Post relied on the
-        chain and did not independently report. The
-        verification_note renders below the body and above
-        the sources block; it does NOT belong in body.
+    (c) If Verity Post relied on the chain and did not
+        independently report, the piece either lives with
+        that fact in its body (a one-clause acknowledgment
+        of which outlet did the primary work) OR it does
+        not ship. There is no separate disclosure surface.
 
 ═══════════════════════════════════════════════════════════
 LANGUAGE RULES — VIOLATING ANY IS A FAILURE
@@ -1101,16 +1123,23 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
     rule 21 places the strongest fact at the end of the
     article. The article's last sentence is its kicker — the
     line the reader carries away. The kicker is NOT a
-    verification disclosure, hedge, or "what's next" graf.
-    Those belong in the verification_note field, which
-    renders below the body and above the sources block. The
-    body closes on the most resonant fact in the piece.
+    verification disclosure, hedge, or "what's next" graf —
+    those belong nowhere on the page (an earlier draft of
+    this rule pointed hedges at a separate verification_note
+    surface; owner killed that surface 2026-05-19). If a
+    piece needs a disclosure, it lands in the body where it
+    can be read against the news, or the piece doesn't ship.
+    The body closes on the most resonant fact in the piece.
       BAD CLOSE:  "Verity Post did not independently report
                    from Lagos."
-                  (Belongs in verification_note.)
+                  (Either kill the line and ship the piece
+                  on its sources block, or move the
+                  disclosure earlier in the body — never the
+                  last sentence.)
       BAD CLOSE:  "Independent replication has not yet been
                    published."
-                  (Belongs in verification_note.)
+                  (Same — flag this earlier in the body if
+                  load-bearing; do not end on it.)
       BAD CLOSE:  "The authors identify three paths to faster
                    operation: better collection optics,
                    engineered crystals, and improved

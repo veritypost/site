@@ -85,7 +85,7 @@ Topic-swap test, both levels:
 
 No-quotes / no-outlet check (added 2026-05-18, ABSOLUTE — supersedes prior carve-outs):
 - [ ] **No direct quotes in body.** Search the draft for `"` and confirm every quotation mark wraps a factual label (Operation Midas, Dynasty, ghost face) — not a speaker's sentence. Strip every direct quote and replace with reported fact.
-- [ ] **No inline news-outlet references.** Search for outlet names (NPR, CBS, Reuters, AP, Bloomberg, Axios, NYT, WaPo, Lawfare, etc.). Strip every inline occurrence; the sources block carries the credit. Provision applies to `verification_note` as well — neutral disclosure ("Verity Post did not independently report from X"), not outlet enumeration.
+- [ ] **No inline news-outlet references.** Search for outlet names (NPR, CBS, Reuters, AP, Bloomberg, Axios, NYT, WaPo, Lawfare, etc.). Strip every inline occurrence; the sources block carries the credit.
 - [ ] **Speech-attribution verbs stripped:** said, told, stated, declared, described as, characterized as, claimed, asserted, called X a Y. Replace with action verbs (confirmed, signed, ordered, paid, fired, etc.) or strip entirely.
 - [ ] **Codenames and nicknames are NAMES, not quotes.** Capitalize and drop the quotation marks. Dynasty, not "Dynasty." Operation Midas, not "Operation Midas." Vova, not "Vova."
 
@@ -93,14 +93,8 @@ Story-flow check (added 2026-05-18 after the 5-lever uplift):
 - [ ] **Lede ranked.** Named human > sensory image > institutional subject. Pick the highest available rank. If institutional, at least one piece in the same batch must lead with a named human (HUMAN ANCHOR rule).
 - [ ] **One concrete, surprising detail per piece** the reader will remember a week later. Chosen before drafting. Without it, the piece is unfinished. ("A four-mansion compound with a spa and pool." "Florida 19." "Ghost face." "Mats under a shed outside our pastor's house.")
 - [ ] **Rhythm hit.** At least one sentence ≤6 words AND at least one sentence whose length is at least 3× the short. Place the short at a turn, landing, or after a long technical run.
-- [ ] **Kicker discipline.** Body closes on the most resonant fact, NOT on a verification hedge. Verification disclosures go in the `verification_note` field (separate column), which renders below the body and above the sources block. Body kicker is its own line.
+- [ ] **Kicker discipline.** Body closes on the most resonant fact, NOT on a verification hedge. If a piece needs a disclosure that Verity Post relied on a chain or couldn't independently verify, that line lands in the body (a one-clause acknowledgment of which outlet did the primary work) or the piece doesn't ship. There is no separate verification-disclosure surface (an earlier draft of this rule pointed hedges at an articles.verification_note column; owner killed that column 2026-05-19).
 - [ ] **Observational sentence permission.** At most one per piece. Strictly verifiable — defensible to a hostile fact-checker via measurement, named-prior comparison, or documented event. If unsure, omit.
-
-Payload field for verification:
-```json
-"verification_note": "Independent replication of the Xiamen result has not yet been published."
-```
-The RPC stores this in `articles.verification_note`; the `/[slug]/page.tsx` render places it in an italic aside between the body and the sources block.
 
 ---
 

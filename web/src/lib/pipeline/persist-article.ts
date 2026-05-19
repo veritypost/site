@@ -99,10 +99,6 @@ export interface PersistArticlePayload {
   metadata?: Record<string, unknown>;
   // If set, attaches the article to this story instead of creating a new one.
   existing_story_id?: string | null;
-  // Below-body verification disclosure. Renders in an italic aside
-  // between the body and the sources block on /[slug]. Keeps the
-  // body kicker uncluttered. Schema migration 2026-05-18.
-  verification_note?: string | null;
   sources: PersistArticleSource[];
   timeline: PersistArticleTimelineEntry[];
   quizzes: PersistArticleQuizItem[];
