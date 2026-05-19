@@ -12758,7 +12758,6 @@ export type Database = {
           ai_subcategory_id: string | null
           ai_suggested_headline: string | null
           ai_suggested_slug: string | null
-          background: string | null
           created_at: string
           description: string | null
           first_seen_at: string | null
@@ -12780,7 +12779,6 @@ export type Database = {
           ai_subcategory_id?: string | null
           ai_suggested_headline?: string | null
           ai_suggested_slug?: string | null
-          background?: string | null
           created_at?: string
           description?: string | null
           first_seen_at?: string | null
@@ -12802,7 +12800,6 @@ export type Database = {
           ai_subcategory_id?: string | null
           ai_suggested_headline?: string | null
           ai_suggested_slug?: string | null
-          background?: string | null
           created_at?: string
           description?: string | null
           first_seen_at?: string | null
