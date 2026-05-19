@@ -11520,7 +11520,7 @@ export type Database = {
       }
       quizzes: {
         Row: {
-          article_id: string
+          article_id: string | null
           attempt_count: number
           correct_count: number
           created_at: string
@@ -11535,13 +11535,15 @@ export type Database = {
           points: number
           question_text: string
           question_type: string
+          quiz_type: string
           sort_order: number
+          story_id: string | null
           title: string
           updated_at: string
           version: number
         }
         Insert: {
-          article_id: string
+          article_id?: string | null
           attempt_count?: number
           correct_count?: number
           created_at?: string
@@ -11556,13 +11558,15 @@ export type Database = {
           points?: number
           question_text: string
           question_type?: string
+          quiz_type?: string
           sort_order?: number
+          story_id?: string | null
           title: string
           updated_at?: string
           version?: number
         }
         Update: {
-          article_id?: string
+          article_id?: string | null
           attempt_count?: number
           correct_count?: number
           created_at?: string
@@ -11577,7 +11581,9 @@ export type Database = {
           points?: number
           question_text?: string
           question_type?: string
+          quiz_type?: string
           sort_order?: number
+          story_id?: string | null
           title?: string
           updated_at?: string
           version?: number
@@ -11595,6 +11601,13 @@ export type Database = {
             columns: ["article_id"]
             isOneToOne: false
             referencedRelation: "trending_stories_recent"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quizzes_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
             referencedColumns: ["id"]
           },
         ]
@@ -12748,6 +12761,7 @@ export type Database = {
           ai_subcategory_id: string | null
           ai_suggested_headline: string | null
           ai_suggested_slug: string | null
+          background: string | null
           created_at: string
           description: string | null
           first_seen_at: string | null
@@ -12769,6 +12783,7 @@ export type Database = {
           ai_subcategory_id?: string | null
           ai_suggested_headline?: string | null
           ai_suggested_slug?: string | null
+          background?: string | null
           created_at?: string
           description?: string | null
           first_seen_at?: string | null
@@ -12790,6 +12805,7 @@ export type Database = {
           ai_subcategory_id?: string | null
           ai_suggested_headline?: string | null
           ai_suggested_slug?: string | null
+          background?: string | null
           created_at?: string
           description?: string | null
           first_seen_at?: string | null
@@ -16419,6 +16435,14 @@ export type Database = {
       }
       start_conversation: {
         Args: { p_other_user_id: string; p_user_id: string }
+        Returns: Json
+      }
+      start_history_quiz_attempt: {
+        Args: {
+          p_kid_profile_id?: string
+          p_story_id: string
+          p_user_id: string
+        }
         Returns: Json
       }
       start_kid_trial: {

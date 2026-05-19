@@ -46,6 +46,7 @@ type StoryRow = {
   title: string;
   description: string | null;
   published_at: string | null;
+  background: string | null;
 };
 
 type ArticleRow = {
@@ -90,7 +91,7 @@ const fetchBySlug = cache(async (
   const service = createServiceClient();
   const { data: story } = await service
     .from('stories')
-    .select('id, slug, title, description, published_at')
+    .select('id, slug, title, description, published_at, background')
     .eq('slug', slug)
     .maybeSingle();
   if (!story) return null;
@@ -503,46 +504,95 @@ export default async function ArticleSlugPage({
                 the same scroll, not in a side rail they often miss.
                 Logo-driven rows with click-to-expand headlines. */}
             <SourcesSection sources={!isAnon ? sources : []} showTease={false} articleCountReached={articleCountReached} />
-            {/* Deeper-dive resources — owner-locked 2026-05-18. Curated
-                further-reading per story slug: Wikipedia entries, primary
-                documents, official agency pages, academic background.
-                Renders below the sources block. */}
-            {!isAnon && resources.length > 0 && (
+            {/* How we got here — owner-locked 2026-05-19.
+                When stories.background is set, render the in-house
+                deep-dive learning module (prose + history-quiz CTA)
+                in place of the external-link list. The link list
+                still serves the 13 older stories that don't have a
+                background written yet. */}
+            {!isAnon && story.background && story.background.trim().length > 0 ? (
               <section
-                aria-label="Take a deeper dive"
+                aria-label="How we got here"
                 style={{
                   margin: '32px 0 0',
-                  padding: '20px 0',
+                  padding: '24px 0 8px',
                   borderTop: '1px solid var(--vp-border, #ddd)',
                   fontFamily: 'var(--vp-serif, Georgia, "Times New Roman", serif)',
                 }}
               >
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 14px', letterSpacing: 0.2 }}>
-                  Take a deeper dive
+                <h2 style={{ fontSize: 22, fontWeight: 600, margin: '0 0 6px', letterSpacing: 0.2 }}>
+                  How we got here
                 </h2>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {resources.map((r) => (
-                    <li key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <a
-                        href={r.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ fontSize: 15, fontWeight: 600, color: 'var(--vp-link, #1a1a1a)', textDecoration: 'none', borderBottom: '1px solid currentColor', alignSelf: 'flex-start' }}
-                      >
-                        {r.title}
-                      </a>
-                      {r.description && (
-                        <span style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--vp-text-muted, #555)' }}>
-                          {r.description}
-                        </span>
-                      )}
-                      <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--vp-text-muted, #888)' }}>
-                        {r.resource_type.replace(/_/g, ' ')}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <p style={{ fontSize: 13, lineHeight: 1.55, margin: '0 0 18px', color: 'var(--vp-text-muted, #555)', fontStyle: 'italic' }}>
+                  Background context on the arc — written by our editors.
+                </p>
+                <div
+                  style={{
+                    fontSize: 16,
+                    lineHeight: 1.7,
+                    color: 'var(--vp-text, #1a1a1a)',
+                    whiteSpace: 'pre-wrap',
+                    marginBottom: 24,
+                  }}
+                >
+                  {story.background}
+                </div>
+                <a
+                  href="#history-quiz"
+                  style={{
+                    display: 'inline-block',
+                    padding: '10px 18px',
+                    background: 'var(--vp-burgundy, #6b1f24)',
+                    color: '#fff',
+                    borderRadius: 4,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    fontFamily: 'var(--vp-sans, system-ui, sans-serif)',
+                    textDecoration: 'none',
+                    letterSpacing: 0.2,
+                  }}
+                >
+                  Test what you know about the history →
+                </a>
               </section>
+            ) : (
+              !isAnon && resources.length > 0 && (
+                <section
+                  aria-label="Take a deeper dive"
+                  style={{
+                    margin: '32px 0 0',
+                    padding: '20px 0',
+                    borderTop: '1px solid var(--vp-border, #ddd)',
+                    fontFamily: 'var(--vp-serif, Georgia, "Times New Roman", serif)',
+                  }}
+                >
+                  <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 14px', letterSpacing: 0.2 }}>
+                    Further reading
+                  </h2>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {resources.map((r) => (
+                      <li key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: 15, fontWeight: 600, color: 'var(--vp-link, #1a1a1a)', textDecoration: 'none', borderBottom: '1px solid currentColor', alignSelf: 'flex-start' }}
+                        >
+                          {r.title}
+                        </a>
+                        {r.description && (
+                          <span style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--vp-text-muted, #555)' }}>
+                            {r.description}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--vp-text-muted, #888)' }}>
+                          {r.resource_type.replace(/_/g, ' ')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )
             )}
           </>
         }
