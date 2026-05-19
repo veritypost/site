@@ -1582,7 +1582,7 @@ fixed Q1-Q5 order — must contain the ramp.
 - 2 connection questions: require linking facts from two different paragraphs.
 - 2 hard questions: test a specific detail, number, or named entity from deep in the piece.
 
-When the pipeline writes these, set the `difficulty` field on each row (`easy`, `medium`, `hard`) so the editor surface can audit the spread.
+When the pipeline writes these, set the difficulty field on each row (easy, medium, or hard) so the editor surface can audit the spread.
 
 WRONG ANSWER DESIGN:
 Wrong answers must not just be plausible — they must be
