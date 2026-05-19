@@ -208,6 +208,11 @@ struct Story: Codable, Identifiable, Hashable {
     /// blocking set (tragedy, breaking_casualty, suicide_coverage, cw_sa,
     /// cw_violence, obit) means the article is unfit for ad adjacency.
     var sensitivityTags: [String]?
+    /// Below-body verification disclosure — shown between body and the
+    /// sources block. Keeps the article kicker clean while preserving
+    /// credibility transparency. Owner-locked 2026-05-18; schema column
+    /// `articles.verification_note`.
+    var verificationNote: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, subtitle, status, stories
@@ -223,6 +228,7 @@ struct Story: Codable, Identifiable, Hashable {
         case heroPickForDate = "hero_pick_for_date"
         case adEligible = "ad_eligible"
         case sensitivityTags = "sensitivity_tags"
+        case verificationNote = "verification_note"
     }
 
     /// Slug lives on the related stories row; this computed property
@@ -635,6 +641,35 @@ struct SourceLink: Codable, Identifiable {
 private func hostFromURLString(_ urlString: String?) -> String? {
     guard let s = urlString, !s.isEmpty, let u = URL(string: s), let host = u.host else { return nil }
     return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+}
+
+// MARK: - Story Resource (deeper-dive)
+//
+// One row per curated link in the story_resources table (FK to stories.id).
+// Renders below the sources block as a "Take a deeper dive" section. Owner-
+// locked 2026-05-18. Mirrors web `[slug]/page.tsx` resource render.
+struct StoryResource: Codable, Identifiable, Hashable {
+    let id: String
+    var storyId: String?
+    var title: String
+    var url: String
+    var description: String?
+    var resourceType: String?
+    var sortOrder: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, url, description
+        case storyId = "story_id"
+        case resourceType = "resource_type"
+        case sortOrder = "sort_order"
+    }
+
+    var typeLabel: String {
+        (resourceType ?? "further_reading").replacingOccurrences(of: "_", with: " ")
+    }
+
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    static func == (lhs: StoryResource, rhs: StoryResource) -> Bool { lhs.id == rhs.id }
 }
 
 // MARK: - Timeline Event

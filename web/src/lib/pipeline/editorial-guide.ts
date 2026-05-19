@@ -50,6 +50,64 @@
  *      withheld key facts, rhetorical questions, list-bait, tease
  *      colons, reaction framing, hype adjectives). Owner: "nothing
  *      here can be seen as clickbaitable."
+ *   8. Source-attribution and aggregation uplift (2026-05-18):
+ *      rules added inside existing thematic sections after a
+ *      10-reviewer adversarial panel surfaced a uniform blind spot
+ *      across the first manual-seed batch — institutional sources
+ *      cited as if neutral. THE BAR gets a source-choice swap test.
+ *      FACTS ONLY gets seven new named rules — source-actor origin
+ *      tag, methodology graf required, codename attribution,
+ *      disaggregation when a source combines unlike categories,
+ *      unnamed-actor naming, buried-thread rule, aggregator citation
+ *      chain. LANGUAGE RULES gets rule 20: LLM sentence-template
+ *      blacklist. Owner: "make sure this doesn't happen again."
+ *   9. Comprehension floor — age 12 (2026-05-18): VOICE section
+ *      gets a COMPREHENSION FLOOR — AGE 12 rule block. State the
+ *      event in plain English before naming the technical term;
+ *      gloss every specialist term on first use; attach role on
+ *      first mention of any official; avoid synonym thickets.
+ *      Comprehension floor is age 12, not the topic floor.
+ *      Owner: "make sure readers ages 12+ would really enjoy
+ *      reading it."
+ *  10. Story-flow uplift (2026-05-18): adds five rules after owner
+ *      asked for "engaging + fun + trusted + flowing perfectly."
+ *      VOICE gets RHYTHM HIT — MANDATORY (one ≤6-word sentence
+ *      and one notably long sentence per piece, ratio 3x+).
+ *      STRUCTURE gets HUMAN ANCHOR — REQUIRED ONCE PER BATCH and
+ *      ONE-DETAIL RULE. FACTS ONLY gets OBSERVATIONAL SENTENCE —
+ *      ONE PERMITTED. LANGUAGE RULES gets rule 21: STRESS POSITION
+ *      OF THE ARTICLE — THE KICKER. Schema migration adds
+ *      articles.verification_note column rendered below body /
+ *      above sources so kickers close on the resonant fact rather
+ *      than verification hedges. Owner: "make it fucking perfect."
+ *  11. NO DIRECT QUOTES / NO OUTLET REFS — ABSOLUTE (2026-05-18):
+ *      THE BAR gets an absolute rule that supersedes every
+ *      earlier carve-out — direct quotes in body cause emotional
+ *      pull and editorialize via the choice of which sentence to
+ *      surface; news-outlet names belong in the sources block,
+ *      never inline. The "REPORTED OPINIONS AND REACTIONS —
+ *      INCLUDE ONLY WHEN THE STATEMENT ITSELF IS A NEWS EVENT"
+ *      allowance and the "NO IN-LINE OUTLET ATTRIBUTION" named
+ *      exceptions are killed. The AGGREGATOR CITATION CHAIN rule's
+ *      "credit the named reporter inline" provision is replaced
+ *      by "credit in the sources block, never in body." Codenames
+ *      and nicknames (Dynasty, Operation Midas, Vova) are names,
+ *      not quotes — capitalize, do not quote-mark. Owner: "direct
+ *      quotes cause emotion and could be leading ppl to different
+ *      views — we are not doing that whatsoever."
+ *  12. Quiz pool of 10 + story resources (2026-05-18): QUIZ_PROMPT
+ *      bumped from 5 questions to 10, and start_quiz_attempt RPC
+ *      now serves 5 at random per attempt (ORDER BY random()
+ *      LIMIT 5). The bible's DIFFICULTY RAMP reframed for a 10-pool
+ *      (2 easy / 4 medium / 2 connection / 2 hard) since fixed
+ *      Q1-Q5 ordering no longer holds. Schema adds story_resources
+ *      table (FK to stories.id) holding 5-10 curated deeper-dive
+ *      links per story slug — Wikipedia entries, primary documents,
+ *      official pages, academic background. Renders below sources
+ *      block on /[slug]. New rule block in WHAT GOES IN THE ARTICLE
+ *      vs TIMELINE section enumerates the resource categories.
+ *      Owner: "10 questions and it asks a random 5 yes or no? and
+ *      … another section per slug for deeper dive yes or no? yes."
  *
  * HEADLINE_PROMPT emits one JSON {title, summary} per snapshot L649-653.
  * Body generation is a separate canonical step owned by Phase 3;
@@ -87,10 +145,76 @@ yes, it is reporting. If the tone or shape would shift
 depending on the topic, framing has leaked in. Cut until it
 does not.
 
+SOURCE-CHOICE SWAP — THE SECOND-LEVEL TEST.
+The topic-swap test above catches framing in adjectives and
+sentence shape. It does not catch framing carried by the
+source. The institutions you cite and let define the
+categories you report are themselves carriers of priors.
+Apply the second-level test on every piece: if you swapped
+your anchor source for one with opposite priors, would your
+framing still hold? If the swap would force a different
+sentence shape — different categories, different verbs,
+different what-counts-as-news — the source was doing framing
+work the byline should have been doing. Cite the source,
+name its position, and write the sentence anyway.
+
 A reader should be able to finish any article and not be able
 to tell whether the site leans left, right, independent, wire,
 or anywhere else. The events do the work. The reader supplies
 the reaction.
+
+NO DIRECT QUOTES IN BODY. NO NEWS-OUTLET REFERENCES IN BODY.
+This rule is ABSOLUTE. It supersedes every rule below that
+appears to permit a direct quote or an inline outlet name —
+including REPORTED OPINIONS AND REACTIONS' "include only
+when the statement itself is a news event" carve-out and
+NO IN-LINE OUTLET ATTRIBUTION's "name the outlet when the
+reporting itself is the news" exception. Those allowances
+no longer apply. Read this rule against any rule below
+that conflicts; this rule wins.
+
+Why: a direct quote carries the speaker's voice, register,
+and emotion into the reader's head, and the choice of WHICH
+sentence from a longer statement to surface is itself an
+editorial act that leads the reader to a view of the speaker
+they did not arrive at independently. Verity Post reports
+the fact the speaker established, not the sentence the
+speaker spoke. News-outlet names belong in the SOURCES
+BLOCK at the bottom of the article — never inline.
+
+  BAD:  "We now sleep on mats under a shed outside our
+         pastor's house," Agando told NPR.
+  GOOD: He now sleeps on a mat under a shed outside his
+        pastor's house.
+
+  BAD:  The minister described the policy as "a shameless
+         betrayal."
+  GOOD: [Strip — characterization-by-quotation is editorial
+         smuggling. If the underlying fact is news, report
+         the fact without the speaker's voice.]
+
+  BAD:  An NPR investigation found 10,000 displaced.
+  BAD:  NPR reporter Jane Smith documented this week...
+  GOOD: Roughly 10,000 people were displaced.
+
+Attribution-to-speech verbs to STRIP from body as the
+crutches they are:
+  said, told, stated, declared, described as, characterized
+  as, claimed, asserted, called X a Y.
+Replace with action verbs: confirmed, signed, ordered,
+resigned, executed, paid, fired, raided.
+
+Factual labels and codenames (the Dynasty compound, the
+agency-assigned Operation Midas inquiry, Zelensky's
+nickname Vova, the researchers' ghost face image) are
+NAMES, not direct quotes. Capitalize them; do not enclose
+ordinary names in quotation marks. The reader treats a
+capitalized proper noun as a name without the punctuation
+doing extra work.
+
+The scene-lead carve-out continues to apply: a real person
+doing a real thing. The "thing" is the action — never the
+words.
 
 Every rule below this section is a tool for getting there.
 When a rule below seems to conflict with this section, this
@@ -105,6 +229,43 @@ the story. Not a press release. Not a textbook. You know what
 happened, you checked the numbers, and now you're telling a
 smart adult in plain English.
 
+COMPREHENSION FLOOR — AGE 12.
+Every adult article must be readable end-to-end by a smart
+12-year-old: a bright middle-schooler who reads above grade
+level and follows real news, but who has not taken physics,
+has not heard the term "kickback," and does not know what
+"extradition" means. This is a comprehension floor, not a
+topic floor — write the same stories, just gloss what needs
+glossing.
+
+State the actual event or move in plain English BEFORE you
+name the technical term. "Physicists used sunlight to take a
+picture of an object without ever pointing a camera at it"
+opens the door; "quantum ghost imaging" walks through it.
+The reader meets the idea first, then collects the label.
+
+Gloss every technical or specialist term on first use, in a
+single comma-set or em-dash aside. Subsequent mentions need
+no gloss.
+  GOOD: "kickbacks — illegal payments in exchange for
+         awarded contracts"
+  GOOD: "extradition, the formal transfer of an accused
+         person between countries to face charges"
+  GOOD: "Andriy Yermak, President Zelensky's former chief
+         of staff" (role attached on first appearance)
+
+Avoid synonym thickets. If you have named a thing once, use
+the same name on every mention. Do not vary "corruption
+probe" / "graft investigation" / "anti-corruption inquiry"
+across one article to sound writerly. Vary sentence shape,
+not vocabulary.
+
+This rule is NOT a downgrade in rigor. The 12-year-old who
+needs a gloss to follow the Energoatom kickback story is the
+same reader as the educated 35-year-old who has never read
+Ukrainian anti-corruption coverage. Glossing serves both,
+and excluding the 12-year-old serves neither.
+
 Vary sentence length deliberately. A short sentence lands harder
 after a long one. A three-word sentence after a twenty-word one
 creates emphasis no adjective can buy.
@@ -114,6 +275,21 @@ a sentence of 20-plus words, the next sentence should be
 under 10 words. Use 3-5 word sentences for emphasis on
 verified outcomes ("The vote was unanimous."). Do not stack
 three same-length sentences in a row.
+
+RHYTHM HIT — MANDATORY.
+Every piece contains at least one sentence of six words or
+fewer AND at least one notably long sentence whose length
+is at least three times that short sentence's. The contrast
+is what makes prose feel paced rather than steady-state.
+Place the short sentence at a turn, a landing, or after a
+long technical run; place the long sentence to layer
+modifiers around a base clause per the cumulative-shape
+rule.
+
+If your piece's sentence-length distribution falls inside a
+narrow band — every sentence between 15 and 22 words —
+you have failed the rhythm test. Read aloud; if every
+sentence sounds the same, rewrite.
 
 CUMULATIVE SHAPE FOR LONG SENTENCES. When a sentence runs
 long, anchor it on a base clause that stands alone, then
@@ -205,6 +381,39 @@ into the briefing room and accused Pretoria of arming Russia."
 The fact is the news. The scene is the carrier. FACTS ONLY
 still applies — strip framing, do not narrate emotion.
 
+HUMAN ANCHOR — REQUIRED ONCE PER BATCH.
+A scene lead with a named person is the strongest pull a
+Verity Post article has. Every published batch (three or
+more articles released together) must contain at least one
+piece that uses one. Institutional subjects — "Amnesty
+International recorded," "Ukraine's anti-corruption bureau
+arrested," "Bulldozers cleared" — are fine as the lede for
+the other pieces in the batch, but a batch composed
+entirely of institutional subjects has skipped the most
+engaging opening the bible allows.
+
+For pure-research stories where no human anchor is honestly
+available, substitute a sensory image anchor — a concrete
+picture the reader can hold. "Two linked sunbeams
+reconstructed an image of an object no camera ever pointed
+at" is a sensory anchor. The fallback rank is: named human
+> sensory image > institutional subject. Use the highest
+available rank.
+
+ONE-DETAIL RULE.
+Every article must carry at least one concrete, specific,
+surprising detail that a reader will remember a week after
+they read it.
+  "A four-mansion compound with a spa and pool."
+  "Florida alone accounted for 19."
+  "The ghost face took several days to assemble."
+  "Mats under a shed outside our pastor's house."
+These are not decorative. They are the difference between
+a piece that informed someone and a piece they still talk
+about Thursday. Choose the detail before drafting; build
+the paragraph that contains it around it. Without it, the
+piece is unfinished.
+
 PARAGRAPH 2: The critical details. How it happened, who was
 involved, what the direct consequence is. Two to three sentences.
 
@@ -288,6 +497,25 @@ TIMELINE (a separate step generates this — NOT your job):
 - Previous record comparisons (for data stories)
 - Standing context (death tolls, ongoing conditions, background)
 - Everything a related VP article already covered in detail
+
+DEEPER-DIVE RESOURCES (story_resources table — NOT your job
+either; surfaced below the body and sources block):
+- Wikipedia entries on the people, agencies, places, and
+  concepts the article names (origin tags pair well here —
+  if NABU is named in the body, link the NABU Wikipedia
+  entry as a resource).
+- Primary documents — court filings, agency press releases,
+  legislation, peer-reviewed papers (DOI links).
+- Official agency or institutional pages relevant to the
+  story arc.
+- Academic background — historical or theoretical reading.
+- Other rights-advocacy or watchdog organizations covering
+  the same ground.
+These are curated per story slug, not per article, and
+accumulate across the arc. Five to ten per story is the
+target. They are NOT inline sources — those live in the
+sources block. Deeper-dive resources are for the reader
+who finished the article and wants to keep going.
 
 DATE RULE — THIS IS CRITICAL:
 
@@ -374,8 +602,43 @@ selection implies the judgment.
 A "remarkable" adjective signals you have not done the
 selection work yet. Pick the fact that does it for you.
 
+OBSERVATIONAL SENTENCE — ONE PERMITTED.
+One sentence per piece may be observational: a fact the
+writer noticed that the reader could not have noticed
+without it, but that is still strictly verifiable. Not
+opinion. Not characterization. Not prediction. The
+TELLING DETAIL rule above gestures at this; the explicit
+permission is: pick one sentence in the piece where you may
+distill the data into a sharper observation than a flat
+number alone.
+
+Test: can you defend the sentence to a hostile fact-checker
+by pointing to a measurement, a ranked comparison against a
+named prior fact, or a documented event? If yes,
+observational, and it stays. If no — if the sentence
+requires interpretation or value-judgment to land — it is
+editorial, and you cut it.
+  GOOD (observational): "He was an outlier."
+    (After naming Rocky Myers in a year of mass-execution
+    increases — the reader sees he is the rare counter-
+    trend; the writer makes the comparison explicit.)
+  BAD (editorial): "The 78 percent rise reflects a chilling
+    shift in global norms."
+    ("chilling" = characterization; "shift in norms" =
+    unattributable interpretation.)
+
+Use this once per piece, at most. Two observational
+sentences in one article reads as a column.
+
 REPORTED OPINIONS AND REACTIONS — INCLUDE ONLY WHEN THE
 STATEMENT ITSELF IS A NEWS EVENT.
+  SUPERSEDED 2026-05-18: THE BAR now prohibits ALL direct
+  quotes in body, including on-record statements that are
+  themselves news events. Report the FACT a speaker
+  established, not the SENTENCE they spoke. The rule below
+  is retained for historical context and for the
+  enumeration of in/out categories — but every "IN" item
+  reduces to "report the fact, never quote the sentence."
   IN: An on-record statement from a relevant party — a
       politician's statement on their own situation, an
       agency's formal response, a CEO's public remarks at a
@@ -412,6 +675,12 @@ DO NOT INHERIT THE SOURCE'S FRAMING.
     "marks a shift" / "signals a change" / "underscores ___"
 
 NO IN-LINE OUTLET ATTRIBUTION FOR FACTS.
+  SUPERSEDED 2026-05-18: the named-outlet exceptions
+  enumerated below ("the reporting itself is the news,"
+  "the claim is contested between sources") no longer
+  apply. THE BAR now prohibits ALL inline outlet
+  references in body without exception. Outlets are
+  credited in the sources block, period.
   Source outlets are credited in the sources block at the
   bottom of the article. The article body does NOT name
   outlets inline ("according to NBC News," "CBS News
@@ -526,6 +795,103 @@ WIKIPEDIA IS A RESEARCH AID, NOT A CONTENT SOURCE.
   sources. Wikipedia text is CC-BY-SA — paraphrasing it without
   attribution would create a license-incompatibility problem
   the outlet credit rule cannot fix.
+
+SOURCE-ACTOR ORIGIN TAG.
+  Every institutional source named in a story carries a prior.
+  Amnesty International is a London-headquartered rights group
+  with documented Western-aligned reporting priors. NABU was
+  established under U.S. and European Union aid conditions
+  Kyiv accepted after the 2014 revolution. NPR is U.S. public
+  radio. UN human-rights bodies are interpretive bodies, not
+  courts. When you cite any institutional source — NGO,
+  agency, outlet, treaty body — anchor it with a one-clause
+  origin tag the first time it appears in the article.
+    BAD:  "Amnesty International recorded 2,707 executions"
+    GOOD: "Amnesty International, the London-based rights
+           organization, recorded 2,707 executions"
+  The origin tag is not editorializing. It is the equivalent
+  of identifying a politician by party — a fact about the
+  speaker that the reader needs to weigh the speech.
+
+METHODOLOGY GRAF REQUIRED ON SINGLE-AGGREGATOR STORIES.
+  Any article built on a single NGO's count, a single agency's
+  report, or a single dataset must include one paragraph
+  stating what was counted, what was excluded, what is
+  estimated, and who did the counting. If Amnesty's tally
+  excludes China and North Korea, say so. If a federal
+  estimate omits undocumented workers, say so. If a
+  preprint has not been replicated independently, say so.
+  The methodology graf is the difference between reporting
+  a number and laundering it.
+
+CODENAMES CARRY ATTRIBUTION.
+  When an agency, prosecutor, military, or PR shop assigns a
+  codename to an operation or inquiry — "Operation Midas,"
+  "Operation Inherent Resolve," "Project Veritas" — the
+  article identifies who named it on first use.
+    BAD:  "Operation Midas began with a November raid."
+    GOOD: "The inquiry, which the agency named 'Operation
+           Midas,' began with a November raid."
+  Bare codenames inherit the framing of the actor that
+  minted them and pass that framing to the reader as if
+  it were neutral.
+
+DISAGGREGATE WHEN A SOURCE COMBINES UNLIKE CATEGORIES.
+  When the source institution rolls morally or systemically
+  distinct categories into a single tally, the article notes
+  the combination explicitly before citing the combined
+  figure. Iran's clerical executions and U.S.
+  appellate-reviewed lethal injections in one number is
+  Amnesty's framing — defensible as an aggregate, but it
+  is a framing choice the article surfaces for the reader,
+  not inherits silently. Cite the combined figure, then
+  show its parts.
+
+UNNAMED ACTORS — NAME THEM OR FLAG THEM.
+  "Private developer," "private contractor," "private
+  investor," "a foreign government," "a defense contractor,"
+  "a tech company," and similar placeholders are framing
+  devices that conceal the interested party. Identify the
+  actor by proper noun, or state in the article that the
+  actor could not be identified and what was tried. Never
+  run a placeholder without that disclosure.
+    BAD:  "the cleared waterfront has been contracted to
+           private developers for an estate project"
+    GOOD: "the cleared waterfront sits under a 2021
+           agreement with FBT Coral Estate Limited"
+    ALSO GOOD: "the cleared waterfront has been contracted
+                to a developer Verity Post could not
+                independently identify"
+
+BURIED-THREAD RULE.
+  Any clause containing "fled to X," "reported to be hiding
+  in X," "said to be in X," or similar geographic placement
+  of a fugitive carries an implicit second question — why
+  there? — that a reader will ask within one sentence. The
+  article either answers it in the next sentence (citizenship,
+  extradition posture, prior business connections, asylum
+  status) or omits the geographic placement. A throwaway
+  location clause plants a frame the article has not earned.
+
+AGGREGATOR CITATION CHAIN.
+  AMENDED 2026-05-18: provision (a) below previously
+  required crediting the named reporter inline. THE BAR
+  now prohibits ALL inline outlet references; reporter
+  and outlet credit live in the sources block exclusively.
+  The revised rule:
+  When a story is built on one secondary outlet's primary
+  reporting:
+    (a) Credit the named reporter AND outlet in the
+        sources block. Never in body.
+    (b) Cite at least one additional outlet — ideally one
+        with a different institutional position or
+        geographic base — that covered the same story, in
+        the sources block.
+    (c) Include one sentence in the `verification_note`
+        field disclosing that Verity Post relied on the
+        chain and did not independently report. The
+        verification_note renders below the body and above
+        the sources block; it does NOT belong in body.
 
 ═══════════════════════════════════════════════════════════
 LANGUAGE RULES — VIOLATING ANY IS A FAILURE
@@ -700,6 +1066,65 @@ LANGUAGE RULES — VIOLATING ANY IS A FAILURE
                to Freddie Mac data released today."
       STRONG: "Mortgage rates, according to Freddie Mac data
                released today, climbed to 7.4 percent."
+
+20. LLM SENTENCE-TEMPLATE BLACKLIST. Avoid the cadence
+    fingerprints that signal generated prose. Three patterns
+    are diagnostic:
+      (a) The compressed-methods sentence:
+            "X percent of the Y percent achieved under matched
+             conditions" / "X reached Y percent of the visibility
+             a laser-pumped system achieves at the same Z."
+          Technical parallelism compressing a methods section
+          rather than reporting it. Rewrite as direct
+          comparison: "X percent, compared with Y percent at
+          the same pump power."
+      (b) The three-clause em-dash appositive lede:
+            "The arrest — sweeping in scope, swift in
+             execution, decisive in implication — set off..."
+          Three adjectival appositives stacked between em-dashes
+          in the lede. The shape is generated, not reported.
+          Strip to one informative clause.
+      (c) The parallel-triplet opener:
+            "Iran led the surge, Saudi Arabia drove the
+             drug-offense share, and China remained opaque."
+          One sentence, three rhetorically balanced clauses,
+          no new information past the first. Strip to the
+          highest-value fact and break the rest into separate
+          sentences.
+    The tell across all three is that the cadence is doing the
+    work the facts should be doing. Read every lede aloud; if
+    it sounds like the introduction to a wedding speech,
+    rewrite.
+
+21. STRESS POSITION OF THE ARTICLE — THE KICKER. Rule 19
+    places the strongest word at the end of the sentence;
+    rule 21 places the strongest fact at the end of the
+    article. The article's last sentence is its kicker — the
+    line the reader carries away. The kicker is NOT a
+    verification disclosure, hedge, or "what's next" graf.
+    Those belong in the `verification_note` field, which
+    renders below the body and above the sources block. The
+    body closes on the most resonant fact in the piece.
+      BAD CLOSE:  "Verity Post did not independently report
+                   from Lagos."
+                  (Belongs in verification_note.)
+      BAD CLOSE:  "Independent replication has not yet been
+                   published."
+                  (Belongs in verification_note.)
+      BAD CLOSE:  "The authors identify three paths to faster
+                   operation: better collection optics,
+                   engineered crystals, and improved
+                   algorithms."
+                  (Trailing into "what's next." End on the
+                  result, not the to-do list.)
+      GOOD CLOSE: "Makoko residents told legislators they
+                   would not leave the lagoon."
+      GOOD CLOSE: "Until this experiment, it had always
+                   needed a laser."
+      GOOD CLOSE: "Throughout, the speakers refer to the
+                   president by his nickname: 'Vova.'"
+    Choose the kicker before drafting; build the closing
+    paragraph around it.
 
 ═══════════════════════════════════════════════════════════
 COPYRIGHT — THIS IS NON-NEGOTIABLE
@@ -1139,7 +1564,7 @@ OUTPUT FORMAT:
   "slug": "kebab-case-from-headline"
 }`;
 
-export const QUIZ_PROMPT: string = `Generate 5 Quick Check questions for readers.
+export const QUIZ_PROMPT: string = `Generate 10 Quick Check questions for readers. The 10 questions form a POOL; the live quiz UI serves 5 of them at random per attempt, so each question must stand alone — do not write questions that depend on a specific sibling question being asked.
 
 VOICE:
 These should feel like a casual challenge from a curious friend,
@@ -1149,10 +1574,15 @@ catch...", "What's the deal with...", "Here's one from the
 middle of the piece..." — not dry textbook stems.
 
 DIFFICULTY RAMP (critical):
-- Q1: Easy warm-up — answerable from the summary or first paragraph. Should feel like a gimme.
-- Q2-Q3: Substantive — requires reading the body of the article.
-- Q4: Requires connecting multiple parts of the article.
-- Q5: Hardest — tests a specific detail or nuance from deep in the piece.
+Spread the 10 questions across four difficulty rungs. The live
+quiz UI draws 5 at random per attempt, so the pool — not any
+fixed Q1-Q5 order — must contain the ramp.
+- 2 easy questions: answerable from the headline, subtitle, or first paragraph. Should feel like gimmes.
+- 4 medium questions: require reading the body of the article.
+- 2 connection questions: require linking facts from two different paragraphs.
+- 2 hard questions: test a specific detail, number, or named entity from deep in the piece.
+
+When the pipeline writes these, set the `difficulty` field on each row (`easy`, `medium`, `hard`) so the editor surface can audit the spread.
 
 WRONG ANSWER DESIGN:
 Wrong answers must not just be plausible — they must be

@@ -68,6 +68,9 @@ struct StoryDetailView: View {
     // MARK: - State
     @State private var timeline: [TimelineEvent] = []
     @State private var sources: [SourceLink] = []
+    /// Owner-locked 2026-05-18 — deeper-dive resources per story slug,
+    /// rendered below the sources block. Mirrors web `[slug]/page.tsx`.
+    @State private var resources: [StoryResource] = []
     @State private var comments: [VPComment] = []
     @State private var categoryName: String? = nil
     @State private var loading = true
@@ -3867,6 +3870,12 @@ struct StoryDetailView: View {
             // arrive only through /api/quiz/start, which strips is_correct.
             async let tReq: [TimelineEvent] = client.from("timelines").select().eq("story_id", value: story.storyId ?? "").order("event_date", ascending: true).execute().value
             async let sReq: [SourceLink] = client.from("sources").select().eq("article_id", value: story.id).execute().value
+            // Deeper-dive resources per story slug — owner-locked 2026-05-18.
+            // Curated Wikipedia entries, primary docs, official pages, etc.
+            // Renders below the sources block as a "Take a deeper dive"
+            // section. Mirrors web `[slug]/page.tsx`. Fetched alongside
+            // sources; failure does not block the main view render.
+            async let rReq: [StoryResource] = client.from("story_resources").select("id, story_id, title, url, description, resource_type, sort_order").eq("story_id", value: story.storyId ?? "").order("sort_order", ascending: true).execute().value
             async let cReq: [VPComment] = client.from("comments")
                 // A126 — pull the soft-delete + edit + mentions fields so
                 // [deleted] tombstones, (edited) labels, and tap-to-profile
@@ -3971,6 +3980,8 @@ struct StoryDetailView: View {
             }
             timeline = t
             sources = s
+            // Resources are best-effort — failure shouldn't block render.
+            resources = (try? await rReq) ?? []
             comments = c.map { row in
                 var mutable = row
                 if let uid = row.userId { mutable.users = authorById[uid] }
